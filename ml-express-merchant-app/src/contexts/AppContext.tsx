@@ -61,6 +61,8 @@ export function AppProvider({ children }: AppProviderProps) {
   const pendingIdsRef = useRef<Set<string>>(new Set());
   const inProgressReadyRef = useRef(false);
   const inProgressFingerprintRef = useRef('');
+  const lastNudgeAtRef = useRef('');
+  const languageRef = useRef(language);
   const [userType, setUserType] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -68,6 +70,10 @@ export function AppProvider({ children }: AppProviderProps) {
   const syncPendingIds = useCallback((orders: any[]) => {
     pendingIdsRef.current = new Set(orders.map((order) => order.id));
   }, []);
+
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
 
   const addPendingOrder = useCallback((order: any) => {
     if (!order?.id) return;
@@ -374,6 +380,39 @@ export function AppProvider({ children }: AppProviderProps) {
               if (updated?.id && updated.status !== '待确认') {
                 removePendingOrder(updated.id);
               }
+            },
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'delivery_stores',
+              filter: `id=eq.${user.id}`,
+            },
+            (payload) => {
+              const nextAt = String(
+                (payload.new as { ops_nudge_at?: string | null } | undefined)?.ops_nudge_at || '',
+              );
+              if (!nextAt || nextAt === lastNudgeAtRef.current) return;
+              lastNudgeAtRef.current = nextAt;
+              setShowOrderAlert(true);
+              void fetchPendingOrdersFromServer();
+              Vibration.cancel();
+              Vibration.vibrate([0, 400, 200, 400, 200, 800]);
+              const lang = languageRef.current;
+              const speakText =
+                lang === 'my'
+                  ? 'ML Express မှ လက်ခံရန်တိုက်တွန်းပါသည်၊ ကျေးဇူးပြု၍ အော်ဒါလက်ခံပါ'
+                  : lang === 'en'
+                    ? 'ML Express ops is nudging you — please accept pending orders now'
+                    : '调度催您尽快接单，请打开待确认订单';
+              Speech.stop();
+              Speech.speak(speakText, {
+                language: lang === 'my' ? 'my-MM' : lang === 'en' ? 'en-US' : 'zh-CN',
+                rate: 0.9,
+                pitch: 1.0,
+              });
             },
           )
           .subscribe();

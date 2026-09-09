@@ -35,6 +35,7 @@ const AdminShellLayout: React.FC = () => {
   const watchReviewsCount = counts.watchReviews;
   const waitingChatsCount = counts.waitingChats;
   const pendingRefundsCount = counts.pendingRefunds;
+  const pendingFinanceCashCount = counts.pendingFinanceCash;
 
   const alertAudioRef = useRef<HTMLAudioElement | null>(null);
   const prevRechargeCountRef = useRef<number>(0);
@@ -476,17 +477,7 @@ const AdminShellLayout: React.FC = () => {
         language={language}
         isMobile={isMobile}
         mobileNavOpen={mobileNavOpen}
-        badges={{
-          pendingRecharge: pendingRechargeCount,
-          pendingAssignment: pendingAssignmentCount,
-          pendingProductReview: pendingProductReviewCount,
-          pendingDeliveryAlerts: pendingDeliveryAlertsCount,
-          pendingMerchantApplications: pendingMerchantApplicationsCount,
-          overdueMerchantAccept: overdueMerchantAcceptCount,
-          watchReviews: watchReviewsCount,
-          waitingChats: waitingChatsCount,
-          pendingRefunds: pendingRefundsCount,
-        }}
+        badges={counts}
         onNavigate={(path) => navigate(path)}
         onCloseMobile={() => setMobileNavOpen(false)}
       />

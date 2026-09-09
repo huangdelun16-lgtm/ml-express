@@ -283,6 +283,64 @@ describe('packaging stock-in finance', () => {
     );
     expect(summary.collectedTotal).toBe(90000);
   });
+
+  it('多个入库任一行签收后财务只记一次到付总费用', () => {
+    const entries = buildFinanceLedgerEntries(
+      'MDY001',
+      'MDY',
+      dataset({
+        items: [
+          {
+            id: 'i1',
+            barcode: 'MDY555306070926(3-1)',
+            final_destination: 'MDY',
+            customer_signed_at: '2026-09-07T10:00:00Z',
+          },
+          { id: 'i2', barcode: 'MDY555306070926(3-2)', final_destination: 'MDY' },
+          { id: 'i3', barcode: 'MDY555306070926(3-3)', final_destination: 'MDY' },
+        ],
+        movements: [
+          {
+            id: 'm1',
+            item_id: 'i1',
+            barcode: 'MDY555306070926(3-1)',
+            type: 'in',
+            note: '总费用 125000 MMK · 到付',
+            destination: 'MDY',
+            origin_store_code: 'MUSE001',
+          },
+          {
+            id: 'm2',
+            item_id: 'i2',
+            barcode: 'MDY555306070926(3-2)',
+            type: 'in',
+            note: '总费用 125000 MMK · 到付',
+            destination: 'MDY',
+            origin_store_code: 'MUSE001',
+          },
+          {
+            id: 'm3',
+            item_id: 'i3',
+            barcode: 'MDY555306070926(3-3)',
+            type: 'in',
+            note: '总费用 125000 MMK · 到付',
+            destination: 'MDY',
+            origin_store_code: 'MUSE001',
+          },
+        ],
+      }),
+    );
+    const collected = entries.filter((entry) => entry.category === 'order_collected');
+    expect(collected).toHaveLength(1);
+    expect(collected[0].amount).toBe(125000);
+    const summary = buildFinanceLedgerSummary(
+      filterCrossBorderFinanceEntries(entries),
+      'MDY001',
+      'MDY',
+      true,
+    );
+    expect(summary.collectedTotal).toBe(125000);
+  });
 });
 
 describe('filterCrossBorderFinanceEntries', () => {

@@ -8,7 +8,7 @@ import React, {
   useState,
 } from "react";
 import { SkeletonCard } from "../components/SkeletonLoader";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   TranslationKeys,
   translations as financeTranslations,
@@ -41,9 +41,7 @@ import {
   getMerchantSettlementParts,
   getMerchantRecordedAmountMmk,
   getPendingRiderCashAmountMmk,
-  isRiderCashUnsettledPackage,
-  getPackageFinanceDateKey,
-  packageMatchesRegionPrefix,
+  isPriorUnsettledRiderCashPackage,
   isMerchantFinancePackage,
   parsePackagePriceMmk,
   calculateFinanceOverviewSummary,
@@ -106,6 +104,7 @@ const FinanceManagement: React.FC = () => {
     [language],
   );
 
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabKey>(
     isRegionalUser ? "records" : "overview",
   );
@@ -273,6 +272,21 @@ const FinanceManagement: React.FC = () => {
   }, [packagePaymentFilter]);
 
   useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (
+      tab === "overview" ||
+      tab === "records" ||
+      tab === "analytics" ||
+      tab === "package_records" ||
+      tab === "courier_records" ||
+      tab === "cash_collection" ||
+      tab === "merchants_collection"
+    ) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     const id = window.setInterval(() => setCashReminderTick(Date.now()), 60_000);
     return () => window.clearInterval(id);
   }, []);
@@ -310,18 +324,13 @@ const FinanceManagement: React.FC = () => {
   ]);
 
   const cashUnsettledForYesterdayLocal = useMemo(() => {
-    return packages.filter((pkg) => {
-      if (!isRiderCashUnsettledPackage(pkg)) return false;
-      const dateKey = getPackageFinanceDateKey(pkg);
-      if (!dateKey || dateKey >= cashCollectionDate) return false;
-      if (
-        isRegionalUser &&
-        !packageMatchesRegionPrefix(pkg, currentRegionPrefix)
-      ) {
-        return false;
-      }
-      return true;
-    });
+    return packages.filter((pkg) =>
+      isPriorUnsettledRiderCashPackage(
+        pkg,
+        cashCollectionDate,
+        isRegionalUser ? currentRegionPrefix : undefined,
+      ),
+    );
   }, [
     packages,
     cashCollectionDate,

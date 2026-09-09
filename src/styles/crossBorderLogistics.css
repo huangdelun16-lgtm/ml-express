@@ -1240,6 +1240,32 @@ button.cbl-stat,
   color: #0f766e;
 }
 
+.cbl-packaging-group-head td {
+  background: #f5f3ff;
+  color: #5b21b6;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  padding: 8px 12px !important;
+  white-space: normal !important;
+}
+
+.cbl-table--customer-items tbody tr.cbl-packaging-group-row,
+.cbl-table--customer-items tbody tr.cbl-packaging-group-row:nth-child(even) {
+  background: #faf8ff;
+}
+
+.cbl-table--customer-items tbody tr.cbl-packaging-group-row:hover {
+  background: #f3e8ff;
+}
+
+.cbl-fee-shared {
+  display: inline-block;
+  color: #7c3aed;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
 .cbl-code--origin {
   background: #eef2ff;
   color: #4338ca;
@@ -1446,6 +1472,19 @@ button.cbl-stat,
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+}
+
+.cbl-card__head-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cbl-card-hint--in-head {
+  margin: 0;
+  max-width: 46rem;
 }
 
 .cbl-card__status {
@@ -2406,6 +2445,39 @@ button.cbl-stat,
 .cbl-page--standalone .cbl-card__head {
   background: transparent;
   border-bottom-color: rgba(148, 163, 184, 0.18);
+}
+
+.cbl-page--standalone .cbl-card--customers .cbl-card__head {
+  align-items: flex-start;
+  border-bottom: none;
+  padding-bottom: 4px;
+}
+
+.cbl-page--standalone .cbl-card--customers .cbl-card__body {
+  padding-top: 4px;
+}
+
+.cbl-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.cbl-customer-name-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.cbl-table-row--paused td {
+  opacity: 0.78;
+}
+
+.cbl-table--customers .cbl-badge {
+  margin-left: 8px;
+  vertical-align: middle;
 }
 
 .cbl-page--standalone .cbl-card__status {

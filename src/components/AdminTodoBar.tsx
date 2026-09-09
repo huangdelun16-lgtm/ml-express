@@ -12,6 +12,7 @@ function readTodoAccess(): {
   merchantApps: boolean;
   merchantOps: boolean;
   afterSales: boolean;
+  finance: boolean;
   audit: boolean;
 } {
   const role =
@@ -44,6 +45,7 @@ function readTodoAccess(): {
       hasPerm('after_sales') ||
       hasPerm('merchant_stores') ||
       hasPerm('finance'),
+    finance: role === 'admin' || role === 'manager' || role === 'finance' || hasPerm('finance'),
     audit: role === 'admin' || role === 'manager' || role === 'finance',
   };
 }
@@ -119,6 +121,12 @@ const AdminTodoBar: React.FC = () => {
         : language === 'en'
           ? 'After-sales'
           : 'ရောင်းချပြီး',
+    finance:
+      language === 'zh'
+        ? '骑手现金未结'
+        : language === 'en'
+          ? 'Rider cash'
+          : 'စီးနင်းသူငွေ',
     audit:
       language === 'zh'
         ? '操作审计'
@@ -136,7 +144,8 @@ const AdminTodoBar: React.FC = () => {
     (access.merchantOps ? counts.overdueMerchantAccept : 0) +
     (access.afterSales
       ? counts.watchReviews + counts.waitingChats + counts.pendingRefunds
-      : 0);
+      : 0) +
+    (access.finance ? counts.pendingFinanceCash : 0);
 
   const pill = (
     label: string,
@@ -192,6 +201,13 @@ const AdminTodoBar: React.FC = () => {
               t.afterSales,
               counts.watchReviews + counts.waitingChats + counts.pendingRefunds,
               () => navigate('/admin/after-sales'),
+              '#d48806',
+            )}
+          {access.finance &&
+            pill(
+              t.finance,
+              counts.pendingFinanceCash,
+              () => navigate('/admin/finance?tab=cash_collection'),
               '#d48806',
             )}
         </div>

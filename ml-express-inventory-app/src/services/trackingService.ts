@@ -287,7 +287,7 @@ async function maybeFinalizePkg(
         updated_at: now,
       })
       .eq('id', pkgId)
-      .in('status', ['hub_received', 'completed']);
+      .in('status', ['in_transit', 'hub_received', 'completed']);
 
     if (error) throwTrackingCloudWriteError(error);
   });

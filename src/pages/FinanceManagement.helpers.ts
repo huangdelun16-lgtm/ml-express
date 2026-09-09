@@ -400,6 +400,21 @@ export const isRiderCashUnsettledPackage = (pkg: Package): boolean =>
   isFinanceDeliveredStatus(pkg.status) &&
   !pkg.rider_settled;
 
+/** 与财务页「当日收款管理」Tab 橙点同一口径：往日骑手现金未结清。 */
+export const isPriorUnsettledRiderCashPackage = (
+  pkg: Package,
+  selectedDate: string,
+  regionPrefix?: string,
+): boolean => {
+  if (!isRiderCashUnsettledPackage(pkg)) return false;
+  const dateKey = getPackageFinanceDateKey(pkg);
+  if (!dateKey || dateKey >= selectedDate) return false;
+  if (regionPrefix && !packageMatchesRegionPrefix(pkg, regionPrefix)) {
+    return false;
+  }
+  return true;
+};
+
 /** 收款日骑手未交现金：已送达现金单的跑腿费 + 商家现金 COD。 */
 export const getPendingRiderCashAmountMmk = (
   pkg: Package,

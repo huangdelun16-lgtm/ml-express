@@ -1024,6 +1024,23 @@ export async function updateCrossBorderRegisteredCustomer(
   return body.customer as CrossBorderRegisteredCustomer;
 }
 
+export async function setCrossBorderRegisteredCustomerStatus(
+  id: string,
+  status: 'active' | 'inactive',
+): Promise<CrossBorderRegisteredCustomer> {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-cross-border-customers', {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, status }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(body.error || `更新状态失败 (${response.status})`);
+  }
+  return body.customer as CrossBorderRegisteredCustomer;
+}
+
 export type StationSettlementRow = {
   id: string;
   period_type: 'day' | 'month';

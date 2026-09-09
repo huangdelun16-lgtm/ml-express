@@ -24,13 +24,15 @@ const AdminDashboardHome: React.FC = () => {
   const overdueMerchantAcceptCount = counts.overdueMerchantAccept;
   const afterSalesCount =
     counts.watchReviews + counts.waitingChats + counts.pendingRefunds;
+  const pendingFinanceCashCount = counts.pendingFinanceCash;
   const pendingTotal =
     pendingRechargeCount +
     pendingAssignmentCount +
     pendingProductReviewCount +
     pendingDeliveryAlertsCount +
     overdueMerchantAcceptCount +
-    afterSalesCount;
+    afterSalesCount +
+    pendingFinanceCashCount;
 
   const [banners, setBanners] = useState<Banner[]>([]);
   const [bannersLoading, setBannersLoading] = useState(true);
@@ -114,7 +116,8 @@ const AdminDashboardHome: React.FC = () => {
     pendingProductReviewCount +
     pendingDeliveryAlertsCount +
     overdueMerchantAcceptCount +
-    afterSalesCount;
+    afterSalesCount +
+    pendingFinanceCashCount;
 
   const quickLinks: { path: string; icon: string; labelZh: string; labelEn: string; labelMy: string }[] = [
     { path: '/admin/city-packages', icon: '📦', labelZh: '同城订单', labelEn: 'Orders', labelMy: 'အပြင်ဘက်အော်ဒါများ' },
@@ -137,7 +140,8 @@ const AdminDashboardHome: React.FC = () => {
         pendingProductReviewCount > 0 ||
         pendingDeliveryAlertsCount > 0 ||
         overdueMerchantAcceptCount > 0 ||
-        afterSalesCount > 0) && (
+        afterSalesCount > 0 ||
+        pendingFinanceCashCount > 0) && (
         <div
           style={{
             display: 'flex',
@@ -267,6 +271,42 @@ const AdminDashboardHome: React.FC = () => {
             </div>
           )}
 
+          {pendingFinanceCashCount > 0 && (
+            <div
+              role="button"
+              tabIndex={0}
+              className="admin-home-alert admin-home-alert--warn"
+              onClick={() => navigate('/admin/finance?tab=cash_collection')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  navigate('/admin/finance?tab=cash_collection');
+                }
+              }}
+              style={{ animation: 'pulse-alert 2s infinite' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: '1.6rem' }}>💰</span>
+                <div>
+                  <div className="admin-home-alert__title">
+                    {language === 'zh'
+                      ? '往日骑手现金未结清'
+                      : language === 'en'
+                        ? 'Prior rider cash unsettled'
+                        : 'ယခင်ရက် ငွေမရှင်းရသေး'}
+                  </div>
+                  <div className="admin-home-alert__sub">
+                    {language === 'zh'
+                      ? '打开财务管理 → 当日收款管理，核对骑手上缴现金'
+                      : language === 'en'
+                        ? 'Open Finance → Daily collection to settle rider cash'
+                        : 'ဘဏ္ဍာရေး → ယနေ့ငွေကောက်ယူမှု'}
+                  </div>
+                </div>
+              </div>
+              <div className="admin-home-alert__n">{pendingFinanceCashCount}</div>
+            </div>
+          )}
+
           {afterSalesCount > 0 && (
             <div
               role="button"
@@ -389,6 +429,14 @@ const AdminDashboardHome: React.FC = () => {
             my: 'ရောင်းချပြီး',
             color: '#fbbf24',
             path: '/admin/after-sales',
+          },
+          {
+            n: pendingFinanceCashCount,
+            zh: '骑手现金未结',
+            en: 'Rider cash',
+            my: 'စီးနင်းသူငွေ',
+            color: '#fbbf24',
+            path: '/admin/finance?tab=cash_collection',
           },
         ].map((item) => (
           <button

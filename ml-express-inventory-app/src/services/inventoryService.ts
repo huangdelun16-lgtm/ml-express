@@ -47,7 +47,11 @@ import { todayIsoDate } from '../utils/dateFormat';
 import { resolveTripNumberPrefix } from '../utils/tripNumber';
 import { inventoryOperationId } from '../utils/inventoryReliability';
 import { parseTransportFeeFromLoadNote } from '../utils/truckRouteFee';
-import { parseInboundMovementNote } from '../utils/inboundMovementNote';
+import {
+  parseInboundMovementNote,
+  pickInboundFeeFields,
+  pickPrimaryInboundMovement,
+} from '../utils/inboundMovementNote';
 import { applyFxLockToNote, type CrossBorderFxLock } from '../utils/crossBorderFxLock';
 import { isSupabaseConfigured, supabase } from './supabase';
 import { preferConfirmedHubReceivePack } from '../utils/hubReceivePack';
@@ -689,7 +693,8 @@ export async function getItemDetail(id: string): Promise<InventoryItemDetail | n
   if (!item) return null;
   const { items, packs } = await all(undefined, false);
   const moves = await cloudListMovementsForItem(id);
-  const inbound = moves.find((m) => m.type === 'in');
+  const inboundMoves = moves.filter((m) => m.type === 'in');
+  const inbound = pickPrimaryInboundMovement(inboundMoves);
   const parsedNote = parseInboundMovementNote(inbound?.note ?? '');
 
   let pack =
@@ -700,9 +705,13 @@ export async function getItemDetail(id: string): Promise<InventoryItemDetail | n
     (await getPackedShipmentByBundleItemId(id)) ??
     (await getPackedShipmentContainingItem(id));
 
-  const packNoteParsed = pack?.note?.trim() ? parseInboundMovementNote(pack.note) : {};
-  const totalFee = parsedNote.totalFee ?? packNoteParsed.totalFee;
-  const paymentLabel = parsedNote.paymentLabel ?? packNoteParsed.paymentLabel;
+  const feeFields = pickInboundFeeFields(
+    ...inboundMoves.map((row) => row.note),
+    pack?.note,
+    item.note,
+  );
+  const totalFee = feeFields.totalFee;
+  const paymentLabel = feeFields.paymentLabel;
 
   const signReceipt = item.customer_signed_at?.trim()
     ? {
@@ -749,7 +758,9 @@ export async function getStockInPrefillByCode(code: string) {
   const item = await getItemByBarcode(code);
   if (!item) return null;
   const detail = await getItemDetail(item.id);
-  const movement = (await listMovementsForItem(item.id)).find((m) => m.type === 'in');
+  const movement = pickPrimaryInboundMovement(
+    (await listMovementsForItem(item.id)).filter((m) => m.type === 'in'),
+  );
   return {
     item, productName: item.name, spec: item.spec, weight: item.weight,
     packaging: detail?.packaging ?? '', recipientName: item.recipient_name ?? '',
@@ -768,7 +779,7 @@ async function persistFxLockBestEffort(item: InventoryItem, lock: CrossBorderFxL
   if (!isSupabaseConfigured()) return;
   try {
     const moves = await cloudListMovementsForItem(item.id);
-    const inbound = moves.find((row) => row.type === 'in');
+    const inbound = pickPrimaryInboundMovement(moves.filter((row) => row.type === 'in'));
     if (inbound?.id) {
       const nextNote = applyFxLockToNote(inbound.note || '', lock);
       if (nextNote !== (inbound.note || '')) {

@@ -4,36 +4,24 @@ import { supabase } from '../services/supabase';
 import { fetchPendingMerchantApplicationCount } from '../services/merchantApplicationService';
 import { fetchOverdueMerchantAcceptCount } from '../services/merchantOpsWatchService';
 import { fetchAfterSalesTodoCounts } from '../services/afterSalesDeskService';
+import { fetchPendingFinanceCashCount } from '../utils/adminFinanceTodo';
+import {
+  emptyAdminTodoCounts,
+  markModuleSeen,
+  moduleIdFromAdminPath,
+  type AdminTodoCounts,
+} from '../utils/adminMenuNotifications';
+import { fetchAdminMenuExtraCounts } from '../utils/adminMenuNotificationFetch';
 import { useAdminSessionReady } from '../hooks/useAdminSessionReady';
 import { ADMIN_TODOS_REFRESH_EVENT } from '../utils/adminTodoBridge';
 import { isBrowserRealtimeAvailable } from '../utils/supabaseBrowserUrl';
 
-export type AdminTodoCounts = {
-  pendingRecharge: number;
-  pendingAssignment: number;
-  pendingProductReview: number;
-  pendingDeliveryAlerts: number;
-  pendingMerchantApplications: number;
-  overdueMerchantAccept: number;
-  watchReviews: number;
-  waitingChats: number;
-  pendingRefunds: number;
-};
+export type { AdminTodoCounts };
 
-const emptyCounts: AdminTodoCounts = {
-  pendingRecharge: 0,
-  pendingAssignment: 0,
-  pendingProductReview: 0,
-  pendingDeliveryAlerts: 0,
-  pendingMerchantApplications: 0,
-  overdueMerchantAccept: 0,
-  watchReviews: 0,
-  waitingChats: 0,
-  pendingRefunds: 0,
-};
+const emptyCounts = emptyAdminTodoCounts;
 
 export async function fetchAdminTodoCounts(): Promise<AdminTodoCounts> {
-  const [rechargeRes, alertsRes, assignRes, productsRes, pendingMerchantApplications, overdueMerchantAccept, afterSales] = await Promise.all([
+  const [rechargeRes, alertsRes, assignRes, productsRes, pendingMerchantApplications, overdueMerchantAccept, afterSales, pendingFinanceCash, extra] = await Promise.all([
     supabase.from('recharge_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('delivery_alerts').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase
@@ -48,6 +36,8 @@ export async function fetchAdminTodoCounts(): Promise<AdminTodoCounts> {
     fetchPendingMerchantApplicationCount(),
     fetchOverdueMerchantAcceptCount(),
     fetchAfterSalesTodoCounts(),
+    fetchPendingFinanceCashCount(),
+    fetchAdminMenuExtraCounts().catch(() => emptyAdminTodoCounts),
   ]);
 
   const pendingProductRows = productsRes.data ?? [];
@@ -69,6 +59,8 @@ export async function fetchAdminTodoCounts(): Promise<AdminTodoCounts> {
     watchReviews: afterSales.watchReviews,
     waitingChats: afterSales.waitingChats,
     pendingRefunds: afterSales.pendingRefunds,
+    pendingFinanceCash,
+    ...extra,
   };
 }
 
@@ -102,9 +94,11 @@ export const AdminTodoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setLastUpdatedAt(null);
   }, [sessionReady]);
 
-  /** 会话就绪或路由切换时拉一次，避免跨页处理完后计数仍旧 */
+  /** 进入某模块即视为已读该模块的「新进来」计数，再拉待办 */
   useEffect(() => {
     if (!sessionReady) return;
+    const moduleId = moduleIdFromAdminPath(pathname);
+    if (moduleId) markModuleSeen(moduleId);
     void refresh();
   }, [sessionReady, pathname, refresh]);
 

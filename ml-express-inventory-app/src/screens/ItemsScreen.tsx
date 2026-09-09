@@ -34,6 +34,7 @@ import { canMarkCustomerSigned } from '../utils/customerSign';
 import CustomerSignFlowModal, { type CustomerSignFlowRequest } from '../components/CustomerSignFlowModal';
 import {
   collectSameCustomerPeers,
+  resolvePackagingStockInSignIds,
   validateBatchSignSelection,
 } from '../utils/customerBatchSign';
 import {
@@ -244,6 +245,22 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     if (wasPackFlow) setPackSuccessInfo(null);
   };
 
+  const openCustomerSign = async (anchors: InventoryItemListRow[]) => {
+    if (!store || anchors.length === 0) return;
+    const scope = hubCode ? { store, hubCode } : undefined;
+    const expanded = await resolvePackagingStockInSignIds(
+      items,
+      anchors,
+      store,
+      (keyword) => listItems(keyword, scope),
+    );
+    setSignRequest({
+      itemIds: expanded.map((item) => item.id),
+      operator: operatorName ?? t.common.operator,
+      store,
+    });
+  };
+
   const handleBatchSign = () => {
     if (!store) return;
     const validationError = validateBatchSignSelection(selectedItems);
@@ -256,11 +273,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
       );
       return;
     }
-    setSignRequest({
-      itemIds: selectedItems.map((item) => item.id),
-      operator: operatorName ?? t.common.operator,
-      store,
-    });
+    void openCustomerSign(selectedItems);
   };
 
   const openPackModal = () => {
@@ -496,11 +509,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
             ? () => {
                 const item = actionItem;
                 setActionItem(null);
-                setSignRequest({
-                  itemIds: [item.id],
-                  operator: operatorName ?? t.common.operator,
-                  store,
-                });
+                void openCustomerSign([item]);
               }
             : undefined
         }

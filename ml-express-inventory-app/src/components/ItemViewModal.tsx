@@ -117,13 +117,20 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
     void fetchCrossBorderFxRate().then((rate) => {
       if (!cancelled) setLiveRate(rate);
     });
-    void getItemDetail(itemId).then((d) => {
-      if (!cancelled) {
-        setDetail(d);
-        setLoading(false);
-        if (d?.barcode) loadExceptions(d.barcode);
-      }
-    });
+    void getItemDetail(itemId)
+      .then((d) => {
+        if (!cancelled) {
+          setDetail(d);
+          setLoading(false);
+          if (d?.barcode) loadExceptions(d.barcode);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDetail(null);
+          setLoading(false);
+        }
+      });
     return () => {
       cancelled = true;
     };

@@ -19,24 +19,14 @@ import type { PkgTrackingDetail } from '../types/tracking';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { formatDisplayDate } from '../utils/dateFormat';
 import { resolveStoreHubCode } from '../utils/storeZone';
+import {
+  effectivePkgTrackingStatus,
+  isActiveInboundTrackingPack,
+  isActiveOutboundTrackingPack,
+} from '../utils/shipmentTrackVisibility';
 import { splitOutboundByTrip, type TruckTripSummary } from '../utils/truckTripGroups';
 
 type Tab = 'inbound' | 'outbound';
-
-function isActiveInboundTrackingPack(pack: PkgTrackingDetail): boolean {
-  if (pack.status === 'completed' || pack.status === 'cancelled' || pack.status === 'split_at_hub') {
-    return false;
-  }
-  if (pack.status === 'in_transit') return true;
-  return pack.orders.some((order) => order.status === 'in_transit');
-}
-
-function isActiveOutboundTrackingPack(pack: PkgTrackingDetail): boolean {
-  if (pack.status === 'completed' || pack.status === 'cancelled' || pack.status === 'split_at_hub') {
-    return false;
-  }
-  return pack.status === 'in_transit' || pack.status === 'hub_received';
-}
 
 type Nav = { navigate: (name: string, params?: { presetCode?: string }) => void };
 
@@ -52,7 +42,7 @@ function PackTrackCard({ item, onPress }: { item: PkgTrackingDetail; onPress?: (
         <Text style={styles.barcode} numberOfLines={1}>
           {item.pack_barcode}
         </Text>
-        <Text style={styles.status}>{getPkgStatusLabel(t, item.status)}</Text>
+        <Text style={styles.status}>{getPkgStatusLabel(t, effectivePkgTrackingStatus(item))}</Text>
       </View>
       <Text style={styles.route}>
         {item.origin_store_code} → {regionDisplayLabel(item.destination_code)}
@@ -126,7 +116,7 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
       listInboundPackages(hubCode),
       listOutboundPackagesFromOrigin(store.storeCode),
     ]);
-    setInbound(inList.filter((pack) => isActiveInboundTrackingPack(pack)));
+    setInbound(inList.filter((pack) => isActiveInboundTrackingPack(pack, hubCode)));
     setOutbound(outList.filter((pack) => isActiveOutboundTrackingPack(pack)));
   }, [store, hubCode]);
 

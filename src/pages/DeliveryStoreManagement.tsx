@@ -51,6 +51,8 @@ const DeliveryStoreManagement: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const storeListSearchQ = (searchParams.get('q') || '').trim().toLowerCase();
+  const openProductsDeepLink = searchParams.get('products') === '1';
+  const openedProductsKeyRef = useRef('');
   const { isMobile } = useResponsive();
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('ml-express-language') || 'zh';
@@ -863,6 +865,24 @@ const DeliveryStoreManagement: React.FC = () => {
       setLoadingProducts(false);
     }
   };
+
+  useEffect(() => {
+    if (!openProductsDeepLink || !storeListSearchQ || allStores.length === 0) return;
+    const q = storeListSearchQ;
+    const merchantStores = allStores.filter((store) => store.store_type !== 'transit_station');
+    const match =
+      merchantStores.find((store) => (store.store_code || '').toLowerCase() === q) ||
+      merchantStores.find(
+        (store) =>
+          (store.store_code || '').toLowerCase().includes(q) ||
+          (store.store_name || '').toLowerCase().includes(q),
+      );
+    if (!match) return;
+    const key = `${match.id}:${q}`;
+    if (openedProductsKeyRef.current === key) return;
+    openedProductsKeyRef.current = key;
+    void viewStoreProducts(match);
+  }, [openProductsDeepLink, storeListSearchQ, allStores]);
 
   const loadPendingProductReviewSummary = useCallback(async () => {
     try {

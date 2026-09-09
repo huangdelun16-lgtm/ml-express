@@ -1,4 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  formatMenuBadgeCount,
+  getAdminMenuNotice,
+  type AdminTodoCounts,
+} from '../utils/adminMenuNotifications';
 
 export const MODULE_ICONS: Record<string, string> = {
   city_packages: '📦',
@@ -110,17 +115,7 @@ export type AdminNavCard = {
   roles: ('admin' | 'manager' | 'operator' | 'finance')[];
 };
 
-export type AdminMenuBadges = {
-  pendingRecharge: number;
-  pendingAssignment: number;
-  pendingProductReview: number;
-  pendingDeliveryAlerts: number;
-  pendingMerchantApplications: number;
-  overdueMerchantAccept: number;
-  watchReviews: number;
-  waitingChats: number;
-  pendingRefunds: number;
-};
+export type AdminMenuBadges = AdminTodoCounts;
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -228,7 +223,8 @@ const AdminFunctionMenu: React.FC<Props> = ({
   const go = (id: string) => {
     const path = MODULE_ROUTES[id];
     if (!path) return;
-    onNavigate(path);
+    const notice = getAdminMenuNotice(id, badges);
+    onNavigate(notice?.href || path);
     if (isMobile) onCloseMobile();
   };
 
@@ -250,29 +246,14 @@ const AdminFunctionMenu: React.FC<Props> = ({
     language === 'zh' ? zh : language === 'en' ? en : my;
 
   const renderItem = (card: AdminNavCard) => {
-    const pulseNav =
-      (card.id === 'tracking' && badges.pendingAssignment > 0) ||
-      (card.id === 'delivery_alerts' && badges.pendingDeliveryAlerts > 0) ||
-      (card.id === 'merchant_ops' && badges.overdueMerchantAccept > 0) ||
-      (card.id === 'after_sales' &&
-        badges.watchReviews + badges.waitingChats + badges.pendingRefunds > 0);
-    const showProductBadge = card.id === 'product_reviews' && badges.pendingProductReview > 0;
-    const showMerchantOpsBadge = card.id === 'merchant_ops' && badges.overdueMerchantAccept > 0;
-    const showAfterSalesBadge =
-      card.id === 'after_sales' &&
-      badges.watchReviews + badges.waitingChats + badges.pendingRefunds > 0;
-    const showMerchantAppBadge =
-      card.id === 'merchant_stores' && badges.pendingMerchantApplications > 0;
-    const showRechargeBadge = card.id === 'recharges' && badges.pendingRecharge > 0;
-    const showAssignBadge = card.id === 'tracking' && badges.pendingAssignment > 0;
-    const showAlertBadge = card.id === 'delivery_alerts' && badges.pendingDeliveryAlerts > 0;
+    const notice = getAdminMenuNotice(card.id, badges);
     const active = isModulePathActive(pathname, card.id);
     const pinned = pins.includes(card.id);
     const outline = card.id === 'metric_management' || card.id === 'cross_border_logistics';
     const itemClass = [
       'admin-fn__item',
       active ? 'is-active' : '',
-      pulseNav ? 'is-pulse' : '',
+      notice?.pulse ? 'is-pulse' : '',
       outline ? 'is-outline' : '',
     ]
       .filter(Boolean)
@@ -295,18 +276,7 @@ const AdminFunctionMenu: React.FC<Props> = ({
           {!compact && <span className="admin-fn__label">{card.title}</span>}
           {!compact && (
             <span className="admin-fn__meta">
-              {showRechargeBadge && <CountBadge n={badges.pendingRecharge} tone="red" />}
-              {showAssignBadge && <CountBadge n={badges.pendingAssignment} tone="blue" />}
-              {showAlertBadge && <CountBadge n={badges.pendingDeliveryAlerts} tone="red" />}
-              {showProductBadge && <CountBadge n={badges.pendingProductReview} tone="amber" />}
-              {showMerchantOpsBadge && <CountBadge n={badges.overdueMerchantAccept} tone="red" />}
-              {showAfterSalesBadge && (
-                <CountBadge
-                  n={badges.watchReviews + badges.waitingChats + badges.pendingRefunds}
-                  tone="amber"
-                />
-              )}
-              {showMerchantAppBadge && <CountBadge n={badges.pendingMerchantApplications} tone="blue" />}
+              {notice && <CountBadge n={notice.n} tone={notice.tone} />}
               <span
                 role="button"
                 tabIndex={0}
@@ -331,14 +301,7 @@ const AdminFunctionMenu: React.FC<Props> = ({
               </span>
             </span>
           )}
-          {compact &&
-            (showRechargeBadge ||
-              showAssignBadge ||
-              showAlertBadge ||
-              showProductBadge ||
-              showMerchantOpsBadge ||
-              showAfterSalesBadge ||
-              showMerchantAppBadge) && <span className="admin-fn__dot" />}
+          {compact && notice && <span className="admin-fn__dot" />}
         </button>
       </div>
     );
@@ -428,12 +391,20 @@ const AdminFunctionMenu: React.FC<Props> = ({
                 .filter((c) => !pins.includes(c.id));
               if (items.length === 0) return null;
               const folded = !compact && foldedGroups.includes(group.id);
+              const groupHasNotice = items.some((c) => getAdminMenuNotice(c.id, badges));
               return (
                 <div key={group.id}>
                   {!compact && (
-                    <button type="button" className="admin-fn__group-btn" onClick={() => toggleGroup(group.id)}>
+                    <button
+                      type="button"
+                      className={`admin-fn__group-btn${groupHasNotice ? ' has-notice' : ''}`}
+                      onClick={() => toggleGroup(group.id)}
+                    >
                       <span>{t(group.zh, group.en, group.my)}</span>
-                      <span style={{ opacity: 0.7 }}>{folded ? '+' : '–'}</span>
+                      <span className="admin-fn__group-meta">
+                        {folded && groupHasNotice ? <span className="admin-fn__group-dot" aria-hidden /> : null}
+                        <span style={{ opacity: 0.7 }}>{folded ? '+' : '–'}</span>
+                      </span>
                     </button>
                   )}
                   {(compact || !folded) && items.map(renderItem)}
@@ -448,7 +419,7 @@ const AdminFunctionMenu: React.FC<Props> = ({
 };
 
 function CountBadge({ n, tone }: { n: number; tone: 'red' | 'blue' | 'amber' }) {
-  return <span className={`admin-fn__badge admin-fn__badge--${tone}`}>{n}</span>;
+  return <span className={`admin-fn__badge admin-fn__badge--${tone}`}>{formatMenuBadgeCount(n)}</span>;
 }
 
 export default AdminFunctionMenu;

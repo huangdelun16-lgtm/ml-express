@@ -4,6 +4,10 @@ import {
   collectStockAlerts,
   filterWatchRows,
   formatAgeLabel,
+  formatRemainLabel,
+  isClosedDuringHours,
+  isClosedWatch,
+  isInactiveStoreStatus,
   isOverduePending,
   isWithinOperatingHours,
   localDateKey,
@@ -11,6 +15,7 @@ import {
   resolveStoreHoursState,
   rowHasWatchIssue,
   sortWatchRows,
+  stockOnlyIssue,
   summarizeWatchRows,
   type MerchantOpsWatchRow,
 } from './merchantOpsWatch';
@@ -124,9 +129,13 @@ describe('merchantOpsWatch', () => {
     );
     expect(pending[0].id).toBe('old');
     expect(pending[0].overdue).toBe(true);
+    expect(pending[0].remainMs).toBe(0);
     expect(pending[1].overdue).toBe(false);
+    expect(pending[1].remainMs).toBe(5 * 60 * 1000);
     expect(formatAgeLabel(12 * 60 * 1000)).toBe('12 分钟');
     expect(formatAgeLabel(65 * 60 * 1000)).toBe('1 小时 5 分');
+    expect(formatRemainLabel(90 * 1000)).toBe('剩余 2 分钟');
+    expect(formatRemainLabel(0)).toBe('已超时');
   });
 
   it('filters watch rows by tab and search, and ignores after-hours-only stores', () => {
@@ -157,24 +166,66 @@ describe('merchantOpsWatch', () => {
       oldestOverdueMs: 20 * 60 * 1000,
     });
     const quiet = row({ storeId: 'q', storeName: '正常店' });
+    const pendingFresh = row({
+      storeId: 'p',
+      storeName: '待接店',
+      pending: [
+        {
+          id: 'PKG1',
+          createdAt: '2026-08-30T09:55:00.000Z',
+          ageMs: 5 * 60 * 1000,
+          remainMs: 5 * 60 * 1000,
+          overdue: false,
+        },
+      ],
+    });
+    const inactive = row({
+      storeId: 'i',
+      storeName: '停用店',
+      status: 'inactive',
+      hours: {
+        closedToday: true,
+        onVacation: false,
+        inHours: true,
+        shouldBeOpen: false,
+        hoursLabel: '09:00 - 21:00',
+      },
+    });
+    const low = row({ storeId: 'l', storeName: '偏低店', lowStockCount: 5 });
 
     expect(rowHasWatchIssue(quiet)).toBe(false);
-    expect(filterWatchRows([closed, stock, overdue, quiet], '', 'all').map((r) => r.storeId)).toEqual(
-      ['c', 'k', 'o'],
-    );
+    expect(rowHasWatchIssue(pendingFresh)).toBe(true);
+    expect(isInactiveStoreStatus(inactive.status)).toBe(true);
+    expect(isClosedWatch(inactive)).toBe(false);
+    expect(isClosedWatch(closed)).toBe(true);
+    expect(isClosedDuringHours(closed)).toBe(true);
+    expect(stockOnlyIssue(low)).toBe(true);
+    expect(stockOnlyIssue(pendingFresh)).toBe(false);
+
+    expect(
+      filterWatchRows([closed, stock, overdue, quiet, pendingFresh], '', 'all').map((r) => r.storeId),
+    ).toEqual(['c', 'k', 'o', 'p']);
     expect(filterWatchRows([closed, stock, overdue], '', 'closed').map((r) => r.storeId)).toEqual(['c']);
     expect(filterWatchRows([closed, stock, overdue], '', 'stock').map((r) => r.storeId)).toEqual(['k']);
     expect(filterWatchRows([closed, stock, overdue], '', 'overdue').map((r) => r.storeId)).toEqual(['o']);
+    expect(filterWatchRows([pendingFresh, overdue], '', 'pending').map((r) => r.storeId)).toEqual(['p']);
     expect(filterWatchRows([closed, stock], 'ygn', 'all').map((r) => r.storeId)).toEqual(['c']);
     expect(filterWatchRows([closed, stock], '', 'all', 'mandalay').map((r) => r.storeId)).toEqual(['k']);
+    expect(filterWatchRows([inactive], '', 'all').map((r) => r.storeId)).toEqual(['i']);
+    expect(filterWatchRows([inactive], '', 'closed')).toEqual([]);
 
-    const summary = summarizeWatchRows([closed, stock, overdue]);
+    const summary = summarizeWatchRows([closed, stock, overdue, pendingFresh, inactive, low]);
     expect(summary).toEqual({
       closed: 1,
-      stock: 1,
+      closedDuringHours: 1,
+      stock: 2,
       overdue: 1,
       overdueOrders: 1,
+      pendingFresh: 1,
+      pendingFreshOrders: 1,
       outOfStockItems: 2,
+      lowStockItems: 5,
+      inactive: 1,
     });
 
     expect(sortWatchRows([stock, overdue, closed]).map((r) => r.storeId)).toEqual(['o', 'c', 'k']);

@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import {
   buildPendingWatchOrders,
   collectStockAlerts,
+  isInactiveStoreStatus,
   overdueCutoffIso,
   resolveStoreHoursState,
   rowHasWatchIssue,
@@ -70,6 +71,8 @@ async function loadStores(): Promise<StoreRow[]> {
 export type MerchantOpsWatchResult = {
   rows: MerchantOpsWatchRow[];
   watchedStoreCount: number;
+  healthyStoreCount: number;
+  inactiveStoreCount: number;
 };
 
 export async function fetchMerchantOpsWatch(now = new Date()): Promise<MerchantOpsWatchResult> {
@@ -107,35 +110,41 @@ export async function fetchMerchantOpsWatch(now = new Date()): Promise<MerchantO
   }
 
   const watchedStores = stores.filter((store) => store?.id);
-  const rows: MerchantOpsWatchRow[] = watchedStores
-    .map((store) => {
-      const pending = buildPendingWatchOrders(pendingRawByStore.get(store.id) || [], now);
-      const overdue = pending.filter((item) => item.overdue);
-      const stockAlerts: StockAlertItem[] = collectStockAlerts(productsByStore.get(store.id) || []);
-      const hours = resolveStoreHoursState(store, now);
-      return {
-        storeId: store.id,
-        storeName: String(store.store_name || '未命名店铺'),
-        storeCode: String(store.store_code || ''),
-        region: String(store.region || ''),
-        storeType: String(store.store_type || ''),
-        status: String(store.status || 'active'),
-        phone: String(store.phone || ''),
-        managerPhone: String(store.manager_phone || ''),
-        hours,
-        pending,
-        overdueCount: overdue.length,
-        oldestOverdueMs: overdue[0]?.ageMs ?? null,
-        stockAlerts,
-        outOfStockCount: stockAlerts.filter((item) => item.level === 'out').length,
-        lowStockCount: stockAlerts.filter((item) => item.level === 'low').length,
-      };
-    })
-    .filter(rowHasWatchIssue);
+  const mapped: MerchantOpsWatchRow[] = watchedStores.map((store) => {
+    const pending = buildPendingWatchOrders(pendingRawByStore.get(store.id) || [], now);
+    const overdue = pending.filter((item) => item.overdue);
+    const stockAlerts: StockAlertItem[] = collectStockAlerts(productsByStore.get(store.id) || []);
+    const hours = resolveStoreHoursState(store, now);
+    const status = String(store.status || 'active');
+    return {
+      storeId: store.id,
+      storeName: String(store.store_name || '未命名店铺'),
+      storeCode: String(store.store_code || ''),
+      region: String(store.region || ''),
+      storeType: String(store.store_type || ''),
+      status,
+      phone: String(store.phone || ''),
+      managerPhone: String(store.manager_phone || ''),
+      hours,
+      pending,
+      overdueCount: overdue.length,
+      oldestOverdueMs: overdue[0]?.ageMs ?? null,
+      stockAlerts,
+      outOfStockCount: stockAlerts.filter((item) => item.level === 'out').length,
+      lowStockCount: stockAlerts.filter((item) => item.level === 'low').length,
+    };
+  });
+
+  const inactiveStoreCount = mapped.filter((row) => isInactiveStoreStatus(row.status)).length;
+  const healthyStoreCount = mapped.filter(
+    (row) => !isInactiveStoreStatus(row.status) && !rowHasWatchIssue(row),
+  ).length;
 
   return {
-    rows: sortWatchRows(rows),
+    rows: sortWatchRows(mapped.filter(rowHasWatchIssue)),
     watchedStoreCount: watchedStores.length,
+    healthyStoreCount,
+    inactiveStoreCount,
   };
 }
 

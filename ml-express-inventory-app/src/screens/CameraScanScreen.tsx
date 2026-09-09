@@ -5,9 +5,10 @@ import BarcodeScannerView from '../components/BarcodeScannerView';
 import CustomerSignFlowModal, { type CustomerSignFlowRequest } from '../components/CustomerSignFlowModal';
 import { useAuth } from '../contexts/AuthContext';
 import { getPkgStatusLabel, resolveAppError, useTranslation } from '../i18n';
-import { getItemByBarcode } from '../services/inventoryService';
+import { getItemByBarcode, listItems } from '../services/inventoryService';
 import { findTrackingByAnyCode } from '../services/trackingService';
 import type { InventoryItem } from '../types/inventory';
+import { resolvePackagingStockInSignIds } from '../utils/customerBatchSign';
 import { canMarkCustomerSigned } from '../utils/customerSign';
 import { isPackageBarcode } from '../utils/packageNumber';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
@@ -29,7 +30,7 @@ type ScanResult = {
 
 export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
   const { t, fmt } = useTranslation();
-  const { store, operatorName } = useAuth();
+  const { store, hubCode, operatorName } = useAuth();
   const isFocused = useIsFocused();
   const [loading, setLoading] = useState(false);
   const [signRequest, setSignRequest] = useState<CustomerSignFlowRequest | null>(null);
@@ -74,11 +75,21 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
 
   const handleSign = () => {
     if (!result?.item || !store) return;
-    setSignRequest({
-      itemIds: [result.item.id],
-      operator: operatorName ?? t.common.operator,
-      store,
-    });
+    const item = result.item;
+    const scope = hubCode ? { store, hubCode } : undefined;
+    void (async () => {
+      const expanded = await resolvePackagingStockInSignIds(
+        [item],
+        [item],
+        store,
+        (keyword) => listItems(keyword, scope),
+      );
+      setSignRequest({
+        itemIds: expanded.map((item) => item.id),
+        operator: operatorName ?? t.common.operator,
+        store,
+      });
+    })();
   };
 
   return (

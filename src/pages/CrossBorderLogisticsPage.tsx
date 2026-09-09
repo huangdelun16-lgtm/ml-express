@@ -21,6 +21,7 @@ import {
   fetchInventoryConsolePacks,
   fetchInventoryCustomerSummaries,
   fetchCrossBorderRegisteredCustomers,
+  setCrossBorderRegisteredCustomerStatus,
   type CreateCrossBorderAccountResult,
   type CrossBorderRegisteredCustomer,
   type UpdateCrossBorderAccountResult,
@@ -356,6 +357,7 @@ const CrossBorderLogisticsPage: FC = () => {
   const [editingCustomer, setEditingCustomer] = useState<CrossBorderRegisteredCustomer | null>(
     null,
   );
+  const [customerStatusBusyId, setCustomerStatusBusyId] = useState<string | null>(null);
   const [customerModalTarget, setCustomerModalTarget] = useState<InventoryCustomerSummary | null>(
     null,
   );
@@ -810,6 +812,43 @@ const CrossBorderLogisticsPage: FC = () => {
   const pagedRegisteredCustomers = useMemo(
     () => paginateSlice(registeredCustomers, registeredCustomersPage, tablePageSize),
     [registeredCustomers, registeredCustomersPage, tablePageSize],
+  );
+
+  const handleRegisteredCustomerStatus = useCallback(
+    async (row: CrossBorderRegisteredCustomer, nextStatus: 'active' | 'inactive') => {
+      const pause = nextStatus === 'inactive';
+      const ok = window.confirm(
+        pause
+          ? isEn
+            ? `Pause ${row.customer_name} (${row.customer_code})? Inventory App will stop auto-filling this customer code.`
+            : `暂停「${row.customer_name}」(${row.customer_code})？暂停后 Inventory App 填写该客户编码将不再自动带出姓名和电话。`
+          : isEn
+            ? `Resume ${row.customer_name} (${row.customer_code})?`
+            : `恢复「${row.customer_name}」(${row.customer_code})？恢复后 App 可再次用客户编码带出资料。`,
+      );
+      if (!ok) return;
+      setCustomerStatusBusyId(row.id);
+      try {
+        const updated = await setCrossBorderRegisteredCustomerStatus(row.id, nextStatus);
+        setRegisteredCustomers((prev) =>
+          prev.map((item) => (item.id === updated.id ? updated : item)),
+        );
+        feedbackService.success(
+          pause
+            ? isEn
+              ? 'Customer paused'
+              : '客户已暂停'
+            : isEn
+              ? 'Customer resumed'
+              : '客户已恢复',
+        );
+      } catch (err) {
+        feedbackService.notify(err instanceof Error ? err.message : isEn ? 'Update failed' : '更新失败');
+      } finally {
+        setCustomerStatusBusyId(null);
+      }
+    },
+    [isEn],
   );
 
   const pricingCustomers = useMemo(
@@ -1631,9 +1670,16 @@ const CrossBorderLogisticsPage: FC = () => {
             </div>
           </section>
 
-          <section className="cbl-card" ref={customersSectionRef}>
+          <section className="cbl-card cbl-card--customers" ref={customersSectionRef}>
             <div className="cbl-card__head">
-              <h2 className="cbl-card__title">{isEn ? 'Customers' : '客户信息'}</h2>
+              <div className="cbl-card__head-copy">
+                <h2 className="cbl-card__title">{isEn ? 'Customers' : '客户信息'}</h2>
+                <p className="cbl-card-hint cbl-card-hint--in-head">
+                  {isEn
+                    ? 'Registered customers and Inventory App「Express details」aggregates. Pause unused accounts so the App no longer auto-fills them. Click a name for parcels.'
+                    : '登记客户与 Inventory App「快递明细」汇总（按客户编码合并）。不用的账号请点「暂停」，App 填写客户编码将不再带出电话。点姓名可看包裹。'}
+                </p>
+              </div>
               <div className="cbl-card__head-actions">
                 <button
                   type="button"
@@ -1648,17 +1694,8 @@ const CrossBorderLogisticsPage: FC = () => {
               </div>
             </div>
             <div className="cbl-card__body">
-              <p className="cbl-card-hint">
-                {isEn
-                  ? 'Registered customers and Inventory App「Express details」aggregates. Click a name for parcels.'
-                  : '登记客户与 Inventory App「快递明细」汇总（按客户编码合并）。App 填写客户编码后自动带出电话。'}
-              </p>
-
               {registeredCustomers.length ? (
                 <>
-                  <h3 className="cbl-customer-section-title">
-                    {isEn ? 'Registered customers' : '登记客户'}
-                  </h3>
                   <div className="cbl-table-wrap">
                     <table className="cbl-table cbl-table--customers">
                       <thead>
@@ -1675,8 +1712,11 @@ const CrossBorderLogisticsPage: FC = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {pagedRegisteredCustomers.map((row) => (
-                          <tr key={row.id}>
+                        {pagedRegisteredCustomers.map((row) => {
+                          const paused = row.status === 'inactive';
+                          const busy = customerStatusBusyId === row.id;
+                          return (
+                          <tr key={row.id} className={paused ? 'cbl-table-row--paused' : undefined}>
                             <td>
                               <button
                                 type="button"
@@ -1691,17 +1731,22 @@ const CrossBorderLogisticsPage: FC = () => {
                               </button>
                             </td>
                             <td>
-                              <button
-                                type="button"
-                                className="cbl-customer-name-btn"
-                                onClick={() =>
-                                  setCustomerModalTarget(
-                                    registeredCustomerToSummary(row, customerSummaries),
-                                  )
-                                }
-                              >
-                                <span className="cbl-customer-name-btn__name">{row.customer_name}</span>
-                              </button>
+                              <div className="cbl-customer-name-cell">
+                                <button
+                                  type="button"
+                                  className="cbl-customer-name-btn"
+                                  onClick={() =>
+                                    setCustomerModalTarget(
+                                      registeredCustomerToSummary(row, customerSummaries),
+                                    )
+                                  }
+                                >
+                                  <span className="cbl-customer-name-btn__name">{row.customer_name}</span>
+                                </button>
+                                {paused ? (
+                                  <span className="cbl-badge cbl-badge--gray">{isEn ? 'Paused' : '已暂停'}</span>
+                                ) : null}
+                              </div>
                             </td>
                             <td>{row.phone || '—'}</td>
                             <td>
@@ -1715,19 +1760,47 @@ const CrossBorderLogisticsPage: FC = () => {
                             <td className="cbl-dim">{formatIsoDate(row.application_date, language)}</td>
                             <td className="cbl-dim">{row.address_notes || '—'}</td>
                             <td>
-                              <button
-                                type="button"
-                                className="cbl-btn cbl-btn--primary cbl-btn--sm"
-                                onClick={() => {
-                                  setEditingCustomer(row);
-                                  setShowCreateCustomerModal(true);
-                                }}
-                              >
-                                {isEn ? 'Edit' : '编辑'}
-                              </button>
+                              <div className="cbl-row-actions">
+                                <button
+                                  type="button"
+                                  className="cbl-btn cbl-btn--primary cbl-btn--sm"
+                                  onClick={() => {
+                                    setEditingCustomer(row);
+                                    setShowCreateCustomerModal(true);
+                                  }}
+                                >
+                                  {isEn ? 'Edit' : '编辑'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`cbl-btn cbl-btn--sm ${
+                                    paused ? 'cbl-btn--ghost' : 'cbl-btn--danger-outline'
+                                  }`}
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void handleRegisteredCustomerStatus(
+                                      row,
+                                      paused ? 'active' : 'inactive',
+                                    )
+                                  }
+                                >
+                                  {busy
+                                    ? isEn
+                                      ? 'Saving…'
+                                      : '保存中…'
+                                    : paused
+                                      ? isEn
+                                        ? 'Resume'
+                                        : '恢复'
+                                      : isEn
+                                        ? 'Pause'
+                                        : '暂停'}
+                                </button>
+                              </div>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -1740,7 +1813,13 @@ const CrossBorderLogisticsPage: FC = () => {
                     isEn={isEn}
                   />
                 </>
-              ) : null}
+              ) : (
+                <div className="cbl-empty cbl-empty--in-card">
+                  {isEn
+                    ? 'No registered customers yet. Use「+ Add customer」.'
+                    : '暂无登记客户。请点击右上角「+ 添加客户」。'}
+                </div>
+              )}
 
               <h3 className="cbl-customer-section-title">
                 {isEn ? 'Express summary' : '快递明细汇总'}

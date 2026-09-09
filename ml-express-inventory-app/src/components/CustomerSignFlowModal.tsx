@@ -25,6 +25,12 @@ import { svc } from '../errors/serviceError';
 import { fmt, formatServiceError, useTranslation } from '../i18n';
 import { fetchCrossBorderFxRate, formatCnyAmount, formatMmkAmount, mmkToCny } from '../utils/crossBorderFx';
 import {
+  buildCodAlertFeeGroups,
+  fxLockFeeMmkForItem,
+  packagingStockInSignBatch,
+  uniqueSignFeeMmk,
+} from '../utils/customerBatchSign';
+import {
   buildSignFxLock,
   parseFeeMmk,
   type CrossBorderPaidCurrency,
@@ -68,11 +74,11 @@ export default function CustomerSignFlowModal({
   const { t } = useTranslation();
   const visible = request != null;
   const itemIds = request?.itemIds ?? [];
-  const batchCount = itemIds.length;
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [detail, setDetail] = useState<InventoryItemDetail | null>(null);
   const [details, setDetails] = useState<InventoryItemDetail[]>([]);
+  const batchCount = details.length > 0 ? details.length : itemIds.length;
   const [formReady, setFormReady] = useState(false);
   const [signPhone, setSignPhone] = useState('');
   const [pickupType, setPickupType] = useState<CustomerSignPickupType>('self');
@@ -113,24 +119,47 @@ export default function CustomerSignFlowModal({
         const loadedDetails = loadedRows.filter((row): row is InventoryItemDetail => Boolean(row));
         const loaded = loadedDetails[0];
         if (!loaded) throw svc('orderNotFoundOrDeleted');
+        // 只签收加载成功的行，避免漏载兄弟件时用第一件的费用去锁汇/提交
         setDetail(loaded);
         setDetails(loadedDetails);
         const resolvedRate = rate ?? request.liveRate ?? null;
         setMmkPerCny(resolvedRate);
         setPayCurrency('MMK');
 
-        const codItems = loadedDetails.filter((row) => row.payment_label === '到付');
-        if (codItems.length > 0) {
-          const feeLines = codItems
-            .map((row, index) => {
-              const feeLine = feeLineText(row.total_fee, resolvedRate, t.hubReceive.feeNotRegistered);
+        const codGroups = buildCodAlertFeeGroups(loadedDetails);
+        if (codGroups.length > 0) {
+          const feeLines = codGroups
+            .flatMap((group, index) => {
+              if (group.kind === 'packaging') {
+                const feeLine = feeLineText(
+                  String(group.fee),
+                  resolvedRate,
+                  t.hubReceive.feeNotRegistered,
+                );
+                return [
+                  fmt(t.sign.packagingBatchFeeLine, { count: group.count, fee: feeLine }),
+                  ...group.barcodes.map((barcode, siblingIndex) =>
+                    fmt(t.sign.packagingSiblingLine, {
+                      index: siblingIndex + 1,
+                      barcode,
+                    }),
+                  ),
+                ];
+              }
+              const feeLine = feeLineText(
+                String(group.fee),
+                resolvedRate,
+                t.hubReceive.feeNotRegistered,
+              );
               return batchCount > 1
-                ? fmt(t.sign.batchFeeLine, {
-                    index: index + 1,
-                    name: row.name ?? t.sign.orderFallback,
-                    fee: feeLine,
-                  })
-                : fmt(t.sign.totalFeeLine, { fee: feeLine });
+                ? [
+                    fmt(t.sign.batchFeeLine, {
+                      index: index + 1,
+                      name: group.name || t.sign.orderFallback,
+                      fee: feeLine,
+                    }),
+                  ]
+                : [fmt(t.sign.totalFeeLine, { fee: feeLine })];
             })
             .join('\n');
           Alert.alert(
@@ -157,14 +186,12 @@ export default function CustomerSignFlowModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, request, itemIds.join(','), batchCount, onClose, onError, resolveError, t]);
+  }, [visible, request, itemIds.join(','), onClose, onError, resolveError, t]);
 
   const hasCod = details.some((row) => row.payment_label === '到付');
   const hasPrepaid = details.some((row) => row.payment_label === '预付');
-  const feeMmk = useMemo(
-    () => details.reduce((sum, row) => sum + parseFeeMmk(row.total_fee), 0),
-    [details],
-  );
+  const packagingBatch = useMemo(() => packagingStockInSignBatch(details), [details]);
+  const feeMmk = useMemo(() => uniqueSignFeeMmk(details), [details]);
   const collectCny = mmkToCny(feeMmk, mmkPerCny);
 
   const selectPayCurrency = async (currency: CrossBorderPaidCurrency) => {
@@ -217,10 +244,11 @@ export default function CustomerSignFlowModal({
 
     setSubmitting(true);
     try {
-      for (const id of itemIds) {
+      const signIds = details.map((row) => row.id);
+      for (const id of signIds) {
         const row = details.find((item) => item.id === id) ?? detail;
         const lock = buildSignFxLock({
-          feeMmk: parseFeeMmk(row.total_fee),
+          feeMmk: fxLockFeeMmkForItem(row, details),
           currency: payCurrency,
           mmkPerCny,
         });
@@ -229,8 +257,8 @@ export default function CustomerSignFlowModal({
           fxLock: lock ?? undefined,
         });
       }
-      const refreshed = await getItemDetail(itemIds[0]);
-      if (refreshed) onSuccess?.(refreshed, itemIds.length);
+      const refreshed = await getItemDetail(signIds[0]);
+      if (refreshed) onSuccess?.(refreshed, signIds.length);
       onClose();
     } catch (e: unknown) {
       onError?.(resolveError?.(e) ?? (e instanceof Error ? e.message : t.sign.signFailed));
@@ -260,7 +288,11 @@ export default function CustomerSignFlowModal({
             <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
               {detail ? (
                 <View style={styles.summaryBox}>
-                  {batchCount > 1 ? (
+                  {packagingBatch && batchCount > 1 ? (
+                    <Text style={styles.batchBadge}>
+                      {fmt(t.sign.packagingBatchBadge, { count: batchCount })}
+                    </Text>
+                  ) : batchCount > 1 ? (
                     <Text style={styles.batchBadge}>
                       {fmt(t.sign.batchBadge, { count: batchCount })}
                     </Text>
@@ -273,6 +305,23 @@ export default function CustomerSignFlowModal({
                     <Text style={styles.summaryMeta}>
                       {fmt(t.sign.inboundCodeLine, { barcode: detail.barcode })}
                     </Text>
+                  ) : packagingBatch ? (
+                    <>
+                      {details.map((row) => (
+                        <Text key={row.id} style={styles.siblingLine}>
+                          {row.barcode}
+                        </Text>
+                      ))}
+                      <Text style={styles.summaryMeta}>{t.sign.packagingBatchShareHint}</Text>
+                      {packagingBatch.count < packagingBatch.declaredTotal ? (
+                        <Text style={styles.summaryMeta}>
+                          {fmt(t.sign.packagingBatchIncomplete, {
+                            count: packagingBatch.count,
+                            total: packagingBatch.declaredTotal,
+                          })}
+                        </Text>
+                      ) : null}
+                    </>
                   ) : (
                     <Text style={styles.summaryMeta}>{t.sign.batchShareHint}</Text>
                   )}
@@ -468,6 +517,7 @@ const styles = StyleSheet.create({
   batchBadge: { color: '#6ee7b7', fontSize: 12, fontWeight: '800', marginBottom: 2 },
   summaryTitle: { color: '#f8fafc', fontSize: 16, fontWeight: '800' },
   summaryMeta: { color: '#94a3b8', fontSize: 13 },
+  siblingLine: { color: '#cbd5e1', fontSize: 12, fontWeight: '700' },
   fieldLabel: { color: '#cbd5e1', fontSize: 13, fontWeight: '700', marginTop: 4 },
   payAmount: { color: '#f8fafc', fontSize: 18, fontWeight: '800' },
   payMeta: { color: '#7dd3fc', fontSize: 13, fontWeight: '700' },

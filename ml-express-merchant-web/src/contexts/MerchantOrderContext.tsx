@@ -65,6 +65,8 @@ export function MerchantOrderProvider({
   const [pendingOrders, setPendingOrders] = useState<MerchantPendingOrder[]>([]);
   const [showOrderAlert, setShowOrderAlert] = useState(false);
   const [isVoiceEnabled, setIsVoiceEnabledState] = useState(true);
+  const lastNudgeAtRef = useRef('');
+  const pendingCountRef = useRef(0);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const lastVoiceAtRef = useRef(0);
   const knownPendingIdsRef = useRef<Set<string>>(new Set());
@@ -217,12 +219,17 @@ export function MerchantOrderProvider({
   }, [storeId]);
 
   useEffect(() => {
+    pendingCountRef.current = pendingOrders.length;
+  }, [pendingOrders.length]);
+
+  useEffect(() => {
     if (!storeId) return undefined;
 
     pendingSyncReadyRef.current = false;
     knownPendingIdsRef.current = new Set();
     inProgressReadyRef.current = false;
     inProgressFingerprintRef.current = '';
+    lastNudgeAtRef.current = '';
     void ensureDesktopNotificationPermission();
     void syncPendingFromServer();
     void syncInProgressFromServer();
@@ -266,6 +273,29 @@ export function MerchantOrderProvider({
             removePendingOrder(row.id);
           }
           broadcastMerchantOrdersRefresh();
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'delivery_stores',
+          filter: `id=eq.${storeId}`,
+        },
+        (payload) => {
+          const nextAt = String(
+            (payload.new as { ops_nudge_at?: string | null } | undefined)?.ops_nudge_at || '',
+          );
+          if (!nextAt || nextAt === lastNudgeAtRef.current) return;
+          lastNudgeAtRef.current = nextAt;
+          focusMerchantWindow();
+          playNewOrderChime();
+          setShowOrderAlert(true);
+          showNewOrderDesktopNotification(Math.max(1, pendingCountRef.current), language, () => {
+            setShowOrderAlert(true);
+          });
+          speakMerchantNewOrderAlert(Math.max(1, pendingCountRef.current), language);
         },
       )
       .subscribe((status, err) => {
@@ -312,6 +342,7 @@ export function MerchantOrderProvider({
     };
   }, [
     storeId,
+    language,
     addPendingOrder,
     removePendingOrder,
     syncPendingFromServer,

@@ -258,14 +258,6 @@ exports.handler = async (event) => {
     if (event.httpMethod === 'PUT') {
       const body = parseBody(event);
       const id = String(body.id || '').trim();
-      const customer_name = String(body.customer_name || '').trim();
-      const phone = String(body.phone || '').trim();
-      const delivery_region_id = String(body.delivery_region_id || '').trim();
-      const delivery_area_code = String(body.delivery_area_code || '').trim().toUpperCase();
-      const address_notes = String(body.address_notes || '').trim();
-      const notify_method = normalizeNotifyMethod(body.notify_method);
-      const notify_account = String(body.notify_account || '').trim();
-
       if (!id) {
         return {
           statusCode: 400,
@@ -273,6 +265,66 @@ exports.handler = async (event) => {
           body: JSON.stringify({ error: '缺少客户 id' }),
         };
       }
+
+      const statusRaw = String(body.status || '').trim().toLowerCase();
+      const nextStatus = statusRaw === 'inactive' ? 'inactive' : statusRaw === 'active' ? 'active' : '';
+      const customer_name = String(body.customer_name || '').trim();
+
+      const selectUpdated = async (payload) => {
+        let updated = await supabase
+          .from('cross_border_customers')
+          .update(payload)
+          .eq('id', id)
+          .select(CUSTOMER_SELECT)
+          .maybeSingle();
+        if (updated.error && isMissingNotifyAccountColumn(updated.error)) {
+          const { notify_account: _droppedAccount, ...withoutAccount } = payload;
+          updated = await supabase
+            .from('cross_border_customers')
+            .update(withoutAccount)
+            .eq('id', id)
+            .select(CUSTOMER_SELECT_WITHOUT_ACCOUNT)
+            .maybeSingle();
+        }
+        if (updated.error && isMissingNotifyMethodColumn(updated.error)) {
+          const { notify_method: _droppedMethod, notify_account: _droppedAccount, ...withoutNotify } =
+            payload;
+          updated = await supabase
+            .from('cross_border_customers')
+            .update(withoutNotify)
+            .eq('id', id)
+            .select(CUSTOMER_SELECT_WITHOUT_NOTIFY)
+            .maybeSingle();
+        }
+        return updated;
+      };
+
+      if (nextStatus && !customer_name) {
+        const updated = await selectUpdated({
+          status: nextStatus,
+          updated_at: new Date().toISOString(),
+        });
+        if (updated.error) throw updated.error;
+        if (!updated.data) {
+          return {
+            statusCode: 404,
+            headers,
+            body: JSON.stringify({ error: '未找到该登记客户' }),
+          };
+        }
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ ok: true, customer: updated.data }),
+        };
+      }
+
+      const phone = String(body.phone || '').trim();
+      const delivery_region_id = String(body.delivery_region_id || '').trim();
+      const delivery_area_code = String(body.delivery_area_code || '').trim().toUpperCase();
+      const address_notes = String(body.address_notes || '').trim();
+      const notify_method = normalizeNotifyMethod(body.notify_method);
+      const notify_account = String(body.notify_account || '').trim();
       if (!customer_name) {
         return {
           statusCode: 400,
@@ -300,31 +352,7 @@ exports.handler = async (event) => {
         updated_at: now,
       };
 
-      let updated = await supabase
-        .from('cross_border_customers')
-        .update(payload)
-        .eq('id', id)
-        .select(CUSTOMER_SELECT)
-        .maybeSingle();
-      if (updated.error && isMissingNotifyAccountColumn(updated.error)) {
-        const { notify_account: _droppedAccount, ...withoutAccount } = payload;
-        updated = await supabase
-          .from('cross_border_customers')
-          .update(withoutAccount)
-          .eq('id', id)
-          .select(CUSTOMER_SELECT_WITHOUT_ACCOUNT)
-          .maybeSingle();
-      }
-      if (updated.error && isMissingNotifyMethodColumn(updated.error)) {
-        const { notify_method: _droppedMethod, notify_account: _droppedAccount, ...withoutNotify } =
-          payload;
-        updated = await supabase
-          .from('cross_border_customers')
-          .update(withoutNotify)
-          .eq('id', id)
-          .select(CUSTOMER_SELECT_WITHOUT_NOTIFY)
-          .maybeSingle();
-      }
+      const updated = await selectUpdated(payload);
       if (updated.error) throw updated.error;
       if (!updated.data) {
         return {

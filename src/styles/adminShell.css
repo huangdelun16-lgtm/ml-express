@@ -406,6 +406,24 @@
   text-transform: uppercase;
 }
 
+.admin-fn__group-btn.has-notice {
+  color: #fbbf24;
+}
+
+.admin-fn__group-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-fn__group-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  background: #faad14;
+  box-shadow: 0 0 0 2px #001529;
+}
+
 .admin-fn__empty {
   padding: 16px 8px;
   color: rgba(255, 255, 255, 0.45);

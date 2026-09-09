@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Fragment, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
@@ -13,6 +13,7 @@ import {
   isSettledCustomerCategory,
   resolveCustomerFeeCny,
 } from '../utils/crossBorderFx';
+import { groupCustomerExpressItems } from '../utils/packagingStockInDisplay';
 import '../styles/crossBorderLogistics.css';
 
 type Props = {
@@ -40,6 +41,49 @@ function transportStatusClass(status: string): string {
   return 'cbl-status-pill cbl-status-pill--gray';
 }
 
+function FeeCell({
+  item,
+  sharedLabel,
+  isEn,
+  fxRate,
+}: {
+  item: InventoryCustomerExpressItem;
+  sharedLabel?: string;
+  isEn: boolean;
+  fxRate: number | null;
+}) {
+  if (item.fee > 0) {
+    return (
+      <>
+        <DualMoney
+          mmk={item.fee}
+          rate={displayRateForCustomerCategory(
+            customerExpressLedgerCategory(item),
+            item.fxMmkPerCny,
+            fxRate,
+          )}
+          cny={item.paidCny != null && item.paidCny > 0 ? item.paidCny : undefined}
+        />
+        {isSettledCustomerCategory(customerExpressLedgerCategory(item)) ? (
+          <span className="cbl-fx-lock-hint">
+            {item.fxMmkPerCny || (item.paidCny != null && item.paidCny > 0)
+              ? isEn
+                ? 'Locked FX'
+                : '锁定汇率'
+              : isEn
+                ? 'MMK only'
+                : '旧单无锁'}
+          </span>
+        ) : null}
+      </>
+    );
+  }
+  if (sharedLabel) {
+    return <span className="cbl-fee-shared">{sharedLabel}</span>;
+  }
+  return <>{'—'}</>;
+}
+
 function formatInboundDate(isEn: boolean, value?: string | null): string {
   if (!value?.trim()) return '—';
   const d = new Date(value);
@@ -63,6 +107,8 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<InventoryCustomerExpressItem[]>([]);
+
+  const itemGroups = useMemo(() => groupCustomerExpressItems(items), [items]);
 
   const headerCny = useMemo(() => {
     if (!items.length) return undefined;
@@ -206,68 +252,69 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((item) => (
-                      <tr key={item.id}>
-                        <td className="cbl-dim">{formatInboundDate(isEn, item.inboundAt)}</td>
-                        <td className="cbl-customer-col-product">
-                          <span className="cbl-customer-product-name">{item.productName}</span>
-                        </td>
-                        <td><span className="cbl-code">{item.expressBarcode}</span></td>
-                        <td><span className="cbl-code">{item.inboundBarcode}</span></td>
-                        <td>{item.packaging}</td>
-                        <td><span className="cbl-code cbl-code--origin">{item.origin}</span></td>
-                        <td><span className="cbl-dest-chip">{item.destination}</span></td>
-                        <td>{item.weight}</td>
-                        <td className="cbl-col-num">{item.qty}</td>
-                        <td className="cbl-col-num cbl-col-fee">
-                          {item.fee > 0 ? (
-                            <>
-                              <DualMoney
-                                mmk={item.fee}
-                                rate={displayRateForCustomerCategory(
-                                  customerExpressLedgerCategory(item),
-                                  item.fxMmkPerCny,
-                                  fxRate,
-                                )}
-                                cny={
-                                  item.paidCny != null && item.paidCny > 0
-                                    ? item.paidCny
-                                    : undefined
-                                }
-                              />
-                              {isSettledCustomerCategory(customerExpressLedgerCategory(item)) ? (
-                                <span className="cbl-fx-lock-hint">
-                                  {item.fxMmkPerCny || (item.paidCny != null && item.paidCny > 0)
-                                    ? isEn
-                                      ? 'Locked FX'
-                                      : '锁定汇率'
-                                    : isEn
-                                      ? 'MMK only'
-                                      : '旧单无锁'}
+                    {itemGroups.map((group) => {
+                      const rows = group.type === 'single' ? [group.item] : group.items;
+                      const sharedLabel =
+                        group.type === 'packaging' && group.sharedFee > 0
+                          ? isEn
+                            ? 'Shared total'
+                            : '同批总价'
+                          : undefined;
+                      return (
+                        <Fragment key={group.type === 'single' ? group.item.id : `pack:${group.base}`}>
+                          {group.type === 'packaging' ? (
+                            <tr className="cbl-packaging-group-head">
+                              <td colSpan={13}>
+                                {isEn
+                                  ? `Multiple inbound · ${group.base} · ${group.items.length}/${group.declaredTotal} parcels · one total fee`
+                                  : `多个入库 · ${group.base} · ${group.items.length}/${group.declaredTotal} 件 · 总费用只计一次`}
+                              </td>
+                            </tr>
+                          ) : null}
+                          {rows.map((item) => (
+                            <tr
+                              key={item.id}
+                              className={group.type === 'packaging' ? 'cbl-packaging-group-row' : undefined}
+                            >
+                              <td className="cbl-dim">{formatInboundDate(isEn, item.inboundAt)}</td>
+                              <td className="cbl-customer-col-product">
+                                <span className="cbl-customer-product-name">{item.productName}</span>
+                              </td>
+                              <td><span className="cbl-code">{item.expressBarcode}</span></td>
+                              <td><span className="cbl-code">{item.inboundBarcode}</span></td>
+                              <td>{item.packaging}</td>
+                              <td><span className="cbl-code cbl-code--origin">{item.origin}</span></td>
+                              <td><span className="cbl-dest-chip">{item.destination}</span></td>
+                              <td>{item.weight}</td>
+                              <td className="cbl-col-num">{item.qty}</td>
+                              <td className="cbl-col-num cbl-col-fee">
+                                <FeeCell
+                                  item={item}
+                                  sharedLabel={item.fee > 0 ? undefined : sharedLabel}
+                                  isEn={isEn}
+                                  fxRate={fxRate}
+                                />
+                              </td>
+                              <td>
+                                <span className={paymentStatusClass(item.paymentStatus)}>
+                                  {item.paymentStatus}
                                 </span>
-                              ) : null}
-                            </>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                        <td>
-                          <span className={paymentStatusClass(item.paymentStatus)}>
-                            {item.paymentStatus}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={packageStatusClass(item.packageStatus)}>
-                            {item.packageStatus}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={transportStatusClass(item.transportStatus)}>
-                            {item.transportStatus}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                              </td>
+                              <td>
+                                <span className={packageStatusClass(item.packageStatus)}>
+                                  {item.packageStatus}
+                                </span>
+                              </td>
+                              <td>
+                                <span className={transportStatusClass(item.transportStatus)}>
+                                  {item.transportStatus}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -283,8 +330,8 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
         <footer className="cbl-pricing-modal__foot cbl-customer-modal__foot">
           <span className="cbl-customer-modal__foot-hint">
             {isEn
-              ? 'Express details from Inventory App. Pending uses live FX; collected uses the locked rate.'
-              : '数据来自 Inventory App。待收用活汇率，已收用锁定汇率；旧单无锁只显示缅币。'}
+              ? 'Express details from Inventory App. Multiple inbound parcels share one total fee. Pending uses live FX; collected uses the locked rate.'
+              : '数据来自 Inventory App。多个入库共用一笔总费用。待收用活汇率，已收用锁定汇率；旧单无锁只显示缅币。'}
           </span>
           <button type="button" className="cbl-btn cbl-btn--primary" onClick={onClose}>
             {isEn ? 'Close' : '关闭'}

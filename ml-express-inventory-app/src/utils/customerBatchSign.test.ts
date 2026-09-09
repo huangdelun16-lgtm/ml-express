@@ -1,9 +1,23 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../services/supabase', () => ({
+  isSupabaseConfigured: () => false,
+  getSupabaseUrl: () => '',
+  getSupabaseAnonKey: () => '',
+  supabase: {},
+}));
+
 import type { InventoryItemListRow } from '../types/inventory';
 import type { InventoryStoreSession } from '../services/authService';
 import {
+  buildCodAlertFeeGroups,
+  collectPackagingStockInSiblings,
   collectSameCustomerPeers,
+  fxLockFeeMmkForItem,
+  packagingStockInSignBatch,
   resolveCustomerKey,
+  resolvePackagingStockInSignIds,
+  uniqueSignFeeMmk,
   validateBatchSignSelection,
 } from './customerBatchSign';
 
@@ -79,5 +93,64 @@ describe('customerBatchSign', () => {
         row({ id: 'b', customer_name: 'Ma Hla' }),
       ]),
     ).toBe('batchSignMixedCustomer');
+  });
+
+  it('collects unsigned packaging stock-in siblings by (n-i) barcode', () => {
+    const items = [
+      row({ id: 'a', barcode: 'MDY555306070926(3-1)' }),
+      row({ id: 'b', barcode: 'MDY555306070926(3-2)' }),
+      row({ id: 'c', barcode: 'MDY555306070926(3-3)' }),
+      row({ id: 'd', barcode: 'MDY555306070926(3-2)', customer_signed_at: '2026-09-07T00:00:00.000Z' }),
+      row({ id: 'e', barcode: 'OTHER(2-1)' }),
+    ];
+    expect(
+      collectPackagingStockInSiblings(items, items[1], store).map((item) => item.id),
+    ).toEqual(['a', 'b', 'c']);
+  });
+
+  it('loads missing (n-i) siblings when the current list is incomplete', async () => {
+    const anchor = row({ id: 'b', barcode: 'MDY555306070926(3-2)' });
+    const extra = [
+      row({ id: 'a', barcode: 'MDY555306070926(3-1)' }),
+      row({ id: 'c', barcode: 'MDY555306070926(3-3)' }),
+    ];
+    const resolved = await resolvePackagingStockInSignIds(
+      [anchor],
+      [anchor],
+      store,
+      async () => extra,
+    );
+    expect(resolved.map((item) => item.barcode)).toEqual([
+      'MDY555306070926(3-1)',
+      'MDY555306070926(3-2)',
+      'MDY555306070926(3-3)',
+    ]);
+  });
+
+  it('counts a shared packaging-stock-in fee once and locks it on the first sibling', () => {
+    const details = [
+      { id: 'a', barcode: 'MDY1(3-1)', total_fee: '125000', payment_label: '到付', name: 'A' },
+      { id: 'b', barcode: 'MDY1(3-2)', total_fee: '125000', payment_label: '到付', name: 'B' },
+      { id: 'c', barcode: 'MDY1(3-3)', total_fee: '125000', payment_label: '到付', name: 'C' },
+      { id: 'd', barcode: 'SOLO-1', total_fee: '10000', payment_label: '到付', name: 'Solo' },
+    ];
+    expect(uniqueSignFeeMmk(details.slice(0, 3))).toBe(125000);
+    expect(uniqueSignFeeMmk(details)).toBe(135000);
+    expect(fxLockFeeMmkForItem(details[0], details.slice(0, 3))).toBe(125000);
+    expect(fxLockFeeMmkForItem(details[1], details.slice(0, 3))).toBe(0);
+    expect(fxLockFeeMmkForItem(details[2], details.slice(0, 3))).toBe(0);
+    expect(packagingStockInSignBatch(details.slice(0, 3))).toEqual({
+      base: 'MDY1',
+      declaredTotal: 3,
+      count: 3,
+    });
+    expect(buildCodAlertFeeGroups(details.slice(0, 3))).toEqual([
+      {
+        kind: 'packaging',
+        count: 3,
+        fee: 125000,
+        barcodes: ['MDY1(3-1)', 'MDY1(3-2)', 'MDY1(3-3)'],
+      },
+    ]);
   });
 });

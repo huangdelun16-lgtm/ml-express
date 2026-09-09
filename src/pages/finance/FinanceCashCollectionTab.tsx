@@ -2,6 +2,7 @@
 import React from "react";
 import { packageService } from "../../services/supabase";
 import { feedbackService } from "../../services/FeedbackService";
+import { notifyAdminTodosRefresh } from "../../utils/adminTodoBridge";
 import {
   REGIONS,
   getLocalDateYYYYMMDD,
@@ -786,6 +787,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                         setSelectedCashPackages(new Set());
                         // 重新加载数据，确保状态同步
                         loadRecords();
+                        notifyAdminTodosRefresh();
                       } else {
                         feedbackService.notify("结清失败，请重试");
                       }

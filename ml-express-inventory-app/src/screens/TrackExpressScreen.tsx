@@ -24,11 +24,17 @@ import { listItems, listPackedShipments, trackOrderByCode } from '../services/in
 import { findTrackingByAnyCode } from '../services/trackingService';
 import type { InventoryItemListRow, PackedShipmentDetail, TrackOrderResult } from '../types/inventory';
 import type { OrderTrackingRecord, PkgTrackingDetail } from '../types/tracking';
+import { resolvePackagingStockInSignIds } from '../utils/customerBatchSign';
 import { canMarkCustomerSigned, isDestinationHubViewer } from '../utils/customerSign';
 import { formatCnyAmount, formatMmkAmount, fetchCrossBorderFxRate } from '../utils/crossBorderFx';
 import { parseFeeMmk, resolveInvoiceFeeDisplay } from '../utils/crossBorderFxLock';
 import { parseInboundMovementNote, pickNotesFxLock } from '../utils/inboundMovementNote';
 import { stockUnitLabel } from '../utils/itemFieldFormat';
+import { packStatusStyle, type PackDisplayStatus } from '../utils/packDisplayStatus';
+import {
+  effectivePkgTrackingStatus,
+  resolveTrackPackDisplayStatus,
+} from '../utils/shipmentTrackVisibility';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { pickupTypeLabel } from '../types/customerSignReceipt';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
@@ -73,25 +79,33 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function LoadStatusBadge({ loaded }: { loaded: boolean }) {
+function LoadStatusBadge({ status }: { status: PackDisplayStatus }) {
   const { t } = useTranslation();
+  const colors = packStatusStyle(status);
   return (
-    <View style={[styles.statusBadge, loaded ? styles.statusLoaded : styles.statusPending]}>
-      <Text style={[styles.statusText, loaded ? styles.statusLoadedText : styles.statusPendingText]}>
-        {loaded ? t.trackExpress.loaded : t.trackExpress.notLoaded}
-      </Text>
+    <View style={[styles.statusBadge, { backgroundColor: colors.badgeBg }]}>
+      <Text style={[styles.statusText, { color: colors.badgeText }]}>{t.packStatus[status]}</Text>
     </View>
   );
 }
 
-function PackSection({ pack, title }: { pack: PackedShipmentDetail; title: string }) {
+function PackSection({
+  pack,
+  title,
+  cloudPkg,
+}: {
+  pack: PackedShipmentDetail;
+  title: string;
+  cloudPkg?: PkgTrackingDetail | null;
+}) {
   const { t, fmt } = useTranslation();
+  const displayStatus = resolveTrackPackDisplayStatus(pack, cloudPkg);
   return (
     <>
       <Section title={title}>
         <View style={styles.packHeader}>
           <DetailRow label={t.trackExpress.packNo} value={pack.bundle_barcode} />
-          <LoadStatusBadge loaded={pack.loaded} />
+          <LoadStatusBadge status={displayStatus} />
         </View>
         <DetailRow label={t.trackExpress.packName} value={pack.bundle_name} />
         <DetailRow label={t.trackExpress.spec} value={pack.spec} />
@@ -133,7 +147,10 @@ function CloudTrackSection({
   return (
     <Section title={t.trackExpress.sectionCloud}>
       <DetailRow label={t.trackExpress.cloudPkg} value={pkg.pack_barcode} />
-      <DetailRow label={t.trackExpress.transitStatus} value={getPkgStatusLabel(t, pkg.status)} />
+      <DetailRow
+        label={t.trackExpress.transitStatus}
+        value={getPkgStatusLabel(t, effectivePkgTrackingStatus(pkg))}
+      />
       <DetailRow label={t.trackExpress.origin} value={`${pkg.origin_store_code} ${pkg.origin_store_name}`} />
       <DetailRow label={t.trackExpress.destination} value={regionDisplayLabel(pkg.destination_code)} />
       <DetailRow
@@ -184,6 +201,7 @@ function TrackResultPanel({
   const { t, fmt } = useTranslation();
   const { detail, parentPack, truckLoad } = result;
   const activePack = detail.pack ?? parentPack;
+  const displayStatus = activePack ? resolveTrackPackDisplayStatus(activePack, cloudPkg) : null;
   const showSign = canSignDelivered && onSignDelivered;
   const feeMmk = parseFeeMmk(detail.total_fee);
   const signed = Boolean(detail.customer_signed_at?.trim() || detail.sign_receipt);
@@ -225,10 +243,14 @@ function TrackResultPanel({
         {fmt(t.common.stockQty, { qty: detail.qty_on_hand })} {stockUnitLabel()}
       </Text>
 
-      {activePack ? (
+      {activePack && displayStatus ? (
         <View style={styles.loadRow}>
-          <Text style={styles.loadLabel}>{t.trackExpress.loadStatus}</Text>
-          <LoadStatusBadge loaded={activePack.loaded} />
+          <Text style={styles.loadLabel}>
+            {displayStatus === 'arrived' || displayStatus === 'completed'
+              ? t.trackExpress.transitStatus
+              : t.trackExpress.loadStatus}
+          </Text>
+          <LoadStatusBadge status={displayStatus} />
         </View>
       ) : null}
 
@@ -239,9 +261,14 @@ function TrackResultPanel({
           <DetailRow label={t.trackExpress.operator} value={truckLoad.operator} />
           <DetailRow label={t.trackExpress.recordTime} value={formatTime(truckLoad.created_at)} />
         </Section>
-      ) : activePack && !activePack.loaded ? (
+      ) : displayStatus === 'pending_load' ? (
         <View style={styles.pendingHint}>
           <Text style={styles.pendingHintText}>{t.trackExpress.pendingPackHint}</Text>
+        </View>
+      ) : null}
+      {displayStatus === 'arrived' || displayStatus === 'completed' ? (
+        <View style={styles.pendingHint}>
+          <Text style={styles.pendingHintText}>{t.trackExpress.arrivedPackHint}</Text>
         </View>
       ) : null}
 
@@ -326,8 +353,12 @@ function TrackResultPanel({
         </Section>
       ) : null}
 
-      {detail.pack ? <PackSection pack={detail.pack} title={t.trackExpress.sectionPack} /> : null}
-      {parentPack ? <PackSection pack={parentPack} title={t.trackExpress.sectionParentPkg} /> : null}
+      {detail.pack ? (
+        <PackSection pack={detail.pack} title={t.trackExpress.sectionPack} cloudPkg={cloudPkg} />
+      ) : null}
+      {parentPack ? (
+        <PackSection pack={parentPack} title={t.trackExpress.sectionParentPkg} cloudPkg={cloudPkg} />
+      ) : null}
 
       <CloudTrackSection pkg={cloudPkg} order={cloudOrder} />
 
@@ -486,12 +517,22 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
 
   const handleSign = () => {
     if (!result || !store) return;
-    setSignRequest({
-      itemIds: [result.detail.id],
-      operator: operatorName ?? t.common.operator,
-      store,
-      liveRate,
-    });
+    const detail = result.detail;
+    const scope = hubCode ? { store, hubCode } : undefined;
+    void (async () => {
+      const expanded = await resolvePackagingStockInSignIds(
+        keywordMatches,
+        [detail],
+        store,
+        (keyword) => listItems(keyword, scope),
+      );
+      setSignRequest({
+        itemIds: expanded.map((item) => item.id),
+        operator: operatorName ?? t.common.operator,
+        store,
+        liveRate,
+      });
+    })();
   };
 
   return (

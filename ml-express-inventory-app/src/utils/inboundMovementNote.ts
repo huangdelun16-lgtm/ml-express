@@ -69,3 +69,36 @@ export function inboundNoteHasFeeOrPayment(note: string): boolean {
   const parsed = parseInboundMovementNote(note);
   return Boolean(parsed.totalFee?.trim() || parsed.paymentLabel?.trim());
 }
+
+/** 到站/中转补写的入库流水，不含发站总费用 */
+export const HUB_RECEIVE_INBOUND_NOTE_RE =
+  /到站交付确认|到站收货入库|到站入库\s*·|中转站到站/;
+
+export function pickInboundFeeFields(
+  ...notes: Array<string | null | undefined>
+): { totalFee?: string; paymentLabel?: string } {
+  let totalFee: string | undefined;
+  let paymentLabel: string | undefined;
+  for (const note of notes) {
+    const parsed = parseInboundMovementNote(String(note || ''));
+    if (!totalFee && parsed.totalFee?.trim()) totalFee = parsed.totalFee.trim();
+    if (!paymentLabel && parsed.paymentLabel) paymentLabel = parsed.paymentLabel;
+    if (totalFee && paymentLabel) break;
+  }
+  return { totalFee, paymentLabel };
+}
+
+/** 发票/详情用发站那条入库（带总费用），不要用后补的「到站交付确认」 */
+export function pickPrimaryInboundMovement<T extends { created_at?: string; note?: string }>(
+  moves: T[],
+): T | undefined {
+  if (moves.length === 0) return undefined;
+  const oldestFirst = [...moves].sort((a, b) =>
+    String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')),
+  );
+  return (
+    oldestFirst.find((row) => inboundNoteHasFeeOrPayment(row.note ?? '')) ??
+    oldestFirst.find((row) => !HUB_RECEIVE_INBOUND_NOTE_RE.test(row.note ?? '')) ??
+    oldestFirst[0]
+  );
+}

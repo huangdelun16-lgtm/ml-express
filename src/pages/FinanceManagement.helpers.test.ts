@@ -8,6 +8,7 @@ import {
   getPendingRiderCashAmountMmk,
   getPlatformPaymentAmountFromDescription,
   summarizeRiderCashCollection,
+  isPriorUnsettledRiderCashPackage,
   getPlatformDeliveryKeepMmk,
   getRiderDeliveryShareMmk,
   getRiderShareBaseFeeMmk,
@@ -448,6 +449,75 @@ describe('summarizeRiderCashCollection', () => {
     });
     expect(summary.overdueCashMmk).toBe(0);
     expect(summary.overduePackages).toHaveLength(0);
+  });
+});
+
+describe('isPriorUnsettledRiderCashPackage', () => {
+  const today = '2026-09-09';
+
+  it('flags yesterday cash that is delivered and not settled', () => {
+    expect(
+      isPriorUnsettledRiderCashPackage(
+        pkg({
+          payment_method: 'cash',
+          status: '已送达',
+          rider_settled: false,
+          delivery_time: '2026-09-08T10:00:00',
+        }),
+        today,
+      ),
+    ).toBe(true);
+  });
+
+  it('ignores today unsettled cash', () => {
+    expect(
+      isPriorUnsettledRiderCashPackage(
+        pkg({
+          payment_method: 'cash',
+          status: '已送达',
+          rider_settled: false,
+          delivery_time: '2026-09-09T10:00:00',
+        }),
+        today,
+      ),
+    ).toBe(false);
+  });
+
+  it('ignores settled or non-cash packages', () => {
+    expect(
+      isPriorUnsettledRiderCashPackage(
+        pkg({
+          payment_method: 'cash',
+          status: '已送达',
+          rider_settled: true,
+          delivery_time: '2026-09-08T10:00:00',
+        }),
+        today,
+      ),
+    ).toBe(false);
+    expect(
+      isPriorUnsettledRiderCashPackage(
+        pkg({
+          payment_method: 'balance',
+          status: '已送达',
+          rider_settled: false,
+          delivery_time: '2026-09-08T10:00:00',
+        }),
+        today,
+      ),
+    ).toBe(false);
+  });
+
+  it('applies region prefix the same way as the finance tab', () => {
+    const ygn = pkg({
+      id: 'YGN-RIDER-1',
+      payment_method: 'cash',
+      status: '已完成',
+      rider_settled: false,
+      delivery_time: '2026-09-07T10:00:00',
+    });
+    expect(isPriorUnsettledRiderCashPackage(ygn, today, 'MDY')).toBe(false);
+    expect(isPriorUnsettledRiderCashPackage(ygn, today, 'YGN')).toBe(true);
   });
 });
 
