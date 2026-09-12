@@ -37,11 +37,22 @@ import {
   type StoreFinanceDetailMode,
   type CrossBorderExpenseCategory,
   type FinancePeriodParams,
+  INVENTORY_CONSOLE_LIST_LIMIT,
 } from '../services/inventoryConsoleService';
 import {
   orderTrackingStatusBadgeClass,
   orderTrackingStatusLabel,
 } from '../utils/inventoryOrderTracking';
+import { filterOrders, filterPacks } from '../utils/crossBorderConsoleSearch';
+import {
+  filterUnifiedCustomers,
+  mergeConsoleCustomers,
+} from '../utils/crossBorderConsoleCustomers';
+import {
+  orderTouchesStation,
+  packTouchesStation,
+  stationFilterKeys,
+} from '../utils/crossBorderStationFilter';
 import { CROSS_BORDER_HUBS } from '../utils/crossBorderHubs';
 import DualMoney from '../components/DualMoney';
 import {
@@ -67,7 +78,11 @@ import '../styles/crossBorderLogistics.css';
 import { feedbackService } from '../services/FeedbackService';
 import CrossBorderFinancePeriodBar from '../components/CrossBorderFinancePeriodBar';
 import StationSettlementQueue from '../components/StationSettlementQueue';
-import { buildHqFinanceExportCsv, downloadCsv } from '../utils/crossBorderFinanceExport';
+import OrderPickupVisibilityCell from '../components/OrderPickupVisibilityCell';
+import CblSearchCombobox, { type CblSearchOption } from '../components/CblSearchCombobox';
+import CblContactActions from '../components/CblContactActions';
+import type { PackOrdersTarget } from '../components/PackOrdersModal';
+import { downloadHqFinanceExcel } from '../utils/crossBorderFinanceExport';
 import {
   type FinancePeriodKind,
   yangonTodayYmd,
@@ -88,10 +103,43 @@ const CustomerExpressItemsModal = lazy(() => import('../components/CustomerExpre
 const StoreFinanceDetailModal = lazy(() => import('../components/StoreFinanceDetailModal'));
 const StationReconciliationModal = lazy(() => import('../components/StationReconciliationModal'));
 const InventoryExceptionPhotosModal = lazy(() => import('../components/InventoryExceptionPhotosModal'));
+const PackOrdersModal = lazy(() => import('../components/PackOrdersModal'));
 
 function CblLazyModal({ open, children }: { open: boolean; children: ReactNode }) {
   if (!open) return null;
   return <Suspense fallback={null}>{children}</Suspense>;
+}
+
+function transportQueryKey(filter: string, stationKeys: string[]): string {
+  return `${filter}|${stationKeys.slice().sort().join(',')}`;
+}
+
+function resolveStationKeys(
+  stores: InventoryTransitStore[] | undefined,
+  storeCode: string,
+): string[] {
+  const code = String(storeCode || '').trim();
+  if (!code) return [];
+  const store = (stores || []).find((item) => item.store_code === code);
+  return stationFilterKeys(store ?? { store_code: code });
+}
+
+function CblTruncationHint({ show, isEn }: { show: boolean; isEn: boolean }) {
+  if (!show) return null;
+  return (
+    <p className="cbl-truncation-hint">
+      {isEn
+        ? `Showing the latest ${INVENTORY_CONSOLE_LIST_LIMIT} rows. Use search or a station filter to narrow the list.`
+        : `仅显示最近 ${INVENTORY_CONSOLE_LIST_LIMIT} 条。请用搜索或站点筛选缩小范围。`}
+    </p>
+  );
+}
+
+function joinSearchDetail(...parts: Array<string | null | undefined>): string {
+  return parts
+    .map((part) => String(part || '').trim())
+    .filter((part) => part && part !== '—')
+    .join(' · ');
 }
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -348,6 +396,9 @@ const CrossBorderLogisticsPage: FC = () => {
   const [viewingException, setViewingException] = useState<InventoryExceptionConsoleRow | null>(
     null,
   );
+  const [viewingPack, setViewingPack] = useState<PackOrdersTarget | null>(null);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [transportSearch, setTransportSearch] = useState('');
   const [customerSummaries, setCustomerSummaries] = useState<InventoryCustomerSummary[]>([]);
   const [registeredCustomers, setRegisteredCustomers] = useState<CrossBorderRegisteredCustomer[]>(
     [],
@@ -364,8 +415,8 @@ const CrossBorderLogisticsPage: FC = () => {
   const [lastCreated, setLastCreated] = useState<CreateCrossBorderAccountResult | null>(null);
   const [storesPage, setStoresPage] = useState(1);
   const [customersPage, setCustomersPage] = useState(1);
-  const [registeredCustomersPage, setRegisteredCustomersPage] = useState(1);
   const [packsPage, setPacksPage] = useState(1);
+  const [transportStoreCode, setTransportStoreCode] = useState('');
   const [ordersPage, setOrdersPage] = useState(1);
   const [financePage, setFinancePage] = useState(1);
   const [tablePageSize, setTablePageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -383,10 +434,12 @@ const CrossBorderLogisticsPage: FC = () => {
     return isEn ? hub.nameEn : hub.nameZh;
   };
 
-  const packsFilterLoadedRef = useRef<PackStatusFilter>('active');
-  const ordersFilterLoadedRef = useRef<OrderStatusFilter>('active');
+  const packsFilterLoadedRef = useRef(transportQueryKey('active', []));
+  const ordersFilterLoadedRef = useRef(transportQueryKey('active', []));
   const packFilterRef = useRef(packFilter);
   const orderFilterRef = useRef(orderFilter);
+  const transportStoreCodeRef = useRef(transportStoreCode);
+  const transportStationKeysRef = useRef<string[]>([]);
   const financePageRef = useRef(financePage);
   const tablePageSizeRef = useRef(tablePageSize);
   const periodKindRef = useRef(periodKind);
@@ -403,6 +456,7 @@ const CrossBorderLogisticsPage: FC = () => {
 
   packFilterRef.current = packFilter;
   orderFilterRef.current = orderFilter;
+  transportStoreCodeRef.current = transportStoreCode;
   financePageRef.current = financePage;
   tablePageSizeRef.current = tablePageSize;
   periodKindRef.current = periodKind;
@@ -533,6 +587,7 @@ const CrossBorderLogisticsPage: FC = () => {
     const ordersReqId = ++ordersReqIdRef.current;
     const filter = packFilterRef.current;
     const nextOrderFilter = orderFilterRef.current;
+    const stationKeys = transportStationKeysRef.current;
     const shouldReloadCustomers = customersFetchStartedRef.current;
     setLoading(true);
     setFinanceLoading(true);
@@ -547,8 +602,8 @@ const CrossBorderLogisticsPage: FC = () => {
         date: periodDateRef.current,
         storeCode: financeStoreCodeRef.current || undefined,
       }),
-      fetchInventoryConsolePacks(filter),
-      fetchInventoryConsoleOrders(nextOrderFilter),
+      fetchInventoryConsolePacks(filter, stationKeys),
+      fetchInventoryConsoleOrders(nextOrderFilter, stationKeys),
     ]);
 
     if (loadId !== loadSeqRef.current) return;
@@ -593,6 +648,12 @@ const CrossBorderLogisticsPage: FC = () => {
         orderStatusFilter: ordersResult && ordersFresh
           ? (ordersResult.orderStatusFilter ?? nextOrderFilter)
           : (prev?.orderStatusFilter ?? nextOrderFilter),
+        packsTruncated: packsResult && packsFresh
+          ? Boolean(packsResult.packsTruncated)
+          : prev?.packsTruncated,
+        ordersTruncated: ordersResult && ordersFresh
+          ? Boolean(ordersResult.ordersTruncated)
+          : prev?.ordersTruncated,
         crossBorderFinance: financeResult && financeFresh
           ? financeResult.crossBorderFinance
           : prev?.crossBorderFinance,
@@ -600,10 +661,10 @@ const CrossBorderLogisticsPage: FC = () => {
       }));
 
       if (packsFresh) {
-        packsFilterLoadedRef.current = filter;
+        packsFilterLoadedRef.current = transportQueryKey(filter, stationKeys);
       }
       if (ordersFresh) {
-        ordersFilterLoadedRef.current = nextOrderFilter;
+        ordersFilterLoadedRef.current = transportQueryKey(nextOrderFilter, stationKeys);
       }
     } else {
       const reason = overviewSettled.reason;
@@ -657,20 +718,22 @@ const CrossBorderLogisticsPage: FC = () => {
   }, [financePage, tablePageSize, loadFinanceEntries, periodKind, periodDate, financeStoreCode]);
 
   useEffect(() => {
-    if (packsFilterLoadedRef.current === packFilter) return;
+    const nextKey = transportQueryKey(packFilter, transportStationKeysRef.current);
+    if (packsFilterLoadedRef.current === nextKey) return;
     const reqId = ++packsReqIdRef.current;
     setPacksPage(1);
     setPacksLoading(true);
-    void fetchInventoryConsolePacks(packFilter)
+    void fetchInventoryConsolePacks(packFilter, transportStationKeysRef.current)
       .then((result) => {
         if (reqId !== packsReqIdRef.current) return;
-        packsFilterLoadedRef.current = packFilter;
+        packsFilterLoadedRef.current = nextKey;
         setData((prev) =>
           prev
             ? {
                 ...prev,
                 recentPacks: result.recentPacks,
                 packStatusFilter: packFilter,
+                packsTruncated: Boolean(result.packsTruncated),
               }
             : prev,
         );
@@ -683,23 +746,25 @@ const CrossBorderLogisticsPage: FC = () => {
           setPacksLoading(false);
         }
       });
-  }, [packFilter]);
+  }, [packFilter, transportStoreCode]);
 
   useEffect(() => {
-    if (ordersFilterLoadedRef.current === orderFilter) return;
+    const nextKey = transportQueryKey(orderFilter, transportStationKeysRef.current);
+    if (ordersFilterLoadedRef.current === nextKey) return;
     const reqId = ++ordersReqIdRef.current;
     setOrdersPage(1);
     setOrdersLoading(true);
-    void fetchInventoryConsoleOrders(orderFilter)
+    void fetchInventoryConsoleOrders(orderFilter, transportStationKeysRef.current)
       .then((result) => {
         if (reqId !== ordersReqIdRef.current) return;
-        ordersFilterLoadedRef.current = orderFilter;
+        ordersFilterLoadedRef.current = nextKey;
         setData((prev) =>
           prev
             ? {
                 ...prev,
                 recentOrders: result.recentOrders,
                 orderStatusFilter: orderFilter,
+                ordersTruncated: Boolean(result.ordersTruncated),
               }
             : prev,
         );
@@ -712,7 +777,7 @@ const CrossBorderLogisticsPage: FC = () => {
           setOrdersLoading(false);
         }
       });
-  }, [orderFilter]);
+  }, [orderFilter, transportStoreCode]);
 
   useEffect(() => {
     setStoresPage(1);
@@ -721,6 +786,15 @@ const CrossBorderLogisticsPage: FC = () => {
     setOrdersPage(1);
     setFinancePage(1);
   }, [tablePageSize]);
+
+  useEffect(() => {
+    setCustomersPage(1);
+  }, [customerSearch]);
+
+  useEffect(() => {
+    setPacksPage(1);
+    setOrdersPage(1);
+  }, [transportSearch]);
 
   const crossBorderFinance = data?.crossBorderFinance;
   const expenseEntries = crossBorderFinance?.entries ?? [];
@@ -737,24 +811,25 @@ const CrossBorderLogisticsPage: FC = () => {
         storeCode: financeStoreCode || undefined,
         financeExport: true,
       });
-      const csv = buildHqFinanceExportCsv({
+      const store = (data?.transitStores ?? []).find((item) => item.store_code === financeStoreCode);
+      await downloadHqFinanceExcel(`ML-finance-${periodKind}-${periodDate.slice(0, 10)}.xlsx`, {
         entries: result.crossBorderFinance?.entries ?? [],
         summary: result.crossBorderFinance?.summary,
         periodLabel: `${periodKind} ${periodDate}`,
-        stationLabel: financeStoreCode || (isEn ? 'All stations' : '全部站点'),
+        stationLabel: financeStoreCode
+          ? `${financeStoreCode}${store?.store_name ? ` · ${store.store_name}` : ''}`
+          : isEn
+            ? 'All stations'
+            : '全部站点',
         isEn,
         liveRate: fxRate,
       });
-      downloadCsv(
-        `ML-finance-${periodKind}-${periodDate.slice(0, 10)}.csv`,
-        csv,
-      );
     } catch (e) {
       feedbackService.notify(e instanceof Error ? e.message : isEn ? 'Export failed' : '导出失败');
     } finally {
       setExportingCsv(false);
     }
-  }, [periodKind, periodDate, financeStoreCode, isEn, fxRate]);
+  }, [periodKind, periodDate, financeStoreCode, isEn, fxRate, data?.transitStores]);
 
   /** 总收入/总支出与下方「跨境财务」同源：全站汇总 */
   const totalIncomeAllStations = useMemo(() => {
@@ -776,12 +851,20 @@ const CrossBorderLogisticsPage: FC = () => {
   }, [expenseSummary]);
 
   const transitStores = data?.transitStores ?? [];
+  const transportStationKeys = useMemo(
+    () => resolveStationKeys(transitStores, transportStoreCode),
+    [transitStores, transportStoreCode],
+  );
+  transportStationKeysRef.current = transportStationKeys;
+
   const recentPacks = useMemo(
     () =>
-      (data?.recentPacks ?? []).filter((pack) =>
-        matchesPackTransportFilter(pack, packFilter),
+      (data?.recentPacks ?? []).filter(
+        (pack) =>
+          matchesPackTransportFilter(pack, packFilter) &&
+          packTouchesStation(pack, transportStationKeys),
       ),
-    [data?.recentPacks, packFilter],
+    [data?.recentPacks, packFilter, transportStationKeys],
   );
   const packTripGroupMap = useMemo(
     () =>
@@ -804,14 +887,17 @@ const CrossBorderLogisticsPage: FC = () => {
     [transitStores, storesPage, tablePageSize],
   );
 
-  const pagedCustomers = useMemo(
-    () => paginateSlice(customerSummaries, customersPage, tablePageSize),
-    [customerSummaries, customersPage, tablePageSize],
+  const unifiedCustomers = useMemo(
+    () => mergeConsoleCustomers(registeredCustomers, customerSummaries),
+    [registeredCustomers, customerSummaries],
   );
-
-  const pagedRegisteredCustomers = useMemo(
-    () => paginateSlice(registeredCustomers, registeredCustomersPage, tablePageSize),
-    [registeredCustomers, registeredCustomersPage, tablePageSize],
+  const filteredUnifiedCustomers = useMemo(
+    () => filterUnifiedCustomers(unifiedCustomers, customerSearch),
+    [unifiedCustomers, customerSearch],
+  );
+  const pagedUnifiedCustomers = useMemo(
+    () => paginateSlice(filteredUnifiedCustomers, customersPage, tablePageSize),
+    [filteredUnifiedCustomers, customersPage, tablePageSize],
   );
 
   const handleRegisteredCustomerStatus = useCallback(
@@ -856,16 +942,80 @@ const CrossBorderLogisticsPage: FC = () => {
     [registeredCustomers, customerSummaries],
   );
 
+  const filteredPacks = useMemo(
+    () => filterPacks(recentPacks, transportSearch),
+    [recentPacks, transportSearch],
+  );
   const pagedPacks = useMemo(
-    () => paginateSlice(recentPacks, packsPage, tablePageSize),
-    [recentPacks, packsPage, tablePageSize],
+    () => paginateSlice(filteredPacks, packsPage, tablePageSize),
+    [filteredPacks, packsPage, tablePageSize],
   );
 
-  const recentOrders = useMemo(() => data?.recentOrders ?? [], [data?.recentOrders]);
-  const pagedOrders = useMemo(
-    () => paginateSlice(recentOrders, ordersPage, tablePageSize),
-    [recentOrders, ordersPage, tablePageSize],
+  const recentOrders = useMemo(
+    () =>
+      (data?.recentOrders ?? []).filter((order) =>
+        orderTouchesStation(order, transportStationKeys),
+      ),
+    [data?.recentOrders, transportStationKeys],
   );
+  const filteredOrders = useMemo(
+    () => filterOrders(recentOrders, transportSearch),
+    [recentOrders, transportSearch],
+  );
+  const pagedOrders = useMemo(
+    () => paginateSlice(filteredOrders, ordersPage, tablePageSize),
+    [filteredOrders, ordersPage, tablePageSize],
+  );
+
+  const customerSearchOptions = useMemo((): CblSearchOption[] => {
+    const seenCodes = new Set<string>();
+    const options: CblSearchOption[] = [];
+    for (const row of registeredCustomers) {
+      const code = String(row.customer_code || '').trim();
+      if (code) seenCodes.add(code.toUpperCase());
+      options.push({
+        id: `reg:${row.id}`,
+        label: row.customer_name || code || row.phone || '—',
+        detail: joinSearchDetail(code, row.phone),
+        value: code || row.phone || row.customer_name,
+      });
+    }
+    for (const row of customerSummaries) {
+      const code = String(row.customerCode || '').trim();
+      if (code && seenCodes.has(code.toUpperCase())) continue;
+      options.push({
+        id: `sum:${row.customerKey}`,
+        label: row.customerName || code || row.customerPhone || '—',
+        detail: joinSearchDetail(code, row.customerPhone),
+        value: code || row.customerPhone || row.customerName,
+      });
+    }
+    return options;
+  }, [registeredCustomers, customerSummaries]);
+
+  const transportSearchOptions = useMemo((): CblSearchOption[] => {
+    if (transportView === 'orders') {
+      return recentOrders.map((order) => ({
+        id: order.id,
+        label: order.order_barcode || order.express_barcode || '—',
+        detail: joinSearchDetail(
+          order.express_barcode && order.express_barcode !== order.order_barcode
+            ? order.express_barcode
+            : '',
+          orderCustomerLabel(order),
+          order.recipient_phone,
+          order.pack_barcode,
+        ),
+        value: order.order_barcode || order.express_barcode || order.pack_barcode,
+      }));
+    }
+    return recentPacks.map((pack) => ({
+      id: pack.id,
+      label: pack.pack_barcode,
+      detail: joinSearchDetail(pack.trip_number, packLegRoute(pack), pack.pack_name),
+      value: pack.pack_barcode,
+    }));
+  }, [transportView, recentOrders, recentPacks]);
 
   const statsCards = useMemo((): StatCard[] => {
     if (!data?.stats) return [];
@@ -973,9 +1123,17 @@ const CrossBorderLogisticsPage: FC = () => {
     { id: 'active', label: isEn ? 'Active' : '进行中' },
     { id: 'in_transit', label: isEn ? 'In transit' : '在途' },
     { id: 'hub_received', label: isEn ? 'Arrived' : '到站' },
+    { id: 'awaiting_pickup', label: isEn ? 'Awaiting pickup' : '待签收' },
+    { id: 'signed', label: isEn ? 'Signed' : '已签收' },
     { id: 'released_at_hub', label: isEn ? 'Released' : '已释放' },
     { id: 'all', label: isEn ? 'All' : '全部' },
   ];
+
+  const openPackOrders = (target: PackOrdersTarget) => {
+    const code = String(target.pack_barcode || '').trim();
+    if (!code) return;
+    setViewingPack({ ...target, pack_barcode: code });
+  };
 
   const transportLoading = transportView === 'packs' ? packsLoading : ordersLoading;
 
@@ -1676,8 +1834,8 @@ const CrossBorderLogisticsPage: FC = () => {
                 <h2 className="cbl-card__title">{isEn ? 'Customers' : '客户信息'}</h2>
                 <p className="cbl-card-hint cbl-card-hint--in-head">
                   {isEn
-                    ? 'Registered customers and Inventory App「Express details」aggregates. Pause unused accounts so the App no longer auto-fills them. Click a name for parcels.'
-                    : '登记客户与 Inventory App「快递明细」汇总（按客户编码合并）。不用的账号请点「暂停」，App 填写客户编码将不再带出电话。点姓名可看包裹。'}
+                    ? 'One list: registered customers plus unfiled inbound. Click a name for parcels; tap a phone to WhatsApp or call. Pause unused accounts so the App no longer auto-fills them.'
+                    : '一张表：登记客户与未建档入库合并。点姓名看包裹，点电话可 WhatsApp / 拨打。不用的账号请点「暂停」，App 填写客户编码将不再带出电话。'}
                 </p>
               </div>
               <div className="cbl-card__head-actions">
@@ -1694,7 +1852,24 @@ const CrossBorderLogisticsPage: FC = () => {
               </div>
             </div>
             <div className="cbl-card__body">
-              {registeredCustomers.length ? (
+              {registeredCustomers.length || customerSummaries.length ? (
+                <CblSearchCombobox
+                  value={customerSearch}
+                  onChange={setCustomerSearch}
+                  options={customerSearchOptions}
+                  placeholder={
+                    isEn
+                      ? 'Search name, phone, customer code…'
+                      : '搜索姓名、电话、客户编码…'
+                  }
+                  emptyText={isEn ? 'No matching customers' : '没有匹配的客户'}
+                  count={filteredUnifiedCustomers.length}
+                  isEn={isEn}
+                />
+              ) : null}
+              {customersLoading ? (
+                <div className="cbl-empty">{isEn ? 'Loading customers…' : '加载客户信息…'}</div>
+              ) : filteredUnifiedCustomers.length ? (
                 <>
                   <div className="cbl-table-wrap">
                     <table className="cbl-table cbl-table--customers">
@@ -1704,188 +1879,174 @@ const CrossBorderLogisticsPage: FC = () => {
                           <th>{isEn ? 'Name' : '客户姓名'}</th>
                           <th>{isEn ? 'Phone' : '电话'}</th>
                           <th>{isEn ? 'Notify' : '通知方式'}</th>
-                          <th>{isEn ? 'Delivery city' : '送货城市'}</th>
-                          <th>{isEn ? 'Salesperson' : '推销员'}</th>
-                          <th>{isEn ? 'Applied' : '申请日期'}</th>
-                          <th>{isEn ? 'Notes' : '备注'}</th>
+                          <th>{isEn ? 'City / pieces' : '城市 / 件数'}</th>
+                          <th>{isEn ? 'Fee' : '费用'}</th>
                           <th>{isEn ? 'Action' : '操作'}</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {pagedRegisteredCustomers.map((row) => {
-                          const paused = row.status === 'inactive';
-                          const busy = customerStatusBusyId === row.id;
+                        {pagedUnifiedCustomers.map((row) => {
+                          const registered = row.registered;
+                          const summary = row.summary;
+                          const paused = registered?.status === 'inactive';
+                          const busy = registered ? customerStatusBusyId === registered.id : false;
+                          const name = registered?.customer_name || summary?.customerName || '—';
+                          const phone = registered?.phone || summary?.customerPhone || '';
+                          const code = registered?.customer_code || summary?.customerCode || '';
+                          const modalTarget = registered
+                            ? registeredCustomerToSummary(registered, customerSummaries)
+                            : summary ?? null;
                           return (
-                          <tr key={row.id} className={paused ? 'cbl-table-row--paused' : undefined}>
-                            <td>
-                              <button
-                                type="button"
-                                className="cbl-customer-name-btn"
-                                onClick={() =>
-                                  setCustomerModalTarget(
-                                    registeredCustomerToSummary(row, customerSummaries),
-                                  )
-                                }
-                              >
-                                <span className="cbl-code">{row.customer_code}</span>
-                              </button>
-                            </td>
-                            <td>
-                              <div className="cbl-customer-name-cell">
-                                <button
-                                  type="button"
-                                  className="cbl-customer-name-btn"
-                                  onClick={() =>
-                                    setCustomerModalTarget(
-                                      registeredCustomerToSummary(row, customerSummaries),
-                                    )
-                                  }
-                                >
-                                  <span className="cbl-customer-name-btn__name">{row.customer_name}</span>
-                                </button>
-                                {paused ? (
-                                  <span className="cbl-badge cbl-badge--gray">{isEn ? 'Paused' : '已暂停'}</span>
+                            <tr
+                              key={row.key}
+                              className={paused ? 'cbl-table-row--paused' : undefined}
+                            >
+                              <td>
+                                {code ? (
+                                  <button
+                                    type="button"
+                                    className="cbl-customer-name-btn"
+                                    onClick={() => modalTarget && setCustomerModalTarget(modalTarget)}
+                                  >
+                                    <span className="cbl-code">{code}</span>
+                                  </button>
+                                ) : (
+                                  <span className="cbl-dim">—</span>
+                                )}
+                                {row.kind === 'express' ? (
+                                  <span className="cbl-badge cbl-badge--amber">
+                                    {isEn ? 'Unfiled' : '未建档'}
+                                  </span>
                                 ) : null}
-                              </div>
-                            </td>
-                            <td>{row.phone || '—'}</td>
-                            <td>
-                              {formatCustomerNotifyDisplay(row.notify_method, row.notify_account)}
-                            </td>
-                            <td>
-                              {hubLabel(row.delivery_region_id)}
-                              <span className="cbl-dim"> · {row.delivery_area_code}</span>
-                            </td>
-                            <td>{formatSalespersonEmployeeCodeDisplay(row.salesperson_employee_code) || '—'}</td>
-                            <td className="cbl-dim">{formatIsoDate(row.application_date, language)}</td>
-                            <td className="cbl-dim">{row.address_notes || '—'}</td>
-                            <td>
-                              <div className="cbl-row-actions">
-                                <button
-                                  type="button"
-                                  className="cbl-btn cbl-btn--primary cbl-btn--sm"
-                                  onClick={() => {
-                                    setEditingCustomer(row);
-                                    setShowCreateCustomerModal(true);
-                                  }}
-                                >
-                                  {isEn ? 'Edit' : '编辑'}
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`cbl-btn cbl-btn--sm ${
-                                    paused ? 'cbl-btn--ghost' : 'cbl-btn--danger-outline'
-                                  }`}
-                                  disabled={busy}
-                                  onClick={() =>
-                                    void handleRegisteredCustomerStatus(
-                                      row,
-                                      paused ? 'active' : 'inactive',
-                                    )
+                              </td>
+                              <td>
+                                <div className="cbl-customer-name-cell">
+                                  <button
+                                    type="button"
+                                    className="cbl-customer-name-btn"
+                                    onClick={() => modalTarget && setCustomerModalTarget(modalTarget)}
+                                  >
+                                    <span className="cbl-customer-name-btn__name">{name}</span>
+                                  </button>
+                                  {paused ? (
+                                    <span className="cbl-badge cbl-badge--gray">
+                                      {isEn ? 'Paused' : '已暂停'}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </td>
+                              <td>
+                                <CblContactActions
+                                  phone={phone}
+                                  notifyMethod={registered?.notify_method}
+                                  notifyAccount={registered?.notify_account}
+                                  isEn={isEn}
+                                  message={
+                                    isEn
+                                      ? `Hello, this is ML Express regarding your shipment.`
+                                      : `您好，我是 ML Express，关于您的跨境快件。`
                                   }
-                                >
-                                  {busy
-                                    ? isEn
-                                      ? 'Saving…'
-                                      : '保存中…'
-                                    : paused
-                                      ? isEn
-                                        ? 'Resume'
-                                        : '恢复'
-                                      : isEn
-                                        ? 'Pause'
-                                        : '暂停'}
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
+                                />
+                              </td>
+                              <td>
+                                {registered
+                                  ? formatCustomerNotifyDisplay(
+                                      registered.notify_method,
+                                      registered.notify_account,
+                                    )
+                                  : '—'}
+                              </td>
+                              <td>
+                                {registered ? (
+                                  <>
+                                    {hubLabel(registered.delivery_region_id)}
+                                    <span className="cbl-dim"> · {registered.delivery_area_code}</span>
+                                  </>
+                                ) : (
+                                  <span className="cbl-dim">—</span>
+                                )}
+                                <div className="cbl-dim">
+                                  {summary
+                                    ? `${summary.totalPieces} ${isEn ? 'pcs' : '件'}${
+                                        summary.totalWeightKg > 0 ? ` · ${summary.totalWeightKg} Kg` : ''
+                                      }`
+                                    : isEn
+                                      ? 'No inbound yet'
+                                      : '暂无入库'}
+                                </div>
+                              </td>
+                              <td>
+                                {summary ? <DualMoney mmk={summary.totalFee} rate={fxRate} /> : '—'}
+                              </td>
+                              <td>
+                                {registered ? (
+                                  <div className="cbl-row-actions">
+                                    <button
+                                      type="button"
+                                      className="cbl-btn cbl-btn--primary cbl-btn--sm"
+                                      onClick={() => {
+                                        setEditingCustomer(registered);
+                                        setShowCreateCustomerModal(true);
+                                      }}
+                                    >
+                                      {isEn ? 'Edit' : '编辑'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`cbl-btn cbl-btn--sm ${
+                                        paused ? 'cbl-btn--ghost' : 'cbl-btn--danger-outline'
+                                      }`}
+                                      disabled={busy}
+                                      onClick={() =>
+                                        void handleRegisteredCustomerStatus(
+                                          registered,
+                                          paused ? 'active' : 'inactive',
+                                        )
+                                      }
+                                    >
+                                      {busy
+                                        ? isEn
+                                          ? 'Saving…'
+                                          : '保存中…'
+                                        : paused
+                                          ? isEn
+                                            ? 'Resume'
+                                            : '恢复'
+                                          : isEn
+                                            ? 'Pause'
+                                            : '暂停'}
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="cbl-dim">
+                                    {isEn ? 'Register to manage' : '建档后可编辑'}
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
                           );
                         })}
                       </tbody>
                     </table>
                   </div>
                   <CblTablePagination
-                    page={registeredCustomersPage}
+                    page={customersPage}
                     pageSize={tablePageSize}
-                    totalItems={registeredCustomers.length}
-                    onPageChange={setRegisteredCustomersPage}
+                    totalItems={filteredUnifiedCustomers.length}
+                    onPageChange={setCustomersPage}
                     onPageSizeChange={setTablePageSize}
                     isEn={isEn}
                   />
                 </>
               ) : (
                 <div className="cbl-empty cbl-empty--in-card">
-                  {isEn
-                    ? 'No registered customers yet. Use「+ Add customer」.'
-                    : '暂无登记客户。请点击右上角「+ 添加客户」。'}
-                </div>
-              )}
-
-              <h3 className="cbl-customer-section-title">
-                {isEn ? 'Express summary' : '快递明细汇总'}
-              </h3>
-              {customersLoading ? (
-                <div className="cbl-empty">{isEn ? 'Loading customers…' : '加载客户信息…'}</div>
-              ) : customerSummaries.length ? (
-                <>
-                <div className="cbl-table-wrap">
-                  <table className="cbl-table cbl-table--customers">
-                    <thead>
-                      <tr>
-                        <th>{isEn ? 'Customer code' : '客户编码'}</th>
-                        <th>{isEn ? 'Customer name' : '客户姓名'}</th>
-                        <th>{isEn ? 'Phone' : '电话'}</th>
-                        <th>{isEn ? 'Total pieces' : '总件数'}</th>
-                        <th>{isEn ? 'Total weight' : '总重量'}</th>
-                        <th>{isEn ? 'Total fee' : '总费用'}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagedCustomers.map((row) => (
-                        <tr key={row.customerKey}>
-                          <td>
-                            {row.customerCode ? (
-                              <span className="cbl-code">{row.customerCode}</span>
-                            ) : (
-                              <span className="cbl-dim">—</span>
-                            )}
-                          </td>
-                          <td>
-                            <button
-                              type="button"
-                              className="cbl-customer-name-btn"
-                              onClick={() => setCustomerModalTarget(row)}
-                            >
-                              <span className="cbl-customer-name-btn__name">{row.customerName}</span>
-                            </button>
-                          </td>
-                          <td>{row.customerPhone && row.customerPhone !== '—' ? row.customerPhone : '—'}</td>
-                          <td>{row.totalPieces}</td>
-                          <td>
-                            {row.totalWeightKg > 0 ? `${row.totalWeightKg} Kg` : '—'}
-                          </td>
-                          <td>
-                            <DualMoney mmk={row.totalFee} rate={fxRate} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <CblTablePagination
-                  page={customersPage}
-                  pageSize={tablePageSize}
-                  totalItems={customerSummaries.length}
-                  onPageChange={setCustomersPage}
-                  onPageSizeChange={setTablePageSize}
-                  isEn={isEn}
-                />
-                </>
-              ) : (
-                <div className="cbl-empty">
-                  {isEn
-                    ? 'No customer orders in cloud yet. Sync from Inventory App express details.'
-                    : '暂无客户订单。请先在 Inventory App 入库并同步云端。'}
+                  {customerSearch.trim()
+                    ? isEn
+                      ? 'No matching customers.'
+                      : '没有匹配的客户。'
+                    : isEn
+                      ? 'No customers yet. Use「+ Add customer」, or sync inbound from Inventory App.'
+                      : '暂无客户。请点右上角「+ 添加客户」，或先在 Inventory App 入库并同步。'}
                 </div>
               )}
             </div>
@@ -1927,6 +2088,19 @@ const CrossBorderLogisticsPage: FC = () => {
                   {isEn ? 'Orders' : '订单'}
                 </button>
               </div>
+              <select
+                className="cbl-station-select"
+                value={transportStoreCode}
+                onChange={(event) => setTransportStoreCode(event.target.value)}
+                aria-label={isEn ? 'Station' : '站点'}
+              >
+                <option value="">{isEn ? 'All stations' : '全部站点'}</option>
+                {transitStores.map((store) => (
+                  <option key={store.id} value={store.store_code}>
+                    {store.store_code} · {store.store_name}
+                  </option>
+                ))}
+              </select>
               <div className="cbl-chip-row">
                 {(transportView === 'packs' ? packFilters : orderFilters).map((f) => (
                   <button
@@ -1953,16 +2127,51 @@ const CrossBorderLogisticsPage: FC = () => {
             <p className="cbl-card-hint">
               {transportView === 'orders'
                 ? isEn
-                  ? 'Live data from inventory_order_tracking — one row per express order inside a pack.'
-                  : '实时读取云端 inventory_order_tracking；每个快递包内的订单一行。'
+                  ? 'Live data from inventory_order_tracking — one row per express order inside a pack. Notify/sign come from station Inventory App; HQ does not sign for customers.'
+                  : '实时读取云端 inventory_order_tracking；每个快递包内的订单一行。通知/签收来自站点 Inventory App，总部不代签。'
                 : isEn
-                  ? 'Live data from inventory_pkg_tracking — written when Inventory App stock-out syncs to cloud.'
-                  : '实时读取云端 inventory_pkg_tracking；Inventory App 装车出库并成功同步后才会出现记录。'}
+                  ? 'Live data from inventory_pkg_tracking — written when Inventory App stock-out syncs to cloud. Click a pack barcode to see orders inside. Station filter uses the same transit accounts as finance.'
+                  : '实时读取云端 inventory_pkg_tracking；Inventory App 装车出库并成功同步后才会出现记录。点包装号可看包内订单。站点筛选与财务同一套中转站列表。'}
             </p>
+            <CblTruncationHint
+              show={
+                transportView === 'packs'
+                  ? Boolean(data?.packsTruncated)
+                  : Boolean(data?.ordersTruncated)
+              }
+              isEn={isEn}
+            />
+            {(recentPacks.length || recentOrders.length) ? (
+              <CblSearchCombobox
+                value={transportSearch}
+                onChange={setTransportSearch}
+                options={transportSearchOptions}
+                placeholder={
+                  transportView === 'orders'
+                    ? isEn
+                      ? 'Search order, express, pack, name or phone…'
+                      : '搜索订单条码、快递单、包装号、姓名或电话…'
+                    : isEn
+                      ? 'Search pack, trip or route…'
+                      : '搜索包装号、车次或路线…'
+                }
+                emptyText={
+                  transportView === 'orders'
+                    ? isEn
+                      ? 'No matching orders'
+                      : '没有匹配的订单'
+                    : isEn
+                      ? 'No matching packs'
+                      : '没有匹配的包裹'
+                }
+                count={transportView === 'orders' ? filteredOrders.length : filteredPacks.length}
+                isEn={isEn}
+              />
+            ) : null}
             {transportView === 'packs' ? (
               packsLoading && !recentPacks.length ? (
                 <div className="cbl-empty">{isEn ? 'Loading transport…' : '正在加载运输明细…'}</div>
-              ) : recentPacks.length ? (
+              ) : filteredPacks.length ? (
                 <>
                   <div className={`cbl-table-wrap${packsLoading ? ' is-loading' : ''}`}>
                     <table className="cbl-table">
@@ -1982,7 +2191,20 @@ const CrossBorderLogisticsPage: FC = () => {
                         {pagedPacks.map((pack: InventoryPackRow) => (
                           <tr key={pack.id}>
                             <td>
-                              <div style={{ fontWeight: 650 }}>{pack.pack_barcode}</div>
+                              <button
+                                type="button"
+                                className="cbl-customer-name-btn"
+                                onClick={() =>
+                                  openPackOrders({
+                                    pack_barcode: pack.pack_barcode,
+                                    pack_name: pack.pack_name,
+                                    trip_number: pack.trip_number,
+                                    routeLabel: packLegRoute(pack),
+                                  })
+                                }
+                              >
+                                <span className="cbl-customer-name-btn__name">{pack.pack_barcode}</span>
+                              </button>
                               {pack.pack_name && (
                                 <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
                                   {pack.pack_name}
@@ -2031,7 +2253,7 @@ const CrossBorderLogisticsPage: FC = () => {
                   <CblTablePagination
                     page={packsPage}
                     pageSize={tablePageSize}
-                    totalItems={recentPacks.length}
+                    totalItems={filteredPacks.length}
                     onPageChange={setPacksPage}
                     onPageSizeChange={setTablePageSize}
                     isEn={isEn}
@@ -2039,14 +2261,18 @@ const CrossBorderLogisticsPage: FC = () => {
                 </>
               ) : (
                 <div className="cbl-empty">
-                  {isEn
-                    ? 'No packages for this filter. Stock out in Inventory App and ensure cloud sync succeeded.'
-                    : '当前筛选下无包裹。请在 Inventory App 装车出库并确认云端同步成功。'}
+                  {transportSearch.trim()
+                    ? isEn
+                      ? 'No matching packs.'
+                      : '没有匹配的包裹。'
+                    : isEn
+                      ? 'No packages for this filter. Stock out in Inventory App and ensure cloud sync succeeded.'
+                      : '当前筛选下无包裹。请在 Inventory App 装车出库并确认云端同步成功。'}
                 </div>
               )
             ) : ordersLoading && !recentOrders.length ? (
               <div className="cbl-empty">{isEn ? 'Loading orders…' : '正在加载订单明细…'}</div>
-            ) : recentOrders.length ? (
+            ) : filteredOrders.length ? (
               <>
                 <div className={`cbl-table-wrap${ordersLoading ? ' is-loading' : ''}`}>
                   <table className="cbl-table">
@@ -2054,11 +2280,12 @@ const CrossBorderLogisticsPage: FC = () => {
                       <tr>
                         <th>{isEn ? 'Order' : '订单条码'}</th>
                         <th>{isEn ? 'Customer' : '客户 / 品名'}</th>
-                        {!isMobile && <th>{isEn ? 'Phone' : '电话'}</th>}
+                        <th>{isEn ? 'Phone' : '电话'}</th>
                         <th>{isEn ? 'Pack' : '包装号'}</th>
                         <th>{isEn ? 'Destination' : '目的地'}</th>
                         <th>{isEn ? 'Hub' : '到站站点'}</th>
                         <th>{isEn ? 'Status' : '状态'}</th>
+                        <th>{isEn ? 'Notify / sign' : '通知 / 签收'}</th>
                         {!isMobile && <th>{isEn ? 'Arrived' : '到站时间'}</th>}
                       </tr>
                     </thead>
@@ -2083,9 +2310,29 @@ const CrossBorderLogisticsPage: FC = () => {
                               </div>
                             ) : null}
                           </td>
-                          {!isMobile && <td>{order.recipient_phone || '—'}</td>}
                           <td>
-                            <span className="cbl-code">{order.pack_barcode || '—'}</span>
+                            <CblContactActions
+                              phone={order.recipient_phone}
+                              isEn={isEn}
+                              message={
+                                isEn
+                                  ? `Hello, this is ML Express regarding ${order.order_barcode || 'your shipment'}.`
+                                  : `您好，我是 ML Express，关于快件 ${order.order_barcode || ''}。`
+                              }
+                            />
+                          </td>
+                          <td>
+                            {order.pack_barcode ? (
+                              <button
+                                type="button"
+                                className="cbl-customer-name-btn"
+                                onClick={() => openPackOrders({ pack_barcode: order.pack_barcode })}
+                              >
+                                <span className="cbl-code">{order.pack_barcode}</span>
+                              </button>
+                            ) : (
+                              <span className="cbl-code">—</span>
+                            )}
                           </td>
                           <td>{order.destination_code || '—'}</td>
                           <td>
@@ -2098,6 +2345,9 @@ const CrossBorderLogisticsPage: FC = () => {
                               {orderTrackingStatusLabel(order.status, isEn)}
                             </span>
                           </td>
+                          <td>
+                            <OrderPickupVisibilityCell order={order} isEn={isEn} />
+                          </td>
                           {!isMobile && (
                             <td>{formatDateTime(order.hub_received_at, language)}</td>
                           )}
@@ -2109,7 +2359,7 @@ const CrossBorderLogisticsPage: FC = () => {
                 <CblTablePagination
                   page={ordersPage}
                   pageSize={tablePageSize}
-                  totalItems={recentOrders.length}
+                  totalItems={filteredOrders.length}
                   onPageChange={setOrdersPage}
                   onPageSizeChange={setTablePageSize}
                   isEn={isEn}
@@ -2117,9 +2367,13 @@ const CrossBorderLogisticsPage: FC = () => {
               </>
             ) : (
               <div className="cbl-empty">
-                {isEn
-                  ? 'No orders for this filter. Scan inbound at a hub in Inventory App after cloud sync.'
-                  : '当前筛选下无订单。请在 Inventory App 装车/到站扫码并确认云端同步成功。'}
+                {transportSearch.trim()
+                  ? isEn
+                    ? 'No matching orders.'
+                    : '没有匹配的订单。'
+                  : isEn
+                    ? 'No orders for this filter. Scan inbound at a hub in Inventory App after cloud sync.'
+                    : '当前筛选下无订单。请在 Inventory App 装车/到站扫码并确认云端同步成功。'}
               </div>
             )}
           </div>
@@ -2192,7 +2446,7 @@ const CrossBorderLogisticsPage: FC = () => {
           editingCustomer={editingCustomer}
           onCreated={(customer) => {
             setRegisteredCustomers((prev) => [customer, ...prev]);
-            setRegisteredCustomersPage(1);
+            setCustomersPage(1);
           }}
           onUpdated={(customer) => {
             setRegisteredCustomers((prev) =>
@@ -2219,6 +2473,16 @@ const CrossBorderLogisticsPage: FC = () => {
           onClose={() => setReconcileModalStore(null)}
           store={reconcileModalStore}
           period={statementPeriod}
+        />
+      </CblLazyModal>
+
+      <CblLazyModal open={viewingPack != null}>
+        <PackOrdersModal
+          open={viewingPack != null}
+          pack={viewingPack}
+          isEn={isEn}
+          language={language}
+          onClose={() => setViewingPack(null)}
         />
       </CblLazyModal>
 

@@ -90,7 +90,7 @@ const CrossBorderFinancePeriodBar: React.FC<Props> = ({
         onClick={onExport}
         disabled={Boolean(exporting)}
       >
-        {exporting ? (isEn ? 'Exporting…' : '导出中…') : isEn ? 'Export CSV' : '导出 CSV'}
+        {exporting ? (isEn ? 'Exporting…' : '导出中…') : isEn ? 'Export Excel' : '导出 Excel'}
       </button>
     </div>
   );

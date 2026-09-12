@@ -10,9 +10,9 @@ import {
   getRangeForPreset,
   summarizePackages,
   fetchRechargeSummaryBetween,
-  toCsvRow,
   inferPackageRegion,
 } from '../services/adminInsightsService';
+import { downloadAdminExcel } from '../utils/adminExcelExport';
 
 const REGIONS: { id: string; labelZh: string; labelEn: string }[] = [
   { id: 'all', labelZh: '全部区域', labelEn: 'All regions' },
@@ -21,16 +21,6 @@ const REGIONS: { id: string; labelZh: string; labelEn: string }[] = [
   { id: 'maymyo', labelZh: '彬乌伦', labelEn: 'Pyin Oo Lwin' },
   { id: 'other', labelZh: '其他/未标', labelEn: 'Other' },
 ];
-
-function downloadText(filename: string, text: string, mime = 'text/csv;charset=utf-8') {
-  const blob = new Blob(['\uFEFF', text], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 function formatRangeLabel(startIso: string, endIso: string, lang: string): string {
   const opt: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
@@ -98,70 +88,88 @@ const AdminReportsPage: React.FC = () => {
 
   const completionRate = summary.total > 0 ? Math.round((summary.delivered / summary.total) * 1000) / 10 : 0;
 
-  const exportSummaryCsv = () => {
+  const exportSummaryExcel = () => {
     const { start, end } = getRangeForPreset(preset, customStart, customEnd);
-    const lines = [
-      toCsvRow(['报表类型', '数据报表-汇总']),
-      toCsvRow(['时间起', start]),
-      toCsvRow(['时间止', end]),
-      toCsvRow(['区域筛选', regionLabel(region)]),
-      toCsvRow([]),
-      toCsvRow(['总单量', summary.total]),
-      toCsvRow(['已送达', summary.delivered]),
-      toCsvRow(['运输中', summary.inTransit]),
-      toCsvRow(['待取/待收', summary.pending]),
-      toCsvRow(['送达占比(%)', completionRate]),
-      toCsvRow(['COD 估算合计(MMK)', Math.round(summary.codTotalMmk)]),
-      toCsvRow([]),
-      toCsvRow(['充值笔数', recharge.count]),
-      toCsvRow(['充值已完成', recharge.completed]),
-      toCsvRow(['充值待审', recharge.pending]),
-      toCsvRow(['充值拒绝', recharge.rejected]),
-      toCsvRow(['充值入账金额(MMK)', Math.round(recharge.amountCompletedMmk)]),
-      toCsvRow([]),
-      toCsvRow(['状态', '件数']),
-      ...sortedStatusEntries.map(([k, v]) => toCsvRow([k, v])),
-      toCsvRow([]),
-      toCsvRow(['区域', '件数']),
-      ...sortedRegionEntries.map(([k, v]) => toCsvRow([k, v])),
-    ];
-    downloadText(`ml-reports-summary-${Date.now()}.csv`, lines.join('\n'));
+    void downloadAdminExcel(`ml-reports-summary-${Date.now()}.xlsx`, [
+      {
+        name: isEn ? 'Summary' : '汇总',
+        title: isEn ? 'MARKET LINK · Reports summary' : 'MARKET LINK · 数据报表汇总',
+        subtitle: `${start} — ${end} · ${regionLabel(region)}`,
+        columns: [
+          { header: isEn ? 'Item' : '项目', width: 28 },
+          { header: isEn ? 'Value' : '数值', width: 18, align: 'right' },
+        ],
+        rows: [
+          [isEn ? 'Orders' : '总单量', summary.total],
+          [isEn ? 'Delivered' : '已送达', summary.delivered],
+          [isEn ? 'In transit' : '运输中', summary.inTransit],
+          [isEn ? 'Pending' : '待取/待收', summary.pending],
+          [isEn ? 'Delivery rate %' : '送达占比(%)', completionRate],
+          [isEn ? 'COD estimate MMK' : 'COD 估算合计(MMK)', Math.round(summary.codTotalMmk)],
+          [isEn ? 'Recharge count' : '充值笔数', recharge.count],
+          [isEn ? 'Recharge completed' : '充值已完成', recharge.completed],
+          [isEn ? 'Recharge pending' : '充值待审', recharge.pending],
+          [isEn ? 'Recharge rejected' : '充值拒绝', recharge.rejected],
+          [isEn ? 'Credited MMK' : '充值入账金额(MMK)', Math.round(recharge.amountCompletedMmk)],
+        ],
+      },
+      {
+        name: isEn ? 'Status' : '状态',
+        columns: [
+          { header: isEn ? 'Status' : '状态', width: 18 },
+          { header: isEn ? 'Count' : '件数', width: 12, align: 'right' },
+        ],
+        rows: sortedStatusEntries,
+      },
+      {
+        name: isEn ? 'Region' : '区域',
+        columns: [
+          { header: isEn ? 'Region' : '区域', width: 18 },
+          { header: isEn ? 'Count' : '件数', width: 12, align: 'right' },
+        ],
+        rows: sortedRegionEntries,
+      },
+    ]);
   };
 
-  const exportDetailCsv = () => {
-    const head = toCsvRow([
-      'id',
-      'status',
-      'region推断',
-      'courier',
-      'receiver_name',
-      'receiver_phone',
-      'price',
-      'cod_amount',
-      'created_at',
-      'delivery_time',
+  const exportDetailExcel = () => {
+    void downloadAdminExcel(`ml-reports-packages-${Date.now()}.xlsx`, [
+      {
+        name: isEn ? 'Packages' : '运单明细',
+        title: isEn ? 'MARKET LINK · Package lines' : 'MARKET LINK · 运单明细',
+        subtitle: regionLabel(region),
+        columns: [
+          { header: 'id', width: 16 },
+          { header: 'status', width: 12 },
+          { header: isEn ? 'region' : 'region推断', width: 12 },
+          { header: 'courier', width: 14 },
+          { header: 'receiver_name', width: 16 },
+          { header: 'receiver_phone', width: 16 },
+          { header: 'price', width: 12, align: 'right' },
+          { header: 'cod_amount', width: 12, align: 'right' },
+          { header: 'created_at', width: 20 },
+          { header: 'delivery_time', width: 20 },
+        ],
+        rows: filtered.map((p) => [
+          p.id,
+          p.status,
+          inferPackageRegion(p),
+          p.courier,
+          p.receiver_name,
+          p.receiver_phone,
+          p.price ?? '',
+          p.cod_amount ?? '',
+          p.created_at || p.create_time || '',
+          p.delivery_time || '',
+        ]),
+      },
     ]);
-    const rows = filtered.map((p) =>
-      toCsvRow([
-        p.id,
-        p.status,
-        inferPackageRegion(p),
-        p.courier,
-        p.receiver_name,
-        p.receiver_phone,
-        p.price,
-        p.cod_amount ?? '',
-        p.created_at || p.create_time || '',
-        p.delivery_time || '',
-      ])
-    );
-    downloadText(`ml-reports-packages-${Date.now()}.csv`, [head, ...rows].join('\n'));
   };
 
   const t = isEn
     ? {
         title: 'Reports & export',
-        subtitle: 'Order & recharge aggregates for the selected period — export CSV for Excel',
+        subtitle: 'Order & recharge aggregates for the selected period — export Excel',
         hint: 'Region filter applies after loading; data is based on package created_at and recharge created_at in the range.',
         back: 'Dashboard',
         preset: 'Range',
@@ -187,7 +195,7 @@ const AdminReportsPage: React.FC = () => {
       }
     : {
         title: '报表与导出',
-        subtitle: '按时间段汇总运单与充值，一键导出 CSV，便于透视与对账',
+        subtitle: '按时间段汇总运单与充值，一键导出 Excel，便于透视与对账',
         hint: '统计以运单 created_at、充值申请 created_at 落入时间范围为准；区域为二次筛选（含单号前缀推断）。',
         back: '控制台',
         preset: '统计范围',
@@ -242,7 +250,7 @@ const AdminReportsPage: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={exportSummaryCsv}
+              onClick={exportSummaryExcel}
               style={{
                 padding: '10px 18px',
                 borderRadius: 12,
@@ -258,7 +266,7 @@ const AdminReportsPage: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={exportDetailCsv}
+              onClick={exportDetailExcel}
               disabled={!filtered.length}
               style={{
                 padding: '10px 18px',

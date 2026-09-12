@@ -7,7 +7,7 @@
  * - overview：账号列表 + 统计 + 车费合计（优先 inventory_admin_overview_stats RPC）
  * - finance：中转站财务 + 跨境财务（financePage / financePageSize 分页明细）
  * - packs：运输明细（packStatus）
- * - orders：订单级追踪（orderStatus）
+ * - orders：订单级追踪（orderStatus；packBarcode 时按包装号返回包内全部订单）
  */
 
 const { createClient } = require('@supabase/supabase-js');
@@ -23,6 +23,31 @@ const {
   packStatusesForQuery,
   resolvePackDisplayStatusFromTracking,
 } = require('./utils/packDisplayStatus');
+const {
+  attachPickupToOrders,
+  collectItemLookupCodes,
+  escapePostgrestIlike,
+  filterAwaitingPickupOrders,
+  filterSignedOrders,
+  uniqueCodes,
+} = require('./utils/inventoryOrderPickup');
+const { applyStationKeys, parseStationKeys, rowTouchesStation } = require('./utils/inventoryStationFilter');
+
+const CONSOLE_LIST_LIMIT = 500;
+const PACK_STATION_COLUMNS = [
+  'origin_store_code',
+  'destination_code',
+  'leg_destination_code',
+  'hub_received_by_store_code',
+];
+const ORDER_STATION_COLUMNS = ['destination_code', 'hub_received_by_store_code'];
+
+const ORDER_TRACKING_SELECT =
+  'id, pack_barcode, order_barcode, express_barcode, order_name, destination_code, qty, status, recipient_name, recipient_phone, inbound_store_name, hub_received_at, hub_received_by_store_code, hub_received_by_store_name, created_at, updated_at';
+const STORE_ITEM_PICKUP_SELECT =
+  'barcode, input_barcode, customer_signed_at, arrival_notified_at, hub_arrived_at';
+const STORE_ITEM_PICKUP_SELECT_FALLBACK =
+  'barcode, input_barcode, customer_signed_at, hub_arrived_at';
 
 
 async function countRows(supabase, table, filters = []) {
@@ -297,12 +322,12 @@ async function loadStats(supabase) {
   };
 }
 
-async function loadRecentPacks(supabase, packStatus, warnings) {
+async function loadRecentPacks(supabase, packStatus, warnings, stationKeys = []) {
   let packsQuery = supabase
     .from('inventory_pkg_tracking')
     .select('*')
     .order('updated_at', { ascending: false })
-    .limit(500);
+    .limit(CONSOLE_LIST_LIMIT);
 
   const queryStatuses = packStatusesForQuery(packStatus);
   if (queryStatuses?.length === 1) {
@@ -310,23 +335,27 @@ async function loadRecentPacks(supabase, packStatus, warnings) {
   } else if (queryStatuses?.length) {
     packsQuery = packsQuery.in('status', queryStatuses);
   }
+  packsQuery = applyStationKeys(packsQuery, stationKeys, PACK_STATION_COLUMNS);
 
   const { data: packRows, error: packsErr } = await packsQuery;
   if (packsErr) {
     console.warn('inventory-admin-data: packs query failed', packsErr.message);
     warnings.push(`包裹追踪表暂不可用：${packsErr.message}`);
-    return [];
+    return { packs: [], truncated: false };
   }
 
+  const truncated = (packRows || []).length >= CONSOLE_LIST_LIMIT;
   const barcodes = (packRows || []).map((r) => r.pack_barcode);
   const qtyByBarcode = await loadPackedQtyByBarcode(supabase, barcodes);
-  return (packRows || [])
+  const packs = (packRows || [])
     .map((row) => {
       const code = String(row.pack_barcode || '').trim().toUpperCase();
       const qtyOnHand = qtyByBarcode[code];
       return normalizePackRow(row, qtyOnHand);
     })
-    .filter((pack) => matchesPackTransportFilter(pack, packStatus));
+    .filter((pack) => matchesPackTransportFilter(pack, packStatus))
+    .filter((pack) => rowTouchesStation(pack, stationKeys, PACK_STATION_COLUMNS));
+  return { packs, truncated };
 }
 
 function normalizeOrderRow(row) {
@@ -345,38 +374,205 @@ function normalizeOrderRow(row) {
     hub_received_at: row.hub_received_at ?? null,
     hub_received_by_store_code: row.hub_received_by_store_code ?? null,
     hub_received_by_store_name: row.hub_received_by_store_name ?? null,
+    customer_signed_at: row.customer_signed_at ?? null,
+    arrival_notified_at: row.arrival_notified_at ?? null,
+    hub_arrived_at: row.hub_arrived_at ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
 }
 
-async function loadRecentOrders(supabase, orderStatus, warnings) {
-  let ordersQuery = supabase
+function missingArrivalNotifiedColumn(message) {
+  return /arrival_notified_at/i.test(String(message || ''));
+}
+
+async function loadStoreItemPickupRows(supabase, barcodes, expresses, warnings) {
+  const codes = uniqueCodes(barcodes);
+  const expressCodes = uniqueCodes(expresses);
+  if (!codes.length && !expressCodes.length) return [];
+
+  const run = async (selectCols) => {
+    const [byBarcode, byExpress] = await Promise.all([
+      codes.length
+        ? supabase
+            .from('inventory_store_items')
+            .select(selectCols)
+            .in('barcode', codes)
+            .limit(500)
+        : Promise.resolve({ data: [], error: null }),
+      expressCodes.length
+        ? supabase
+            .from('inventory_store_items')
+            .select(selectCols)
+            .in('input_barcode', expressCodes)
+            .limit(500)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    return { byBarcode, byExpress };
+  };
+
+  let { byBarcode, byExpress } = await run(STORE_ITEM_PICKUP_SELECT);
+  const firstError = byBarcode.error || byExpress.error;
+  if (firstError && missingArrivalNotifiedColumn(firstError.message)) {
+    ({ byBarcode, byExpress } = await run(STORE_ITEM_PICKUP_SELECT_FALLBACK));
+  }
+
+  if (byBarcode.error || byExpress.error) {
+    const message = (byBarcode.error || byExpress.error).message;
+    console.warn('inventory-admin-data: store item pickup lookup failed', message);
+    warnings.push(`签收/通知字段暂不可用：${message}`);
+    return [];
+  }
+
+  const byKey = new Map();
+  for (const row of [...(byBarcode.data || []), ...(byExpress.data || [])]) {
+    const barcode = String(row.barcode || '').trim().toUpperCase();
+    const express = String(row.input_barcode || '').trim().toUpperCase();
+    if (barcode) byKey.set(`b:${barcode}`, row);
+    if (express) byKey.set(`e:${express}`, row);
+  }
+  return [...byKey.values()];
+}
+
+async function enrichOrdersWithPickup(supabase, orders, warnings) {
+  if (!orders.length) return orders;
+  const items = await loadStoreItemPickupRows(
+    supabase,
+    orders.map((order) => order.order_barcode),
+    orders.map((order) => order.express_barcode),
+    warnings,
+  );
+  return attachPickupToOrders(orders, items);
+}
+
+async function loadOrdersMatchingCodes(supabase, barcodes, expresses, warnings) {
+  const codes = uniqueCodes(barcodes);
+  const expressCodes = uniqueCodes(expresses);
+  if (!codes.length && !expressCodes.length) return [];
+
+  const [byOrder, byExpress] = await Promise.all([
+    codes.length
+      ? supabase
+          .from('inventory_order_tracking')
+          .select(ORDER_TRACKING_SELECT)
+          .in('order_barcode', codes)
+          .limit(500)
+      : Promise.resolve({ data: [], error: null }),
+    expressCodes.length
+      ? supabase
+          .from('inventory_order_tracking')
+          .select(ORDER_TRACKING_SELECT)
+          .in('express_barcode', expressCodes)
+          .limit(500)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (byOrder.error || byExpress.error) {
+    const message = (byOrder.error || byExpress.error).message;
+    console.warn('inventory-admin-data: signed-order lookup failed', message);
+    warnings.push(`订单追踪表暂不可用：${message}`);
+    return [];
+  }
+
+  const byId = new Map();
+  for (const row of [...(byOrder.data || []), ...(byExpress.data || [])]) {
+    byId.set(row.id, normalizeOrderRow(row));
+  }
+  return [...byId.values()];
+}
+
+async function loadSignedRecentOrders(supabase, warnings) {
+  const run = async (selectCols) =>
+    supabase
+      .from('inventory_store_items')
+      .select(selectCols)
+      .not('customer_signed_at', 'is', null)
+      .order('customer_signed_at', { ascending: false })
+      .limit(500);
+
+  let { data, error } = await run(STORE_ITEM_PICKUP_SELECT);
+  if (error && missingArrivalNotifiedColumn(error.message)) {
+    ({ data, error } = await run(STORE_ITEM_PICKUP_SELECT_FALLBACK));
+  }
+  if (error) {
+    console.warn('inventory-admin-data: signed items query failed', error.message);
+    warnings.push(`签收记录暂不可用：${error.message}`);
+    return [];
+  }
+
+  const items = data || [];
+  const { barcodes, expresses } = collectItemLookupCodes(items);
+  const orders = await loadOrdersMatchingCodes(supabase, barcodes, expresses, warnings);
+  return filterSignedOrders(attachPickupToOrders(orders, items));
+}
+
+async function loadOrdersByPack(supabase, packBarcode, warnings) {
+  const code = String(packBarcode || '').trim();
+  if (!code) return [];
+  const { data, error } = await supabase
     .from('inventory_order_tracking')
-    .select(
-      'id, pack_barcode, order_barcode, express_barcode, order_name, destination_code, qty, status, recipient_name, recipient_phone, inbound_store_name, hub_received_at, hub_received_by_store_code, hub_received_by_store_name, created_at, updated_at',
-    )
+    .select(ORDER_TRACKING_SELECT)
+    .ilike('pack_barcode', escapePostgrestIlike(code))
     .order('updated_at', { ascending: false })
     .limit(500);
+  if (error) {
+    console.warn('inventory-admin-data: pack orders query failed', error.message);
+    warnings.push(`包装号订单暂不可用：${error.message}`);
+    return [];
+  }
+  return enrichOrdersWithPickup(supabase, (data || []).map(normalizeOrderRow), warnings);
+}
+
+async function loadRecentOrders(supabase, orderStatus, warnings, packBarcode, stationKeys = []) {
+  const pack = String(packBarcode || '').trim();
+  if (pack) {
+    const orders = await loadOrdersByPack(supabase, pack, warnings);
+    return { orders, truncated: orders.length >= CONSOLE_LIST_LIMIT };
+  }
+  if (orderStatus === 'signed') {
+    const orders = (await loadSignedRecentOrders(supabase, warnings)).filter((order) =>
+      rowTouchesStation(order, stationKeys, ORDER_STATION_COLUMNS),
+    );
+    return { orders, truncated: orders.length >= CONSOLE_LIST_LIMIT };
+  }
+
+  let ordersQuery = supabase
+    .from('inventory_order_tracking')
+    .select(ORDER_TRACKING_SELECT)
+    .order('updated_at', { ascending: false })
+    .limit(CONSOLE_LIST_LIMIT);
 
   if (orderStatus === 'in_transit') {
     ordersQuery = ordersQuery.eq('status', 'in_transit');
-  } else if (orderStatus === 'hub_received') {
+  } else if (orderStatus === 'hub_received' || orderStatus === 'awaiting_pickup') {
     ordersQuery = ordersQuery.eq('status', 'hub_received');
   } else if (orderStatus === 'released_at_hub') {
     ordersQuery = ordersQuery.eq('status', 'released_at_hub');
   } else if (orderStatus === 'active') {
     ordersQuery = ordersQuery.in('status', ['in_transit', 'hub_received']);
   }
+  ordersQuery = applyStationKeys(ordersQuery, stationKeys, ORDER_STATION_COLUMNS);
 
   const { data: orderRows, error: ordersErr } = await ordersQuery;
   if (ordersErr) {
     console.warn('inventory-admin-data: orders query failed', ordersErr.message);
     warnings.push(`订单追踪表暂不可用：${ordersErr.message}`);
-    return [];
+    return { orders: [], truncated: false };
   }
 
-  return (orderRows || []).map(normalizeOrderRow);
+  const truncated = (orderRows || []).length >= CONSOLE_LIST_LIMIT;
+  const enriched = await enrichOrdersWithPickup(
+    supabase,
+    (orderRows || []).map(normalizeOrderRow),
+    warnings,
+  );
+  const scoped = enriched.filter((order) =>
+    rowTouchesStation(order, stationKeys, ORDER_STATION_COLUMNS),
+  );
+  return {
+    orders: orderStatus === 'awaiting_pickup' ? filterAwaitingPickupOrders(scoped) : scoped,
+    truncated,
+  };
 }
 
 function attachFinanceToStores(storesList, financeByStoreCode) {
@@ -508,26 +704,40 @@ async function handleFinance(supabase, warnings, financePagination, financeScope
   };
 }
 
-async function handlePacks(supabase, packStatus, warnings) {
-  const recentPacks = await loadRecentPacks(supabase, packStatus, warnings);
+async function handlePacks(supabase, packStatus, warnings, stationKeys) {
+  const { packs: recentPacks, truncated } = await loadRecentPacks(
+    supabase,
+    packStatus,
+    warnings,
+    stationKeys,
+  );
   return {
     ok: true,
     at: new Date().toISOString(),
     section: 'packs',
     recentPacks,
     packStatusFilter: packStatus,
+    packsTruncated: truncated,
     warnings,
   };
 }
 
-async function handleOrders(supabase, orderStatus, warnings) {
-  const recentOrders = await loadRecentOrders(supabase, orderStatus, warnings);
+async function handleOrders(supabase, orderStatus, warnings, packBarcode, stationKeys) {
+  const { orders: recentOrders, truncated } = await loadRecentOrders(
+    supabase,
+    orderStatus,
+    warnings,
+    packBarcode,
+    stationKeys,
+  );
   return {
     ok: true,
     at: new Date().toISOString(),
     section: 'orders',
     recentOrders,
     orderStatusFilter: orderStatus,
+    packBarcode: String(packBarcode || '').trim() || undefined,
+    ordersTruncated: truncated,
     warnings,
   };
 }
@@ -538,7 +748,7 @@ async function handleAll(supabase, packStatus, warnings, financePagination, fina
   const [
     { financeByStoreCode, crossBorderFinance, warnings: financeWarnings, period },
     snapshot,
-    recentPacks,
+    packsResult,
     exceptions,
   ] = await Promise.all([
     aggregateFinanceForTransitStores(supabase, storesList, financeScope),
@@ -553,7 +763,8 @@ async function handleAll(supabase, packStatus, warnings, financePagination, fina
     section: 'all',
     transitStores: attachFinanceToStores(storesList, financeByStoreCode),
     stats: snapshot.stats,
-    recentPacks,
+    recentPacks: packsResult.packs,
+    packsTruncated: packsResult.truncated,
     transportFeeTotal: snapshot.transportFeeTotal,
     openExceptionCount: exceptions.openExceptionCount,
     openExceptions: exceptions.openExceptions,
@@ -623,6 +834,8 @@ exports.handler = async (event) => {
     event.queryStringParameters?.packStatus ||
     'active'
   ).toLowerCase();
+  const packBarcode = String(event.queryStringParameters?.packBarcode || '').trim();
+  const stationKeys = parseStationKeys(event.queryStringParameters?.stationKeys || '');
   const section = String(event.queryStringParameters?.section || 'overview').toLowerCase();
   const financePagination = parseFinancePagination(event.queryStringParameters);
   const financeScope = parseFinancePeriodQuery(event.queryStringParameters || {});
@@ -633,9 +846,9 @@ exports.handler = async (event) => {
     if (section === 'finance') {
       body = await handleFinance(supabase, warnings, financePagination, financeScope);
     } else if (section === 'packs') {
-      body = await handlePacks(supabase, packStatus, warnings);
+      body = await handlePacks(supabase, packStatus, warnings, stationKeys);
     } else if (section === 'orders') {
-      body = await handleOrders(supabase, orderStatus, warnings);
+      body = await handleOrders(supabase, orderStatus, warnings, packBarcode, stationKeys);
     } else if (section === 'all') {
       body = await handleAll(supabase, packStatus, warnings, financePagination, financeScope);
     } else {

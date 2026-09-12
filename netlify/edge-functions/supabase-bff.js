@@ -22,6 +22,7 @@ const DROP_RES = new Set([
   'set-cookie',
   'nel',
   'report-to',
+  'reporting-endpoints',
   'content-encoding',
   'content-length',
   'transfer-encoding',

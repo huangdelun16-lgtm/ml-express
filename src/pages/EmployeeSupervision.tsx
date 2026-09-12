@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { auditLogService, AuditLog, adminAccountService, AdminAccount } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 import { useLanguage } from '../contexts/LanguageContext';
+import { downloadAdminExcel } from '../utils/adminExcelExport';
 import '../styles/adminAuditLogs.css';
 
 const ACTION_TYPE_LABELS: Record<string, string> = {
@@ -28,15 +29,6 @@ const MODULE_LABELS: Record<string, string> = {
   recharges: '充值管理',
 };
 
-function downloadCsv(filename: string, text: string) {
-  const blob = new Blob(['\uFEFF', text], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 function formatLogTime(iso?: string | null): string {
   if (!iso) return '—';
@@ -204,34 +196,36 @@ const EmployeeSupervision: React.FC = () => {
   };
 
   const exportFiltered = () => {
-    const header = [
-      '时间',
-      '员工',
-      '账号',
-      '操作类型',
-      '模块',
-      '描述',
-      '目标ID',
-      '目标名称',
-      'IP',
-    ];
-    const rows = filteredLogs.map((log) =>
-      [
-        formatLogTime(log.action_time || log.created_at),
-        log.user_name,
-        log.user_id,
-        getActionLabel(log.action_type),
-        getModuleLabel(log.module),
-        log.action_description,
-        log.target_id || '',
-        log.target_name || '',
-        log.ip_address || '',
-      ]
-        .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
-        .join(','),
-    );
     const stamp = new Date().toISOString().slice(0, 10);
-    downloadCsv(`audit-logs-${stamp}.csv`, [header.join(','), ...rows].join('\n'));
+    void downloadAdminExcel(`audit-logs-${stamp}.xlsx`, [
+      {
+        name: isEn ? 'Audit' : '审计日志',
+        title: isEn ? 'MARKET LINK · Operation audit' : 'MARKET LINK · 操作审计日志',
+        subtitle: `${stamp} · ${filteredLogs.length}`,
+        columns: [
+          { header: isEn ? 'Time' : '时间', width: 20 },
+          { header: isEn ? 'Staff' : '员工', width: 16 },
+          { header: isEn ? 'Account' : '账号', width: 16 },
+          { header: isEn ? 'Action' : '操作类型', width: 12 },
+          { header: isEn ? 'Module' : '模块', width: 14 },
+          { header: isEn ? 'Description' : '描述', width: 36 },
+          { header: isEn ? 'Target ID' : '目标ID', width: 16 },
+          { header: isEn ? 'Target name' : '目标名称', width: 18 },
+          { header: 'IP', width: 16 },
+        ],
+        rows: filteredLogs.map((log) => [
+          formatLogTime(log.action_time || log.created_at),
+          log.user_name,
+          log.user_id,
+          getActionLabel(log.action_type),
+          getModuleLabel(log.module),
+          log.action_description,
+          log.target_id || '',
+          log.target_name || '',
+          log.ip_address || '',
+        ]),
+      },
+    ]);
   };
 
   const pageStart = filteredLogs.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
@@ -300,7 +294,7 @@ const EmployeeSupervision: React.FC = () => {
             onClick={exportFiltered}
             disabled={loading || filteredLogs.length === 0}
           >
-            ⬇ {isEn ? 'Export CSV' : '导出 CSV'}
+            ⬇ {isEn ? 'Export Excel' : '导出 Excel'}
           </button>
           <button type="button" className="audit-btn audit-btn--primary" onClick={() => void loadData()} disabled={loading}>
             {loading ? (isEn ? 'Loading…' : '加载中…') : isEn ? 'Refresh' : '🔄 刷新'}

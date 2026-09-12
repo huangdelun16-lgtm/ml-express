@@ -11,6 +11,7 @@ import {
   nudgeMerchantAccept,
   persistMerchantOpsDesk,
 } from '../services/merchantOpsDeskService';
+import { downloadAdminExcel } from '../utils/adminExcelExport';
 import {
   PENDING_ACCEPT_TIMEOUT_MINUTES,
   filterWatchRows,
@@ -27,9 +28,8 @@ import {
 } from '../utils/merchantOpsWatch';
 import {
   buildNudgeMessage,
-  buildOpsWatchCsv,
+  buildOpsWatchTable,
   buildWhatsAppUrl,
-  downloadCsv,
   emptyDeskState,
   isStoreIgnoredToday,
   markStoreContacted,
@@ -264,13 +264,21 @@ const MerchantOpsWatchPage: React.FC = () => {
     }
   };
 
-  const exportCsv = () => {
-    const csv = buildOpsWatchCsv(attentionRows, desk);
-    downloadCsv(`merchant-ops-${localDateKey()}.csv`, csv);
+  const exportExcel = () => {
+    const table = buildOpsWatchTable(attentionRows, desk);
+    void downloadAdminExcel(`merchant-ops-${localDateKey()}.xlsx`, [
+      {
+        name: '商家监管',
+        title: 'MARKET LINK · 今日商家监管',
+        subtitle: `Asia/Yangon · ${localDateKey()} · ${attentionRows.length} 家`,
+        columns: table.headers.map((header) => ({ header, width: 14 })),
+        rows: table.rows,
+      },
+    ]);
     void logMerchantOpsFollowup({
       storeId: 'merchant-ops',
       storeName: '今日商家监管',
-      action: `导出当日监管 CSV（${attentionRows.length} 家）`,
+      action: `导出当日监管 Excel（${attentionRows.length} 家）`,
     });
   };
 
@@ -331,10 +339,10 @@ const MerchantOpsWatchPage: React.FC = () => {
           <button
             type="button"
             className="merchant-apps-btn merchant-apps-btn--ghost"
-            onClick={exportCsv}
+            onClick={exportExcel}
             disabled={attentionRows.length === 0}
           >
-            {t('导出 CSV', 'Export CSV', 'CSV ထုတ်')}
+            {t('导出 Excel', 'Export Excel', 'Excel ထုတ်')}
           </button>
           <span className="merchant-apps-poll-hint">
             {t('每 20 秒自动刷新', 'Auto-refresh every 20s', '၂၀ စက္ကန့်တစ်ကြိမ်')}

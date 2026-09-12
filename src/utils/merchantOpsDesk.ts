@@ -181,12 +181,12 @@ function csvCell(value: string | number | undefined | null): string {
   return s;
 }
 
-export function buildOpsWatchCsv(
+export function buildOpsWatchTable(
   rows: MerchantOpsWatchRow[],
   desk: MerchantOpsDeskState,
   day = localDateKey(),
-): string {
-  const head = [
+): { headers: string[]; rows: Array<Array<string | number>> } {
+  const headers = [
     '店码',
     '店名',
     '区域',
@@ -204,8 +204,8 @@ export function buildOpsWatchCsv(
     '联系人',
     '备注',
     '今日忽略',
-  ].map(csvCell).join(',');
-  const body = rows.map((row) => {
+  ];
+  const tableRows = rows.map((row) => {
     const contact = desk.contacted[row.storeId];
     return [
       row.storeCode,
@@ -225,9 +225,18 @@ export function buildOpsWatchCsv(
       contact?.by || '',
       contact?.note || '',
       isStoreIgnoredToday(desk, row.storeId, day) ? '1' : '0',
-    ].map(csvCell).join(',');
+    ];
   });
-  return [head, ...body].join('\n');
+  return { headers, rows: tableRows };
+}
+
+export function buildOpsWatchCsv(
+  rows: MerchantOpsWatchRow[],
+  desk: MerchantOpsDeskState,
+  day = localDateKey(),
+): string {
+  const table = buildOpsWatchTable(rows, desk, day);
+  return [table.headers, ...table.rows].map((line) => line.map(csvCell).join(',')).join('\n');
 }
 
 export function downloadCsv(filename: string, text: string): void {

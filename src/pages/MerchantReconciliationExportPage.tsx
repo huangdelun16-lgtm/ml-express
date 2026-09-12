@@ -11,27 +11,7 @@ import {
   type CodDiffFilter,
   type CodLang,
 } from '../utils/codSettlement';
-
-function escapeCsvCell(v: unknown): string {
-  const s = v == null ? '' : String(v);
-  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-
-function toCsvRow(cells: unknown[]): string {
-  return cells.map(escapeCsvCell).join(',');
-}
-
-function downloadCsv(filename: string, lines: string[]) {
-  const body = `\uFEFF${lines.join('\r\n')}`;
-  const blob = new Blob([body], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+import { downloadAdminExcel } from '../utils/adminExcelExport';
 
 type DatePreset = 'today' | '7d' | '30d' | 'all' | 'custom';
 
@@ -152,8 +132,8 @@ const MerchantReconciliationExportPage: React.FC = () => {
   const t =
     language === 'en'
       ? {
-          title: 'Merchant reconciliation (CSV)',
-          subtitle: 'Export store-linked orders for settlement with merchants. UTF-8 CSV for Excel.',
+          title: 'Merchant reconciliation (Excel)',
+          subtitle: 'Export store-linked orders for settlement with merchants as Excel.',
           back: 'Dashboard',
           hint: 'Only orders with a linked delivery store are included. Adjust date range and store, then export.',
           range: 'Created date',
@@ -165,7 +145,7 @@ const MerchantReconciliationExportPage: React.FC = () => {
           statusNoCancel: 'Exclude cancelled',
           refresh: 'Refresh',
           loading: 'Loading…',
-          export: 'Export CSV',
+          export: 'Export Excel',
           exportCod: 'Export COD discrepancies',
           count: 'Rows',
           empty: 'No store-linked orders in this range',
@@ -212,7 +192,7 @@ const MerchantReconciliationExportPage: React.FC = () => {
         }
       : {
           title: '商家对账',
-          subtitle: '导出与快递店/商家关联的运单明细，便于线下对账与结算；CSV 为 UTF-8（含 BOM），可用 Excel 直接打开。',
+          subtitle: '导出与快递店/商家关联的运单明细，便于线下对账与结算。',
           back: '控制台',
           hint: '仅包含已关联「送达店铺」的订单。请选择时间范围与店铺后导出。',
           range: '下单时间',
@@ -224,7 +204,7 @@ const MerchantReconciliationExportPage: React.FC = () => {
           statusNoCancel: '排除已取消',
           refresh: '刷新',
           loading: '加载中…',
-          export: '导出 CSV',
+          export: '导出 Excel',
           exportCod: '导出 COD 差异',
           count: '条数',
           empty: '该条件下没有可导出的商家关联订单',
@@ -272,7 +252,7 @@ const MerchantReconciliationExportPage: React.FC = () => {
 
   const runExport = () => {
     if (!filtered.length) return;
-    const head = toCsvRow([
+    const headers = [
       t.cols.id,
       t.cols.storeId,
       t.cols.storeName,
@@ -297,51 +277,65 @@ const MerchantReconciliationExportPage: React.FC = () => {
       t.cols.delivery,
       t.cols.recvCode,
       t.cols.sendCode,
-    ]);
-    const lines = filtered.map((p) =>
-      toCsvRow([
-        p.id,
-        p.delivery_store_id ?? '',
-        p.delivery_store_name ?? '',
-        p.created_at || p.create_time || '',
-        p.updated_at ?? '',
-        p.status,
-        p.sender_name,
-        p.sender_phone,
-        p.sender_address,
-        p.receiver_name,
-        p.receiver_phone,
-        p.receiver_address,
-        p.courier ?? '',
-        p.delivery_speed ?? '',
-        p.scheduled_delivery_time ?? '',
-        p.price ?? '',
-        p.store_fee ?? '',
-        p.delivery_fee ?? '',
-        p.cod_amount ?? '',
-        p.payment_method ?? '',
-        p.pickup_time ?? '',
-        p.delivery_time ?? '',
-        p.store_receive_code ?? '',
-        p.sender_code ?? '',
-      ]),
-    );
+    ];
     const fname =
       language === 'en'
-        ? `ml-merchant-reconciliation-${Date.now()}.csv`
-        : `商家对账明细-${Date.now()}.csv`;
-    downloadCsv(fname, [head, ...lines]);
+        ? `ml-merchant-reconciliation-${Date.now()}.xlsx`
+        : `商家对账明细-${Date.now()}.xlsx`;
+    void downloadAdminExcel(fname, [
+      {
+        name: language === 'en' ? 'Orders' : '对账明细',
+        title: language === 'en' ? 'MARKET LINK · Merchant reconciliation' : 'MARKET LINK · 商家对账',
+        columns: headers.map((header) => ({ header, width: 16 })),
+        rows: filtered.map((p) => [
+          p.id,
+          p.delivery_store_id ?? '',
+          p.delivery_store_name ?? '',
+          p.created_at || p.create_time || '',
+          p.updated_at ?? '',
+          p.status,
+          p.sender_name,
+          p.sender_phone,
+          p.sender_address,
+          p.receiver_name,
+          p.receiver_phone,
+          p.receiver_address,
+          p.courier ?? '',
+          p.delivery_speed ?? '',
+          p.scheduled_delivery_time ?? '',
+          p.price ?? '',
+          p.store_fee ?? '',
+          p.delivery_fee ?? '',
+          p.cod_amount ?? '',
+          p.payment_method ?? '',
+          p.pickup_time ?? '',
+          p.delivery_time ?? '',
+          p.store_receive_code ?? '',
+          p.sender_code ?? '',
+        ]),
+      },
+    ]);
   };
 
   const runCodDiffExport = () => {
     if (!codDiffRows.length) return;
-    const head = toCsvRow(buildCodDiffCsvHeader(lang));
-    const lines = codDiffRows.map((row) => toCsvRow(buildCodDiffCsvRow(row, lang)));
+    const headers = buildCodDiffCsvHeader(lang);
     const fname =
       language === 'en'
-        ? `ml-cod-discrepancy-${Date.now()}.csv`
-        : `COD差异对账-${Date.now()}.csv`;
-    downloadCsv(fname, [head, ...lines]);
+        ? `ml-cod-discrepancy-${Date.now()}.xlsx`
+        : `COD差异对账-${Date.now()}.xlsx`;
+    void downloadAdminExcel(fname, [
+      {
+        name: language === 'en' ? 'COD diff' : 'COD差异',
+        title: language === 'en' ? 'MARKET LINK · COD discrepancy' : 'MARKET LINK · COD 差异对账',
+        columns: headers.map((header) => ({ header, width: 16 })),
+        rows: codDiffRows.map((row) =>
+          buildCodDiffCsvRow(row, lang).map((cell) =>
+            cell == null ? '' : (cell as string | number),
+          ),
+        ),
+      },
+    ]);
   };
 
   return (

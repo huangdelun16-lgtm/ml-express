@@ -7,6 +7,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
 import { feedbackService } from '../services/FeedbackService';
 import { isBrowserRealtimeAvailable } from '../utils/supabaseBrowserUrl';
+import { downloadAdminExcel } from '../utils/adminExcelExport';
 
 interface DeliveryAlert {
   id: string;
@@ -736,40 +737,36 @@ export default function DeliveryAlerts() {
     }
   };
 
-  // 🚀 新增：导出 CSV 功能
-  const handleExportCSV = () => {
+  const handleExportExcel = () => {
     if (alerts.length === 0) return;
-    
-    const headers = [
-      'ID', 'Time', 'Courier', 'PackageID', 'Type', 'Severity', 'Status', 'Distance(m)', 'Description'
-    ];
-    
-    const rows = alerts.map(alert => [
-      alert.id,
-      new Date(alert.created_at).toLocaleString('zh-CN'),
-      alert.courier_name,
-      alert.package_id,
-      getAlertTypeText(alert.alert_type),
-      alert.severity,
-      alert.status,
-      alert.distance_from_destination?.toFixed(0) || '',
-      alert.description.replace(/,/g, ' ')
+    void downloadAdminExcel(`delivery_alerts_${new Date().toISOString().split('T')[0]}.xlsx`, [
+      {
+        name: language === 'en' ? 'Alerts' : '配送警报',
+        title: language === 'en' ? 'MARKET LINK · Delivery alerts' : 'MARKET LINK · 配送警报',
+        columns: [
+          { header: 'ID', width: 16 },
+          { header: language === 'en' ? 'Time' : '时间', width: 20 },
+          { header: language === 'en' ? 'Courier' : '骑手', width: 16 },
+          { header: language === 'en' ? 'Package' : '运单', width: 16 },
+          { header: language === 'en' ? 'Type' : '类型', width: 14 },
+          { header: language === 'en' ? 'Severity' : '级别', width: 10 },
+          { header: language === 'en' ? 'Status' : '状态', width: 12 },
+          { header: language === 'en' ? 'Distance (m)' : '距离(m)', width: 12, align: 'right' },
+          { header: language === 'en' ? 'Description' : '说明', width: 36 },
+        ],
+        rows: alerts.map((alert) => [
+          alert.id,
+          new Date(alert.created_at).toLocaleString('zh-CN'),
+          alert.courier_name,
+          alert.package_id,
+          getAlertTypeText(alert.alert_type),
+          alert.severity,
+          alert.status,
+          alert.distance_from_destination ?? '',
+          alert.description,
+        ]),
+      },
     ]);
-    
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
-    
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `delivery_alerts_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
 
@@ -978,10 +975,10 @@ export default function DeliveryAlerts() {
             <button
               type="button"
               className="admin-shell__btn"
-              onClick={handleExportCSV}
+              onClick={handleExportExcel}
               disabled={loading || alerts.length === 0}
             >
-              {language === 'zh' ? '导出报表' : language === 'en' ? 'Export CSV' : 'အစီရင်ခံစာ ထုတ်ရန်'}
+              {language === 'zh' ? '导出 Excel' : language === 'en' ? 'Export Excel' : 'Excel ထုတ်ရန်'}
             </button>
 
             <button

@@ -5,6 +5,8 @@ import type { OrderStatusFilter } from '../utils/inventoryOrderTracking';
 
 export type { OrderStatusFilter } from '../utils/inventoryOrderTracking';
 
+export const INVENTORY_CONSOLE_LIST_LIMIT = 500;
+
 export type FinanceOriginAttributionGroup = {
   originKey: string;
   label: string;
@@ -145,6 +147,9 @@ export type InventoryOrderRow = {
   hub_received_at: string | null;
   hub_received_by_store_code: string | null;
   hub_received_by_store_name: string | null;
+  customer_signed_at?: string | null;
+  arrival_notified_at?: string | null;
+  hub_arrived_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -235,6 +240,8 @@ export type InventoryConsoleData = {
   recentOrders?: InventoryOrderRow[];
   packStatusFilter: string;
   orderStatusFilter?: string;
+  packsTruncated?: boolean;
+  ordersTruncated?: boolean;
   transportFeeTotal?: number;
   openExceptionCount?: number;
   openExceptions?: InventoryExceptionConsoleRow[];
@@ -444,11 +451,15 @@ async function fetchInventoryConsoleSection(
   financePagination?: { page: number; pageSize: number },
   period?: FinancePeriodParams | null,
   orderStatus?: OrderStatusFilter,
+  extras?: { stationKeys?: string[] },
 ): Promise<ConsoleSectionResponse> {
   const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
   url.searchParams.set('section', section);
   if (packStatus) url.searchParams.set('packStatus', packStatus);
   if (orderStatus) url.searchParams.set('orderStatus', orderStatus);
+  if (extras?.stationKeys?.length) {
+    url.searchParams.set('stationKeys', extras.stationKeys.join(','));
+  }
   if (financePagination) {
     url.searchParams.set('financePage', String(financePagination.page));
     url.searchParams.set('financePageSize', String(financePagination.pageSize));
@@ -519,24 +530,36 @@ export async function fetchInventoryConsoleFinance(
 
 export async function fetchInventoryConsolePacks(
   packStatus: PackStatusFilter = 'active',
+  stationKeys: string[] = [],
 ): Promise<{
   recentPacks: InventoryPackRow[];
   packStatusFilter?: string;
+  packsTruncated?: boolean;
   warnings?: string[];
 }> {
-  const payload = await fetchInventoryConsoleSection('packs', packStatus);
+  const payload = await fetchInventoryConsoleSection(
+    'packs',
+    packStatus,
+    undefined,
+    undefined,
+    undefined,
+    { stationKeys },
+  );
   return {
     recentPacks: payload.recentPacks ?? [],
     packStatusFilter: payload.packStatusFilter,
+    packsTruncated: payload.packsTruncated,
     warnings: payload.warnings,
   };
 }
 
 export async function fetchInventoryConsoleOrders(
   orderStatus: OrderStatusFilter = 'active',
+  stationKeys: string[] = [],
 ): Promise<{
   recentOrders: InventoryOrderRow[];
   orderStatusFilter?: string;
+  ordersTruncated?: boolean;
   warnings?: string[];
 }> {
   const payload = await fetchInventoryConsoleSection(
@@ -545,10 +568,40 @@ export async function fetchInventoryConsoleOrders(
     undefined,
     undefined,
     orderStatus,
+    { stationKeys },
   );
   return {
     recentOrders: payload.recentOrders ?? [],
     orderStatusFilter: payload.orderStatusFilter,
+    ordersTruncated: payload.ordersTruncated,
+    warnings: payload.warnings,
+  };
+}
+
+export async function fetchInventoryConsoleOrdersByPack(packBarcode: string): Promise<{
+  recentOrders: InventoryOrderRow[];
+  ordersTruncated?: boolean;
+  warnings?: string[];
+}> {
+  const code = String(packBarcode || '').trim();
+  if (!code) {
+    return { recentOrders: [] };
+  }
+  const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
+  url.searchParams.set('section', 'orders');
+  url.searchParams.set('packBarcode', code);
+
+  const response = await adminAuthenticatedFetch(url.toString(), {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `加载失败 (${response.status})`);
+  }
+  return {
+    recentOrders: (payload.recentOrders ?? []) as InventoryOrderRow[],
+    ordersTruncated: Boolean(payload.ordersTruncated),
     warnings: payload.warnings,
   };
 }

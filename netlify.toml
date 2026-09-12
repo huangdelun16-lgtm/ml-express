@@ -51,6 +51,9 @@
     X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    # 覆盖平台下发的畸形 Report-To，避免 Firefox 刷 Reporting-Header / User-Agent JSON 解析噪音
+    Report-To = '[{"group":"default","max_age":0}]'
+    NEL = '{"report_to":"default","max_age":0}'
 
 # 禁用密钥扫描以避免误报
 [build.processing]

@@ -1,5 +1,5 @@
 import type { CrossBorderExpenseRow } from '../services/inventoryConsoleService';
-import { buildHqFinanceExportCsv } from './crossBorderFinanceExport';
+import { buildHqFinanceExportCsv, buildHqFinanceExportWorkbook } from './crossBorderFinanceExport';
 
 function row(partial: Partial<CrossBorderExpenseRow> & Pick<CrossBorderExpenseRow, 'id' | 'category'>): CrossBorderExpenseRow {
   return {
@@ -83,5 +83,63 @@ describe('buildHqFinanceExportCsv', () => {
     expect(truck).toBeTruthy();
     expect(truck).not.toContain('锁定');
     expect(truck).not.toContain('活汇率');
+  });
+});
+
+describe('buildHqFinanceExportWorkbook', () => {
+  const params = {
+    entries: [
+      row({
+        id: 'c1',
+        category: 'collected' as const,
+        title: '已收',
+        subtitle: 'note',
+        amount: 188000,
+        occurredAt: '2026-08-30T10:00:00.000Z',
+        statusLabel: '已收',
+        fxMmkPerCny: 5000,
+        paidCurrency: 'CNY' as const,
+        paidCny: 37.6,
+      }),
+      row({
+        id: 'p1',
+        category: 'pending_inflow' as const,
+        title: '到付待入账',
+        amount: 10000,
+        occurredAt: '2026-08-31T02:00:00.000Z',
+        statusLabel: '待入账',
+      }),
+    ],
+    summary: {
+      entryCount: 2,
+      collectedTotal: 188000,
+      collectedCny: 37.6,
+      transportUnpaidTotal: 200,
+      transportPaidTotal: 0,
+      pendingInflowTotal: 10000,
+      transportRegisteredTotal: 200,
+      agencyRemittedTotal: 0,
+      manualIncomeTotal: 0,
+      manualExpenseTotal: 0,
+    },
+    periodLabel: 'month 2026-09',
+    stationLabel: '全部站点',
+    isEn: false,
+    liveRate: 5000,
+  };
+
+  it('写出汇总+明细两页，并保留锁定人民币', async () => {
+    const wb = await buildHqFinanceExportWorkbook(params);
+    expect(wb.worksheets.map((sheet) => sheet.name)).toEqual(['汇总', '明细']);
+    const summary = wb.getWorksheet('汇总');
+    const detail = wb.getWorksheet('明细');
+    expect(summary?.getCell(1, 1).value).toBe('MARKET LINK · 跨境财务');
+    expect(summary?.getCell(6, 2).value).toBe(188000);
+    expect(detail?.getCell(4, 1).value).toBe('时间');
+    expect(detail?.getCell(5, 5).value).toBe(188000);
+    expect(detail?.getCell(5, 6).value).toBe(37.6);
+    expect(detail?.getCell(5, 9).value).toBe('锁定');
+    expect(detail?.getCell(6, 6).value).toBe(2);
+    expect(detail?.getCell(6, 9).value).toBe('活汇率');
   });
 });

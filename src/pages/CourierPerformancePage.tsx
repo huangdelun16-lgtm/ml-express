@@ -9,18 +9,8 @@ import {
   fetchRiderPerformanceBetween,
   getRangeForPreset,
   RiderStatRow,
-  toCsvRow,
 } from '../services/adminInsightsService';
-
-function downloadText(filename: string, text: string) {
-  const blob = new Blob(['\uFEFF', text], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+import { downloadAdminExcel } from '../utils/adminExcelExport';
 
 type SortKey = 'name' | 'throughput' | 'delivered' | 'alerts' | 'credit' | 'last';
 
@@ -131,95 +121,101 @@ const CourierPerformancePage: React.FC = () => {
 
   const sortMark = (key: SortKey) => (sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '');
 
-  const exportPerformanceCsv = () => {
-    const head = toCsvRow([
-      'courier_name',
-      'courier_id',
-      'delivered',
-      'in_progress',
-      'pending_pickup',
-      'throughput',
-      'alert_count',
-      'credit_score',
-      'last_active',
+  const exportPerformanceExcel = () => {
+    void downloadAdminExcel(`ml-rider-performance-${Date.now()}.xlsx`, [
+      {
+        name: 'KPI',
+        title: 'MARKET LINK · Rider KPI',
+        columns: [
+          { header: 'courier_name', width: 16 },
+          { header: 'courier_id', width: 16 },
+          { header: 'delivered', width: 12, align: 'right' },
+          { header: 'in_progress', width: 12, align: 'right' },
+          { header: 'pending_pickup', width: 14, align: 'right' },
+          { header: 'throughput', width: 12, align: 'right' },
+          { header: 'alert_count', width: 12, align: 'right' },
+          { header: 'credit_score', width: 12, align: 'right' },
+          { header: 'last_active', width: 20 },
+        ],
+        rows: sorted.map((r) => [
+          r.courierName,
+          r.courierId || '',
+          r.delivered,
+          r.inProgress,
+          r.pendingPickup,
+          r.delivered + r.inProgress + r.pendingPickup,
+          r.alertCount,
+          r.creditScore ?? '',
+          r.lastActive ?? '',
+        ]),
+      },
     ]);
-    const lines = sorted.map((r) =>
-      toCsvRow([
-        r.courierName,
-        r.courierId || '',
-        r.delivered,
-        r.inProgress,
-        r.pendingPickup,
-        r.delivered + r.inProgress + r.pendingPickup,
-        r.alertCount,
-        r.creditScore ?? '',
-        r.lastActive ?? '',
-      ])
-    );
-    downloadText(`ml-rider-performance-${Date.now()}.csv`, [head, ...lines].join('\n'));
   };
 
-  const exportSalaryCsv = () => {
+  const exportSalaryExcel = () => {
     if (!salaryFiltered.length) return;
-    const head = toCsvRow([
-      'id',
-      'courier_id',
-      'courier_name',
-      'settlement_period',
-      'period_start_date',
-      'period_end_date',
-      'base_salary',
-      'km_fee',
-      'delivery_bonus',
-      'performance_bonus',
-      'overtime_pay',
-      'tip_amount',
-      'deduction_amount',
-      'total_deliveries',
-      'total_km',
-      'on_time_deliveries',
-      'late_deliveries',
-      'gross_salary',
-      'net_salary',
-      'status',
-      'payment_method',
-      'payment_reference',
-      'payment_date',
-      'notes',
-      'admin_notes',
-      'created_at',
+    void downloadAdminExcel(`ml-rider-salary-records-${Date.now()}.xlsx`, [
+      {
+        name: 'Salary',
+        title: 'MARKET LINK · Rider salary',
+        columns: [
+          { header: 'id', width: 14 },
+          { header: 'courier_id', width: 14 },
+          { header: 'courier_name', width: 16 },
+          { header: 'settlement_period', width: 16 },
+          { header: 'period_start_date', width: 14 },
+          { header: 'period_end_date', width: 14 },
+          { header: 'base_salary', width: 12, align: 'right' },
+          { header: 'km_fee', width: 12, align: 'right' },
+          { header: 'delivery_bonus', width: 14, align: 'right' },
+          { header: 'performance_bonus', width: 16, align: 'right' },
+          { header: 'overtime_pay', width: 12, align: 'right' },
+          { header: 'tip_amount', width: 12, align: 'right' },
+          { header: 'deduction_amount', width: 14, align: 'right' },
+          { header: 'total_deliveries', width: 14, align: 'right' },
+          { header: 'total_km', width: 12, align: 'right' },
+          { header: 'on_time_deliveries', width: 16, align: 'right' },
+          { header: 'late_deliveries', width: 14, align: 'right' },
+          { header: 'gross_salary', width: 12, align: 'right' },
+          { header: 'net_salary', width: 12, align: 'right' },
+          { header: 'status', width: 12 },
+          { header: 'payment_method', width: 14 },
+          { header: 'payment_reference', width: 16 },
+          { header: 'payment_date', width: 14 },
+          { header: 'notes', width: 20 },
+          { header: 'admin_notes', width: 20 },
+          { header: 'created_at', width: 20 },
+        ],
+        rows: salaryFiltered.map((s) => [
+          s.id ?? '',
+          s.courier_id,
+          s.courier_name,
+          s.settlement_period,
+          s.period_start_date,
+          s.period_end_date,
+          s.base_salary,
+          s.km_fee,
+          s.delivery_bonus,
+          s.performance_bonus,
+          s.overtime_pay,
+          s.tip_amount,
+          s.deduction_amount,
+          s.total_deliveries,
+          s.total_km,
+          s.on_time_deliveries,
+          s.late_deliveries,
+          s.gross_salary,
+          s.net_salary,
+          s.status,
+          s.payment_method ?? '',
+          s.payment_reference ?? '',
+          s.payment_date ?? '',
+          s.notes ?? '',
+          s.admin_notes ?? '',
+          s.created_at ?? '',
+        ]),
+      },
     ]);
-    const lines = salaryFiltered.map((s) =>
-      toCsvRow([
-        s.id ?? '',
-        s.courier_id,
-        s.courier_name,
-        s.settlement_period,
-        s.period_start_date,
-        s.period_end_date,
-        s.base_salary,
-        s.km_fee,
-        s.delivery_bonus,
-        s.performance_bonus,
-        s.overtime_pay,
-        s.tip_amount,
-        s.deduction_amount,
-        s.total_deliveries,
-        s.total_km,
-        s.on_time_deliveries,
-        s.late_deliveries,
-        s.gross_salary,
-        s.net_salary,
-        s.status,
-        s.payment_method ?? '',
-        s.payment_reference ?? '',
-        s.payment_date ?? '',
-        s.notes ?? '',
-        s.admin_notes ?? '',
-        s.created_at ?? '',
-      ])
-    );
-    downloadText(`ml-rider-salary-records-${Date.now()}.csv`, [head, ...lines].join('\n'));
   };
 
   const t =
@@ -229,8 +225,8 @@ const CourierPerformancePage: React.FC = () => {
           subtitle: 'Delivery stats & salary records for the selected period',
           back: 'Dashboard',
           hint: 'KPI from packages and alerts; salary rows = payroll periods overlapping this range',
-          exportPerf: 'Export KPI (CSV)',
-          exportSalary: 'Export salary (CSV)',
+          exportPerf: 'Export KPI (Excel)',
+          exportSalary: 'Export salary (Excel)',
           salaryHint: 'Payroll rows',
           range: 'Range',
           filterPh: 'Filter by name / ID…',
@@ -329,7 +325,7 @@ const CourierPerformancePage: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={exportPerformanceCsv}
+              onClick={exportPerformanceExcel}
               disabled={!sorted.length}
               style={{
                 padding: '10px 18px',
@@ -346,7 +342,7 @@ const CourierPerformancePage: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={exportSalaryCsv}
+              onClick={exportSalaryExcel}
               disabled={!salaryFiltered.length}
               title={!salaryFiltered.length ? t.noSalary : undefined}
               style={{

@@ -62,6 +62,7 @@ import {
 import { feedbackService } from "../services/FeedbackService";
 import { getCurrentUser } from "../services/authService";
 import { formatCodSettledByLabel } from "../utils/codSettlement";
+import { downloadAdminExcel } from "../utils/adminExcelExport";
 import { FinanceWorkspaceProvider } from "./finance/FinanceWorkspace";
 
 const FinanceAnalyticsTab = lazy(() => import("./finance/FinanceAnalyticsTab"));
@@ -1388,13 +1389,9 @@ const FinanceManagement: React.FC = () => {
     return dt >= start && dt <= end;
   };
 
-  const downloadMerchantCodModalCsv = useCallback(() => {
+  const downloadMerchantCodModalExcel = useCallback(() => {
     const list = filteredMerchantCodModalOrders;
     if (list.length === 0) return;
-    const escape = (v: string | number | null | undefined) => {
-      const s = v == null ? "" : String(v);
-      return `"${s.replace(/"/g, '""')}"`;
-    };
     const statusForRow = (pkg: Package) => {
       const platformAmount = getPlatformPaymentAmount(pkg.description);
       if (Number(pkg.cod_amount || 0) > 0) {
@@ -1462,35 +1459,27 @@ const FinanceManagement: React.FC = () => {
               "Settled by",
               "Status",
             ];
-    const body = list.map((pkg) => {
+    const rows = list.map((pkg) => {
       const parts = getMerchantSettlementParts(pkg, deliveryStores);
       return [
-        escape(pkg.id),
-        escape(pkg.sender_name),
-        escape(pkg.receiver_name),
-        escape(pkg.sender_phone),
-        escape(pkg.receiver_phone),
-        escape(String(parts.countedCodMmk)),
-        escape(String(parts.countedPlatformMmk)),
-        escape(pkg.delivery_time || ""),
-        escape(
-          pkg.cod_settled_at
-            ? new Date(pkg.cod_settled_at).toLocaleString("zh-CN")
-            : "",
+        pkg.id,
+        pkg.sender_name,
+        pkg.receiver_name,
+        pkg.sender_phone,
+        pkg.receiver_phone,
+        parts.countedCodMmk,
+        parts.countedPlatformMmk,
+        pkg.delivery_time || "",
+        pkg.cod_settled_at
+          ? new Date(pkg.cod_settled_at).toLocaleString("zh-CN")
+          : "",
+        formatCodSettledByLabel(
+          pkg,
+          language === "my" ? "my" : language === "en" ? "en" : "zh",
         ),
-        escape(
-          formatCodSettledByLabel(
-            pkg,
-            language === "my" ? "my" : language === "en" ? "en" : "zh",
-          ),
-        ),
-        escape(statusForRow(pkg)),
-      ].join(",");
+        statusForRow(pkg),
+      ];
     });
-    const blob = new Blob(
-      ["\uFEFF" + [header.map(escape).join(","), ...body].join("\r\n")],
-      { type: "text/csv;charset=utf-8" },
-    );
     const y = new Date().getFullYear();
     const m = (getCurrentMonthKey() || `${y}-01`)
       .replace(/-/g, "")
@@ -1507,12 +1496,17 @@ const FinanceManagement: React.FC = () => {
           : language === "my"
             ? `cod_pending_${m}`
             : `cod_uncleared_${m}`;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${base}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    void downloadAdminExcel(`${base}.xlsx`, [
+      {
+        name: language === "zh" ? "对账单" : "Statement",
+        title:
+          language === "zh"
+            ? "MARKET LINK · 商家对账单"
+            : "MARKET LINK · Merchant statement",
+        columns: header.map((item) => ({ header: item, width: 16 })),
+        rows,
+      },
+    ]);
   }, [
     deliveryStores,
     filteredMerchantCodModalOrders,
@@ -2331,7 +2325,7 @@ const FinanceManagement: React.FC = () => {
                   />
                   <button
                     type="button"
-                    onClick={downloadMerchantCodModalCsv}
+                    onClick={downloadMerchantCodModalExcel}
                     disabled={filteredMerchantCodModalOrders.length === 0}
                     style={{
                       padding: "10px 18px",
@@ -2354,10 +2348,10 @@ const FinanceManagement: React.FC = () => {
                     }}
                   >
                     {language === "zh"
-                      ? "导出对账单 (CSV)"
+                      ? "导出对账单 (Excel)"
                       : language === "my"
-                        ? "CSV ထုတ်ရန်"
-                        : "Export statement (CSV)"}
+                        ? "Excel ထုတ်ရန်"
+                        : "Export statement (Excel)"}
                   </button>
                 </div>
               )}

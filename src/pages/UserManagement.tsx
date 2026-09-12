@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, auditLogService, rechargeService } from '../services/supabase';
 import '../styles/adminUserManagement.css';
 import { feedbackService } from '../services/FeedbackService';
-import { toCsvRow } from '../services/adminInsightsService';
+import { downloadAdminExcel } from '../utils/adminExcelExport';
 import {
   CUSTOMER_EXPORT_MAX,
   CUSTOMER_TYPES,
@@ -1307,43 +1307,42 @@ const UserManagement: React.FC = () => {
         if (!data || data.length < pageSizeExport) break;
       }
       const truncated = rows.length >= CUSTOMER_EXPORT_MAX;
-      const head = toCsvRow([
-        'ID',
-        '姓名',
-        '电话',
-        '邮箱',
-        '地区',
-        '类型',
-        '状态',
-        '余额',
-        '订单',
-        '累计消费',
-        '冻结原因',
-        '注册时间',
+      const exported = rows.slice(0, CUSTOMER_EXPORT_MAX);
+      await downloadAdminExcel(`ml-customers-${new Date().toISOString().slice(0, 10)}.xlsx`, [
+        {
+          name: '客户',
+          title: 'MARKET LINK · 客户列表',
+          subtitle: `${exported.length} 条`,
+          columns: [
+            { header: 'ID', width: 16 },
+            { header: '姓名', width: 16 },
+            { header: '电话', width: 16 },
+            { header: '邮箱', width: 22 },
+            { header: '地区', width: 12 },
+            { header: '类型', width: 12 },
+            { header: '状态', width: 10 },
+            { header: '余额', width: 12, align: 'right' },
+            { header: '订单', width: 10, align: 'right' },
+            { header: '累计消费', width: 14, align: 'right' },
+            { header: '冻结原因', width: 22 },
+            { header: '注册时间', width: 20 },
+          ],
+          rows: exported.map((user) => [
+            user.id,
+            user.name,
+            user.phone,
+            user.email,
+            regionLabel(user.register_region),
+            getUserTypeText(user),
+            user.status,
+            user.balance ?? 0,
+            user.total_orders || 0,
+            user.total_spent ?? 0,
+            user.freeze_reason || '',
+            user.created_at || user.registration_date || '',
+          ]),
+        },
       ]);
-      const lines = rows.slice(0, CUSTOMER_EXPORT_MAX).map((user) =>
-        toCsvRow([
-          user.id,
-          user.name,
-          user.phone,
-          user.email,
-          regionLabel(user.register_region),
-          getUserTypeText(user),
-          user.status,
-          user.balance ?? 0,
-          user.total_orders || 0,
-          user.total_spent ?? 0,
-          user.freeze_reason || '',
-          user.created_at || user.registration_date || '',
-        ]),
-      );
-      const blob = new Blob(['\uFEFF', [head, ...lines].join('\n')], { type: 'text/csv;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `ml-customers-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
       feedbackService.notify(truncated ? `已导出前 ${CUSTOMER_EXPORT_MAX} 条，请收窄筛选后再导出` : `已导出 ${rows.length} 条`);
     } catch (error: unknown) {
       feedbackService.notify(`导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
@@ -1616,7 +1615,7 @@ const UserManagement: React.FC = () => {
                     刷新
                   </button>
                   <button type="button" className="user-mgmt__btn" onClick={() => void exportCustomers()} disabled={exporting}>
-                    {exporting ? '导出中…' : '导出 CSV'}
+                    {exporting ? '导出中…' : '导出 Excel'}
                   </button>
                 </div>
               </div>

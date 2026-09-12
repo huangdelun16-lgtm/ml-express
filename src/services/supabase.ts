@@ -12,6 +12,7 @@ import {
   normalizeCustomerExchangeRateStore,
   normalizeCustomerProxyFeeStore,
 } from '../utils/proxyPurchaseExcel';
+import { adminSupabaseAuthOptions } from '../utils/adminSupabaseAuth';
 import { isAbortLikeError } from '../utils/fetchError';
 import {
   buildCodSettlePatch,
@@ -44,7 +45,9 @@ if (!supabaseUrl || !supabaseKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: adminSupabaseAuthOptions,
+});
 // production /__sb: do not dial workers.dev Realtime (TLS-reset in Myanmar)
 applyNetlifyRealtimeFallback(supabase);
 
