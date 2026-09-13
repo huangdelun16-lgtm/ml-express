@@ -395,25 +395,31 @@ export function ClayBook({ size = 44 }: SizeProps) {
   );
 }
 
-export function ClayStoreFront({ size = 44 }: SizeProps) {
+export function ClayStoreFront({ size = 44, accent = 'teal' }: SizeProps & { accent?: 'teal' | 'orange' }) {
   const id = gid(useId());
+  const roof = accent === 'orange'
+    ? [
+        <Stop key="hi" offset="0" stopColor="#FFD39A" />,
+        <Stop key="lo" offset="1" stopColor="#E08A3C" />,
+      ]
+    : tealStops();
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
         <SvgGradient id={`${id}r`} x1="0.2" y1="0" x2="0.8" y2="1">
-          {tealStops()}
+          {roof}
         </SvgGradient>
         <SvgGradient id={`${id}w`} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#F4FEFF" />
-          <Stop offset="1" stopColor="#D5EEF3" />
+          <Stop offset="0" stopColor="#FFF8EF" />
+          <Stop offset="1" stopColor="#F3E0C6" />
         </SvgGradient>
       </Defs>
-      <Ellipse cx="32" cy="56" rx="16" ry="4" fill="#2C98A6" opacity="0.14" />
+      <Ellipse cx="32" cy="56" rx="16" ry="4" fill={accent === 'orange' ? '#E08A3C' : '#2C98A6'} opacity="0.14" />
       <Path d="M12 28 L32 14 L52 28 L52 50 C52 53 50 55 47 55 L17 55 C14 55 12 53 12 50 Z" fill={`url(#${id}w)`} />
       <Path d="M10 26 L32 12 L54 26 L48 30 L32 18 L16 30 Z" fill={`url(#${id}r)`} />
       <Path d="M26 38 L38 38 L38 55 L26 55 Z" fill={`url(#${id}r)`} />
-      <Path d="M16 36 L24 36 L24 46 L16 46 Z" fill="#8AE8F2" opacity="0.85" />
-      <Path d="M40 36 L48 36 L48 46 L40 46 Z" fill="#8AE8F2" opacity="0.85" />
+      <Path d="M16 36 L24 36 L24 46 L16 46 Z" fill={accent === 'orange' ? '#FFE0B0' : '#8AE8F2'} opacity="0.9" />
+      <Path d="M40 36 L48 36 L48 46 L40 46 Z" fill={accent === 'orange' ? '#FFE0B0' : '#8AE8F2'} opacity="0.9" />
     </Svg>
   );
 }
@@ -459,6 +465,73 @@ export function ClayMapBoard({ size = 44 }: SizeProps) {
       <Path d="M14 28 C22 22 30 34 40 24 C48 18 52 30 54 28" stroke="#FFFFFF" strokeWidth="3" fill="transparent" />
       <Path d="M32 22 C38 22 42 28 32 40 C22 28 26 22 32 22 Z" fill={`url(#${id}n)`} />
       <Circle cx="32" cy="28" r="4" fill="#F4FEFF" />
+    </Svg>
+  );
+}
+
+/** 订单追踪：地图底板 + 路线 + 小货车。 */
+export function ClayMapTrack({ size = 56 }: SizeProps) {
+  const id = gid(useId());
+  return (
+    <Svg width={size} height={size} viewBox="0 0 80 64">
+      <Defs>
+        <SvgGradient id={`${id}map`} x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor="#E8F4FF" />
+          <Stop offset="1" stopColor="#B7D8F6" />
+        </SvgGradient>
+        <SvgGradient id={`${id}van`} x1="0.1" y1="0" x2="0.9" y2="1">
+          <Stop offset="0" stopColor="#7EC8F5" />
+          <Stop offset="1" stopColor="#2B6CB0" />
+        </SvgGradient>
+        <RadialGradient id={`${id}pin`} cx="35%" cy="28%" r="70%">
+          <Stop offset="0" stopColor="#7EC8F5" />
+          <Stop offset="1" stopColor="#1D4E89" />
+        </RadialGradient>
+      </Defs>
+      <Ellipse cx="40" cy="58" rx="22" ry="4" fill="#2B6CB0" opacity="0.12" />
+      <Path d="M8 14 L72 14 C75 14 76 16 76 18 L76 46 C76 48 75 50 72 50 L8 50 C5 50 4 48 4 46 L4 18 C4 16 5 14 8 14 Z" fill={`url(#${id}map)`} />
+      <Path d="M12 28 H68 M28 18 V46 M50 18 V46" stroke="#FFFFFF" strokeWidth="1.4" opacity="0.7" />
+      <Path d="M10 42 C24 34 36 40 48 28 C56 22 64 30 68 26" stroke="#2B6CB0" strokeWidth="2.4" fill="none" strokeDasharray="3 3" strokeLinecap="round" />
+      <Path d="M50 34 L64 34 L70 40 L70 46 L50 46 Z" fill={`url(#${id}van)`} />
+      <Path d="M50 36 L60 36 L64 40 L50 40 Z" fill="#E8F4FF" opacity="0.85" />
+      <Circle cx="54" cy="46" r="3.2" fill="#1E293B" />
+      <Circle cx="66" cy="46" r="3.2" fill="#1E293B" />
+      <Circle cx="54" cy="46" r="1.2" fill="#E2E8F0" />
+      <Circle cx="66" cy="46" r="1.2" fill="#E2E8F0" />
+      <Path d="M22 16 C27 16 30 20 22 30 C14 20 17 16 22 16 Z" fill={`url(#${id}pin)`} />
+      <Circle cx="22" cy="20" r="3" fill="#F4FEFF" />
+    </Svg>
+  );
+}
+
+/** 客服：3D 耳机机器人。 */
+export function ClaySupportBot({ size = 56 }: SizeProps) {
+  const id = gid(useId());
+  return (
+    <Svg width={size} height={size} viewBox="0 0 64 64">
+      <Defs>
+        <SvgGradient id={`${id}head`} x1="0.2" y1="0" x2="0.9" y2="1">
+          <Stop offset="0" stopColor="#EDE4FF" />
+          <Stop offset="1" stopColor="#B8A4F0" />
+        </SvgGradient>
+        <SvgGradient id={`${id}ear`} x1="0.2" y1="0" x2="0.9" y2="1">
+          <Stop offset="0" stopColor="#8B7CFF" />
+          <Stop offset="1" stopColor="#4C3FC8" />
+        </SvgGradient>
+      </Defs>
+      <Ellipse cx="32" cy="58" rx="14" ry="4" fill="#4C3FC8" opacity="0.14" />
+      <Path d="M20 18 C20 10 44 10 44 18" stroke={`url(#${id}ear)`} strokeWidth="5" fill="none" strokeLinecap="round" />
+      <Circle cx="32" cy="10" r="3" fill="#6D5EF5" />
+      <Circle cx="32" cy="10" r="1.4" fill="#F4FEFF" />
+      <Ellipse cx="14" cy="34" rx="7" ry="10" fill={`url(#${id}ear)`} />
+      <Ellipse cx="50" cy="34" rx="7" ry="10" fill={`url(#${id}ear)`} />
+      <Ellipse cx="32" cy="34" rx="16" ry="15" fill={`url(#${id}head)`} />
+      <Circle cx="26" cy="33" r="3.2" fill="#3B2F8A" />
+      <Circle cx="38" cy="33" r="3.2" fill="#3B2F8A" />
+      <Circle cx="25" cy="32" r="1" fill="#FFFFFF" />
+      <Circle cx="37" cy="32" r="1" fill="#FFFFFF" />
+      <Path d="M27 42 C30 45 34 45 37 42" stroke="#6D5EF5" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <Ellipse cx="24" cy="26" rx="5" ry="3" fill="#FFFFFF" opacity="0.4" />
     </Svg>
   );
 }

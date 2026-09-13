@@ -184,6 +184,8 @@ export default function AddressBookScreen({ navigation, route }: any) {
     setShowSuggestions,
     handleMapAddressInputChange,
     handleSelectSuggestion,
+    searchStatus,
+    retrySearch,
   } = usePlaceAutocomplete({
     language: language as any,
     selectedLocation,
@@ -407,7 +409,7 @@ export default function AddressBookScreen({ navigation, route }: any) {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
 
-      const location = await Location.getCurrentPositionAsync({});
+      const location = await Location.getCurrentPositionAsync();
       setSelectedLocation({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude
@@ -577,6 +579,8 @@ export default function AddressBookScreen({ navigation, route }: any) {
               mapAddressInput={mapAddressInput}
               showSuggestions={showSuggestions}
               autocompleteSuggestions={autocompleteSuggestions}
+              searchStatus={searchStatus}
+              onRetrySearch={retrySearch}
               onClose={() => setShowMapSelector(false)}
               onConfirm={handleConfirmMapLocation}
               onAddressInputChange={handleMapAddressInputChange}

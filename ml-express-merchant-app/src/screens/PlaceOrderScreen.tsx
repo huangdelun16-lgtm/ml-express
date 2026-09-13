@@ -389,9 +389,10 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     autocompleteSuggestions,
     showSuggestions,
     setShowSuggestions,
-    isLoadingSuggestions,
+    searchStatus,
     handleMapAddressInputChange,
     handleSelectSuggestion,
+    retrySearch,
   } = usePlaceAutocomplete({
     language: language as 'zh' | 'en' | 'my',
     selectedLocation,
@@ -1186,9 +1187,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       }
 
       // 设置超时和优化选项
-      const locationPromise = Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced, // 使用平衡精度，更快
-      });
+      const locationPromise = Location.getCurrentPositionAsync();
+      void locationPromise.catch(() => undefined);
       
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('获取位置超时')), 5000) // 5秒超时
@@ -1219,7 +1219,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         return;
       }
 
-      const location = await Location.getCurrentPositionAsync({});
+      const location = await Location.getCurrentPositionAsync();
       const address = await Location.reverseGeocodeAsync({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
@@ -1319,9 +1319,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           }
 
           // 设置超时，避免等待太久
-          const locationPromise = Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced, // 使用平衡精度，更快
-          });
+          const locationPromise = Location.getCurrentPositionAsync();
+          void locationPromise.catch(() => undefined);
           
           const timeoutPromise = new Promise((_, reject) => 
             setTimeout(() => reject(new Error('获取位置超时')), 3000) // 3秒超时
@@ -2828,6 +2827,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         mapAddressInput={mapAddressInput}
         showSuggestions={showSuggestions}
         autocompleteSuggestions={autocompleteSuggestions}
+        searchStatus={searchStatus}
+        onRetrySearch={retrySearch}
         onClose={() => setShowMapModal(false)}
         onConfirm={confirmMapLocation}
         onAddressInputChange={handleMapAddressInputChange}

@@ -10,11 +10,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
-import * as MediaLibrary from 'expo-media-library';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import { common } from '../../i18n';
 import LoggerService from '../../services/LoggerService';
-import { ensureSaveToLibraryPermission } from '../../utils/mediaAccess';
+import { ensureSaveToLibraryPermission, saveImageToLibrary } from '../../utils/mediaAccess';
 
 const TEAL = '#2C98A6';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -70,7 +69,7 @@ export default function OrderQrModal({
         format: 'png',
         quality: 1.0,
       });
-      await MediaLibrary.saveToLibraryAsync(uri);
+      await saveImageToLibrary(uri);
       hideLoading();
       Alert.alert(c.saved, c.qrSaved);
     } catch (error) {

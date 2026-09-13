@@ -9,8 +9,7 @@ import LoggerService from '../services/LoggerService';
 import QRCode from 'react-native-qrcode-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
-import * as MediaLibrary from 'expo-media-library';
-import { ensureSaveToLibraryPermission } from '../utils/mediaAccess';
+import { ensureSaveToLibraryPermission, saveImageToLibrary } from '../utils/mediaAccess';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import { packageService, reviewService, supabase } from '../services/supabase';
 import { addDismissedReviewOrderId, getDismissedReviewOrderIds } from '../utils/reviewPromptStorage';
@@ -126,7 +125,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
         quality: 1.0,
       });
 
-      await MediaLibrary.saveToLibraryAsync(uri);
+      await saveImageToLibrary(uri);
       hideLoading();
       Alert.alert(
         c.saved,

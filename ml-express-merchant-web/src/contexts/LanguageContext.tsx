@@ -451,6 +451,10 @@ const translations: any = {
       mapTitle: '选择地址',
       mapTip: '💡 提示：点击地图标注位置，系统将自动填充地址. 您可在此基础上补充门牌号等详细信息。',
       mapPlaceholder: '输入详细地址或在地图上点击选择位置',
+      mapSearchLoading: '搜索中...',
+      mapSearchEmpty: '未找到相关位置',
+      mapSearchFailed: '搜索失败，请稍后重试',
+      mapSearchRetry: '重试',
       confirmSelection: '确认选择',
       getMyLocation: '获取我的位置',
       selectType: '请选择包裹类型'
@@ -975,6 +979,10 @@ const translations: any = {
       mapTitle: 'Select Address',
       mapTip: '💡 Tip: Click on the map to mark location, the system will automatically fill in the address. You can add house numbers and other details.',
       mapPlaceholder: 'Enter detailed address or click on the map to select location',
+      mapSearchLoading: 'Searching...',
+      mapSearchEmpty: 'No matching places',
+      mapSearchFailed: 'Search failed. Please try again.',
+      mapSearchRetry: 'Retry',
       confirmSelection: 'Confirm Selection',
       getMyLocation: 'Get My Location',
       selectType: 'Select Package Type'
@@ -1499,6 +1507,10 @@ const translations: any = {
       mapTitle: 'ရွေးချယ်ပါ',
       mapTip: '💡 အကြံပြုချက်: မြေပုံပေါ်တွင် နေရာကို နှိပ်ပြီး လိပ်စာကို အလိုအလျောက် ဖြည့်စွက်ပါ။ သင်သည် အိမ်နံပါတ်နှင့် အသေးစိတ်အချက်အလက်များကို ထပ်မံ ဖြည့်စွက်နိုင်သည်။',
       mapPlaceholder: 'အသေးစိတ်လိပ်စာ ထည့်ပါ သို့မဟုတ် မြေပုံပေါ်တွင် နေရာကို ရွေးချယ်ပါ',
+      mapSearchLoading: 'ရှာဖွေနေသည်...',
+      mapSearchEmpty: 'ကိုက်ညီသောနေရာ မတွေ့ပါ',
+      mapSearchFailed: 'ရှာဖွေမှု မအောင်မြင်ပါ။ ပြန်လည်ကြိုးစားပါ။',
+      mapSearchRetry: 'ပြန်ကြိုးစားရန်',
       confirmSelection: 'ရွေးချယ်မှုကို အတည်ပြုပါ',
       getMyLocation: 'ကျွန်ုပ်၏တည်နေရာကို ရယူပါ',
       selectType: 'ပစ္စည်းအမျိုးအစားကို ရွေးချယ်ပါ'

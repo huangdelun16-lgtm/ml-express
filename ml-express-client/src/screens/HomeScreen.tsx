@@ -9,7 +9,6 @@ import {
   Image,
   Dimensions,
   RefreshControl,
-  Alert,
   Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -19,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../contexts/AppContext';
 import TutorialModal from '../components/TutorialModal';
+import HotlinePickerModal from '../components/HotlinePickerModal';
 import BrandRider from '../components/BrandRider';
 import HomeToolsSection from '../components/HomeToolsSection';
 import {
@@ -103,6 +103,7 @@ export default function HomeScreen({ navigation }: any) {
   const [isBannerPaused, setIsBannerPaused] = useState(false);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [showTutorialModal, setShowTutorialModal] = useState(false);
+  const [showHotlineModal, setShowHotlineModal] = useState(false);
 
   const displayBanners = banners.length > 0 ? banners : FALLBACK_BANNERS;
   const totalBanners = displayBanners.length;
@@ -115,14 +116,19 @@ export default function HomeScreen({ navigation }: any) {
       howToUse: '使用教学',
       howToUseHint: '新手上路 · 图文详解',
       logistics: '我的物流',
+      viewAll: '查看全部',
       inProgress: '进行中',
       pendingPickup: '待取件',
+      inTransitHint: '运输中',
+      pendingHint: '待处理',
       orderNow: '立即下单',
-      orderNowHint: '同城闪送 · 30 分钟',
+      orderNowHint: '同城闪送 · 30分钟送达',
       nearbyStores: '附近商家',
       nearbyHint: '逛商场 · 就近买',
       trackOrder: '订单追踪',
+      trackHint: '实时查看物流动态',
       support: '客服',
+      supportHint: '在线为您服务',
       promoUntil: '活动至 2026年1月',
       newBadge: 'NEW',
     },
@@ -133,14 +139,19 @@ export default function HomeScreen({ navigation }: any) {
       howToUse: 'How to use',
       howToUseHint: 'Beginner guide',
       logistics: 'My logistics',
+      viewAll: 'See all',
       inProgress: 'Ongoing',
       pendingPickup: 'Pickup',
+      inTransitHint: 'In transit',
+      pendingHint: 'Pending',
       orderNow: 'Order now',
-      orderNowHint: 'City flash · 30 min',
+      orderNowHint: 'City flash · 30 min delivery',
       nearbyStores: 'Nearby stores',
       nearbyHint: 'Malls · buy nearby',
       trackOrder: 'Tracking',
+      trackHint: 'Live shipment updates',
       support: 'Support',
+      supportHint: 'We are online for you',
       promoUntil: 'Until Jan 2026',
       newBadge: 'NEW',
     },
@@ -151,14 +162,19 @@ export default function HomeScreen({ navigation }: any) {
       howToUse: 'အသုံးပြုနည်း',
       howToUseHint: 'စတင်သူလမ်းညွှန်',
       logistics: 'ကျွန်ုပ်ပို့ဆောင်မှု',
+      viewAll: 'အားလုံးကြည့်ရန်',
       inProgress: 'ဆောင်ရွက်ဆဲ',
       pendingPickup: 'ထုပ်ယူရန်',
+      inTransitHint: 'ပို့ဆောင်ဆဲ',
+      pendingHint: 'စောင့်ဆိုင်း',
       orderNow: 'ယခုမှာယူ',
-      orderNowHint: 'မြို့တွင်း · ၃၀ မိနစ်',
+      orderNowHint: 'မြို့တွင်း · ၃၀ မိနစ်ပို့ဆောင်',
       nearbyStores: 'အနီးဆိုင်',
       nearbyHint: 'စျေးဝယ် · အနီး',
       trackOrder: 'ခြေရာခံ',
+      trackHint: 'ပို့ဆောင်မှုကို အချိန်နှင့်တပြေးညီကြည့်ရန်',
       support: 'ဝန်ဆောင်မှု',
+      supportHint: 'အွန်လိုင်းမှ ကူညီပေးပါသည်',
       promoUntil: '၂၀၂၆ ဇန်နဝါရီ အထိ',
       newBadge: 'NEW',
     },
@@ -259,15 +275,7 @@ export default function HomeScreen({ navigation }: any) {
   };
 
   const handleCallHotline = () => {
-    const cancelText = c.cancel;
-    const title = c.hotlineTitle;
-    Alert.alert(title, '', [
-      ...HOTLINE_NUMBERS.map((item) => ({
-        text: item.display,
-        onPress: () => Linking.openURL(`tel:${item.tel}`),
-      })),
-      { text: cancelText, style: 'cancel' as const },
-    ]);
+    setShowHotlineModal(true);
   };
 
   const openOrders = (filterStatus: string) => {
@@ -394,6 +402,7 @@ export default function HomeScreen({ navigation }: any) {
           t={t}
           inTransit={orderStats.inTransit}
           pending={orderStats.pending}
+          onViewAll={() => openOrders('all')}
           onOpenInProgress={() => openOrders('配送中')}
           onOpenPickup={() => openOrders('待取件')}
           onOrderNow={() => navigation.navigate('PlaceOrder')}
@@ -404,6 +413,14 @@ export default function HomeScreen({ navigation }: any) {
       </ScrollView>
 
       <TutorialModal isVisible={showTutorialModal} onClose={() => setShowTutorialModal(false)} />
+      <HotlinePickerModal
+        visible={showHotlineModal}
+        title={c.hotlineTitle}
+        numbers={HOTLINE_NUMBERS}
+        cancelLabel={c.cancel}
+        exitLabel={c.exit}
+        onClose={() => setShowHotlineModal(false)}
+      />
     </View>
   );
 }

@@ -4,32 +4,43 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import MyanmarAwareText from './MyanmarAwareText';
-import { ClayBox, ClayHeadset, ClayMapBoard, ClayPlaceOrder, ClayShoppingBag, ClayStoreFront } from './ProfileClayIcons';
+import {
+  ClayBox,
+  ClayMapTrack,
+  ClayPin,
+  ClayPlaceOrder,
+  ClayStoreFront,
+  ClaySupportBot,
+} from './ProfileClayIcons';
 
 const TEAL = '#2C98A6';
-const TEAL_DEEP = '#1E6F7A';
 const NAVY = '#1A2B48';
 const GAP = 12;
-const RADIUS = 24;
-const FEATURE_H = 148;
-const UTIL_H = 96;
+const RADIUS = 26;
+const FEATURE_H = 164;
 
 type Labels = {
   logistics: string;
+  viewAll: string;
   inProgress: string;
   pendingPickup: string;
+  inTransitHint: string;
+  pendingHint: string;
   orderNow: string;
   orderNowHint: string;
   nearbyStores: string;
   nearbyHint: string;
   trackOrder: string;
+  trackHint: string;
   support: string;
+  supportHint: string;
 };
 
 type Props = {
   t: Labels;
   inTransit: number;
   pending: number;
+  onViewAll: () => void;
   onOpenInProgress: () => void;
   onOpenPickup: () => void;
   onOrderNow: () => void;
@@ -62,16 +73,7 @@ function FitLabel({
   );
 }
 
-/** Faint city-block map grid texture used in backgrounds. */
-function MapTexture({
-  variant = 'gray',
-  opacity = 0.1,
-}: {
-  variant?: 'gray' | 'white' | 'teal';
-  opacity?: number;
-}) {
-  const stroke =
-    variant === 'white' ? '#FFFFFF' : variant === 'teal' ? '#2C98A6' : '#1A2B48';
+function MapTexture({ opacity = 0.1 }: { opacity?: number }) {
   return (
     <Svg
       pointerEvents="none"
@@ -81,46 +83,72 @@ function MapTexture({
       viewBox="0 0 220 160"
       preserveAspectRatio="xMidYMid slice"
     >
-      <Path d="M0 38 H220 M0 78 H220 M0 118 H220" stroke={stroke} strokeWidth="1" />
-      <Path d="M36 0 V160 M86 0 V160 M138 0 V160 M186 0 V160" stroke={stroke} strokeWidth="1" />
-      <Rect x="44" y="46" width="34" height="24" rx="3" fill={stroke} opacity={0.3} />
-      <Rect x="94" y="86" width="36" height="24" rx="3" fill={stroke} opacity={0.3} />
-      <Rect x="146" y="46" width="30" height="22" rx="3" fill={stroke} opacity={0.3} />
-      <Rect x="44" y="126" width="28" height="18" rx="3" fill={stroke} opacity={0.3} />
+      <Path d="M0 38 H220 M0 78 H220 M0 118 H220" stroke="#FFFFFF" strokeWidth="1" />
+      <Path d="M36 0 V160 M86 0 V160 M138 0 V160 M186 0 V160" stroke="#FFFFFF" strokeWidth="1" />
+      <Rect x="44" y="46" width="34" height="24" rx="3" fill="#FFFFFF" opacity={0.28} />
+      <Rect x="94" y="86" width="36" height="24" rx="3" fill="#FFFFFF" opacity={0.28} />
       <Path
         d="M18 142 C62 108 108 128 168 58"
-        stroke={stroke}
+        stroke="#FFFFFF"
         strokeWidth="1.5"
         fill="none"
         strokeDasharray="3 3"
       />
-      <Circle cx="18" cy="142" r="2.5" fill={stroke} />
-      <Circle cx="168" cy="58" r="3" fill={stroke} />
+      <Circle cx="18" cy="142" r="2.5" fill="#FFFFFF" />
+      <Circle cx="168" cy="58" r="3" fill="#FFFFFF" />
     </Svg>
   );
 }
 
-function RouteGlyph() {
+function CircleArrow() {
   return (
-    <Svg width={22} height={14} viewBox="0 0 22 14">
-      <Circle cx="3.5" cy="7" r="2.4" fill="#FFFFFF" />
-      <Path
-        d="M7 7 H15"
-        stroke="#FFFFFF"
-        strokeWidth="1.6"
-        strokeDasharray="2 1.6"
-        strokeLinecap="round"
-      />
-      <Path d="M16.2 3.2 L20.6 7 L16.2 10.8 Z" fill="#FFFFFF" />
-    </Svg>
-  );
-}
-
-function GoButton({ dark }: { dark: boolean }) {
-  return (
-    <View style={[styles.go, dark ? styles.goDark : styles.goLight]}>
-      <Ionicons name="arrow-forward" size={13} color={dark ? '#FFFFFF' : TEAL} />
+    <View style={styles.circleArrow}>
+      <Ionicons name="arrow-forward" size={13} color="#FFFFFF" />
     </View>
+  );
+}
+
+function FeatureCard({
+  onPress,
+  colors,
+  iconBg,
+  icon,
+  title,
+  hint,
+  titleColor,
+  hintColor,
+  art,
+}: {
+  onPress: () => void;
+  colors: [string, string];
+  iconBg: [string, string];
+  icon: React.ReactNode;
+  title: string;
+  hint: string;
+  titleColor: string;
+  hintColor: string;
+  art: React.ReactNode;
+}) {
+  return (
+    <TouchableOpacity style={styles.featureCard} onPress={onPress} activeOpacity={0.9}>
+      <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.featureFill}>
+        <View style={styles.featureCopy}>
+          <LinearGradient
+            colors={iconBg}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.iconWell}
+          >
+            {icon}
+          </LinearGradient>
+          <View style={styles.featureText}>
+            <FitLabel text={title} style={{ ...styles.featureTitle, color: titleColor }} />
+            <FitLabel text={hint} style={{ ...styles.featureHint, color: hintColor }} weight="semibold" lines={2} />
+          </View>
+        </View>
+        <View style={styles.featureArt}>{art}</View>
+      </LinearGradient>
+    </TouchableOpacity>
   );
 }
 
@@ -128,6 +156,7 @@ export default function HomeToolsSection({
   t,
   inTransit,
   pending,
+  onViewAll,
   onOpenInProgress,
   onOpenPickup,
   onOrderNow,
@@ -137,130 +166,121 @@ export default function HomeToolsSection({
 }: Props) {
   return (
     <View style={styles.wrap}>
-      {/* 1. Header: 我的物流 */}
       <View style={styles.sectionHead}>
         <View style={styles.sectionBar} />
         <FitLabel text={t.logistics} style={styles.sectionTitle} />
+        <TouchableOpacity onPress={onViewAll} hitSlop={8} style={styles.viewAllBtn}>
+          <FitLabel text={t.viewAll} style={styles.viewAll} weight="semibold" />
+          <Ionicons name="chevron-forward" size={14} color={TEAL} />
+        </TouchableOpacity>
       </View>
 
-      {/* 2. 我的物流 Card */}
-      <View style={styles.logisticsCardContainer}>
+      <View style={styles.logisticsCard}>
         <LinearGradient
-          colors={['#1F7A84', '#2C98A6']}
+          colors={['#1C7A84', '#2C98A6', '#4BB8C4']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.logisticsGradient}
         >
-          <MapTexture variant="white" opacity={0.1} />
+          <MapTexture opacity={0.09} />
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0)']}
+            start={{ x: 0.2, y: 0 }}
+            end={{ x: 0.8, y: 0.7 }}
+            style={StyleSheet.absoluteFill}
+          />
 
-          {/* Left Column: 进行中 */}
-          <TouchableOpacity
-            style={styles.logisticsColumn}
-            onPress={onOpenInProgress}
-            activeOpacity={0.88}
-          >
-            <View style={styles.colTopRow}>
-              <FitLabel text={t.inProgress} style={styles.colLabel} weight="semibold" />
-              <RouteGlyph />
-            </View>
-
-            <View style={styles.colMiddleRow}>
-              <Text style={styles.colNumber}>{inTransit}</Text>
-            </View>
-
-            <View style={styles.colBottomRow}>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressSeg, inTransit > 0 && styles.progressSegActive]} />
-                <View style={[styles.progressSeg, inTransit > 1 && styles.progressSegActive]} />
-                <View style={[styles.progressSeg, inTransit > 2 && styles.progressSegActive]} />
-              </View>
-              <ClayBox size={44} />
+          <TouchableOpacity style={styles.logisticsColumn} onPress={onOpenInProgress} activeOpacity={0.88}>
+            <FitLabel text={t.inProgress} style={styles.colLabel} weight="semibold" />
+            <Text style={styles.colNumber}>{inTransit}</Text>
+            <View style={styles.colMeta}>
+              <FitLabel
+                text={`${t.inTransitHint} · ${inTransit}`}
+                style={styles.colHint}
+                weight="semibold"
+              />
+              <CircleArrow />
             </View>
           </TouchableOpacity>
 
-          {/* Divider */}
           <View style={styles.colDivider} />
 
-          {/* Right Column: 待取件 */}
-          <TouchableOpacity
-            style={styles.logisticsColumn}
-            onPress={onOpenPickup}
-            activeOpacity={0.88}
-          >
-            <View style={styles.colTopRow}>
-              <FitLabel text={t.pendingPickup} style={styles.colLabel} weight="semibold" />
-              <RouteGlyph />
-            </View>
-
-            <View style={styles.colMiddleRow}>
-              <Text style={styles.colNumber}>{pending}</Text>
-            </View>
-
-            <View style={styles.colBottomRowRight}>
-              <ClayShoppingBag size={44} />
+          <TouchableOpacity style={[styles.logisticsColumn, styles.logisticsColumnRight]} onPress={onOpenPickup} activeOpacity={0.88}>
+            <FitLabel text={t.pendingPickup} style={styles.colLabel} weight="semibold" />
+            <Text style={styles.colNumber}>{pending}</Text>
+            <View style={styles.colMeta}>
+              <FitLabel
+                text={`${t.pendingHint} · ${pending}`}
+                style={styles.colHint}
+                weight="semibold"
+              />
+              <CircleArrow />
             </View>
           </TouchableOpacity>
+
+          <View pointerEvents="none" style={styles.logisticsArt}>
+            <ClayBox size={54} />
+            <View style={styles.logisticsPin}>
+              <ClayPin size={28} />
+            </View>
+          </View>
         </LinearGradient>
       </View>
 
-      {/* 3. 立即下单 & 附近商家 Cards */}
       <View style={styles.row}>
-        {/* 立即下单 */}
-        <TouchableOpacity style={styles.featureCard} onPress={onOrderNow} activeOpacity={0.9}>
-          <LinearGradient
-            colors={['#2C98A6', TEAL_DEEP]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.featureFill}
-          >
-            <MapTexture variant="white" opacity={0.08} />
-            <View style={styles.featureCopy}>
-              <FitLabel text={t.orderNow} style={styles.featureTitleOn} />
-              <FitLabel text={t.orderNowHint} style={styles.featureHintOn} weight="semibold" />
+        <FeatureCard
+          onPress={onOrderNow}
+          colors={['#FFFFFF', '#F3FBFC']}
+          iconBg={['#5EC4CF', '#1E7A84']}
+          icon={<Ionicons name="cube-outline" size={18} color="#FFFFFF" />}
+          title={t.orderNow}
+          hint={t.orderNowHint}
+          titleColor={NAVY}
+          hintColor="#5B6B7C"
+          art={
+            <View style={styles.artPair}>
+              <ClayPlaceOrder size={52} />
+              <ClayPin size={26} />
             </View>
-            <View style={styles.featureBottom}>
-              <View style={styles.iconWell}>
-                <ClayPlaceOrder size={46} />
-              </View>
-              <GoButton dark />
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* 附近商家 */}
-        <TouchableOpacity style={styles.featureCard} onPress={onNearby} activeOpacity={0.9}>
-          <LinearGradient
-            colors={['#2C98A6', TEAL_DEEP]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.featureFill}
-          >
-            <MapTexture variant="white" opacity={0.08} />
-            <View style={styles.featureCopy}>
-              <FitLabel text={t.nearbyStores} style={styles.featureTitleOn} />
-              <FitLabel text={t.nearbyHint} style={styles.featureHintOn} weight="semibold" />
-            </View>
-            <View style={styles.featureBottom}>
-              <View style={styles.iconWell}>
-                <ClayStoreFront size={46} />
-              </View>
-              <GoButton dark />
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
+          }
+        />
+        <FeatureCard
+          onPress={onNearby}
+          colors={['#FFF8EF', '#F7E4C8']}
+          iconBg={['#FFC56A', '#E08A3C']}
+          icon={<Ionicons name="storefront-outline" size={18} color="#FFFFFF" />}
+          title={t.nearbyStores}
+          hint={t.nearbyHint}
+          titleColor="#5A3A16"
+          hintColor="#9A7040"
+          art={<ClayStoreFront size={56} accent="orange" />}
+        />
       </View>
 
-      {/* 4. 订单追踪 & 客服 Cards */}
       <View style={styles.row}>
-        <TouchableOpacity style={styles.utilCard} onPress={onTrack} activeOpacity={0.88}>
-          <ClayMapBoard size={44} />
-          <FitLabel text={t.trackOrder} style={styles.utilLabel} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.utilCard} onPress={onSupport} activeOpacity={0.88}>
-          <ClayHeadset size={44} />
-          <FitLabel text={t.support} style={styles.utilLabel} />
-        </TouchableOpacity>
+        <FeatureCard
+          onPress={onTrack}
+          colors={['#EEF6FF', '#D5E8FA']}
+          iconBg={['#7EC8F5', '#2B6CB0']}
+          icon={<Ionicons name="navigate-outline" size={18} color="#FFFFFF" />}
+          title={t.trackOrder}
+          hint={t.trackHint}
+          titleColor="#163A5F"
+          hintColor="#5B7A99"
+          art={<ClayMapTrack size={64} />}
+        />
+        <FeatureCard
+          onPress={onSupport}
+          colors={['#F6F1FF', '#E4D9FB']}
+          iconBg={['#A78BFA', '#4C3FC8']}
+          title={t.support}
+          hint={t.supportHint}
+          titleColor="#3B2F6A"
+          hintColor="#7A6A9A"
+          icon={<Ionicons name="headset-outline" size={18} color="#FFFFFF" />}
+          art={<ClaySupportBot size={58} />}
+        />
       </View>
     </View>
   );
@@ -269,9 +289,9 @@ export default function HomeToolsSection({
 const cardShadow = Platform.select({
   ios: {
     shadowColor: '#1A2B48',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.08,
-    shadowRadius: 16,
+    shadowRadius: 18,
   },
   default: { elevation: 3 },
 });
@@ -279,15 +299,15 @@ const cardShadow = Platform.select({
 const styles = StyleSheet.create({
   wrap: {
     marginTop: 6,
-    paddingBottom: 4,
+    paddingBottom: 8,
   },
   sectionHead: {
     marginTop: 18,
-    marginHorizontal: 16,
+    marginHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    height: 22,
+    minHeight: 24,
   },
   sectionBar: {
     width: 4,
@@ -298,90 +318,106 @@ const styles = StyleSheet.create({
   sectionTitle: {
     flex: 1,
     fontSize: 16,
-    lineHeight: 20,
+    lineHeight: 22,
     fontWeight: '800',
     color: NAVY,
   },
-  logisticsCardContainer: {
+  viewAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  viewAll: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+    color: TEAL,
+  },
+  logisticsCard: {
     marginTop: GAP,
     marginHorizontal: 16,
     borderRadius: RADIUS,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.38)',
     ...Platform.select({
       ios: {
         shadowColor: '#1E6F7A',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.22,
-        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.2,
+        shadowRadius: 16,
       },
       default: { elevation: 5 },
     }),
   },
   logisticsGradient: {
     flexDirection: 'row',
-    padding: 16,
-    minHeight: 148,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 16,
+    minHeight: 168,
   },
   logisticsColumn: {
     flex: 1,
     justifyContent: 'space-between',
+    zIndex: 1,
   },
-  colTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  logisticsColumnRight: {
+    paddingRight: 8,
+    paddingBottom: 28,
   },
   colLabel: {
     fontSize: 13,
     lineHeight: 18,
-    color: '#FFFFFF',
+    color: 'rgba(255,255,255,0.88)',
     fontWeight: '700',
   },
-  colMiddleRow: {
-    marginTop: 2,
-    marginBottom: 2,
-  },
   colNumber: {
-    fontSize: 36,
-    lineHeight: 42,
+    marginTop: 6,
+    fontSize: 40,
+    lineHeight: 44,
     fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: -0.5,
-    textShadowColor: 'rgba(0,0,0,0.18)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    letterSpacing: -1,
   },
-  colBottomRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-  },
-  progressTrack: {
+  colMeta: {
+    marginTop: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 8,
-    width: 68,
+    justifyContent: 'space-between',
+    gap: 8,
   },
-  progressSeg: {
+  colHint: {
     flex: 1,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    fontSize: 12,
+    lineHeight: 16,
+    color: 'rgba(255,255,255,0.78)',
+    fontWeight: '600',
   },
-  progressSegActive: {
-    backgroundColor: '#B7EEF4',
-  },
-  colBottomRowRight: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'flex-end',
+  circleArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   colDivider: {
-    width: 1,
-    marginVertical: 4,
-    marginHorizontal: 12,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    width: StyleSheet.hairlineWidth,
+    marginVertical: 6,
+    marginHorizontal: 14,
+    backgroundColor: 'rgba(255,255,255,0.28)',
+  },
+  logisticsArt: {
+    position: 'absolute',
+    right: 14,
+    bottom: 10,
+    zIndex: 0,
+  },
+  logisticsPin: {
+    position: 'absolute',
+    right: -8,
+    top: -6,
   },
   row: {
     marginTop: GAP,
@@ -398,70 +434,45 @@ const styles = StyleSheet.create({
   },
   featureFill: {
     flex: 1,
-    padding: 14,
+    padding: 16,
     justifyContent: 'space-between',
   },
   featureCopy: {
-    zIndex: 1,
-    height: 40,
-    justifyContent: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
   },
-  featureTitleOn: {
-    fontSize: 16,
+  iconWell: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureText: {
+    flex: 1,
+    minHeight: 40,
+    justifyContent: 'center',
+  },
+  featureTitle: {
+    fontSize: 15,
     lineHeight: 20,
     fontWeight: '800',
-    color: '#FFFFFF',
   },
-  featureHintOn: {
+  featureHint: {
     marginTop: 3,
     fontSize: 11,
     lineHeight: 15,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.82)',
   },
-  featureBottom: {
-    zIndex: 1,
+  featureArt: {
+    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
+    minHeight: 58,
+  },
+  artPair: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    justifyContent: 'space-between',
-  },
-  iconWell: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  go: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  goDark: {
-    backgroundColor: 'rgba(255,255,255,0.22)',
-  },
-  goLight: {
-    backgroundColor: 'rgba(44,152,166,0.14)',
-  },
-  utilCard: {
-    flex: 1,
-    height: UTIL_H,
-    backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    ...cardShadow,
-  },
-  utilLabel: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '700',
-    color: NAVY,
-    textAlign: 'center',
-    paddingHorizontal: 8,
+    gap: 2,
   },
 });

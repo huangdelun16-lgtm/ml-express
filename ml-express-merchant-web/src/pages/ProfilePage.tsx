@@ -71,6 +71,9 @@ import {
 } from "../constants/merchantOrderStatus";
 import { exportMerchantStatement } from "../services/exportMerchantStatement";
 import { useMerchantPackageModals } from "../hooks/useMerchantPackageModals";
+import { useMapPlaceSearch } from "../hooks/useMapPlaceSearch";
+import { MapAddressSearchDropdown } from "../components/MapAddressSearchDropdown";
+import type { MapPlaceSuggestion } from "../utils/mapPlaceSearch";
 import { batchSettleCodOrders } from "../services/packageBatchService";
 import { toggleSelectedId } from "../utils/merchantBatchSelection";
 import MerchantPackageDetailModal from "../components/orders/MerchantPackageDetailModal";
@@ -222,22 +225,19 @@ const ProfilePage: React.FC = () => {
     useRef<google.maps.places.AutocompleteService | null>(null);
   const merchantPlacesServiceRef =
     useRef<google.maps.places.PlacesService | null>(null);
-  const merchantMapSearchDebounceRef = useRef<ReturnType<
-    typeof setTimeout
-  > | null>(null);
-  const lastMerchantMapSearchQueryRef = useRef("");
-  const [merchantMapSuggestions, setMerchantMapSuggestions] = useState<
-    Array<{
-      place_id: string;
-      main_text: string;
-      secondary_text: string;
-      description: string;
-    }>
-  >([]);
-  const [showMerchantMapSuggestions, setShowMerchantMapSuggestions] =
-    useState(false);
-  const [isLoadingMerchantMapSuggestions, setIsLoadingMerchantMapSuggestions] =
-    useState(false);
+  const merchantMapBiasRef = useRef({ lat: 21.95, lng: 96.08 });
+  merchantMapBiasRef.current = mapClickPosition || { lat: 21.95, lng: 96.08 };
+  const mapPlaceSearch = useMapPlaceSearch({
+    getAutocompleteService: () => merchantAutocompleteServiceRef.current,
+    getLocationBias: () => merchantMapBiasRef.current,
+    language,
+  });
+  const mapSearchLabels = {
+    loading: allT.order.mapSearchLoading,
+    empty: allT.order.mapSearchEmpty,
+    failed: allT.order.mapSearchFailed,
+    retry: allT.order.mapSearchRetry,
+  };
   const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<string>>(
     new Set(),
   );
@@ -1869,9 +1869,7 @@ const ProfilePage: React.FC = () => {
     const previewBase = existingAddress.split("\n📍 坐标:")[0].trim();
     setMapClickPosition(existingCoords);
     setMapModalPreviewAddress(previewBase);
-    setMerchantMapSuggestions([]);
-    setShowMerchantMapSuggestions(false);
-    lastMerchantMapSearchQueryRef.current = "";
+    mapPlaceSearch.reset();
     setShowMapModal(true);
   };
 
@@ -1903,102 +1901,17 @@ const ProfilePage: React.FC = () => {
     });
   };
 
-  const MERCHANT_MAP_DEFAULT_CENTER = { lat: 21.95, lng: 96.08 };
-
-  const performMerchantMapAutocomplete = (input: string) => {
-    const svc = merchantAutocompleteServiceRef.current;
-    if (!input.trim() || !svc || input.trim().length < 2) {
-      setMerchantMapSuggestions([]);
-      setShowMerchantMapSuggestions(false);
-      setIsLoadingMerchantMapSuggestions(false);
-      return;
-    }
-    if (lastMerchantMapSearchQueryRef.current === input.trim()) {
-      return;
-    }
-    setIsLoadingMerchantMapSuggestions(true);
-    lastMerchantMapSearchQueryRef.current = input.trim();
-    const center = mapClickPosition || MERCHANT_MAP_DEFAULT_CENTER;
-    svc.getPlacePredictions(
-      {
-        input: input.trim(),
-        location: new window.google.maps.LatLng(center.lat, center.lng),
-        radius: 50000,
-        componentRestrictions: { country: "mm" },
-        language:
-          language === "zh" ? "zh-CN" : language === "my" ? "my" : "en",
-      },
-      (predictions, status) => {
-        if (lastMerchantMapSearchQueryRef.current !== input.trim()) {
-          return;
-        }
-        setIsLoadingMerchantMapSuggestions(false);
-        if (
-          status === window.google.maps.places.PlacesServiceStatus.OK &&
-          predictions &&
-          predictions.length > 0
-        ) {
-          const suggestions = predictions
-            .slice(0, 10)
-            .map((prediction: google.maps.places.AutocompletePrediction) => ({
-              place_id: prediction.place_id,
-              main_text:
-                prediction.structured_formatting?.main_text ||
-                prediction.description,
-              secondary_text:
-                prediction.structured_formatting?.secondary_text || "",
-              description: prediction.description,
-            }));
-          setMerchantMapSuggestions(suggestions);
-          setShowMerchantMapSuggestions(true);
-        } else {
-          setMerchantMapSuggestions([]);
-          setShowMerchantMapSuggestions(false);
-        }
-      },
-    );
-  };
-
-  const handleMerchantMapAddressInputChange = (raw: string) => {
-    setMapModalPreviewAddress(raw);
-    if (merchantMapSearchDebounceRef.current) {
-      clearTimeout(merchantMapSearchDebounceRef.current);
-    }
-    if (!raw.trim()) {
-      setMerchantMapSuggestions([]);
-      setShowMerchantMapSuggestions(false);
-      setIsLoadingMerchantMapSuggestions(false);
-      lastMerchantMapSearchQueryRef.current = "";
-      return;
-    }
-    if (raw.trim().length < 2) {
-      setMerchantMapSuggestions([]);
-      setShowMerchantMapSuggestions(false);
-      setIsLoadingMerchantMapSuggestions(false);
-      return;
-    }
-    merchantMapSearchDebounceRef.current = setTimeout(() => {
-      performMerchantMapAutocomplete(raw);
-    }, 300);
-  };
-
-  const handleMerchantMapSelectSuggestion = (suggestion: {
-    place_id: string;
-    description: string;
-  }) => {
+  const handleMerchantMapSelectSuggestion = (suggestion: MapPlaceSuggestion) => {
     const places = merchantPlacesServiceRef.current;
     if (!places) return;
-    setShowMerchantMapSuggestions(false);
-    setIsLoadingMerchantMapSuggestions(true);
-    lastMerchantMapSearchQueryRef.current = "";
+    mapPlaceSearch.reset();
     setMapModalPreviewAddress(suggestion.description);
     places.getDetails(
       {
-        placeId: suggestion.place_id,
+        placeId: suggestion.placeId,
         fields: ["geometry", "formatted_address", "name"],
       },
       (place, status) => {
-        setIsLoadingMerchantMapSuggestions(false);
         if (
           status === window.google.maps.places.PlacesServiceStatus.OK &&
           place?.geometry?.location
@@ -2016,16 +1929,7 @@ const ProfilePage: React.FC = () => {
         }
       },
     );
-    setMerchantMapSuggestions([]);
   };
-
-  useEffect(() => {
-    return () => {
-      if (merchantMapSearchDebounceRef.current) {
-        clearTimeout(merchantMapSearchDebounceRef.current);
-      }
-    };
-  }, []);
 
   // 🚀 获取当前位置（对齐客户端 HomePage 地图）
   const handleMapModalLocateCurrent = async (
@@ -2169,8 +2073,7 @@ const ProfilePage: React.FC = () => {
     setShowMapModal(false);
     setMapClickPosition(null);
     setMapModalPreviewAddress("");
-    setMerchantMapSuggestions([]);
-    setShowMerchantMapSuggestions(false);
+    mapPlaceSearch.reset();
   };
 
   // 🚀 新增：下载订单二维码
@@ -7354,8 +7257,7 @@ const ProfilePage: React.FC = () => {
                   setShowMapModal(false);
                   setMapClickPosition(null);
                   setMapModalPreviewAddress("");
-                  setMerchantMapSuggestions([]);
-                  setShowMerchantMapSuggestions(false);
+                  mapPlaceSearch.reset();
                 }}
                 style={{
                   background: "none",
@@ -7530,21 +7432,22 @@ const ProfilePage: React.FC = () => {
                         type="text"
                         value={mapModalPreviewAddress}
                         placeholder={allT.order.mapPlaceholder}
-                        onChange={(e) =>
-                          handleMerchantMapAddressInputChange(e.target.value)
-                        }
+                        role="combobox"
+                        aria-expanded={mapPlaceSearch.open}
+                        aria-controls="merchant-map-address-search-listbox"
+                        aria-autocomplete="list"
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setMapModalPreviewAddress(next);
+                          mapPlaceSearch.scheduleSearch(next);
+                        }}
                         onFocus={(e) => {
                           if (e.currentTarget.value.trim().length >= 2) {
-                            performMerchantMapAutocomplete(
-                              e.currentTarget.value,
-                            );
+                            mapPlaceSearch.searchNow(e.currentTarget.value);
                           }
                         }}
                         onBlur={() => {
-                          setTimeout(
-                            () => setShowMerchantMapSuggestions(false),
-                            200,
-                          );
+                          setTimeout(() => mapPlaceSearch.setOpen(false), 200);
                         }}
                         autoComplete="off"
                         style={{
@@ -7558,7 +7461,7 @@ const ProfilePage: React.FC = () => {
                           color: "#0f172a",
                         }}
                       />
-                      {isLoadingMerchantMapSuggestions && (
+                      {mapPlaceSearch.status === "loading" && (
                         <div
                           style={{
                             position: "absolute",
@@ -7569,68 +7472,22 @@ const ProfilePage: React.FC = () => {
                             color: "#64748b",
                           }}
                         >
-                          🔍
+                          {mapSearchLabels.loading}
                         </div>
                       )}
-                      {showMerchantMapSuggestions &&
-                        merchantMapSuggestions.length > 0 && (
-                          <div
-                            style={{
-                              position: "absolute",
-                              top: "100%",
-                              left: 0,
-                              right: 0,
-                              marginTop: "4px",
-                              background: "#fff",
-                              borderRadius: "10px",
-                              border: "1px solid #e2e8f0",
-                              boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                              maxHeight: "280px",
-                              overflowY: "auto",
-                              zIndex: 20,
-                            }}
-                          >
-                            {merchantMapSuggestions.map((s, index) => (
-                              <button
-                                key={`${s.place_id}-${index}`}
-                                type="button"
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() =>
-                                  handleMerchantMapSelectSuggestion(s)
-                                }
-                                style={{
-                                  width: "100%",
-                                  textAlign: "left",
-                                  padding: "0.75rem 1rem",
-                                  border: "none",
-                                  borderBottom:
-                                    index < merchantMapSuggestions.length - 1
-                                      ? "1px solid #f1f5f9"
-                                      : "none",
-                                  background: "transparent",
-                                  cursor: "pointer",
-                                  fontSize: "0.9rem",
-                                  color: "#0f172a",
-                                }}
-                              >
-                                <div style={{ fontWeight: 600 }}>
-                                  {s.main_text}
-                                </div>
-                                {s.secondary_text ? (
-                                  <div
-                                    style={{
-                                      fontSize: "0.8rem",
-                                      color: "#64748b",
-                                      marginTop: "2px",
-                                    }}
-                                  >
-                                    {s.secondary_text}
-                                  </div>
-                                ) : null}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                      <MapAddressSearchDropdown
+                        open={mapPlaceSearch.open}
+                        status={mapPlaceSearch.status}
+                        suggestions={mapPlaceSearch.suggestions}
+                        labels={mapSearchLabels}
+                        variant="light"
+                        placement="top"
+                        listboxId="merchant-map-address-search-listbox"
+                        onSelect={handleMerchantMapSelectSuggestion}
+                        onRetry={() =>
+                          mapPlaceSearch.searchNow(mapModalPreviewAddress)
+                        }
+                      />
                     </div>
                   </div>
                 </>
@@ -7679,8 +7536,7 @@ const ProfilePage: React.FC = () => {
                   setShowMapModal(false);
                   setMapClickPosition(null);
                   setMapModalPreviewAddress("");
-                  setMerchantMapSuggestions([]);
-                  setShowMerchantMapSuggestions(false);
+                  mapPlaceSearch.reset();
                 }}
                 style={{
                   padding: "0.75rem 1.5rem",

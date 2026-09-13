@@ -1,6 +1,7 @@
 import React, { memo, useCallback, useMemo } from 'react';
 import LoggerService from './../../services/LoggerService';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Modal, ScrollView, Alert, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Modal, ScrollView, Alert, Platform, ActivityIndicator } from 'react-native';
+import type { MapPlaceSearchStatus } from '../../utils/mapPlaceSearch';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { errorService } from '../../services/ErrorService';
 import AutocompleteSuggestionItem from './AutocompleteSuggestionItem';
@@ -29,6 +30,8 @@ interface MapModalProps {
   onUseCurrentLocation: () => void;
   onSelectSuggestion: (suggestion: any) => void;
   onSetShowSuggestions: (show: boolean) => void;
+  searchStatus?: MapPlaceSearchStatus;
+  onRetrySearch?: () => void;
   onLocationChange: (coords: { latitude: number; longitude: number }) => void;
   onPlaceChange: (place: { name?: string; address?: string; rating?: number } | null) => void;
   markerTitle?: string;
@@ -52,6 +55,8 @@ const MapModal = memo<MapModalProps>(({
   onUseCurrentLocation,
   onSelectSuggestion,
   onSetShowSuggestions,
+  searchStatus,
+  onRetrySearch,
   onLocationChange,
   onPlaceChange,
   markerTitle,
@@ -80,14 +85,24 @@ const MapModal = memo<MapModalProps>(({
   }, [onSelectSuggestion, onSetShowSuggestions]);
 
   const handleInputFocus = useCallback(() => {
+    if (onRetrySearch) {
+      onRetrySearch();
+      return;
+    }
     if (mapAddressInput.trim()) {
       onMapAddressInputChange(mapAddressInput);
     }
-  }, [mapAddressInput, onMapAddressInputChange]);
+  }, [mapAddressInput, onMapAddressInputChange, onRetrySearch]);
 
   const handleInputBlur = useCallback(() => {
-    setTimeout(() => onSetShowSuggestions(false), 200);
-  }, [onSetShowSuggestions]);
+    setTimeout(() => {
+      // 失败/空结果/加载中要留下拉，否则「重试」会被 200ms 后的关闭冲掉
+      if (searchStatus === 'loading' || searchStatus === 'empty' || searchStatus === 'error') {
+        return;
+      }
+      onSetShowSuggestions(false);
+    }, 200);
+  }, [onSetShowSuggestions, searchStatus]);
 
   const mapRegion = useMemo(() => {
     const lat = selectedLocation?.latitude || 21.9588;
@@ -116,6 +131,24 @@ const MapModal = memo<MapModalProps>(({
     return 'ရွေးချယ်ထားသောနေရာ';
   }, [language]);
 
+  const searchLabels = useMemo(() => {
+    if (language === 'zh') {
+      return { loading: '搜索中...', empty: '未找到相关位置', failed: '搜索失败，请稍后重试', retry: '重试' };
+    }
+    if (language === 'en') {
+      return { loading: 'Searching...', empty: 'No matching places', failed: 'Search failed. Please try again.', retry: 'Retry' };
+    }
+    return {
+      loading: 'ရှာဖွေနေသည်...',
+      empty: 'ကိုက်ညီသောနေရာ မတွေ့ပါ',
+      failed: 'ရှာဖွေမှု မအောင်မြင်ပါ။ ပြန်လည်ကြိုးစားပါ။',
+      retry: 'ပြန်ကြိုးစားရန်',
+    };
+  }, [language]);
+
+  const status = searchStatus || (showSuggestions && autocompleteSuggestions.length > 0 ? 'success' : 'idle');
+  const showDropdown = showSuggestions && status !== 'idle';
+
   return (
     <Modal
       visible={visible}
@@ -134,18 +167,27 @@ const MapModal = memo<MapModalProps>(({
         </View>
 
         <View style={styles.mapAddressInputContainer}>
-          <TextInput
-            style={styles.mapAddressInput}
-            value={mapAddressInput}
-            onChangeText={(text) => {
-              onAddressInputChange(text);
-              onMapAddressInputChange(text);
-            }}
-            placeholder={placeholderText}
-            placeholderTextColor="#9ca3af"
-            onFocus={handleInputFocus}
-            onBlur={handleInputBlur}
-          />
+          <View>
+            <TextInput
+              style={[styles.mapAddressInput, status === 'loading' ? { paddingRight: 40 } : null]}
+              value={mapAddressInput}
+              onChangeText={(text) => {
+                onAddressInputChange(text);
+                onMapAddressInputChange(text);
+              }}
+              placeholder={placeholderText}
+              placeholderTextColor="#9ca3af"
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+            />
+            {status === 'loading' ? (
+              <ActivityIndicator
+                size="small"
+                color="#3b82f6"
+                style={{ position: 'absolute', right: 14, top: 14 }}
+              />
+            ) : null}
+          </View>
           
           <TouchableOpacity 
             onPress={onUseCurrentLocation} 
@@ -171,26 +213,58 @@ const MapModal = memo<MapModalProps>(({
             </Text>
           </TouchableOpacity>
 
-          {showSuggestions && autocompleteSuggestions.length > 0 && (
+          {showDropdown ? (
             <View style={styles.suggestionsContainer}>
-              <ScrollView 
-                style={styles.suggestionsList} 
-                keyboardShouldPersistTaps="handled"
-                nestedScrollEnabled={true}
-              >
-                {autocompleteSuggestions.map((suggestion, index) => (
-                  <AutocompleteSuggestionItem
-                    key={`${suggestion.place_id}-${index}`}
-                    suggestion={suggestion}
-                    index={index}
-                    totalCount={autocompleteSuggestions.length}
-                    onPress={() => handleSuggestionPress(suggestion)}
-                    styles={styles}
-                  />
-                ))}
-              </ScrollView>
+              {status === 'loading' ? (
+                <Text style={{ padding: 16, textAlign: 'center', color: '#6b7280' }}>
+                  {searchLabels.loading}
+                </Text>
+              ) : null}
+              {status === 'empty' ? (
+                <Text style={{ padding: 16, textAlign: 'center', color: '#6b7280' }}>
+                  {searchLabels.empty}
+                </Text>
+              ) : null}
+              {status === 'error' ? (
+                <View style={{ padding: 16, alignItems: 'center' }}>
+                  <Text style={{ color: '#b45309', textAlign: 'center' }}>{searchLabels.failed}</Text>
+                  {onRetrySearch ? (
+                    <TouchableOpacity
+                      onPress={onRetrySearch}
+                      style={{
+                        marginTop: 10,
+                        paddingHorizontal: 14,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: '#d1d5db',
+                      }}
+                    >
+                      <Text style={{ color: '#1f2937', fontSize: 14 }}>{searchLabels.retry}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              ) : null}
+              {status === 'success' ? (
+                <ScrollView
+                  style={styles.suggestionsList}
+                  keyboardShouldPersistTaps="handled"
+                  nestedScrollEnabled={true}
+                >
+                  {autocompleteSuggestions.map((suggestion, index) => (
+                    <AutocompleteSuggestionItem
+                      key={`${suggestion.place_id}-${index}`}
+                      suggestion={suggestion}
+                      index={index}
+                      totalCount={autocompleteSuggestions.length}
+                      onPress={() => handleSuggestionPress(suggestion)}
+                      styles={styles}
+                    />
+                  ))}
+                </ScrollView>
+              ) : null}
             </View>
-          )}
+          ) : null}
         </View>
 
         <MapView

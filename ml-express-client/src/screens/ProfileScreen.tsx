@@ -11,14 +11,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import * as MediaLibrary from 'expo-media-library';
-import { ensureSaveToLibraryPermission, pickImageFromLibrary, takePhotoWithCamera } from '../utils/mediaAccess';
+import { ensureSaveToLibraryPermission, pickImageFromLibrary, saveImageToLibrary, takePhotoWithCamera } from '../utils/mediaAccess';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import { customerService, packageService, rechargeService, addressService, supabase, fetchRechargeQrUrlMap, getDefaultRechargeQrUrlMap } from '../services/supabase';
 import { remoteImageUri } from '../services/clientApi/nativeSupabaseUrl';
 import { persistUserAvatarUrl, hydrateUserAvatarFromServer } from '../utils/userAvatar';
 import Toast from '../components/Toast';
+import HotlinePickerModal from '../components/HotlinePickerModal';
 import { feedbackService } from '../services/FeedbackService';
 import { common, tt } from '../i18n';
 import { APP_CONFIG } from '../config/constants';
@@ -100,6 +100,7 @@ export default function ProfileScreen({ navigation }: any) {
   const [toReviewCount, setToReviewCount] = useState(0);
   const [addressCount, setAddressCount] = useState(0);
   const [showSettingsSheet, setShowSettingsSheet] = useState(false);
+  const [showHotlineModal, setShowHotlineModal] = useState(false);
   const settingsSheetClosing = useRef(false);
   const settingsSheetY = useRef(new Animated.Value(SETTINGS_SHEET_SLIDE)).current;
   const settingsOverlayOpacity = useRef(new Animated.Value(0)).current;
@@ -660,7 +661,29 @@ export default function ProfileScreen({ navigation }: any) {
     );
   };
 
-  const handleDeleteAccount = async () => {
+  const performDeleteAccount = async () => {
+    try {
+      setRefreshing(true);
+      const result = await customerService.deleteAccount(userId);
+
+      if (result.success) {
+        showToast(t.deleteSuccess, 'success');
+        await AsyncStorage.clear();
+        setTimeout(() => {
+          navigation.replace('Login');
+        }, 1500);
+      } else {
+        Alert.alert(t.deleteFailed, result.error?.message || '');
+      }
+    } catch (error) {
+      LoggerService.error('注销账号操作失败:', error);
+      showToast(t.deleteFailed, 'error');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleDeleteAccount = () => {
     if (isGuest || !userId) {
       showToast(t.pleaseLogin, 'warning');
       return;
@@ -672,31 +695,28 @@ export default function ProfileScreen({ navigation }: any) {
       [
         { text: t.cancel, style: 'cancel' },
         {
-          text: t.deleteAccount,
+          text: t.continueDelete,
           style: 'destructive',
-          onPress: async () => {
-            try {
-              setRefreshing(true);
-              const result = await customerService.deleteAccount(userId);
-              
-              if (result.success) {
-                showToast(t.deleteSuccess, 'success');
-                await AsyncStorage.clear();
-                setTimeout(() => {
-                  navigation.replace('Login');
-                }, 1500);
-              } else {
-                Alert.alert(t.deleteFailed, result.error?.message || '');
-              }
-            } catch (error) {
-              LoggerService.error('注销账号操作失败:', error);
-              showToast(t.deleteFailed, 'error');
-            } finally {
-              setRefreshing(false);
-            }
-          }
-        }
-      ]
+          onPress: () => {
+            setTimeout(() => {
+              Alert.alert(
+                t.confirmDeleteAgainTitle,
+                t.confirmDeleteAgain,
+                [
+                  { text: t.cancel, style: 'cancel' },
+                  {
+                    text: t.deleteAccount,
+                    style: 'destructive',
+                    onPress: () => {
+                      void performDeleteAccount();
+                    },
+                  },
+                ],
+              );
+            }, 300);
+          },
+        },
+      ],
     );
   };
 
@@ -800,7 +820,7 @@ export default function ProfileScreen({ navigation }: any) {
       
       if (localUri) {
         console.log('正在保存到相册...', localUri);
-        await MediaLibrary.saveToLibraryAsync(localUri);
+        await saveImageToLibrary(localUri);
         
         hideLoading();
         Alert.alert(
@@ -1005,22 +1025,7 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   const openCustomerService = () => {
-    const numbers = [
-      { display: '(+95) 09788848928', tel: '+959788848928' },
-      { display: '(+95) 09941118588', tel: '+959941118588' },
-      { display: '(+95) 09941118688', tel: '+959941118688' },
-    ];
-    Alert.alert(
-      c.hotlineTitle,
-      APP_CONFIG.CONTACT.PHONE_DISPLAY,
-      [
-        ...numbers.map((n) => ({
-          text: n.display,
-          onPress: () => Linking.openURL(`tel:${n.tel}`),
-        })),
-        { text: c.cancel, style: 'cancel' as const },
-      ],
-    );
+    setShowHotlineModal(true);
   };
 
   const memberBadgeLabel = () => {
@@ -1238,6 +1243,18 @@ export default function ProfileScreen({ navigation }: any) {
             <Text style={me.menuLabel}>{t.customerService}</Text>
             <Ionicons name="chevron-forward" size={18} color="#D0D7DE" />
           </TouchableOpacity>
+          {!isGuest ? (
+            <>
+              <View style={me.menuDivider} />
+              <TouchableOpacity style={me.menuRow} onPress={handleDeleteAccount}>
+                <View style={[me.menuIcon, { backgroundColor: '#FEF2F2' }]}>
+                  <Ionicons name="trash-outline" size={22} color="#ef4444" />
+                </View>
+                <Text style={[me.menuLabel, { color: '#ef4444' }]}>{t.deleteAccount}</Text>
+                <Ionicons name="chevron-forward" size={18} color="#FECACA" />
+              </TouchableOpacity>
+            </>
+          ) : null}
           <View style={me.menuDivider} />
           <TouchableOpacity style={me.menuRow} onPress={() => setShowAboutModal(true)}>
             <View style={me.menuIcon}><ClayInfo size={26} /></View>
@@ -1354,12 +1371,6 @@ export default function ProfileScreen({ navigation }: any) {
               <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(handleLogout)}>
                 <Ionicons name="log-out-outline" size={22} color="#ef4444" />
                 <Text style={[me.sheetRowText, { color: '#ef4444' }]}>{t.logout}</Text>
-              </TouchableOpacity>
-            ) : null}
-            {!isGuest ? (
-              <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(handleDeleteAccount)}>
-                <Ionicons name="trash-outline" size={22} color="#ef4444" />
-                <Text style={[me.sheetRowText, { color: '#ef4444' }]}>{t.deleteAccount}</Text>
               </TouchableOpacity>
             ) : null}
             <Text style={me.sheetVer}>v{appVersion}</Text>
@@ -1626,24 +1637,7 @@ export default function ProfileScreen({ navigation }: any) {
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={styles.aboutLink}
-                  onPress={() => {
-                    const numbers = [
-                      { display: '(+95) 09788848928', tel: '+959788848928' },
-                      { display: '(+95) 09941118588', tel: '+959941118588' },
-                      { display: '(+95) 09941118688', tel: '+959941118688' }
-                    ];
-                    Alert.alert(
-                      c.hotlineTitle,
-                      '',
-                      [
-                        ...numbers.map(n => ({
-                          text: n.display,
-                          onPress: () => Linking.openURL(`tel:${n.tel}`)
-                        })),
-                        { text: c.cancel, style: 'cancel' }
-                      ]
-                    );
-                  }}
+                  onPress={() => setShowHotlineModal(true)}
                 >
                   <Text style={styles.aboutLinkText}>📞 {t.contactPhone}</Text>
                   <Text style={[styles.aboutLinkText, { fontSize: 12, opacity: 0.8 }]}>多线拨打 ➔</Text>
@@ -1964,6 +1958,18 @@ export default function ProfileScreen({ navigation }: any) {
         visible={toastVisible}
         duration={3000}
         onHide={() => setToastVisible(false)}
+      />
+      <HotlinePickerModal
+        visible={showHotlineModal}
+        title={c.hotlineTitle}
+        numbers={[
+          { display: '(+95) 09788848928', tel: '+959788848928' },
+          { display: '(+95) 09941118588', tel: '+959941118588' },
+          { display: '(+95) 09941118688', tel: '+959941118688' },
+        ]}
+        cancelLabel={c.cancel}
+        exitLabel={c.exit}
+        onClose={() => setShowHotlineModal(false)}
       />
     </View>
   );
