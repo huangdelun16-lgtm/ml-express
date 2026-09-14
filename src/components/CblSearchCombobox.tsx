@@ -31,7 +31,7 @@ export default function CblSearchCombobox({
   emptyText,
   isEn,
   count,
-  variant = 'dark',
+  variant = 'light',
   onSelect,
 }: Props) {
   const listId = useId();

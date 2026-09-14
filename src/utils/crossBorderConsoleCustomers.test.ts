@@ -1,4 +1,8 @@
-import { filterUnifiedCustomers, mergeConsoleCustomers } from './crossBorderConsoleCustomers';
+import {
+  filterCustomersByKind,
+  filterUnifiedCustomers,
+  mergeConsoleCustomers,
+} from './crossBorderConsoleCustomers';
 
 describe('crossBorderConsoleCustomers', () => {
   it('merges registered customers with express summaries and keeps unfiled rows', () => {
@@ -17,5 +21,10 @@ describe('crossBorderConsoleCustomers', () => {
     expect(merged[1]).toMatchObject({ kind: 'express', key: 'exp:b' });
     expect(filterUnifiedCustomers(merged, '临时').map((row) => row.key)).toEqual(['exp:b']);
     expect(filterUnifiedCustomers(merged, 'mdy001')).toHaveLength(1);
+    expect(filterCustomersByKind(merged, 'unfiled').map((row) => row.key)).toEqual(['exp:b']);
+    expect(filterCustomersByKind(merged, 'registered').map((row) => row.kind)).toEqual([
+      'registered',
+    ]);
+    expect(filterCustomersByKind(merged, 'all')).toHaveLength(2);
   });
 });

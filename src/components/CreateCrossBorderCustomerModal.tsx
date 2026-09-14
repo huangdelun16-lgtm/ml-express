@@ -35,6 +35,11 @@ import '../styles/crossBorderLogistics.css';
 
 const CrossBorderPricingModal = lazy(() => import('./CrossBorderPricingModal'));
 
+type CustomerCreatePrefill = {
+  customer_name?: string;
+  phone?: string;
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -42,6 +47,7 @@ type Props = {
   onUpdated?: (customer: CrossBorderRegisteredCustomer) => void;
   existingCustomers?: CrossBorderRegisteredCustomer[];
   editingCustomer?: CrossBorderRegisteredCustomer | null;
+  prefill?: CustomerCreatePrefill | null;
 };
 
 type FormState = {
@@ -63,6 +69,7 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
   onUpdated,
   existingCustomers = [],
   editingCustomer = null,
+  prefill = null,
 }) => {
   const { language } = useLanguage();
   const isEn = language === 'en';
@@ -112,8 +119,8 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
       const hub = hubForRegionId('mandalay');
       setRegionId('mandalay');
       setForm({
-        customer_name: '',
-        phone: '',
+        customer_name: prefill?.customer_name?.trim() || '',
+        phone: prefill?.phone?.trim() || '',
         delivery_region_id: hub.regionId,
         delivery_area_code: hub.prefix,
         address_notes: '',
@@ -129,7 +136,7 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
       .then((rows) => setSalespersons(rows.filter((row) => row.status === 'active')))
       .catch(() => setSalespersons([]))
       .finally(() => setLoadingSalespersons(false));
-  }, [open, editingCustomer]);
+  }, [open, editingCustomer, prefill]);
 
   useEffect(() => {
     if (!open) return;

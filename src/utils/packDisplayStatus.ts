@@ -27,6 +27,9 @@ export function matchesPackTransportFilter(
   const finished = isPackDisplayFinished(pack);
   if (packStatus === 'active') return !finished;
   if (packStatus === 'completed') return finished;
+  if (packStatus === 'in_transit' || packStatus === 'hub_received') {
+    return !finished && pack.status === packStatus;
+  }
   return pack.status === packStatus;
 }
 

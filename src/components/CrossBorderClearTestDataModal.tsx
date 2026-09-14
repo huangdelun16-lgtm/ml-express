@@ -79,7 +79,7 @@ const CrossBorderClearTestDataModal: React.FC<Props> = ({ open, onClose, onClear
 
   return createPortal(
     <div
-      className="store-form-overlay cbl-create-overlay"
+      className="store-form-overlay cbl-create-overlay cbl-create-overlay--dialog"
       role="presentation"
       onClick={(e) => {
         if (e.target === e.currentTarget && !busy) onClose();

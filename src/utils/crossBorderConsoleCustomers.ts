@@ -28,6 +28,8 @@ export type UnifiedConsoleCustomer<
   summary?: S;
 };
 
+export type ConsoleCustomerKindFilter = 'all' | 'registered' | 'unfiled';
+
 export function mergeConsoleCustomers<
   R extends RegisteredCustomerMergeSource,
   S extends CustomerSummaryMergeSource,
@@ -64,6 +66,18 @@ export function mergeConsoleCustomers<
   }
 
   return rows;
+}
+
+export function filterCustomersByKind<
+  R extends RegisteredCustomerMergeSource,
+  S extends CustomerSummaryMergeSource,
+>(
+  rows: UnifiedConsoleCustomer<R, S>[],
+  kind: ConsoleCustomerKindFilter,
+): UnifiedConsoleCustomer<R, S>[] {
+  if (kind === 'all') return rows;
+  const wanted = kind === 'unfiled' ? 'express' : 'registered';
+  return rows.filter((row) => row.kind === wanted);
 }
 
 export function filterUnifiedCustomers<

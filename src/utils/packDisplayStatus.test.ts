@@ -46,4 +46,13 @@ describe('matchesPackTransportFilter', () => {
     expect(matchesPackTransportFilter(arrived, 'completed')).toBe(false);
     expect(matchesPackTransportFilter(arrived, 'active')).toBe(true);
   });
+
+  it('drops display-completed packs from 待处理/到站', () => {
+    expect(
+      matchesPackTransportFilter(
+        { status: 'hub_received', display_status: 'completed' },
+        'hub_received',
+      ),
+    ).toBe(false);
+  });
 });
