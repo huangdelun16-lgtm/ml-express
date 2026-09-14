@@ -19,7 +19,6 @@ import {
   type RouteMatrixValues,
 } from '../utils/crossBorderRoutePricing';
 import {
-  buildCrossBorderFxSetting,
   cnyToMmk,
   formatCnyInput,
   mmkToCny,
@@ -38,7 +37,7 @@ type Props = {
   lockCustomer?: boolean;
   focusDestination?: string;
   stacked?: boolean;
-  onFxSaved?: (rate: number | null) => void;
+  onSaved?: () => void;
 };
 
 function convertMatrixUnits(
@@ -96,7 +95,7 @@ const CrossBorderPricingModal: React.FC<Props> = ({
   lockCustomer = false,
   focusDestination,
   stacked = false,
-  onFxSaved,
+  onSaved,
 }) => {
   const { language } = useLanguage();
   const isEn = language === 'en';
@@ -113,9 +112,7 @@ const CrossBorderPricingModal: React.FC<Props> = ({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [fxDraft, setFxDraft] = useState('');
-  const [fxDirty, setFxDirty] = useState(false);
   const displayRateRef = useRef<number | null>(null);
-  const fxDirtyRef = useRef(false);
 
   const focusDestCode = normalizeRouteHubCode(focusDestination ?? '');
 
@@ -194,8 +191,6 @@ const CrossBorderPricingModal: React.FC<Props> = ({
       setSelectedCustomer(DEFAULT_PRICING_CUSTOMER_SCOPE);
       setUsingDefaultPreview(false);
       setHasChanges(false);
-      setFxDirty(false);
-      fxDirtyRef.current = false;
       setFilterOrigin('ALL');
       return;
     }
@@ -210,16 +205,14 @@ const CrossBorderPricingModal: React.FC<Props> = ({
     const customer = selectedCustomer || null;
     const hasOwn = customer ? customerHasRoutePricing(loadedSettings, customer) : true;
     const rate = pickMmkPerCnyRate(loadedSettings);
-    if (!fxDirtyRef.current) {
-      setFxDraft(rate == null ? '' : String(rate));
-      displayRateRef.current = rate;
-    }
+    setFxDraft(rate == null ? '' : String(rate));
+    displayRateRef.current = rate;
     const mmkMatrix =
       customer && !hasOwn
         ? mergeRouteMatrixFromDb(loadedSettings)
         : mergeRouteMatrixFromDb(loadedSettings, customer);
     setUsingDefaultPreview(Boolean(customer && !hasOwn));
-    setMatrix(convertMatrixUnits(mmkMatrix, null, displayRateRef.current));
+    setMatrix(convertMatrixUnits(mmkMatrix, null, rate));
     setHasChanges(false);
   }, [open, loadedSettings, selectedCustomer]);
 
@@ -240,40 +233,6 @@ const CrossBorderPricingModal: React.FC<Props> = ({
 
   const displayRate = parseMmkPerCnyRate(fxDraft);
 
-  const commitFxRate = (next: number | null) => {
-    const prev = displayRateRef.current;
-    if (next === prev) return;
-    if (!hasChanges) {
-      const customer = selectedCustomer || null;
-      const hasOwn = customer ? customerHasRoutePricing(loadedSettings, customer) : true;
-      const mmkMatrix =
-        customer && !hasOwn
-          ? mergeRouteMatrixFromDb(loadedSettings)
-          : mergeRouteMatrixFromDb(loadedSettings, customer);
-      setMatrix(convertMatrixUnits(mmkMatrix, null, next));
-    } else if (!prev && next) {
-      setMatrix((current) => convertMatrixUnits(current, null, next));
-    } else if (prev && !next) {
-      setMatrix((current) => convertMatrixUnits(current, prev, null));
-    }
-    displayRateRef.current = next;
-  };
-
-  const applyFxDraft = (raw: string) => {
-    setFxDraft(raw);
-    fxDirtyRef.current = true;
-    setFxDirty(true);
-    setSuccessMessage(null);
-    setErrorMessage(null);
-    const trimmed = raw.trim();
-    if (trimmed.endsWith('.')) return;
-    commitFxRate(parseMmkPerCnyRate(raw));
-  };
-
-  const commitFxDraft = () => {
-    commitFxRate(parseMmkPerCnyRate(fxDraft));
-  };
-
   const handleCellChange = (origin: string, dest: string, raw: string) => {
     setMatrix((prev) => ({
       ...prev,
@@ -293,11 +252,6 @@ const CrossBorderPricingModal: React.FC<Props> = ({
     setSuccessMessage(null);
 
     try {
-      if (fxDraft.trim() && displayRate == null) {
-        setErrorMessage(isEn ? 'Exchange rate must be a number greater than 0.' : '汇率必须是大于 0 的数字。');
-        return;
-      }
-
       const unitRate = displayRateRef.current;
       const mmkMatrix = convertMatrixUnits(matrix, unitRate, null);
       const parsed = parseRouteMatrixForSave(mmkMatrix);
@@ -312,9 +266,6 @@ const CrossBorderPricingModal: React.FC<Props> = ({
         focusDestCode ? { destinations: [focusDestCode] } : undefined,
       );
       const routeCount = payload.length;
-      if (displayRate != null) {
-        payload.push(buildCrossBorderFxSetting(displayRate));
-      }
       const result = await systemSettingsService.upsertSettings(payload);
 
       if (!result.ok) {
@@ -325,13 +276,6 @@ const CrossBorderPricingModal: React.FC<Props> = ({
         );
         return;
       }
-
-      if (displayRate != null) {
-        displayRateRef.current = displayRate;
-        onFxSaved?.(displayRate);
-      }
-      fxDirtyRef.current = false;
-      setFxDirty(false);
 
       const refreshed = await systemSettingsService.getAllSettings();
       setLoadedSettings(refreshed);
@@ -356,6 +300,7 @@ const CrossBorderPricingModal: React.FC<Props> = ({
           ? `Pricing saved for ${scopeLabel} (${routeCount} routes).`
           : `已保存 ${scopeLabel} 的路线计费（${routeCount} 条路线）。`,
       );
+      onSaved?.();
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       setErrorMessage(
@@ -502,12 +447,16 @@ const CrossBorderPricingModal: React.FC<Props> = ({
                 step="any"
                 inputMode="decimal"
                 value={fxDraft}
-                onChange={(e) => applyFxDraft(e.target.value)}
-                onBlur={commitFxDraft}
+                readOnly
+                tabIndex={-1}
                 disabled={loading || saving}
                 placeholder={isEn ? 'MMK' : '缅币'}
+                title={isEn ? 'Edit the rate on the Settings tab' : '请到设置页修改汇率'}
               />
               <span>{isEn ? 'MMK' : '缅币'}</span>
+              <span className="cbl-pricing-modal__fx-hint">
+                {isEn ? 'Edit in Settings' : '到设置页修改'}
+              </span>
             </label>
             <span className="cbl-pricing-modal__stat">
               {isEn
@@ -641,7 +590,7 @@ const CrossBorderPricingModal: React.FC<Props> = ({
               type="button"
               className="cbl-btn cbl-btn--primary"
               onClick={handleSave}
-              disabled={(!hasChanges && !fxDirty) || saving || loading}
+              disabled={!hasChanges || saving || loading}
             >
               {saving ? (isEn ? 'Saving…' : '保存中…') : isEn ? 'Save' : '保存'}
             </button>

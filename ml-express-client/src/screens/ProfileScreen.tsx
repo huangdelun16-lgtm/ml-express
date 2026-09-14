@@ -1968,7 +1968,6 @@ export default function ProfileScreen({ navigation }: any) {
           { display: '(+95) 09941118688', tel: '+959941118688' },
         ]}
         cancelLabel={c.cancel}
-        exitLabel={c.exit}
         onClose={() => setShowHotlineModal(false)}
       />
     </View>

@@ -1367,6 +1367,28 @@ export const systemSettingsService = {
     }
   },
 
+  async getSettingsByKeyPrefix(prefix: string): Promise<SystemSetting[]> {
+    const trimmed = String(prefix ?? '').trim();
+    if (!trimmed) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('*')
+        .like('settings_key', `${trimmed}%`);
+
+      if (error) {
+        console.error('按前缀获取系统设置失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('按前缀获取系统设置异常:', err);
+      return [];
+    }
+  },
+
   async upsertSetting(setting: Omit<SystemSetting, 'id'>): Promise<boolean> {
     try {
       const payload = {

@@ -150,7 +150,12 @@ function rowToItem(row: CloudStoreItemRow): InventoryItem {
 }
 
 function rowToMovement(row: Awaited<ReturnType<typeof fetchCloudMovementsForItems>>[number]): StockMovement {
-  return { ...row, type: row.type as StockMovement['type'], origin_store_id: row.origin_store_id ?? '' };
+  return {
+    ...row,
+    type: row.type as StockMovement['type'],
+    origin_store_id: row.origin_store_id ?? '',
+    customer_code: String(row.customer_code ?? '').trim().toUpperCase(),
+  };
 }
 
 function packFromRow(row: CloudPackRow, items: InventoryItem[]): PackedShipmentDetail {

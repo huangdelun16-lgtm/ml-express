@@ -173,6 +173,8 @@ export interface InventoryItemDetail extends InventoryItem {
   inbound_qty: number;
   inbound_date_label: string;
   inbound_store_name: string;
+  /** 发站入库流水上的登记客户编码 */
+  customer_code?: string;
   total_fee?: string;
   payment_label?: string;
   inbound_note?: string;

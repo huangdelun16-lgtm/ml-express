@@ -17,7 +17,7 @@ import { feedbackService } from '../services/FeedbackService';
 type Nav = {
   navigate: (
     name: string,
-    params?: { presetBarcode?: string; presetCode?: string },
+    params?: { presetBarcode?: string; presetCode?: string; openPackBarcode?: string },
   ) => void;
 };
 
@@ -67,7 +67,11 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
   };
 
   const goHubReceive = () => {
-    navigation.navigate('HubReceive');
+    if (!result) return;
+    navigation.navigate(
+      'HubReceive',
+      isPackageBarcode(result.code) ? { openPackBarcode: result.code } : undefined,
+    );
   };
 
   const canSign =

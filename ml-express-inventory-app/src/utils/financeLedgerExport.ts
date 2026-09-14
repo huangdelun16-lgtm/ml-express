@@ -1,6 +1,10 @@
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import type { TranslationDict } from '../i18n/translations';
 import type { FinanceLedgerEntry } from '../types/financeLedger';
+import {
+  buildInventoryExcelXlsxBase64,
+  type InventoryExcelSheetInput,
+} from './inventoryExcelExport';
 
 const CUSTOMER_LEDGER_CATEGORIES = new Set([
   'pending_inflow',
@@ -55,6 +59,9 @@ function sumSettledCustomerCny(
 
 export type FinanceExportLabels = {
   metaTitle: string;
+  brand: string;
+  summarySheet: string;
+  detailSheet: string;
   hub: string;
   store: string;
   tab: string;
@@ -90,6 +97,9 @@ export type FinanceExportLabels = {
   fxLocked: string;
   fxLive: string;
   fxLegacy: string;
+  metric: string;
+  value: string;
+  noteBooks: string;
 };
 
 export type FinanceExportSummaryBlock = {
@@ -136,10 +146,11 @@ export function buildFinanceExportFilename(opts: {
   tab: string;
   at?: Date;
 }): string {
-  const hub = String(opts.hub || 'HUB')
-    .replace(/[^A-Za-z0-9]/g, '')
-    .slice(0, 12)
-    .toUpperCase() || 'HUB';
+  const hub =
+    String(opts.hub || 'HUB')
+      .replace(/[^A-Za-z0-9]/g, '')
+      .slice(0, 12)
+      .toUpperCase() || 'HUB';
   const tab =
     String(opts.tab || 'all')
       .replace(/[^A-Za-z0-9_-]/g, '')
@@ -147,13 +158,16 @@ export function buildFinanceExportFilename(opts: {
   const d = opts.at ?? new Date();
   const pad = (x: number) => String(x).padStart(2, '0');
   const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
-  return `ML-finance-${hub}-${tab}-${stamp}.csv`;
+  return `ML-finance-${hub}-${tab}-${stamp}.xlsx`;
 }
 
 export function financeExportLabelsFromT(t: TranslationDict): FinanceExportLabels {
   const f = t.crossBorderFinance;
   return {
     metaTitle: f.csvMetaTitle,
+    brand: f.excelBrand,
+    summarySheet: f.excelSummarySheet,
+    detailSheet: f.excelDetailSheet,
     hub: f.csvHub,
     store: f.csvStore,
     tab: f.csvTab,
@@ -189,17 +203,19 @@ export function financeExportLabelsFromT(t: TranslationDict): FinanceExportLabel
     fxLocked: f.csvFxLocked,
     fxLive: f.csvFxLive,
     fxLegacy: f.csvFxLegacy,
+    metric: f.excelMetric,
+    value: f.excelValue,
+    noteBooks: f.excelNoteBooks,
   };
 }
 
-function entryAmount(entry: FinanceLedgerEntry): string {
-  if (entry.amount != null && Number.isFinite(entry.amount)) {
-    return formatFinanceExportAmount(entry.amount);
-  }
+function entryAmountNum(entry: FinanceLedgerEntry): number | null {
+  if (entry.amount != null && Number.isFinite(entry.amount)) return entry.amount;
   if (entry.category === 'transport_cost') {
-    return formatFinanceExportAmount(entry.transportFee);
+    const fee = entry.transportFee;
+    return fee != null && Number.isFinite(fee) ? fee : null;
   }
-  return '';
+  return null;
 }
 
 function paidCell(entry: FinanceLedgerEntry, labels: FinanceExportLabels): string {
@@ -219,22 +235,20 @@ function destCell(entry: FinanceLedgerEntry): string {
   return dest ? regionDisplayLabel(dest) : '';
 }
 
-function entryCny(entry: FinanceLedgerEntry, liveRate: number | null): string {
-  if (!isCustomerLedgerCategory(entry.category)) return '';
+function entryCnyNum(entry: FinanceLedgerEntry, liveRate: number | null): number | null {
+  if (!isCustomerLedgerCategory(entry.category)) return null;
   if (entry.paidCny != null && Number.isFinite(entry.paidCny) && entry.paidCny > 0) {
-    return formatFinanceExportAmount(entry.paidCny);
+    return entry.paidCny;
   }
   const rate = displayRateForCustomerCategory(entry.category, entry.fxMmkPerCny, liveRate);
   const mmk = entry.amount != null && Number.isFinite(entry.amount) ? entry.amount : null;
-  if (mmk == null) return '';
-  const cny = mmkToCny(mmk, rate);
-  return cny == null ? '' : formatFinanceExportAmount(cny);
+  if (mmk == null) return null;
+  return mmkToCny(mmk, rate);
 }
 
-function entryFxRate(entry: FinanceLedgerEntry, liveRate: number | null): string {
-  if (!isCustomerLedgerCategory(entry.category)) return '';
-  const rate = displayRateForCustomerCategory(entry.category, entry.fxMmkPerCny, liveRate);
-  return rate == null ? '' : formatFinanceExportAmount(rate);
+function entryFxRateNum(entry: FinanceLedgerEntry, liveRate: number | null): number | null {
+  if (!isCustomerLedgerCategory(entry.category)) return null;
+  return displayRateForCustomerCategory(entry.category, entry.fxMmkPerCny, liveRate);
 }
 
 function entryPaidCcy(entry: FinanceLedgerEntry): string {
@@ -252,6 +266,140 @@ function entryFxLock(entry: FinanceLedgerEntry, labels: FinanceExportLabels): st
   return labels.fxLive;
 }
 
+function rowFillForEntry(entry: FinanceLedgerEntry): string | undefined {
+  const category = String(entry.category);
+  if (
+    category === 'order_collected' ||
+    category === 'order_prepaid' ||
+    category === 'collected'
+  ) {
+    return 'FFECFDF5';
+  }
+  if (category === 'order_income_cod' || category === 'pending_inflow') {
+    return 'FFFFFBEB';
+  }
+  if (category === 'transport_cost') {
+    return entry.paid ? 'FFEFF6FF' : 'FFFEF2F2';
+  }
+  if (category === 'agency_remit') return 'FFF5F3FF';
+  if (category === 'manual_income') return 'FFF0FDFA';
+  if (category === 'manual_expense') return 'FFFDF4FF';
+  return undefined;
+}
+
+export function buildFinanceExportSheets(params: {
+  entries: FinanceLedgerEntry[];
+  summary: FinanceExportSummaryBlock;
+  netBalance: number;
+  meta: FinanceExportMeta;
+  labels: FinanceExportLabels;
+  categoryLabel: (entry: FinanceLedgerEntry) => string;
+  amountDisplay: (entry: FinanceLedgerEntry) => string;
+  liveRate?: number | null;
+}): InventoryExcelSheetInput[] {
+  const { entries, summary, netBalance, meta, labels } = params;
+  const liveRate = params.liveRate ?? null;
+  const collectedCny = sumSettledCustomerCny(entries);
+  const subtitle = [
+    `${labels.hub}: ${meta.hub}`,
+    `${labels.store}: ${meta.store}`,
+    `${labels.tab}: ${meta.tab}`,
+    `${labels.exportedAt}: ${meta.exportedAt}`,
+  ].join('  ·  ');
+
+  const summaryRows: Array<[string, string | number]> = [
+    [labels.hub, meta.hub],
+    [labels.store, meta.store],
+    [labels.tab, meta.tab],
+    [labels.exportedAt, meta.exportedAt],
+    [labels.recordCount, entries.length],
+    [labels.balance, netBalance],
+    [labels.collected, summary.collectedTotal],
+    [labels.collectedCny, collectedCny ?? ''],
+    [labels.transportUnpaid, summary.transportUnpaidTotal],
+    [labels.transportPaid, summary.transportPaidTotal],
+    [labels.pendingInflow, summary.pendingInflowTotal],
+    [labels.agencyPayable, summary.agencyPayableTotal],
+    [labels.manualIncome, summary.manualIncomeTotal],
+    [labels.manualExpense, summary.manualExpenseTotal],
+    [labels.noteBooks, ''],
+  ];
+
+  const detailRows = entries.map((entry) => [
+    formatFinanceExportDateTime(entry.occurredAt),
+    params.categoryLabel(entry),
+    entry.title,
+    entry.subtitle,
+    entry.barcode,
+    entry.itemName,
+    entryAmountNum(entry),
+    params.amountDisplay(entry),
+    destCell(entry),
+    originCell(entry),
+    entry.transportFee != null && Number.isFinite(entry.transportFee) ? entry.transportFee : null,
+    paidCell(entry, labels),
+    entryCnyNum(entry, liveRate),
+    entryFxRateNum(entry, liveRate),
+    entryPaidCcy(entry),
+    entryFxLock(entry, labels),
+  ]);
+
+  return [
+    {
+      name: labels.summarySheet,
+      title: labels.brand,
+      subtitle,
+      columns: [
+        { header: labels.metric, width: 22 },
+        { header: labels.value, width: 28, align: 'right' },
+      ],
+      rows: summaryRows,
+      rowFills: summaryRows.map((_, index) =>
+        index === 5 ? 'FFECFDF5' : index === summaryRows.length - 1 ? 'FFF8FAFC' : undefined,
+      ),
+    },
+    {
+      name: labels.detailSheet,
+      title: labels.metaTitle,
+      subtitle,
+      columns: [
+        { header: labels.colTime, width: 16 },
+        { header: labels.colCategory, width: 12 },
+        { header: labels.colTitle, width: 14 },
+        { header: labels.colSubtitle, width: 22 },
+        { header: labels.colBarcode, width: 16 },
+        { header: labels.colItem, width: 14 },
+        { header: labels.colAmount, width: 12, align: 'right' },
+        { header: labels.colAmountDisplay, width: 14 },
+        { header: labels.colDest, width: 10 },
+        { header: labels.colOrigin, width: 12 },
+        { header: labels.colFee, width: 10, align: 'right' },
+        { header: labels.colPaid, width: 8, align: 'center' },
+        { header: labels.colCny, width: 10, align: 'right' },
+        { header: labels.colFxRate, width: 10, align: 'right' },
+        { header: labels.colPaidCcy, width: 10, align: 'center' },
+        { header: labels.colFxLock, width: 10 },
+      ],
+      rows: detailRows,
+      rowFills: entries.map(rowFillForEntry),
+    },
+  ];
+}
+
+export function buildFinanceExportExcelBase64(params: {
+  entries: FinanceLedgerEntry[];
+  summary: FinanceExportSummaryBlock;
+  netBalance: number;
+  meta: FinanceExportMeta;
+  labels: FinanceExportLabels;
+  categoryLabel: (entry: FinanceLedgerEntry) => string;
+  amountDisplay: (entry: FinanceLedgerEntry) => string;
+  liveRate?: number | null;
+}): string {
+  return buildInventoryExcelXlsxBase64(buildFinanceExportSheets(params));
+}
+
+/** 兼容测试：正式导出请用 buildFinanceExportExcelBase64 */
 export function buildFinanceExportCsv(params: {
   entries: FinanceLedgerEntry[];
   summary: FinanceExportSummaryBlock;
@@ -262,64 +410,17 @@ export function buildFinanceExportCsv(params: {
   amountDisplay: (entry: FinanceLedgerEntry) => string;
   liveRate?: number | null;
 }): string {
-  const { entries, summary, netBalance, meta, labels } = params;
-  const liveRate = params.liveRate ?? null;
-  const collectedCny = sumSettledCustomerCny(entries);
+  const sheets = buildFinanceExportSheets(params);
+  const summary = sheets[0];
+  const detail = sheets[1];
   const headerBlock = [
-    toCsvRow([labels.metaTitle]),
-    toCsvRow([labels.hub, meta.hub]),
-    toCsvRow([labels.store, meta.store]),
-    toCsvRow([labels.tab, meta.tab]),
-    toCsvRow([labels.exportedAt, meta.exportedAt]),
-    toCsvRow([labels.recordCount, entries.length]),
-    toCsvRow([labels.balance, formatFinanceExportAmount(netBalance)]),
-    toCsvRow([labels.collected, formatFinanceExportAmount(summary.collectedTotal)]),
-    toCsvRow([labels.collectedCny, formatFinanceExportAmount(collectedCny)]),
-    toCsvRow([labels.transportUnpaid, formatFinanceExportAmount(summary.transportUnpaidTotal)]),
-    toCsvRow([labels.transportPaid, formatFinanceExportAmount(summary.transportPaidTotal)]),
-    toCsvRow([labels.pendingInflow, formatFinanceExportAmount(summary.pendingInflowTotal)]),
-    toCsvRow([labels.agencyPayable, formatFinanceExportAmount(summary.agencyPayableTotal)]),
-    toCsvRow([labels.manualIncome, formatFinanceExportAmount(summary.manualIncomeTotal)]),
-    toCsvRow([labels.manualExpense, formatFinanceExportAmount(summary.manualExpenseTotal)]),
+    toCsvRow([params.labels.metaTitle]),
+    ...summary.rows.slice(0, -1).map((row) => toCsvRow(row)),
     '',
-    toCsvRow([
-      labels.colTime,
-      labels.colCategory,
-      labels.colTitle,
-      labels.colSubtitle,
-      labels.colBarcode,
-      labels.colItem,
-      labels.colAmount,
-      labels.colAmountDisplay,
-      labels.colDest,
-      labels.colOrigin,
-      labels.colFee,
-      labels.colPaid,
-      labels.colCny,
-      labels.colFxRate,
-      labels.colPaidCcy,
-      labels.colFxLock,
-    ]),
+    toCsvRow(detail.columns.map((col) => col.header)),
   ];
-  const dataRows = entries.map((entry) =>
-    toCsvRow([
-      formatFinanceExportDateTime(entry.occurredAt),
-      params.categoryLabel(entry),
-      entry.title,
-      entry.subtitle,
-      entry.barcode,
-      entry.itemName,
-      entryAmount(entry),
-      params.amountDisplay(entry),
-      destCell(entry),
-      originCell(entry),
-      formatFinanceExportAmount(entry.transportFee),
-      paidCell(entry, labels),
-      entryCny(entry, liveRate),
-      entryFxRate(entry, liveRate),
-      entryPaidCcy(entry),
-      entryFxLock(entry, labels),
-    ]),
+  const dataRows = detail.rows.map((row) =>
+    toCsvRow(row.map((cell) => (cell == null ? '' : cell))),
   );
   return `\uFEFF${[...headerBlock, ...dataRows].join('\n')}`;
 }

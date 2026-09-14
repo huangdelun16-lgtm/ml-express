@@ -60,6 +60,7 @@ export type CloudMovementRow = {
   origin_store_id: string | null;
   origin_store_code: string;
   origin_store_name: string;
+  customer_code?: string;
   created_at: string;
 };
 
@@ -572,6 +573,9 @@ export async function fetchCloudMovementsForItems(itemIds: string[]): Promise<Cl
           : null,
         origin_store_code: String((row as CloudMovementRow).origin_store_code ?? ''),
         origin_store_name: String((row as CloudMovementRow).origin_store_name ?? ''),
+        customer_code: String((row as { customer_code?: unknown }).customer_code ?? '')
+          .trim()
+          .toUpperCase(),
         created_at: String((row as CloudMovementRow).created_at),
       })),
     );
@@ -773,6 +777,7 @@ export async function insertCloudStockMovement(
     origin_store_id: toNullableUuid(movement.origin_store_id),
     origin_store_code: movement.origin_store_code,
     origin_store_name: movement.origin_store_name,
+    customer_code: movement.customer_code?.trim().toUpperCase() ?? '',
     created_at: movement.created_at,
   });
   if (error) throw new Error(error.message);

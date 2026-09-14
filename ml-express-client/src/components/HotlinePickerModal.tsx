@@ -18,7 +18,6 @@ type Props = {
   title: string;
   numbers: HotlineNumber[];
   cancelLabel: string;
-  exitLabel: string;
   onClose: () => void;
 };
 
@@ -27,7 +26,6 @@ export default function HotlinePickerModal({
   title,
   numbers,
   cancelLabel,
-  exitLabel,
   onClose,
 }: Props) {
   const call = (tel: string) => {
@@ -58,10 +56,6 @@ export default function HotlinePickerModal({
           <View style={styles.footer}>
             <TouchableOpacity style={styles.footerBtn} onPress={onClose} activeOpacity={0.75}>
               <Text style={styles.cancelText}>{cancelLabel}</Text>
-            </TouchableOpacity>
-            <View style={styles.footerDivider} />
-            <TouchableOpacity style={styles.footerBtn} onPress={onClose} activeOpacity={0.75}>
-              <Text style={styles.exitText}>{exitLabel}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -106,27 +100,15 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E5E7EB',
-    flexDirection: 'row',
-    alignItems: 'stretch',
   },
   footerBtn: {
-    flex: 1,
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  footerDivider: {
-    width: StyleSheet.hairlineWidth,
-    backgroundColor: '#E5E7EB',
   },
   cancelText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#6B7280',
-  },
-  exitText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
   },
 });

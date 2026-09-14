@@ -15,7 +15,6 @@ export function pickCopy<T>(lang: string, dict: { zh: T; en: T; my: T }): T {
 const commonCopy = {
   zh: {
     cancel: '取消',
-    exit: '退出',
     confirm: '确定',
     notice: '提示',
     saving: '正在保存...',
@@ -91,7 +90,6 @@ const commonCopy = {
   },
   en: {
     cancel: 'Cancel',
-    exit: 'Exit',
     confirm: 'OK',
     notice: 'Notice',
     saving: 'Saving...',
@@ -167,7 +165,6 @@ const commonCopy = {
   },
   my: {
     cancel: 'ပယ်မည်',
-    exit: 'ထွက်ရန်',
     confirm: 'အတည်ပြု',
     notice: 'အသိပေးချက်',
     saving: 'သိမ်းနေသည်...',

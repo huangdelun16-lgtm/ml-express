@@ -12,6 +12,8 @@ import {
 import {
   deliverHubOrderInboundAtStation,
   ensurePackHubReceivedAtStation,
+  getItemByBarcode,
+  getItemDetail,
   importInboundPackToLocal,
   maybeAutoReleaseTransitAfterAllInbound,
   releaseHubTransitOrders,
@@ -41,12 +43,21 @@ import {
 } from '../utils/hubReceivePack';
 import { collectArrivalNotifyTargets, type ArrivalNotifyTarget } from '../utils/arrivalNotify';
 import { resolveStoreHubCode } from '../utils/storeZone';
+import { canMarkCustomerSigned } from '../utils/customerSign';
+import {
+  normalizeCustomerSignCode,
+  removeHubReceiveScanIds,
+  upsertHubReceiveScanLine,
+  type HubReceiveScanLine,
+} from '../utils/hubReceiveScanBasket';
 import { isPackageBarcode } from '../utils/packageNumber';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
 export function useHubReceiveFlow(openPackBarcode: string) {
   const { t, fmt } = useTranslation();
   const openedFromRouteRef = useRef('');
+  const scanLockRef = useRef(false);
+  const [scanBusy, setScanBusy] = useState(false);
   const { store, hubCode: authHubCode, operatorName } = useAuth();
   const hubCode = authHubCode ?? (store ? resolveStoreHubCode(store) : '');
   const operator = operatorName ?? t.common.operator;
@@ -67,6 +78,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
   const [error, setError] = useState('');
   const [modalSuccess, setModalSuccess] = useState('');
   const [notifyQueue, setNotifyQueue] = useState<ArrivalNotifyTarget[]>([]);
+  const [scanBasket, setScanBasket] = useState<HubReceiveScanLine[]>([]);
 
   const queueArrivalNotify = useCallback(
     (orders: OrderTrackingRecord[]) => {
@@ -417,11 +429,171 @@ export function useHubReceiveFlow(openPackBarcode: string) {
       }
       queueArrivalNotify([order]);
       setScan('');
+      void addScannedOrderToBasket(order.order_barcode, { quiet: true });
     } catch (e: unknown) {
       setError(resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
+  };
+
+  const addScannedOrderToBasket = async (
+    barcode: string,
+    options?: { quiet?: boolean },
+  ): Promise<boolean> => {
+    if (!store) return false;
+    const code = barcode.trim().toUpperCase();
+    if (!code) return false;
+
+    const item = await getItemByBarcode(code);
+    if (!item) {
+      if (!options?.quiet) {
+        setError(formatOrderNotFoundHint(t, code, hubCode));
+        setMessage('');
+      }
+      return false;
+    }
+
+    if (scanBasket.some((row) => row.id === item.id || row.barcode === item.barcode || row.barcode === code)) {
+      if (!options?.quiet) {
+        setError(fmt(t.hubReceive.scanBasketDuplicate, { barcode: item.barcode }));
+        setMessage('');
+      }
+      return false;
+    }
+
+    if (item.customer_signed_at?.trim()) {
+      if (!options?.quiet) {
+        setError(fmt(t.hubReceive.scanBasketSigned, { barcode: item.barcode }));
+        setMessage('');
+      }
+      return false;
+    }
+
+    if (!canMarkCustomerSigned(store, item)) {
+      if (!options?.quiet) {
+        setError(fmt(t.hubReceive.scanBasketNotReady, { barcode: item.barcode }));
+        setMessage('');
+      }
+      return false;
+    }
+
+    const detail = await getItemDetail(item.id).catch(() => null);
+    const next: HubReceiveScanLine = {
+      id: item.id,
+      barcode: item.barcode,
+      name: item.name,
+      customerCode: normalizeCustomerSignCode(detail?.customer_code),
+      customerName:
+        item.recipient_name?.trim() ||
+        item.customer_name?.trim() ||
+        detail?.recipient_name?.trim() ||
+        '',
+      canSign: true,
+      alreadySigned: false,
+      hub_arrived_at: item.hub_arrived_at,
+      customer_signed_at: item.customer_signed_at,
+      final_destination: item.final_destination,
+      destination: item.destination,
+      owner_store_code: item.owner_store_code,
+    };
+
+    let duplicate = false;
+    let count = 0;
+    setScanBasket((prev) => {
+      const preview = upsertHubReceiveScanLine(prev, next);
+      duplicate = preview.duplicate;
+      count = preview.lines.length;
+      return preview.duplicate ? prev : preview.lines;
+    });
+    if (duplicate) {
+      if (!options?.quiet) {
+        setError(fmt(t.hubReceive.scanBasketDuplicate, { barcode: item.barcode }));
+        setMessage('');
+      }
+      return false;
+    }
+    if (!options?.quiet) {
+      setError('');
+      setMessage(
+        fmt(t.hubReceive.scanBasketAdded, {
+          barcode: item.barcode,
+          count,
+        }),
+      );
+    }
+    return true;
+  };
+
+  const handleOrderScanIntoBasket = async (code: string) => {
+    if (!store || loading) return;
+    const trimmed = code.trim().toUpperCase();
+    setError('');
+    setMessage('');
+    if (scanBasket.some((row) => row.barcode === trimmed)) {
+      setError(fmt(t.hubReceive.scanBasketDuplicate, { barcode: trimmed }));
+      return;
+    }
+    if (!(await preflightHubReceive())) return;
+    setLoading(true);
+    try {
+      const existing = await getItemByBarcode(trimmed);
+      if (existing?.customer_signed_at?.trim()) {
+        setError(fmt(t.hubReceive.scanBasketSigned, { barcode: existing.barcode }));
+        return;
+      }
+      if (!existing || !canMarkCustomerSigned(store, existing)) {
+        let inboundError: unknown;
+        try {
+          const tracked = await getOrderTrackingByBarcode(trimmed, hubCode);
+          const pkg = tracked ? await getPkgTrackingDetail(tracked.pack_barcode).catch(() => null) : null;
+          if (pkg?.status === 'in_transit') {
+            setError(fmt(t.hubReceive.scanBasketNeedPack, { barcode: pkg.pack_barcode }));
+            return;
+          }
+          if (pkg) {
+            const { order, pkg: latest } = await confirmOrderHubReceived(
+              trimmed,
+              store,
+              hubCode,
+              pkg,
+            );
+            await deliverHubOrderInboundAtStation({
+              order,
+              pkg: latest,
+              store,
+              hubCode,
+              operator,
+            });
+          }
+        } catch (e: unknown) {
+          inboundError = e;
+        }
+        const after = await getItemByBarcode(trimmed);
+        if (!after) {
+          setError(
+            inboundError
+              ? resolveAppError(t, inboundError)
+              : formatOrderNotFoundHint(t, trimmed, hubCode),
+          );
+          return;
+        }
+      }
+      const added = await addScannedOrderToBasket(trimmed);
+      if (added) setScan('');
+    } catch (e: unknown) {
+      setError(resolveAppError(t, e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const removeScanBasketIds = (ids: Iterable<string>) => {
+    setScanBasket((prev) => removeHubReceiveScanIds(prev, ids));
+  };
+
+  const clearScanBasket = () => {
+    setScanBasket([]);
   };
 
   const handleConfirmPack = async () => {
@@ -632,17 +804,31 @@ export function useHubReceiveFlow(openPackBarcode: string) {
   };
 
   const onSubmit = (code: string) => {
+    if (scanLockRef.current) return;
+    scanLockRef.current = true;
+    setScanBusy(true);
     setScan(code);
     const trimmed = code.trim().toUpperCase();
-    if (isPackageBarcode(trimmed)) {
-      void handlePackScan(code);
-      return;
-    }
-    if (!activePack || activePack.status === 'in_transit') {
-      void handleOrderLookupScan(code);
-      return;
-    }
-    void handleOrderScan(code);
+    void (async () => {
+      try {
+        if (isPackageBarcode(trimmed)) {
+          await handlePackScan(code);
+          return;
+        }
+        if (ordersModalVisible && activePack) {
+          if (activePack.status === 'in_transit') {
+            await handleOrderLookupScan(code);
+            return;
+          }
+          await handleOrderScan(code);
+          return;
+        }
+        await handleOrderScanIntoBasket(code);
+      } finally {
+        scanLockRef.current = false;
+        setScanBusy(false);
+      }
+    })();
   };
 
   const closeOrdersModal = () => {
@@ -662,6 +848,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
     activePack,
     ordersModalVisible,
     loading,
+    scanBusy,
     confirmingOrderId,
     confirmingHubReceive,
     batchInbounding,
@@ -684,5 +871,9 @@ export function useHubReceiveFlow(openPackBarcode: string) {
     notifyQueue,
     dismissNotifyQueue,
     queueArrivalNotify,
+    scanBasket,
+    removeScanBasketIds,
+    clearScanBasket,
+    operator,
   };
 }

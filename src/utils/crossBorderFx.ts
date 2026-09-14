@@ -1,4 +1,14 @@
 export const CROSS_BORDER_FX_SETTINGS_KEY = 'pricing.cross_border.fx.mmk_per_cny';
+export const CROSS_BORDER_FX_HISTORY_SETTINGS_KEY = 'pricing.cross_border.fx.mmk_per_cny.history';
+
+export const CROSS_BORDER_FX_HISTORY_LIMIT = 20;
+
+export type CrossBorderFxHistoryEntry = {
+  at: string;
+  by: string;
+  from: number | null;
+  to: number;
+};
 
 const CUSTOMER_LEDGER_CATEGORIES = new Set([
   'pending_inflow',
@@ -120,7 +130,10 @@ export function resolveCustomerFeeCny(params: {
   );
 }
 
-export function buildCrossBorderFxSetting(rate: number): {
+export function buildCrossBorderFxSetting(
+  rate: number,
+  updatedBy = 'admin-dashboard',
+): {
   category: 'pricing';
   settings_key: string;
   settings_value: number;
@@ -132,6 +145,66 @@ export function buildCrossBorderFxSetting(rate: number): {
     settings_key: CROSS_BORDER_FX_SETTINGS_KEY,
     settings_value: rate,
     description: '1 CNY = this many MMK (cross-border quote FX)',
-    updated_by: 'admin-dashboard',
+    updated_by: updatedBy || 'admin-dashboard',
+  };
+}
+
+export function parseCrossBorderFxHistory(raw: unknown): CrossBorderFxHistoryEntry[] {
+  let value: unknown = raw;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    try {
+      value = JSON.parse(trimmed);
+    } catch {
+      return [];
+    }
+  }
+  if (value && typeof value === 'object' && !Array.isArray(value) && 'entries' in value) {
+    value = (value as { entries: unknown }).entries;
+  }
+  if (!Array.isArray(value)) return [];
+
+  const entries: CrossBorderFxHistoryEntry[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const rec = item as Record<string, unknown>;
+    const to = parseMmkPerCnyRate(rec.to);
+    if (to == null) continue;
+    const at = typeof rec.at === 'string' ? rec.at.trim() : '';
+    if (!at) continue;
+    const from =
+      rec.from == null || rec.from === '' ? null : parseMmkPerCnyRate(rec.from);
+    const by = typeof rec.by === 'string' && rec.by.trim() ? rec.by.trim() : '—';
+    entries.push({ at, by, from, to });
+  }
+  entries.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+  return entries;
+}
+
+export function appendCrossBorderFxHistory(
+  existing: CrossBorderFxHistoryEntry[],
+  entry: CrossBorderFxHistoryEntry,
+  limit = CROSS_BORDER_FX_HISTORY_LIMIT,
+): CrossBorderFxHistoryEntry[] {
+  return [entry, ...existing.filter((row) => row.at !== entry.at)].slice(0, limit);
+}
+
+export function buildCrossBorderFxHistorySetting(
+  entries: CrossBorderFxHistoryEntry[],
+  updatedBy = 'admin-dashboard',
+): {
+  category: 'pricing';
+  settings_key: string;
+  settings_value: CrossBorderFxHistoryEntry[];
+  description: string;
+  updated_by: string;
+} {
+  return {
+    category: 'pricing',
+    settings_key: CROSS_BORDER_FX_HISTORY_SETTINGS_KEY,
+    settings_value: entries,
+    description: 'Cross-border FX change history',
+    updated_by: updatedBy || 'admin-dashboard',
   };
 }

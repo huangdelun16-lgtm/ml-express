@@ -728,6 +728,13 @@ export async function getItemDetail(id: string): Promise<InventoryItemDetail | n
     recipient_phone: inbound?.recipient_phone ?? '',
     detail_address: inbound?.detail_address ?? '',
     packaging: inbound?.packaging ?? '',
+    customer_code:
+      [...inboundMoves]
+        .sort((a, b) => a.created_at.localeCompare(b.created_at))
+        .map((row) => row.customer_code?.trim().toUpperCase() ?? '')
+        .find(Boolean) ||
+      inbound?.customer_code?.trim().toUpperCase() ||
+      '',
     inbound_qty: inbound?.qty ?? 0,
     inbound_date_label: inbound?.created_at ?? '',
     inbound_store_name: inbound?.origin_store_name ?? '',

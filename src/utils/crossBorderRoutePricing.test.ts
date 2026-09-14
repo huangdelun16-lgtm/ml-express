@@ -9,6 +9,7 @@ import {
   normalizeRouteHubCode,
   parseRouteMatrixForSave,
   parseRoutePerKgSettingsKey,
+  summarizeRoutePricing,
 } from './crossBorderRoutePricing';
 
 describe('crossBorderRoutePricing', () => {
@@ -172,6 +173,44 @@ describe('crossBorderRoutePricing', () => {
       { code: 'MDY260812005', name: '登记客户' },
       { code: 'YGN00921', name: '快递汇总' },
     ]);
+  });
+
+  it('summarizes default matrix time and custom customer count', () => {
+    expect(
+      summarizeRoutePricing([
+        {
+          settings_key: 'pricing.cross_border.fx.mmk_per_cny',
+          updated_at: '2026-09-14T10:00:00.000Z',
+        },
+        {
+          settings_key: 'pricing.cross_border.route.RUI.MDY.per_kg',
+          updated_at: '2026-09-01T08:00:00.000Z',
+          updated_by: '旧保存',
+        },
+        {
+          settings_key: 'pricing.cross_border.route.LSO.MDY.per_kg',
+          updated_at: '2026-09-14T09:00:00.000Z',
+          updated_by: '新保存',
+        },
+        {
+          settings_key: 'pricing.cross_border.customer.MDY260812005.route.RUI.MDY.per_kg',
+          updated_at: '2026-09-10T08:00:00.000Z',
+        },
+        {
+          settings_key: 'pricing.cross_border.customer.MDY260812005.route.LSO.MDY.per_kg',
+          updated_at: '2026-09-11T08:00:00.000Z',
+        },
+        {
+          settings_key: 'pricing.cross_border.customer.YGN00921.route.RUI.YGN.per_kg',
+          updated_at: '2026-09-12T08:00:00.000Z',
+        },
+      ]),
+    ).toEqual({
+      defaultRouteCount: 2,
+      defaultUpdatedAt: '2026-09-14T09:00:00.000Z',
+      defaultUpdatedBy: '新保存',
+      customCustomerCount: 2,
+    });
   });
 
   it('validates numeric matrix on save', () => {

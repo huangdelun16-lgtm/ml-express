@@ -2,16 +2,22 @@ import { describe, expect, it } from 'vitest';
 import type { FinanceLedgerEntry } from '../types/financeLedger';
 import {
   buildFinanceExportCsv,
+  buildFinanceExportExcelBase64,
   buildFinanceExportFilename,
+  buildFinanceExportSheets,
   escapeCsvCell,
   formatFinanceExportAmount,
   formatFinanceExportDateTime,
   toCsvRow,
   type FinanceExportLabels,
 } from './financeLedgerExport';
+import { buildInventoryExcelXlsx } from './inventoryExcelExport';
 
 const LABELS: FinanceExportLabels = {
   metaTitle: '跨境会计导出',
+  brand: 'MARKET LINK · 跨境会计',
+  summarySheet: '汇总',
+  detailSheet: '明细',
   hub: '站点',
   store: '店铺',
   tab: '分类',
@@ -47,6 +53,9 @@ const LABELS: FinanceExportLabels = {
   fxLocked: '锁定',
   fxLive: '活汇率',
   fxLegacy: '旧单无锁',
+  metric: '项目',
+  value: '数值',
+  noteBooks: '客户账人民币与缅甸开销缅币分列，不要互相加总',
 };
 
 function entry(
@@ -63,6 +72,71 @@ function entry(
     ...partial,
   };
 }
+
+const collected = entry({
+  id: 'c1',
+  category: 'order_collected',
+  title: '签收',
+  subtitle: 'note, with comma',
+  amount: 1500,
+  amountDisplay: '+1500',
+  occurredAt: '2026-08-30T10:00:00.000Z',
+  barcode: 'PKG-YGN-1',
+  itemName: '衣物',
+  destination: 'YGN',
+  originLabel: 'RUILI',
+  originKey: 'RUI001',
+  fxMmkPerCny: 5000,
+  paidCurrency: 'CNY',
+  paidCny: 0.3,
+});
+const transport = entry({
+  id: 't1',
+  category: 'transport_cost',
+  title: '车费',
+  amount: null,
+  transportFee: 200,
+  paid: false,
+  occurredAt: '2026-08-29T12:00:00.000Z',
+  barcode: 'TRIP-1',
+  destination: 'MDY',
+});
+const paidTransport = entry({
+  id: 't2',
+  category: 'transport_cost',
+  title: '车费',
+  amount: 80,
+  transportFee: 80,
+  paid: true,
+  occurredAt: 'bad-date',
+  barcode: 'TRIP-2',
+});
+
+const exportParams = {
+  entries: [collected, transport, paidTransport],
+  summary: {
+    collectedTotal: 1500,
+    transportUnpaidTotal: 200,
+    transportPaidTotal: 80,
+    pendingInflowTotal: 0,
+    agencyPayableTotal: 300,
+    manualIncomeTotal: 10,
+    manualExpenseTotal: 5,
+  },
+  netBalance: 1425,
+  meta: {
+    hub: 'YGN',
+    store: 'YGN001',
+    tab: '全部',
+    exportedAt: '2026-08-31 17:00',
+  },
+  labels: LABELS,
+  categoryLabel: (e: FinanceLedgerEntry) =>
+    e.category === 'order_collected' ? '已签收' : '车费',
+  amountDisplay: (e: FinanceLedgerEntry) =>
+    e.amountDisplay || (e.paid ? '已支付' : '待登记车费'),
+  liveRate: 5000,
+};
 
 describe('escapeCsvCell / toCsvRow', () => {
   it('普通文本不包引号', () => {
@@ -98,88 +172,54 @@ describe('formatFinanceExportDateTime / Amount', () => {
 });
 
 describe('buildFinanceExportFilename', () => {
-  it('站点 + tab + 本地日期', () => {
+  it('站点 + tab + 本地日期，后缀 xlsx', () => {
     expect(
       buildFinanceExportFilename({ hub: 'YGN', tab: 'all', at: new Date(2026, 7, 31) }),
-    ).toBe('ML-finance-YGN-all-20260831.csv');
+    ).toBe('ML-finance-YGN-all-20260831.xlsx');
   });
 
   it('清洗非法字符', () => {
     expect(
       buildFinanceExportFilename({ hub: 'YGN 01', tab: 'all/../x', at: new Date(2026, 0, 2) }),
-    ).toBe('ML-finance-YGN01-allx-20260102.csv');
+    ).toBe('ML-finance-YGN01-allx-20260102.xlsx');
   });
 
   it('空站点回退 HUB', () => {
     expect(buildFinanceExportFilename({ hub: '  ', tab: '', at: new Date(2026, 7, 1) })).toBe(
-      'ML-finance-HUB-all-20260801.csv',
+      'ML-finance-HUB-all-20260801.xlsx',
     );
   });
 });
 
-describe('buildFinanceExportCsv', () => {
-  const collected = entry({
-    id: 'c1',
-    category: 'order_collected',
-    title: '签收',
-    subtitle: 'note, with comma',
-    amount: 1500,
-    amountDisplay: '+1500',
-    occurredAt: '2026-08-30T10:00:00.000Z',
-    barcode: 'PKG-YGN-1',
-    itemName: '衣物',
-    destination: 'YGN',
-    originLabel: 'RUILI',
-    originKey: 'RUI001',
-    fxMmkPerCny: 5000,
-    paidCurrency: 'CNY',
-    paidCny: 0.3,
-  });
-  const transport = entry({
-    id: 't1',
-    category: 'transport_cost',
-    title: '车费',
-    amount: null,
-    transportFee: 200,
-    paid: false,
-    occurredAt: '2026-08-29T12:00:00.000Z',
-    barcode: 'TRIP-1',
-    destination: 'MDY',
-  });
-  const paidTransport = entry({
-    id: 't2',
-    category: 'transport_cost',
-    title: '车费',
-    amount: 80,
-    transportFee: 80,
-    paid: true,
-    occurredAt: 'bad-date',
-    barcode: 'TRIP-2',
+describe('buildFinanceExportSheets / Workbook', () => {
+  it('汇总 + 明细两表，金额为数字', () => {
+    const sheets = buildFinanceExportSheets(exportParams);
+    expect(sheets).toHaveLength(2);
+    expect(sheets[0].name).toBe('汇总');
+    expect(sheets[1].name).toBe('明细');
+    expect(sheets[0].rows.some((row) => row[0] === '结余' && row[1] === 1425)).toBe(true);
+    expect(sheets[0].rows.some((row) => row[0] === '已收人民币' && row[1] === 0.3)).toBe(true);
+    const collectedRow = sheets[1].rows.find((row) => row[4] === 'PKG-YGN-1');
+    expect(collectedRow?.[6]).toBe(1500);
+    expect(collectedRow?.[12]).toBe(0.3);
+    expect(sheets[1].rowFills?.[0]).toBe('FFECFDF5');
+    expect(sheets[1].rowFills?.[1]).toBe('FFFEF2F2');
   });
 
-  const csv = buildFinanceExportCsv({
-    entries: [collected, transport, paidTransport],
-    summary: {
-      collectedTotal: 1500,
-      transportUnpaidTotal: 200,
-      transportPaidTotal: 80,
-      pendingInflowTotal: 0,
-      agencyPayableTotal: 300,
-      manualIncomeTotal: 10,
-      manualExpenseTotal: 5,
-    },
-    netBalance: 1425,
-    meta: {
-      hub: 'YGN',
-      store: 'YGN001',
-      tab: '全部',
-      exportedAt: '2026-08-31 17:00',
-    },
-    labels: LABELS,
-    categoryLabel: (e) => (e.category === 'order_collected' ? '已签收' : '车费'),
-    amountDisplay: (e) => e.amountDisplay || (e.paid ? '已支付' : '待登记车费'),
-    liveRate: 5000,
+  it('生成真正的 xlsx zip，含标题与数字', () => {
+    const bytes = buildInventoryExcelXlsx(buildFinanceExportSheets(exportParams));
+    expect(String.fromCharCode(bytes[0], bytes[1])).toBe('PK');
+    const text = new TextDecoder().decode(bytes);
+    expect(text).toContain('MARKET LINK · 跨境会计');
+    expect(text).toContain('name="汇总"');
+    expect(text).toContain('name="明细"');
+    expect(text).toContain('<v>1500</v>');
+    expect(buildFinanceExportExcelBase64(exportParams).length).toBeGreaterThan(200);
   });
+});
+
+describe('buildFinanceExportCsv (兼容)', () => {
+  const csv = buildFinanceExportCsv(exportParams);
 
   it('带 UTF-8 BOM，Excel 能开中文', () => {
     expect(csv.startsWith('\uFEFF')).toBe(true);
@@ -194,7 +234,7 @@ describe('buildFinanceExportCsv', () => {
     expect(csv).toContain('明细条数,3');
     expect(csv).toContain('结余,1425');
     expect(csv).toContain('已收包裹费,1500');
-    expect(csv).toContain('已收人民币,0.30');
+    expect(csv).toContain('已收人民币,0.3');
     expect(csv).toContain('待付车费,200');
     expect(csv).toContain('已付车费,80');
     expect(csv).toContain('代收应转,300');
@@ -228,7 +268,7 @@ describe('buildFinanceExportCsv', () => {
   });
 
   it('已收行带锁定人民币与汇率，车费行人民币留空', () => {
-    expect(csv).toContain('0.30');
+    expect(csv).toContain('0.3');
     expect(csv).toContain('5000');
     expect(csv).toContain('CNY');
     expect(csv).toContain('锁定');

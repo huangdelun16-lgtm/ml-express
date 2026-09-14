@@ -20,8 +20,10 @@ import {
   fetchInventoryConsolePacks,
   fetchInventoryCustomerSummaries,
   fetchCrossBorderRegisteredCustomers,
+  fetchCrossBorderSalespersons,
   setCrossBorderRegisteredCustomerStatus,
   type CreateCrossBorderAccountResult,
+  type CrossBorderSalesperson,
   type CrossBorderRegisteredCustomer,
   type UpdateCrossBorderAccountResult,
   type InventoryConsoleData,
@@ -57,16 +59,25 @@ import {
 import { CROSS_BORDER_HUBS } from '../utils/crossBorderHubs';
 import DualMoney from '../components/DualMoney';
 import {
+  CROSS_BORDER_FX_HISTORY_SETTINGS_KEY,
   CROSS_BORDER_FX_SETTINGS_KEY,
+  appendCrossBorderFxHistory,
+  buildCrossBorderFxHistorySetting,
   buildCrossBorderFxSetting,
   displayRateForCustomerCategory,
   isCustomerLedgerCategory,
   mmkToCny,
+  parseCrossBorderFxHistory,
   parseMmkPerCnyRate,
   pickMmkPerCnyRate,
+  type CrossBorderFxHistoryEntry,
 } from '../utils/crossBorderFx';
-import { collectPricingCustomerOptions } from '../utils/crossBorderRoutePricing';
-import { systemSettingsService } from '../services/supabase';
+import {
+  collectPricingCustomerOptions,
+  summarizeRoutePricing,
+  type RoutePricingSummary,
+} from '../utils/crossBorderRoutePricing';
+import { auditLogService, systemSettingsService } from '../services/supabase';
 import { formatSalespersonEmployeeCodeDisplay } from '../utils/crossBorderSalespersons';
 import { formatCustomerNotifyDisplay } from '../utils/customerNotifyMethod';
 import {
@@ -147,6 +158,17 @@ function joinSearchDetail(...parts: Array<string | null | undefined>): string {
 }
 
 const DEFAULT_PAGE_SIZE = 10;
+const FX_HISTORY_DISPLAY_LIMIT = 5;
+
+function readCblAdminActor(): { id: string; name: string } {
+  const id =
+    sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || 'admin';
+  const name =
+    sessionStorage.getItem('currentUserName') ||
+    localStorage.getItem('currentUserName') ||
+    '系统管理员';
+  return { id, name };
+}
 
 function formatDateTime(value?: string | null, lang: string = 'zh'): string {
   if (!value) return '—';
@@ -451,6 +473,11 @@ const CrossBorderLogisticsPage: FC = () => {
   const [fxRate, setFxRate] = useState<number | null>(null);
   const [fxDraft, setFxDraft] = useState('');
   const [fxSaving, setFxSaving] = useState(false);
+  const [fxHistory, setFxHistory] = useState<CrossBorderFxHistoryEntry[]>([]);
+  const [fxUpdatedAt, setFxUpdatedAt] = useState<string | null>(null);
+  const [salespersons, setSalespersons] = useState<CrossBorderSalesperson[]>([]);
+  const [salespersonsReady, setSalespersonsReady] = useState(false);
+  const [pricingSummary, setPricingSummary] = useState<RoutePricingSummary | null>(null);
   const activeTab = parseCblPageTab(searchParams.get('tab'));
 
   const setActiveTab = useCallback(
@@ -529,10 +556,21 @@ const CrossBorderLogisticsPage: FC = () => {
 
   const loadFxRate = useCallback(async () => {
     try {
-      const rows = await systemSettingsService.getSettingsByKeys([CROSS_BORDER_FX_SETTINGS_KEY]);
+      const rows = await systemSettingsService.getSettingsByKeys([
+        CROSS_BORDER_FX_SETTINGS_KEY,
+        CROSS_BORDER_FX_HISTORY_SETTINGS_KEY,
+      ]);
       applyFxRate(pickMmkPerCnyRate(rows));
+      const fxRow = rows.find((row) => row.settings_key === CROSS_BORDER_FX_SETTINGS_KEY);
+      setFxUpdatedAt(fxRow?.updated_at ?? null);
+      const historyRow = rows.find(
+        (row) => row.settings_key === CROSS_BORDER_FX_HISTORY_SETTINGS_KEY,
+      );
+      setFxHistory(parseCrossBorderFxHistory(historyRow?.settings_value));
     } catch {
       applyFxRate(null);
+      setFxUpdatedAt(null);
+      setFxHistory([]);
     }
   }, [applyFxRate]);
 
@@ -542,9 +580,24 @@ const CrossBorderLogisticsPage: FC = () => {
       feedbackService.notify(isEn ? 'Enter a rate greater than 0.' : '请填写大于 0 的汇率。');
       return;
     }
+    if (fxRate != null && parsed === fxRate) {
+      feedbackService.success(isEn ? 'Rate unchanged' : '汇率未变化');
+      return;
+    }
+    const actor = readCblAdminActor();
+    const at = new Date().toISOString();
+    const nextHistory = appendCrossBorderFxHistory(fxHistory, {
+      at,
+      by: actor.name,
+      from: fxRate,
+      to: parsed,
+    });
     setFxSaving(true);
     try {
-      const result = await systemSettingsService.upsertSettings([buildCrossBorderFxSetting(parsed)]);
+      const result = await systemSettingsService.upsertSettings([
+        buildCrossBorderFxSetting(parsed, actor.name),
+        buildCrossBorderFxHistorySetting(nextHistory, actor.name),
+      ]);
       if (!result.ok) {
         feedbackService.notify(
           isEn
@@ -554,17 +607,53 @@ const CrossBorderLogisticsPage: FC = () => {
         return;
       }
       applyFxRate(parsed);
+      setFxHistory(nextHistory);
+      setFxUpdatedAt(at);
+      void auditLogService.log({
+        user_id: actor.id,
+        user_name: actor.name,
+        action_type: 'update',
+        module: 'settings',
+        target_id: CROSS_BORDER_FX_SETTINGS_KEY,
+        target_name: isEn ? 'Cross-border FX' : '跨境汇率',
+        action_description: isEn
+          ? `FX ${fxRate ?? '—'} → ${parsed} MMK per CNY`
+          : `汇率 ${fxRate ?? '—'} → ${parsed} 缅币/人民币`,
+        old_value: fxRate == null ? '' : String(fxRate),
+        new_value: String(parsed),
+      });
       feedbackService.success(isEn ? 'Exchange rate saved' : '汇率已保存');
     } catch (err) {
       feedbackService.notify(err instanceof Error ? err.message : isEn ? 'Save failed' : '保存失败');
     } finally {
       setFxSaving(false);
     }
-  }, [applyFxRate, fxDraft, isEn]);
+  }, [applyFxRate, fxDraft, fxHistory, fxRate, isEn]);
+
+  const loadSettingsExtras = useCallback(async () => {
+    try {
+      const [salespersonRows, pricingRows] = await Promise.all([
+        fetchCrossBorderSalespersons().catch(() => [] as CrossBorderSalesperson[]),
+        systemSettingsService.getSettingsByKeyPrefix('pricing.cross_border.'),
+      ]);
+      setSalespersons(salespersonRows);
+      setSalespersonsReady(true);
+      setPricingSummary(summarizeRoutePricing(pricingRows));
+    } catch {
+      setSalespersons([]);
+      setSalespersonsReady(true);
+      setPricingSummary(summarizeRoutePricing([]));
+    }
+  }, []);
 
   useEffect(() => {
     void loadFxRate();
   }, [loadFxRate]);
+
+  useEffect(() => {
+    if (activeTab !== 'settings') return;
+    void loadSettingsExtras();
+  }, [activeTab, loadSettingsExtras]);
 
   const scheduleCustomersLoad = useCallback(() => {
     if (customersFetchStartedRef.current) return;
@@ -874,6 +963,40 @@ const CrossBorderLogisticsPage: FC = () => {
   );
   transportStationKeysRef.current = transportStationKeys;
 
+  const accountStatusText = useMemo(() => {
+    if (loading && !transitStores.length) {
+      return isEn ? 'Loading station accounts…' : '站点账号加载中…';
+    }
+    const activeCount = transitStores.filter((store) => store.status === 'active').length;
+    const inactiveCount = Math.max(0, transitStores.length - activeCount);
+    const salespersonText = salespersonsReady
+      ? isEn
+        ? `${salespersons.length} sales`
+        : `推销员 ${salespersons.length}`
+      : isEn
+        ? 'sales…'
+        : '推销员 …';
+    return isEn
+      ? `${activeCount} active · ${inactiveCount} inactive · ${salespersonText}`
+      : `启用 ${activeCount} · 停用 ${inactiveCount} · ${salespersonText}`;
+  }, [isEn, loading, salespersons.length, salespersonsReady, transitStores]);
+
+  const pricingSummaryText = useMemo(() => {
+    if (!pricingSummary) {
+      return isEn ? 'Loading pricing…' : '计费摘要加载中…';
+    }
+    const custom = isEn
+      ? `${pricingSummary.customCustomerCount} customers with custom rates`
+      : `${pricingSummary.customCustomerCount} 个客户有专属价`;
+    if (!pricingSummary.defaultUpdatedAt) {
+      return isEn ? `Default matrix not saved yet · ${custom}` : `尚未保存默认矩阵 · ${custom}`;
+    }
+    const when = formatDateTime(pricingSummary.defaultUpdatedAt, language);
+    return isEn ? `Default matrix saved ${when} · ${custom}` : `默认矩阵更新于 ${when} · ${custom}`;
+  }, [isEn, language, pricingSummary]);
+
+  const visibleFxHistory = fxHistory.slice(0, FX_HISTORY_DISPLAY_LIMIT);
+
   const recentPacks = useMemo(
     () =>
       (data?.recentPacks ?? []).filter(
@@ -1162,6 +1285,7 @@ const CrossBorderLogisticsPage: FC = () => {
     setLastCreated(result);
     setActiveTab('settings');
     load();
+    void loadSettingsExtras();
   };
 
   const handleAccountUpdated = (result: UpdateCrossBorderAccountResult) => {
@@ -1173,10 +1297,12 @@ const CrossBorderLogisticsPage: FC = () => {
       });
     }
     load();
+    void loadSettingsExtras();
   };
 
   const handleAccountDeleted = () => {
     load();
+    void loadSettingsExtras();
   };
 
   const closeFinanceDetail = () => setFinanceModalStore(null);
@@ -2470,18 +2596,43 @@ const CrossBorderLogisticsPage: FC = () => {
                     </span>
                   ) : null}
                 </div>
+                <div className="cbl-fx-history">
+                  <h3 className="cbl-fx-history__title">{isEn ? 'Recent changes' : '最近变更'}</h3>
+                  {visibleFxHistory.length ? (
+                    <ul className="cbl-fx-history__list">
+                      {visibleFxHistory.map((row) => (
+                        <li key={`${row.at}-${row.to}`} className="cbl-fx-history__item">
+                          <time dateTime={row.at}>{formatDateTime(row.at, language)}</time>
+                          <span className="cbl-fx-history__who">{row.by}</span>
+                          <span className="cbl-fx-history__rates">
+                            {row.from == null ? '—' : row.from} → {row.to}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="cbl-card-hint cbl-card-hint--tight">
+                      {fxUpdatedAt
+                        ? isEn
+                          ? `Current rate last saved ${formatDateTime(fxUpdatedAt, language)}. New saves will appear here.`
+                          : `当前汇率上次保存于 ${formatDateTime(fxUpdatedAt, language)}。保存后会出现变更记录。`
+                        : isEn
+                          ? 'Changes will appear here after you save.'
+                          : '保存后会出现变更记录。'}
+                    </p>
+                  )}
+                </div>
               </div>
             </section>
 
             <section className="cbl-card">
               <div className="cbl-card__head">
-                <h2 className="cbl-card__title">{isEn ? 'Accounts and pricing' : '账号与计费'}</h2>
+                <h2 className="cbl-card__title">{isEn ? 'Accounts' : '账号'}</h2>
               </div>
               <div className="cbl-card__body">
+                <p className="cbl-settings-status">{accountStatusText}</p>
                 <p className="cbl-card-hint">
-                  {isEn
-                    ? 'Transit station logins and route pricing are managed here.'
-                    : '中转站登录账号和线路计费只在本页管理。'}
+                  {isEn ? 'Reset passwords in account management.' : '改密码进账号管理。'}
                 </p>
                 <div className="cbl-settings-actions">
                   <button
@@ -2491,9 +2642,20 @@ const CrossBorderLogisticsPage: FC = () => {
                   >
                     {isEn ? 'Account management' : '跨境账号管理'}
                   </button>
+                </div>
+              </div>
+            </section>
+
+            <section className="cbl-card">
+              <div className="cbl-card__head">
+                <h2 className="cbl-card__title">{isEn ? 'Pricing' : '计费'}</h2>
+              </div>
+              <div className="cbl-card__body">
+                <p className="cbl-settings-status">{pricingSummaryText}</p>
+                <div className="cbl-settings-actions">
                   <button
                     type="button"
-                    className="cbl-btn cbl-btn--light"
+                    className="cbl-btn cbl-btn--primary"
                     onClick={() => setShowPricingModal(true)}
                   >
                     {isEn ? 'Pricing' : '跨境计费'}
@@ -2528,7 +2690,10 @@ const CrossBorderLogisticsPage: FC = () => {
       <CblLazyModal open={showAccountMgmtModal}>
         <CrossBorderAccountManagementModal
           open={showAccountMgmtModal}
-          onClose={() => setShowAccountMgmtModal(false)}
+          onClose={() => {
+            setShowAccountMgmtModal(false);
+            void loadSettingsExtras();
+          }}
           stores={data?.transitStores ?? []}
           isEn={isEn}
           onCreated={handleCreated}
@@ -2540,9 +2705,12 @@ const CrossBorderLogisticsPage: FC = () => {
       <CblLazyModal open={showPricingModal}>
         <CrossBorderPricingModal
           open={showPricingModal}
-          onClose={() => setShowPricingModal(false)}
+          onClose={() => {
+            setShowPricingModal(false);
+            void loadSettingsExtras();
+          }}
           customers={pricingCustomers}
-          onFxSaved={applyFxRate}
+          onSaved={() => void loadSettingsExtras()}
         />
       </CblLazyModal>
 

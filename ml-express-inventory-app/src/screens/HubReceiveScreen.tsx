@@ -1,16 +1,25 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ExceptionReportModal from '../components/ExceptionReportModal';
 import ArrivalNotifySheet from '../components/ArrivalNotifySheet';
+import CustomerSignFlowModal, { type CustomerSignFlowRequest } from '../components/CustomerSignFlowModal';
 import ScanInputBar from '../components/ScanInputBar';
 import HubReceiveOrdersModal from '../components/HubReceiveOrdersModal';
 import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
+import { HubReceiveScanBasket } from '../components/hubReceive/HubReceiveScanBasket';
 import { HubReceiveStatusPanels } from '../components/hubReceive/HubReceiveStatusPanels';
 import { useHubReceiveFlow } from '../hooks/useHubReceiveFlow';
+import { fmt, resolveAppError } from '../i18n';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import { feedbackService } from '../services/FeedbackService';
+import { listItems } from '../services/inventoryService';
 import type { ExceptionReportTarget } from '../types/inventoryException';
+import { resolvePackagingStockInSignIds } from '../utils/customerBatchSign';
 import { exceptionTargetFromHubOrder } from '../utils/inventoryException';
+import { groupHubReceiveScanLines, type HubReceiveScanGroup } from '../utils/hubReceiveScanBasket';
+import { isPackageBarcode } from '../utils/packageNumber';
+import { showTaskSuccess } from '../utils/taskSuccessAlert';
 import { colors, space } from '../theme';
 
 export default function HubReceiveScreen({
@@ -20,6 +29,33 @@ export default function HubReceiveScreen({
   const flow = useHubReceiveFlow(openPackBarcode);
   const { t, store } = flow;
   const [exceptionTarget, setExceptionTarget] = useState<ExceptionReportTarget | null>(null);
+  const [signRequest, setSignRequest] = useState<CustomerSignFlowRequest | null>(null);
+  const scanGroups = useMemo(
+    () => groupHubReceiveScanLines(flow.scanBasket),
+    [flow.scanBasket],
+  );
+
+  const openGroupSign = (group: HubReceiveScanGroup) => {
+    if (!store || group.signable.length === 0 || signRequest) return;
+    const scope = flow.hubCode ? { store, hubCode: flow.hubCode } : undefined;
+    void (async () => {
+      try {
+        const expanded = await resolvePackagingStockInSignIds(
+          group.signable,
+          group.signable,
+          store,
+          (keyword) => listItems(keyword, scope),
+        );
+        setSignRequest({
+          itemIds: expanded.map((item) => item.id),
+          operator: flow.operator,
+          store,
+        });
+      } catch (e: unknown) {
+        feedbackService.notify(t.common.signFailed, resolveAppError(t, e));
+      }
+    })();
+  };
 
   if (!store) {
     return (
@@ -30,7 +66,12 @@ export default function HubReceiveScreen({
   }
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+    >
       <OnlineRequiredBanner />
       <HubReceiveStatusPanels
         t={t}
@@ -49,13 +90,36 @@ export default function HubReceiveScreen({
           value={flow.scan}
           onChangeText={flow.setScan}
           onSubmit={flow.onSubmit}
-          busy={flow.loading}
+          busy={flow.loading || flow.scanBusy || signRequest != null}
+          scanBtnLabel={t.scanInput.cameraContinuous}
+          tone="dark"
+          label=""
+          hint=""
           cameraScan={{
             title: t.hubReceive.cameraTitle,
             subtitle: t.hubReceive.cameraSubtitle,
+            continuous: true,
+            scannedCount: flow.scanBasket.length,
+            closeWhen: isPackageBarcode,
+            scannedList: (
+              <HubReceiveScanBasket
+                t={t}
+                groups={scanGroups}
+                embedded
+                onSignGroup={openGroupSign}
+                onRemove={(line) => flow.removeScanBasketIds([line.id])}
+                onClear={flow.clearScanBasket}
+              />
+            ),
           }}
           placeholder={t.hubReceive.scanPlaceholder}
-          label={t.hubReceive.scanLabel}
+        />
+        <HubReceiveScanBasket
+          t={t}
+          groups={scanGroups}
+          onSignGroup={openGroupSign}
+          onRemove={(line) => flow.removeScanBasketIds([line.id])}
+          onClear={flow.clearScanBasket}
         />
       </HubReceiveStatusPanels>
 
@@ -89,6 +153,21 @@ export default function HubReceiveScreen({
         targets={flow.notifyQueue}
         onClose={flow.dismissNotifyQueue}
       />
+      <CustomerSignFlowModal
+        request={signRequest}
+        onClose={() => setSignRequest(null)}
+        resolveError={(e) => resolveAppError(t, e)}
+        onSuccess={(detail, signedCount) => {
+          flow.removeScanBasketIds(signRequest?.itemIds ?? [detail.id]);
+          showTaskSuccess(
+            t.common.signSuccess,
+            signedCount > 1
+              ? fmt(t.sign.batchSignedCount, { count: signedCount })
+              : fmt(t.common.signMarked, { name: detail.name }),
+          );
+        }}
+        onError={(message) => feedbackService.notify(t.common.signFailed, message)}
+      />
       <ExceptionReportModal
         visible={!!exceptionTarget}
         target={exceptionTarget}
@@ -100,7 +179,7 @@ export default function HubReceiveScreen({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: space.lg, paddingBottom: 32 },
+  content: { padding: space.lg, paddingBottom: 48 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
   hint: { color: colors.muted },
 });

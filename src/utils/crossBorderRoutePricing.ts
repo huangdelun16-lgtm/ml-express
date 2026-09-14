@@ -194,6 +194,48 @@ export function customerHasRoutePricing(
   });
 }
 
+export type RoutePricingSummary = {
+  defaultRouteCount: number;
+  defaultUpdatedAt: string | null;
+  defaultUpdatedBy: string | null;
+  customCustomerCount: number;
+};
+
+export function summarizeRoutePricing(
+  settings: Array<{
+    settings_key?: string | null;
+    updated_at?: string | null;
+    updated_by?: string | null;
+  }>,
+): RoutePricingSummary {
+  let defaultRouteCount = 0;
+  let defaultUpdatedAt: string | null = null;
+  let defaultUpdatedBy: string | null = null;
+  const customers = new Set<string>();
+
+  for (const setting of settings) {
+    const parsed = parseRoutePerKgSettingsKey(setting.settings_key ?? '');
+    if (!parsed) continue;
+    if (parsed.customerCode) {
+      customers.add(parsed.customerCode);
+      continue;
+    }
+    defaultRouteCount += 1;
+    const at = setting.updated_at ?? '';
+    if (at && (!defaultUpdatedAt || at > defaultUpdatedAt)) {
+      defaultUpdatedAt = at;
+      defaultUpdatedBy = setting.updated_by ?? null;
+    }
+  }
+
+  return {
+    defaultRouteCount,
+    defaultUpdatedAt,
+    defaultUpdatedBy,
+    customCustomerCount: customers.size,
+  };
+}
+
 export function buildRouteMatrixPayload(
   matrix: RouteMatrixValues,
   customerCode?: string | null,

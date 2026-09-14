@@ -38,6 +38,8 @@ const PRIMARY_STAT_KEYS = [
   { key: 'todayIn' as const, labelKey: 'statTodayIn' as const },
 ] as const;
 
+type HomeTab = 'overview' | 'outbound' | 'inbound' | 'more';
+
 export default function HomeScreen({ navigation }: HomeProps) {
   const insets = useSafeAreaInsets();
   const { operatorName, storeCode, hubCode, store, logout } = useAuth();
@@ -55,6 +57,7 @@ export default function HomeScreen({ navigation }: HomeProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [query, setQuery] = useState('');
+  const [tab, setTab] = useState<HomeTab>('overview');
 
   const load = useCallback(async () => {
     const scope = store && hubCode ? { store, hubCode } : undefined;
@@ -125,223 +128,249 @@ export default function HomeScreen({ navigation }: HomeProps) {
     navigation.navigate('TrackExpress', { presetCode: q });
   };
 
+  const tabs: { id: HomeTab; label: string; icon: string }[] = [
+    { id: 'overview', label: t.home.tabOverview, icon: '🏠' },
+    { id: 'outbound', label: t.home.tabOutbound, icon: '📤' },
+    { id: 'inbound', label: t.home.tabInbound, icon: '✅' },
+    { id: 'more', label: t.home.tabMore, icon: '⋯' },
+  ];
+
+  const headerMeta = [storeCode, hubCode ? regionDisplayLabel(hubCode) : '']
+    .filter(Boolean)
+    .join(' · ');
+
   return (
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={[
-        styles.content,
-        { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 },
-      ]}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          tintColor="#38bdf8"
-          onRefresh={async () => {
-            setRefreshing(true);
-            try {
-              await load();
-            } finally {
-              setRefreshing(false);
-            }
-          }}
-        />
-      }
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={styles.headerCard}>
-        <View style={styles.headerTopRow}>
-          <View style={styles.brandRow}>
-            <View style={styles.headerLogoWrap}>
-              <Image source={LOGIN_LOGO} style={styles.headerLogo} resizeMode="contain" />
-            </View>
-            <View>
-              <Text style={styles.brandTitle}>ML Inventory</Text>
-              <Text style={styles.brandSub}>{t.home.brandSub}</Text>
-            </View>
+    <View style={styles.root}>
+      <ScrollView
+        key={tab}
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + 6 },
+        ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor="#38bdf8"
+            onRefresh={async () => {
+              setRefreshing(true);
+              try {
+                await load();
+              } finally {
+                setRefreshing(false);
+              }
+            }}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.headerBar}>
+          <View style={styles.headerLogoWrap}>
+            <Image source={LOGIN_LOGO} style={styles.headerLogo} resizeMode="contain" />
+          </View>
+          <View style={styles.headerIdentity}>
+            <Text style={styles.headerName} numberOfLines={1}>
+              {operatorName || 'ML Inventory'}
+            </Text>
+            {headerMeta ? (
+              <Text style={styles.headerMeta} numberOfLines={1}>
+                {headerMeta}
+              </Text>
+            ) : null}
           </View>
           <Pressable
             style={({ pressed }) => [styles.logoutBtn, pressed && styles.logoutBtnPressed]}
             onPress={() => logout()}
+            hitSlop={8}
           >
             <Text style={styles.logout}>{t.common.logout}</Text>
           </Pressable>
         </View>
 
-        <View style={styles.headerDivider} />
-
-        <Text style={styles.hello}>{fmt(t.home.hello, { name: operatorName ?? '' })}</Text>
-
-        <View style={styles.chipRow}>
-          {storeCode ? (
-            <View style={styles.chip}>
-              <Text style={styles.chipLabel}>{t.common.store}</Text>
-              <Text style={styles.chipValue}>{storeCode}</Text>
-            </View>
-          ) : null}
-          {hubCode ? (
-            <View style={styles.chip}>
-              <Text style={styles.chipLabel}>{t.common.region}</Text>
-              <Text style={styles.chipValue}>{regionDisplayLabel(hubCode)}</Text>
-            </View>
-          ) : null}
-          <View style={styles.chipMuted}>
-            <Text style={styles.chipMutedText}>{t.home.localCloud}</Text>
-          </View>
-        </View>
-      </View>
-
-      {loadError ? (
-        <View style={styles.inlineError}>
-          <Text style={styles.errorText}>{loadError}</Text>
-          <Pressable
-            style={styles.retryBtn}
-            onPress={() => void load()}
-            accessibilityRole="button"
-            accessibilityLabel={t.common.retry}
-          >
-            <Text style={styles.retryBtnText}>{t.common.retry}</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      <View style={styles.queryCard}>
-        <View style={styles.queryHeader}>
-          <View style={styles.queryIconWrap}>
-            <Text style={styles.queryIcon}>🔍</Text>
-          </View>
-          <View style={styles.queryHeaderText}>
-            <Text style={styles.queryTitle}>{t.home.queryExpressTitle}</Text>
-            <Text style={styles.queryHint}>{t.home.queryExpressHint}</Text>
-          </View>
-        </View>
-        <View style={styles.queryRow}>
-          <TextInput
-            style={styles.queryInput}
-            value={query}
-            onChangeText={setQuery}
-            placeholder={t.home.queryExpressPlaceholder}
-            placeholderTextColor="#64748b"
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="search"
-            onSubmitEditing={goQueryExpress}
-          />
-          <Pressable
-            style={({ pressed }) => [styles.queryBtn, pressed && styles.queryBtnPressed]}
-            onPress={goQueryExpress}
-          >
-            <Text style={styles.queryBtnText}>{t.common.query}</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-          <Text style={styles.sectionLabel}>{t.home.todayOverview}</Text>
-          <View style={styles.statsGrid}>
-            {PRIMARY_STAT_KEYS.map((item) => (
-              <StatCard
-                key={item.key}
-                label={t.home[item.labelKey]}
-                value={String(stats[item.key])}
-              />
-            ))}
-          </View>
-          <View style={styles.todayOutCard}>
-            <View>
-              <Text style={styles.todayOutLabel}>{t.home.statTodayOut}</Text>
-              <Text style={styles.todayOutHint}>{t.home.todayOutHint}</Text>
-            </View>
-            <Text style={styles.todayOutValue}>{stats.todayOut}</Text>
-          </View>
-        </View>
-
-        {stats.lowStockCount > 0 ? (
-          <View style={styles.alertBanner}>
-            <Text style={styles.alertWarn}>
-              {fmt(t.home.lowStockWarn, { count: stats.lowStockCount })}
-            </Text>
+        {loadError ? (
+          <View style={styles.inlineError}>
+            <Text style={styles.errorText}>{loadError}</Text>
+            <Pressable
+              style={styles.retryBtn}
+              onPress={() => void load()}
+              accessibilityRole="button"
+              accessibilityLabel={t.common.retry}
+            >
+              <Text style={styles.retryBtnText}>{t.common.retry}</Text>
+            </Pressable>
           </View>
         ) : null}
 
-        <HomeTodoQueue
-          t={t}
-          items={todoItems}
-          onOpen={(item) => {
-            if (item.screen === 'Items') {
-              navigation.navigate('Items', { initialMode: item.itemsMode });
-              return;
-            }
-            navigation.navigate(item.screen);
-          }}
-        />
-
-        <Pressable
-          style={styles.pkgCard}
-          onPress={() => navigation.navigate('Pkg')}
-        >
-          <View style={styles.pkgCardHeader}>
-            <View style={styles.pkgTitleRow}>
-              <View style={styles.pkgIconWrap}>
-                <Text style={styles.pkgIcon}>📦</Text>
-              </View>
-              <Text style={styles.pkgCardTitle}>{t.home.packSection}</Text>
-            </View>
-            <Text style={styles.pkgCardMore}>
-              {stats.packCount > 0
-                ? fmt(t.home.packTotal, { count: stats.packCount })
-                : t.home.packViewAll}
-            </Text>
-          </View>
-          {recentPacks.length === 0 ? (
-            <Text style={styles.pkgEmpty}>{t.home.packEmpty}</Text>
-          ) : (
-            recentPacks.map((pack, index) => {
-              const statusStyle = packStatusStyle(pack.display_status);
-              return (
-                <View
-                  key={pack.id}
-                  style={[styles.pkgRow, index > 0 && styles.pkgRowBorder]}
-                >
-                  <View style={styles.pkgRowMain}>
-                    <Text style={styles.pkgName} numberOfLines={1}>
-                      {pack.bundle_name}
-                    </Text>
-                    <Text style={styles.pkgBarcode} numberOfLines={1}>
-                      {pack.bundle_barcode}
-                    </Text>
-                  </View>
-                  <View style={styles.pkgRowRight}>
-                    <View
-                      style={[styles.loadBadge, { backgroundColor: statusStyle.badgeBg }]}
-                    >
-                      <Text style={[styles.loadBadgeText, { color: statusStyle.badgeText }]}>
-                        {getPackStatusLabel(language, pack.display_status)}
-                      </Text>
-                    </View>
-                    <Text style={styles.pkgQty}>
-                      {pack.items.length} {t.common.pieces}
-                    </Text>
-                  </View>
+        {tab === 'overview' ? (
+          <>
+            <View style={styles.queryCard}>
+              <View style={styles.queryHeader}>
+                <View style={styles.queryIconWrap}>
+                  <Text style={styles.queryIcon}>🔍</Text>
                 </View>
-              );
-            })
-          )}
-        </Pressable>
+                <View style={styles.queryHeaderText}>
+                  <Text style={styles.queryTitle}>{t.home.queryExpressTitle}</Text>
+                  <Text style={styles.queryHint}>{t.home.queryExpressHint}</Text>
+                </View>
+              </View>
+              <View style={styles.queryRow}>
+                <TextInput
+                  style={styles.queryInput}
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder={t.home.queryExpressPlaceholder}
+                  placeholderTextColor="#64748b"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="search"
+                  onSubmitEditing={goQueryExpress}
+                />
+                <Pressable
+                  style={({ pressed }) => [styles.queryBtn, pressed && styles.queryBtnPressed]}
+                  onPress={goQueryExpress}
+                >
+                  <Text style={styles.queryBtnText}>{t.common.query}</Text>
+                </Pressable>
+              </View>
+            </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>{t.home.sectionOutbound}</Text>
-          <TileGrid tiles={outboundTiles} navigation={navigation} />
-        </View>
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>{t.home.sectionInboundHub}</Text>
-          <TileGrid tiles={inboundTiles} navigation={navigation} />
-        </View>
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>{t.home.sectionMore}</Text>
-          <TileGrid tiles={moreTiles} navigation={navigation} />
-        </View>
-    </ScrollView>
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>{t.home.todayOverview}</Text>
+              <View style={styles.statsGrid}>
+                {PRIMARY_STAT_KEYS.map((item) => (
+                  <StatCard
+                    key={item.key}
+                    label={t.home[item.labelKey]}
+                    value={String(stats[item.key])}
+                  />
+                ))}
+              </View>
+              <View style={styles.todayOutCard}>
+                <View>
+                  <Text style={styles.todayOutLabel}>{t.home.statTodayOut}</Text>
+                  <Text style={styles.todayOutHint}>{t.home.todayOutHint}</Text>
+                </View>
+                <Text style={styles.todayOutValue}>{stats.todayOut}</Text>
+              </View>
+            </View>
+
+            {stats.lowStockCount > 0 ? (
+              <View style={styles.alertBanner}>
+                <Text style={styles.alertWarn}>
+                  {fmt(t.home.lowStockWarn, { count: stats.lowStockCount })}
+                </Text>
+              </View>
+            ) : null}
+
+            <HomeTodoQueue
+              t={t}
+              items={todoItems}
+              onOpen={(item) => {
+                if (item.screen === 'Items') {
+                  navigation.navigate('Items', { initialMode: item.itemsMode });
+                  return;
+                }
+                navigation.navigate(item.screen);
+              }}
+            />
+
+            <Pressable
+              style={styles.pkgCard}
+              onPress={() => navigation.navigate('Pkg')}
+            >
+              <View style={styles.pkgCardHeader}>
+                <View style={styles.pkgTitleRow}>
+                  <View style={styles.pkgIconWrap}>
+                    <Text style={styles.pkgIcon}>📦</Text>
+                  </View>
+                  <Text style={styles.pkgCardTitle}>{t.home.packSection}</Text>
+                </View>
+                <Text style={styles.pkgCardMore}>
+                  {stats.packCount > 0
+                    ? fmt(t.home.packTotal, { count: stats.packCount })
+                    : t.home.packViewAll}
+                </Text>
+              </View>
+              {recentPacks.length === 0 ? (
+                <Text style={styles.pkgEmpty}>{t.home.packEmpty}</Text>
+              ) : (
+                recentPacks.map((pack, index) => {
+                  const statusStyle = packStatusStyle(pack.display_status);
+                  return (
+                    <View
+                      key={pack.id}
+                      style={[styles.pkgRow, index > 0 && styles.pkgRowBorder]}
+                    >
+                      <View style={styles.pkgRowMain}>
+                        <Text style={styles.pkgName} numberOfLines={1}>
+                          {pack.bundle_name}
+                        </Text>
+                        <Text style={styles.pkgBarcode} numberOfLines={1}>
+                          {pack.bundle_barcode}
+                        </Text>
+                      </View>
+                      <View style={styles.pkgRowRight}>
+                        <View
+                          style={[styles.loadBadge, { backgroundColor: statusStyle.badgeBg }]}
+                        >
+                          <Text style={[styles.loadBadgeText, { color: statusStyle.badgeText }]}>
+                            {getPackStatusLabel(language, pack.display_status)}
+                          </Text>
+                        </View>
+                        <Text style={styles.pkgQty}>
+                          {pack.items.length} {t.common.pieces}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </Pressable>
+          </>
+        ) : null}
+
+        {tab === 'outbound' ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>{t.home.sectionOutbound}</Text>
+            <TileGrid tiles={outboundTiles} navigation={navigation} />
+          </View>
+        ) : null}
+
+        {tab === 'inbound' ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>{t.home.sectionInboundHub}</Text>
+            <TileGrid tiles={inboundTiles} navigation={navigation} />
+          </View>
+        ) : null}
+
+        {tab === 'more' ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>{t.home.sectionMore}</Text>
+            <TileGrid tiles={moreTiles} navigation={navigation} />
+          </View>
+        ) : null}
+      </ScrollView>
+
+      <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+        {tabs.map((item) => {
+          const active = tab === item.id;
+          return (
+            <Pressable
+              key={item.id}
+              style={styles.tabItem}
+              onPress={() => setTab(item.id)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={item.label}
+            >
+              <Text style={[styles.tabIcon, active && styles.tabIconActive]}>{item.icon}</Text>
+              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{item.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
@@ -384,35 +413,44 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#020617',
   },
-  content: { paddingHorizontal: 16 },
-  headerCard: {
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.16)',
-    shadowColor: '#0ea5e9',
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
-  },
-  headerTopRow: {
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 16, paddingBottom: 20 },
+  tabBar: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(56, 189, 248, 0.14)',
+    backgroundColor: '#0f172a',
+    paddingTop: 8,
   },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  tabItem: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    paddingVertical: 4,
+  },
+  tabIcon: { fontSize: 18, opacity: 0.55 },
+  tabIconActive: { opacity: 1 },
+  tabLabel: {
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  tabLabelActive: {
+    color: '#7dd3fc',
+    fontWeight: '800',
+  },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+    paddingVertical: 4,
   },
   headerLogoWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     backgroundColor: 'rgba(14, 165, 233, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(56, 189, 248, 0.2)',
@@ -421,109 +459,36 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   headerLogo: {
-    width: 38,
-    height: 38,
+    width: 26,
+    height: 26,
   },
-  brandTitle: {
+  headerIdentity: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerName: {
     color: '#f8fafc',
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 0.3,
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
-  brandSub: {
-    color: '#64748b',
+  headerMeta: {
+    color: '#7dd3fc',
     fontSize: 11,
-    fontWeight: '600',
-    marginTop: 2,
+    fontWeight: '700',
+    marginTop: 1,
+    letterSpacing: 0.2,
   },
   logoutBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(248, 113, 113, 0.35)',
+    borderColor: 'rgba(248, 113, 113, 0.32)',
     backgroundColor: 'rgba(248, 113, 113, 0.08)',
   },
   logoutBtnPressed: { opacity: 0.75 },
-  logout: { color: '#fca5a5', fontWeight: '800', fontSize: 13 },
-  headerDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    marginVertical: 14,
-  },
-  hello: {
-    color: '#f8fafc',
-    fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: 0.2,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 12,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(14, 165, 233, 0.1)',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.22)',
-  },
-  chipLabel: {
-    color: '#64748b',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  chipValue: {
-    color: '#7dd3fc',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.3,
-  },
-  chipMuted: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  chipMutedText: {
-    color: '#64748b',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  chipSync: {
-    backgroundColor: 'rgba(168, 85, 247, 0.12)',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.35)',
-  },
-  chipSyncText: {
-    color: '#c4b5fd',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  chipOffline: {
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.35)',
-  },
-  chipOfflineText: {
-    color: '#fcd34d',
-    fontSize: 11,
-    fontWeight: '800',
-  },
+  logout: { color: '#fca5a5', fontWeight: '800', fontSize: 12 },
   inlineError: {
     flexDirection: 'row',
     alignItems: 'center',

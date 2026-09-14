@@ -1,5 +1,8 @@
 import {
+  CROSS_BORDER_FX_HISTORY_SETTINGS_KEY,
   CROSS_BORDER_FX_SETTINGS_KEY,
+  appendCrossBorderFxHistory,
+  buildCrossBorderFxHistorySetting,
   buildCrossBorderFxSetting,
   cnyToMmk,
   customerExpressLedgerCategory,
@@ -9,6 +12,7 @@ import {
   isCustomerLedgerCategory,
   isSettledCustomerCategory,
   mmkToCny,
+  parseCrossBorderFxHistory,
   parseMmkPerCnyRate,
   pickMmkPerCnyRate,
   resolveCustomerFeeCny,
@@ -100,10 +104,35 @@ describe('crossBorderFx', () => {
   });
 
   it('builds the system_settings payload', () => {
-    expect(buildCrossBorderFxSetting(5000)).toMatchObject({
+    expect(buildCrossBorderFxSetting(5000, '张三')).toMatchObject({
       category: 'pricing',
       settings_key: CROSS_BORDER_FX_SETTINGS_KEY,
       settings_value: 5000,
+      updated_by: '张三',
+    });
+  });
+
+  it('parses and appends FX change history newest first', () => {
+    const parsed = parseCrossBorderFxHistory(
+      JSON.stringify([
+        { at: '2026-09-01T02:00:00.000Z', by: '李四', from: 580, to: 600 },
+        { at: '2026-09-14T08:00:00.000Z', by: '张三', from: 600, to: 655 },
+      ]),
+    );
+    expect(parsed[0]).toMatchObject({ by: '张三', from: 600, to: 655 });
+    expect(parsed[1]).toMatchObject({ by: '李四', from: 580, to: 600 });
+
+    const next = appendCrossBorderFxHistory(parsed, {
+      at: '2026-09-14T09:00:00.000Z',
+      by: '王五',
+      from: 655,
+      to: 660,
+    });
+    expect(next[0]).toMatchObject({ by: '王五', to: 660 });
+    expect(next).toHaveLength(3);
+    expect(buildCrossBorderFxHistorySetting(next, '王五')).toMatchObject({
+      settings_key: CROSS_BORDER_FX_HISTORY_SETTINGS_KEY,
+      updated_by: '王五',
     });
   });
 });

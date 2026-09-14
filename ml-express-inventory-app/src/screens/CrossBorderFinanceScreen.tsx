@@ -20,7 +20,7 @@ import {
 import { deleteCrossBorderManualEntry } from '../services/crossBorderManualEntryService';
 import { feedbackService } from '../services/FeedbackService';
 import { listCrossBorderFinance } from '../services/financeLedgerService';
-import { shareFinanceCsvFile } from '../services/shareFinanceCsv';
+import { shareFinanceExcelFile } from '../services/shareFinanceExcel';
 import {
   fetchStationSettlement,
   isPeriodReadOnly,
@@ -41,7 +41,7 @@ import { regionDisplayLabel } from '../constants/destinationOptions';
 import { filterByTab, type FinanceTabKey } from '../utils/crossBorderFinanceTabs';
 import { fetchCrossBorderFxRate } from '../utils/crossBorderFx';
 import {
-  buildFinanceExportCsv,
+  buildFinanceExportExcelBase64,
   buildFinanceExportFilename,
   financeExportLabelsFromT,
   formatFinanceExportDateTime,
@@ -306,7 +306,7 @@ export default function CrossBorderFinanceScreen() {
     [entries, currentKey],
   );
 
-  const onExportCsv = useCallback(async () => {
+  const onExportExcel = useCallback(async () => {
     if (exporting) return;
     if (displayed.length === 0) {
       feedbackService.warning(t.crossBorderFinance.exportEmpty);
@@ -315,7 +315,7 @@ export default function CrossBorderFinanceScreen() {
     if (!store || !hubCode) return;
     setExporting(true);
     try {
-      const csv = buildFinanceExportCsv({
+      const base64 = buildFinanceExportExcelBase64({
         entries: displayed,
         summary,
         netBalance,
@@ -331,13 +331,13 @@ export default function CrossBorderFinanceScreen() {
         liveRate: mmkPerCny,
       });
       const filename = buildFinanceExportFilename({ hub: hubCode, tab, at: new Date() });
-      const method = await shareFinanceCsvFile({
-        csv,
+      const method = await shareFinanceExcelFile({
+        base64,
         filename,
         dialogTitle: t.crossBorderFinance.exportCsv,
       });
-      if (method === 'copied') {
-        feedbackService.success(t.crossBorderFinance.exportCopied);
+      if (method === 'unavailable') {
+        feedbackService.warning(t.crossBorderFinance.exportCopied);
       }
     } catch {
       feedbackService.error(t.crossBorderFinance.exportFailed);
@@ -445,7 +445,7 @@ export default function CrossBorderFinanceScreen() {
                 onAddManual={() => {
                   if (!periodLocked) setManualModalVisible(true);
                 }}
-                onExport={() => void onExportCsv()}
+                onExport={() => void onExportExcel()}
                 exporting={exporting}
                 onTabChange={setTab}
                 onRetry={() => void load()}

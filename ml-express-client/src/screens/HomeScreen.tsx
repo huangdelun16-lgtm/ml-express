@@ -418,7 +418,6 @@ export default function HomeScreen({ navigation }: any) {
         title={c.hotlineTitle}
         numbers={HOTLINE_NUMBERS}
         cancelLabel={c.cancel}
-        exitLabel={c.exit}
         onClose={() => setShowHotlineModal(false)}
       />
     </View>
