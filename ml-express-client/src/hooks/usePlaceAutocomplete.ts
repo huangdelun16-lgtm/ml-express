@@ -12,6 +12,7 @@ import {
   nextSearchRequestId,
   placesLanguage,
   resolveMapPlaceSearchStatus,
+  searchOpenPlaces,
   shouldSearchMapPlaces,
 } from '../utils/mapPlaceSearch';
 
@@ -79,6 +80,8 @@ function toLegacySuggestion(item: MapPlaceSuggestion) {
     typeIcon: item.typeIcon,
     isEstablishment: item.isEstablishment,
     types: item.types,
+    latitude: item.latitude,
+    longitude: item.longitude,
   };
 }
 
@@ -173,50 +176,42 @@ export function usePlaceAutocomplete({
       applyStatus(requestId, 'loading');
 
       try {
-        if (apiKeys.length === 0) {
-          const q = query.toLowerCase();
-          const mock = MOCK_SUGGESTIONS.filter(
-            (item) =>
-              item.mainText.toLowerCase().includes(q) ||
-              item.description.toLowerCase().includes(q),
-          );
-          applyStatus(requestId, mock.length ? 'success' : 'empty', mock);
-          return;
-        }
-
         const loc = locationRef.current;
         const lang = placesLanguage(languageRef.current);
-        let lastStatus = '';
-        let lastErrorMessage = '';
 
-        for (const key of apiKeys) {
-          if (isStaleSearchRequest(requestId, requestIdRef.current)) return;
-          const data = await fetchJsonWithTimeout(
-            `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
-              query,
-            )}&location=${loc.latitude},${loc.longitude}&radius=50000&components=country:mm&key=${key}&language=${lang}`,
-            MAP_PLACE_SEARCH_TIMEOUT_MS,
-          );
-          if (isStaleSearchRequest(requestId, requestIdRef.current)) return;
-
-          const predictions = Array.isArray(data?.predictions) ? data.predictions : [];
-          const nextStatus = resolveMapPlaceSearchStatus(String(data?.status || ''), predictions.length);
-          lastStatus = String(data?.status || '');
-          lastErrorMessage = String(data?.error_message || '');
-          if (nextStatus !== 'error') {
-            applyStatus(
-              requestId,
-              nextStatus,
-              nextStatus === 'success' ? mapPlacePredictions(predictions) : [],
+        if (apiKeys.length > 0) {
+          for (const key of apiKeys) {
+            if (isStaleSearchRequest(requestId, requestIdRef.current)) return;
+            const data = await fetchJsonWithTimeout(
+              `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
+                query,
+              )}&location=${loc.latitude},${loc.longitude}&radius=50000&components=country:mm&key=${key}&language=${lang}`,
+              MAP_PLACE_SEARCH_TIMEOUT_MS,
             );
-            return;
+            if (isStaleSearchRequest(requestId, requestIdRef.current)) return;
+
+            const status = String(data?.status || '').toUpperCase();
+            if (status === 'REQUEST_DENIED' || status === 'OVER_QUERY_LIMIT') {
+              LoggerService.warn('Google Places 当前不可用，将尝试备用搜索');
+              break;
+            }
+
+            const predictions = Array.isArray(data?.predictions) ? data.predictions : [];
+            const nextStatus = resolveMapPlaceSearchStatus(status, predictions.length);
+            if (nextStatus !== 'error') {
+              applyStatus(
+                requestId,
+                nextStatus,
+                nextStatus === 'success' ? mapPlacePredictions(predictions) : [],
+              );
+              return;
+            }
           }
         }
 
-        if (lastStatus && lastStatus !== 'OK' && lastStatus !== 'ZERO_RESULTS') {
-          LoggerService.error('Google Places API 错误:', lastStatus, lastErrorMessage);
-        }
-        applyStatus(requestId, 'error');
+        const openHits = await searchOpenPlaces(query, languageRef.current, loc);
+        if (isStaleSearchRequest(requestId, requestIdRef.current)) return;
+        applyStatus(requestId, openHits.length > 0 ? 'success' : 'empty', openHits);
       } catch (error) {
         if (isStaleSearchRequest(requestId, requestIdRef.current)) return;
         if ((error as { name?: string })?.name === 'TimeoutError') {
@@ -271,6 +266,17 @@ export function usePlaceAutocomplete({
       invalidateInFlight();
 
       try {
+        const lat = Number(suggestion.latitude);
+        const lng = Number(suggestion.longitude);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          onLocationChange({ latitude: lat, longitude: lng });
+          onPlaceChange?.({
+            name: suggestion.main_text,
+            address: description,
+          });
+          return;
+        }
+
         if (apiKeys.length === 0) {
           LoggerService.warn('Google Maps API Key 未配置，地点详情查询不可用。使用模拟坐标。');
           let mockLocation = { lat: 21.9588, lng: 96.0891 };

@@ -484,7 +484,7 @@ export default function AddressBookScreen({ navigation, route }: any) {
         </LinearGradient>
       </TouchableOpacity>
 
-      <Modal visible={showModal} animationType="slide" transparent>
+      <Modal visible={showModal && !showMapSelector} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -566,35 +566,34 @@ export default function AddressBookScreen({ navigation, route }: any) {
             <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
               <Text style={styles.saveBtnText}>{t.save}</Text>
             </TouchableOpacity>
-
-            {/* MapModal 放在这里以确保它能显示在当前 Modal 之上 */}
-            <MapModal
-              visible={showMapSelector}
-              language={language as any}
-              styles={styles}
-              currentT={currentT}
-              mapType="receiver"
-              selectedLocation={selectedLocation}
-              selectedPlace={selectedPlace}
-              mapAddressInput={mapAddressInput}
-              showSuggestions={showSuggestions}
-              autocompleteSuggestions={autocompleteSuggestions}
-              searchStatus={searchStatus}
-              onRetrySearch={retrySearch}
-              onClose={() => setShowMapSelector(false)}
-              onConfirm={handleConfirmMapLocation}
-              onAddressInputChange={handleMapAddressInputChange}
-              onMapAddressInputChange={setMapAddressInput}
-              onUseCurrentLocation={handleUseCurrentLocation}
-              onSelectSuggestion={handleSelectSuggestion}
-              onSetShowSuggestions={setShowSuggestions}
-              onLocationChange={setSelectedLocation}
-              onPlaceChange={setSelectedPlace}
-              markerTitle={t.selectOnMap}
-            />
           </View>
         </View>
       </Modal>
+
+      <MapModal
+        visible={showMapSelector}
+        language={language as any}
+        styles={styles}
+        currentT={currentT}
+        mapType="receiver"
+        selectedLocation={selectedLocation}
+        selectedPlace={selectedPlace}
+        mapAddressInput={mapAddressInput}
+        showSuggestions={showSuggestions}
+        autocompleteSuggestions={autocompleteSuggestions}
+        searchStatus={searchStatus}
+        onRetrySearch={retrySearch}
+        onClose={() => setShowMapSelector(false)}
+        onConfirm={handleConfirmMapLocation}
+        onAddressInputChange={handleMapAddressInputChange}
+        onMapAddressInputChange={setMapAddressInput}
+        onUseCurrentLocation={handleUseCurrentLocation}
+        onSelectSuggestion={handleSelectSuggestion}
+        onSetShowSuggestions={setShowSuggestions}
+        onLocationChange={setSelectedLocation}
+        onPlaceChange={setSelectedPlace}
+        markerTitle={t.selectOnMap}
+      />
 
       <Toast
         visible={toastVisible}

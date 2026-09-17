@@ -1,5 +1,7 @@
 import {
   isStaleSearchRequest,
+  mapNominatimHits,
+  mapPhotonFeatures,
   mapPlacePredictions,
   nextSearchRequestId,
   placesLanguage,
@@ -49,6 +51,56 @@ describe('mapPlaceSearch', () => {
         mainText: 'Zay Cho',
         secondaryText: 'Mandalay',
         description: 'Zay Cho, Mandalay',
+      }),
+    ]);
+  });
+
+  it('maps nominatim hits with coordinates', () => {
+    expect(
+      mapNominatimHits([
+        {
+          osm_type: 'node',
+          osm_id: 1,
+          lat: '21.9588',
+          lon: '96.0891',
+          name: 'Zay Cho',
+          display_name: 'Zay Cho, Mandalay, Myanmar',
+          address: { city: 'Mandalay', country: 'Myanmar' },
+        },
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        placeId: 'osm:node:1',
+        mainText: 'Zay Cho',
+        secondaryText: 'Mandalay, Myanmar',
+        latitude: 21.9588,
+        longitude: 96.0891,
+      }),
+    ]);
+  });
+
+  it('maps photon features with lon/lat order', () => {
+    expect(
+      mapPhotonFeatures({
+        features: [
+          {
+            geometry: { coordinates: [96.0891, 21.9588] },
+            properties: {
+              osm_id: 9,
+              osm_type: 'N',
+              name: 'Venus',
+              city: 'Mandalay',
+              country: 'Myanmar',
+            },
+          },
+        ],
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        placeId: 'osm:N:9',
+        mainText: 'Venus',
+        latitude: 21.9588,
+        longitude: 96.0891,
       }),
     ]);
   });
