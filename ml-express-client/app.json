@@ -37,8 +37,8 @@
         "UISupportedInterfaceOrientations~ipad": [
           "UIInterfaceOrientationPortrait",
           "UIInterfaceOrientationPortraitUpsideDown",
-          "AudioInterfaceOrientationLandscapeLeft",
-          "AudioInterfaceOrientationLandscapeRight"
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
         ]
       },
       "config": {

@@ -28,6 +28,7 @@ import {
   addDismissedReviewOrderId,
   pickUnratedDeliveredOrder,
 } from '../utils/reviewPromptStorage';
+import { normalizeOrderStatusFilter, orderMatchesStatusFilter } from '../utils/orderStatusFilter';
 
 const { width } = Dimensions.get('window');
 const TEAL = '#2C98A6';
@@ -70,7 +71,9 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   // 从路由参数中获取筛选状态，默认为'all'
-  const [selectedStatus, setSelectedStatus] = useState(route?.params?.filterStatus || 'all');
+  const [selectedStatus, setSelectedStatus] = useState(
+    normalizeOrderStatusFilter(route?.params?.filterStatus || 'all'),
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [customerId, setCustomerId] = useState('');
@@ -318,8 +321,10 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const statusFilters = [
     { key: 'all', label: t.all },
     { key: '待确认', label: t.waitingAccept },
+    { key: '待收款', label: t.pendingPay },
     { key: '打包中', label: t.packing },
     { key: '待取件', label: t.pending },
+    { key: '已取件', label: t.pickedUp },
     { key: '配送中', label: t.inTransit },
     { key: '已送达', label: t.completed },
     { key: '已取消', label: t.cancelled },
@@ -348,7 +353,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   // 监听路由参数变化，自动设置筛选状态
   useEffect(() => {
     if (route?.params?.filterStatus) {
-      const filterStatus = route.params.filterStatus;
+      const filterStatus = normalizeOrderStatusFilter(route.params.filterStatus);
       if (filterStatus !== selectedStatus) {
         setSelectedStatus(filterStatus);
       }
@@ -362,7 +367,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
   // 当筛选状态改变且从首页跳转来时，自动滚动到对应卡片
   useEffect(() => {
-    if (route?.params?.filterStatus && selectedStatus === route.params.filterStatus) {
+    if (route?.params?.filterStatus && selectedStatus === normalizeOrderStatusFilter(route.params.filterStatus)) {
       // 延迟滚动，确保布局已完成
       setTimeout(() => {
         scrollToFilter(selectedStatus);
@@ -599,7 +604,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     if (status === 'all') {
       setFilteredOrders(orderList);
     } else {
-      setFilteredOrders(orderList.filter(order => order.status === status));
+      setFilteredOrders(orderList.filter((order) => orderMatchesStatusFilter(order.status, status)));
     }
   };
 
@@ -1064,7 +1069,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
           const count =
             filter.key === 'all'
               ? orders.length
-              : orders.filter((o) => o.status === filter.key).length;
+              : orders.filter((o) => orderMatchesStatusFilter(o.status, filter.key)).length;
           return (
             <TouchableOpacity
               key={filter.key}

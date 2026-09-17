@@ -54,7 +54,7 @@ const TrackingSection: React.FC<TrackingSectionProps> = ({ language, onTrack, on
             WebkitTextFillColor: 'transparent',
             filter: 'drop-shadow(0 2px 4px rgba(59, 130, 246, 0.3))'
           }}>📦</span>
-          {language === 'zh' ? '运单追踪' : language === 'en' ? 'Track Package' : 'ပစ္စည်းလိုက်ရှာရန်'}
+          {language === 'zh' ? '追踪订单' : language === 'en' ? 'Track Order' : 'အော်ဒါခြေရာခံ'}
         </h2>
         
         <div style={{
@@ -71,7 +71,7 @@ const TrackingSection: React.FC<TrackingSectionProps> = ({ language, onTrack, on
           }}>
             <input
               type="text"
-              placeholder={language === 'zh' ? '请输入运单号 (例如: MLE123456789)' : language === 'en' ? 'Enter Tracking Number (e.g. MLE123456789)' : 'ပို့ဆောင်ရေးနံပါတ်ထည့်ပါ (ဥပမာ MLE123456789)'}
+              placeholder={language === 'zh' ? '订单号 / 快递单号 / 入库单号' : language === 'en' ? 'Order ID / express / inbound barcode' : 'အော်ဒါ / express / inbound barcode'}
               style={{
                 width: '100%',
                 padding: '16px 20px',

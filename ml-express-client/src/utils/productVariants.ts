@@ -11,7 +11,7 @@ export type ProductVariant = {
 export type ProductWithVariants = {
   price: number;
   original_price?: number | null;
-  stock: number;
+  stock?: number;
   variants?: unknown;
 };
 
@@ -72,6 +72,30 @@ export function getProductDisplayOriginalPrice(product: ProductWithVariants): nu
   const withOrig = variants.filter((v) => v.original_price && v.original_price > v.price);
   if (!withOrig.length) return undefined;
   return Math.min(...withOrig.map((v) => v.original_price!));
+}
+
+/** Best off % from the product price or any available variant. 30 means 30% off. */
+export function getProductDiscountPercent(product: ProductWithVariants): number {
+  const variants = getAvailableVariants(product);
+  const rows = variants.length
+    ? variants.map((v) => ({ price: v.price, original: v.original_price }))
+    : [{ price: product.price, original: product.original_price }];
+
+  let best = 0;
+  for (const row of rows) {
+    const original = Number(row.original);
+    const price = Number(row.price);
+    if (!Number.isFinite(original) || !Number.isFinite(price) || original <= 0 || original <= price) {
+      continue;
+    }
+    const pct = ((original - price) / original) * 100;
+    if (pct > best) best = pct;
+  }
+  return best;
+}
+
+export function productMeetsDiscountPercent(product: ProductWithVariants, minPercent: number): boolean {
+  return getProductDiscountPercent(product) >= minPercent;
 }
 
 export function formatProductPriceLabel(

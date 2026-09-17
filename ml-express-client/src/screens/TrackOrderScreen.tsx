@@ -12,6 +12,10 @@ import {
   crossBorderStatusColor,
   type CrossBorderTrackingResult,
 } from '../services/crossBorderTrackingService';
+import {
+  buildCrossBorderTimeline,
+  resolveCrossBorderDisplayKey,
+} from '../utils/crossBorderTimeline';
 import { useApp } from '../contexts/AppContext';
 import { APP_CONFIG } from '../config/constants';
 import { getJourneyCopy } from '../utils/orderJourney';
@@ -461,10 +465,14 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     return colors[status] || '#6b7280';
   };
 
-  const crossBorderEvents = useMemo(() => {
-    if (!crossBorderData?.events?.length) return [];
-    return [...crossBorderData.events].reverse();
-  }, [crossBorderData]);
+  const crossBorderTimeline = useMemo(
+    () => (crossBorderData ? buildCrossBorderTimeline(crossBorderData) : []),
+    [crossBorderData],
+  );
+  const crossBorderDisplayKey = crossBorderData
+    ? resolveCrossBorderDisplayKey(crossBorderData)
+    : 'unknown';
+  const crossBorderCurrentStep = crossBorderTimeline.find((step) => step.state === 'current');
 
 
   const eventTimeFor = (statuses: string[]) => {
@@ -879,8 +887,8 @@ export default function TrackOrderScreen({ navigation, route }: any) {
             <View style={styles.statusCard}>
               <LinearGradient
                 colors={[
-                  crossBorderStatusColor(crossBorderData.current_status_key),
-                  crossBorderStatusColor(crossBorderData.current_status_key) + 'dd',
+                  crossBorderStatusColor(crossBorderDisplayKey),
+                  crossBorderStatusColor(crossBorderDisplayKey) + 'dd',
                 ]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
@@ -889,8 +897,16 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                 <View style={styles.statusHeader}>
                   <Text style={styles.statusBadge}>{t.crossBorderBadge}</Text>
                   <Text style={styles.statusText}>
-                    {pickCrossBorderLabel(crossBorderData.current_status, language)}
+                    {pickCrossBorderLabel(
+                      crossBorderCurrentStep?.labels || crossBorderData.current_status,
+                      language,
+                    )}
                   </Text>
+                  {crossBorderCurrentStep?.detail ? (
+                    <Text style={styles.statusSubtext}>
+                      {pickCrossBorderLabel(crossBorderCurrentStep.detail, language)}
+                    </Text>
+                  ) : null}
                 </View>
               </LinearGradient>
             </View>
@@ -954,36 +970,80 @@ export default function TrackOrderScreen({ navigation, route }: any) {
               ) : null}
             </View>
 
-            {crossBorderEvents.length > 0 && (
+            {crossBorderTimeline.length > 0 && (
               <View style={[styles.card, isDarkMode && styles.darkCard]}>
                 <Text style={[styles.cardTitle, isDarkMode && styles.darkText]}>📍 {t.trackingHistory}</Text>
-                {crossBorderEvents.map((event, index) => (
-                  <View key={`${event.status_key}-${event.event_time}-${index}`} style={styles.trackingItem}>
-                    <View style={styles.trackingDot}>
-                      <View
-                        style={[
-                          styles.trackingDotInner,
-                          index === 0 && styles.trackingDotActive,
-                          isDarkMode && { borderColor: '#1e293b' },
-                        ]}
-                      />
-                      {index !== crossBorderEvents.length - 1 && (
-                        <View style={[styles.trackingLine, isDarkMode && { backgroundColor: '#1e293b' }]} />
-                      )}
-                    </View>
-                    <View style={styles.trackingContent}>
-                      <Text style={[styles.trackingStatus, isDarkMode && styles.darkText]}>
-                        {pickCrossBorderLabel(event.labels, language)}
-                      </Text>
-                      {event.note ? (
-                        <Text style={[styles.trackingNote, isDarkMode && { color: '#94a3b8' }]}>
-                          {event.note}
+                {crossBorderTimeline.map((step, index) => {
+                  const stateLabel =
+                    step.state === 'current'
+                      ? t.historyCurrent
+                      : step.state === 'pending'
+                        ? t.historyPending
+                        : t.historyDone;
+                  return (
+                    <View key={step.key} style={styles.trackingItem}>
+                      <View style={styles.trackingDot}>
+                        <View
+                          style={[
+                            styles.trackingDotInner,
+                            step.state === 'done' && styles.trackingDotDone,
+                            step.state === 'current' && styles.trackingDotCurrent,
+                            isDarkMode && { borderColor: '#1e293b' },
+                          ]}
+                        />
+                        {index !== crossBorderTimeline.length - 1 && (
+                          <View
+                            style={[
+                              styles.trackingLine,
+                              step.state !== 'pending' && styles.trackingLineDone,
+                              isDarkMode && { backgroundColor: '#1e293b' },
+                            ]}
+                          />
+                        )}
+                      </View>
+                      <View style={styles.trackingContent}>
+                        <Text
+                          style={[
+                            styles.trackingStatus,
+                            isDarkMode && styles.darkText,
+                            step.state === 'pending' && styles.trackingStatusMuted,
+                          ]}
+                        >
+                          {pickCrossBorderLabel(step.labels, language)}
                         </Text>
-                      ) : null}
-                      <Text style={styles.trackingTime}>{formatTrackDate(event.event_time)}</Text>
+                        <Text style={[styles.trackingNote, isDarkMode && { color: '#94a3b8' }]}>
+                          {pickCrossBorderLabel(step.detail, language)}
+                        </Text>
+                        {step.note && step.state !== 'pending' ? (
+                          <Text style={[styles.trackingNote, isDarkMode && { color: '#94a3b8' }]}>
+                            {step.note}
+                          </Text>
+                        ) : null}
+                        <Text style={styles.trackingTime}>
+                          {step.event_time && step.state !== 'pending'
+                            ? formatTrackDate(step.event_time)
+                            : stateLabel}
+                        </Text>
+                        <View
+                          style={[
+                            styles.trackingStatePill,
+                            step.state === 'current' && styles.trackingStatePillCurrent,
+                            step.state === 'pending' && styles.trackingStatePillPending,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.trackingStatePillText,
+                              step.state === 'pending' && styles.trackingStatePillTextMuted,
+                            ]}
+                          >
+                            {stateLabel}
+                          </Text>
+                        </View>
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
           </>

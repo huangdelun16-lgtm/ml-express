@@ -3,6 +3,16 @@ import LoggerService from '../services/LoggerService';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Polyline, OverlayView, OverlayViewF } from '@react-google-maps/api';
 import { packageService, supabase } from '../services/supabase';
+import {
+  crossBorderTrackingService,
+  pickCrossBorderLabel,
+  crossBorderStatusColor,
+  type CrossBorderTrackingResult,
+} from '../services/crossBorderTrackingService';
+import {
+  buildCrossBorderTimeline,
+  resolveCrossBorderDisplayKey,
+} from '../utils/crossBorderTimeline';
 import NavigationBar from '../components/home/NavigationBar';
 import ClientInteriorShell from '../components/layout/ClientInteriorShell';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -58,6 +68,7 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [trackingNumber, setTrackingNumber] = useState('');
   const [trackingResult, setTrackingResult] = useState<any>(null);
+  const [crossBorderResult, setCrossBorderResult] = useState<CrossBorderTrackingResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [courierLocation, setCourierLocation] = useState<any>(null);
   
@@ -359,46 +370,88 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
     };
   }, [showLanguageDropdown]);
 
-  const handleTracking = async () => {
-    handleTrackingInternal(trackingNumber);
+  const crossBorderTimeline = useMemo(
+    () => (crossBorderResult ? buildCrossBorderTimeline(crossBorderResult) : []),
+    [crossBorderResult],
+  );
+  const crossBorderDisplayKey = crossBorderResult
+    ? resolveCrossBorderDisplayKey(crossBorderResult)
+    : 'unknown';
+  const crossBorderCurrentStep = crossBorderTimeline.find((step) => step.state === 'current');
+
+  const formatTrackDate = (value?: string) => {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleString(language === 'en' ? 'en-US' : language === 'my' ? 'en-GB' : 'zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const handleTracking = () => {
+    void handleTrackingInternal(trackingNumber);
   };
 
   const handleTrackingInternal = async (number: string) => {
-    if (!number.trim()) {
-      feedbackService.notify(language === 'zh' ? '请输入包裹单号' : language === 'en' ? 'Please enter tracking number' : 'ထုပ်ပိုးနံပါတ်ကို ထည့်ပါ');
+    const code = number.trim();
+    if (!code) {
+      feedbackService.notify(t.tracking.placeholder);
       return;
     }
     setLoading(true);
     try {
-      // 从数据库直接按ID查询，不再使用 getAllPackages
-      const { data: pkg, error } = await supabase
+      let pkg: any = null;
+      const { data, error } = await supabase
         .from('packages')
         .select('*')
-        .eq('id', number.trim())
+        .eq('id', code)
         .maybeSingle();
 
-      if (error) throw error;
+      const invalidId =
+        error &&
+        (String(error.message || '').toLowerCase().includes('uuid') ||
+          String(error.code || '') === '22P02');
+      if (error && !invalidId && error.code !== 'PGRST116') {
+        throw error;
+      }
+      pkg = data || null;
 
       if (pkg) {
-        // 🚀 核心优化：如果该订单是“顺路递”，则不显示在包裹跟踪中
         const isWaySide = pkg.package_type === '顺路递' || pkg.package_type === 'Eco Way' || pkg.package_type === 'တန်တန်လေးပို့';
         if (isWaySide) {
           feedbackService.notify(language === 'zh' ? '该订单类型暂不支持实时跟踪' : 'Live tracking is not available for this package type');
           setTrackingResult(null);
+          setCrossBorderResult(null);
           setCourierLocation(null);
           setAnimatedCourierLocation(null);
-          setLoading(false);
           return;
         }
 
         setTrackingResult(pkg);
-        // 收货地坐标由上方 useEffect 根据 receiver_latitude/receiver_longitude 或地理编码写入 receiverMapPosition（与客户端 App 一致）
-      } else {
-        feedbackService.notify(t.tracking.notFound);
-        setTrackingResult(null);
+        setCrossBorderResult(null);
         setCourierLocation(null);
         setAnimatedCourierLocation(null);
+        return;
       }
+
+      const crossBorder = await crossBorderTrackingService.trackByCode(code);
+      if (crossBorder) {
+        setTrackingResult(null);
+        setCrossBorderResult(crossBorder);
+        setCourierLocation(null);
+        setAnimatedCourierLocation(null);
+        return;
+      }
+
+      feedbackService.notify(t.tracking.notFound);
+      setTrackingResult(null);
+      setCrossBorderResult(null);
+      setCourierLocation(null);
+      setAnimatedCourierLocation(null);
     } catch (error) {
       LoggerService.error('查询失败:', error);
       feedbackService.notify(language === 'zh' ? '查询失败，请稍后重试' : language === 'en' ? 'Query failed, please try again later' : 'ရှာဖွေမှု မအောင်မြင်ပါ');
@@ -406,6 +459,20 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
       setLoading(false);
     }
   };
+
+  const handleTrackingInternalRef = useRef(handleTrackingInternal);
+  handleTrackingInternalRef.current = handleTrackingInternal;
+
+  useEffect(() => {
+    const onExternalTrack = (event: Event) => {
+      const code = String((event as CustomEvent<string>).detail || '').trim();
+      if (!code) return;
+      setTrackingNumber(code);
+      void handleTrackingInternalRef.current(code);
+    };
+    window.addEventListener('mle-track-order', onExternalTrack);
+    return () => window.removeEventListener('mle-track-order', onExternalTrack);
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -458,7 +525,7 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
             {t.tracking.title}
           </h1>
           <p className="client-page-subtitle">
-            {t.tracking.realTimeTracking}
+            {t.tracking.subtitle || t.tracking.realTimeTracking}
           </p>
         </div>
 
@@ -621,6 +688,141 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
               </button>
             </div>
           </div>
+
+          {crossBorderResult && (
+            <div style={{ animation: 'fadeInUp 0.5s ease-out', marginBottom: '2rem' }}>
+              <div style={{
+                background: `linear-gradient(135deg, ${crossBorderStatusColor(crossBorderDisplayKey)}, ${crossBorderStatusColor(crossBorderDisplayKey)}dd)`,
+                borderRadius: 20,
+                padding: '1.5rem 1.25rem',
+                color: '#fff',
+                marginBottom: '1rem',
+                textAlign: 'center',
+              }}>
+                <div style={{
+                  display: 'inline-block',
+                  background: 'rgba(255,255,255,0.2)',
+                  borderRadius: 999,
+                  padding: '4px 12px',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  marginBottom: 10,
+                }}>
+                  {t.tracking.crossBorderBadge}
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 800, marginBottom: 8 }}>
+                  {pickCrossBorderLabel(crossBorderCurrentStep?.labels || crossBorderResult.current_status, language)}
+                </div>
+                {crossBorderCurrentStep?.detail ? (
+                  <div style={{ fontSize: 14, opacity: 0.92, lineHeight: 1.5 }}>
+                    {pickCrossBorderLabel(crossBorderCurrentStep.detail, language)}
+                  </div>
+                ) : null}
+              </div>
+
+              <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: 20,
+                padding: '1.25rem',
+                boxShadow: 'var(--shadow-card)',
+                border: 'var(--card-border)',
+                marginBottom: '1rem',
+              }}>
+                <h3 style={{ margin: '0 0 1rem', color: '#1a2b48' }}>📦 {t.tracking.packageInfo}</h3>
+                {[
+                  [t.tracking.inboundBarcode, crossBorderResult.order_barcode],
+                  [t.tracking.expressBarcode, crossBorderResult.express_barcode],
+                  [t.tracking.receiver, crossBorderResult.recipient_name],
+                  [t.tracking.destination, crossBorderResult.final_destination_label
+                    ? pickCrossBorderLabel({
+                        zh: crossBorderResult.final_destination_label.zh,
+                        en: crossBorderResult.final_destination_label.en,
+                        my: crossBorderResult.final_destination_label.en,
+                      }, language)
+                    : crossBorderResult.final_destination],
+                  [t.tracking.productName, crossBorderResult.product_name],
+                  [t.tracking.weight, crossBorderResult.weight],
+                ].filter(([, value]) => Boolean(value)).map(([label, value]) => (
+                  <div key={String(label)} style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                    padding: '10px 0',
+                    borderBottom: '1px solid #f1f5f9',
+                    color: '#1a2b48',
+                  }}>
+                    <span style={{ color: '#64748b' }}>{label}</span>
+                    <strong style={{ textAlign: 'right' }}>{value}</strong>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: 20,
+                padding: '1.25rem',
+                boxShadow: 'var(--shadow-card)',
+                border: 'var(--card-border)',
+              }}>
+                <h3 style={{ margin: '0 0 1rem', color: '#1a2b48' }}>📍 {t.tracking.trackingHistory}</h3>
+                {crossBorderTimeline.map((step, index) => {
+                  const stateLabel =
+                    step.state === 'current'
+                      ? t.tracking.historyCurrent
+                      : step.state === 'pending'
+                        ? t.tracking.historyPending
+                        : t.tracking.historyDone;
+                  return (
+                    <div key={step.key} style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
+                      <div style={{ width: 22, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <span style={{
+                          width: step.state === 'current' ? 16 : 12,
+                          height: step.state === 'current' ? 16 : 12,
+                          borderRadius: 8,
+                          background: step.state === 'pending' ? '#cbd5e1' : step.state === 'current' ? '#f59e0b' : '#2C98A6',
+                        }} />
+                        {index !== crossBorderTimeline.length - 1 ? (
+                          <span style={{
+                            width: 2,
+                            flex: 1,
+                            minHeight: 28,
+                            marginTop: 4,
+                            background: step.state === 'pending' ? '#e2e8f0' : '#99D5DC',
+                          }} />
+                        ) : null}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 800, color: step.state === 'pending' ? '#94a3b8' : '#1a2b48', marginBottom: 4 }}>
+                          {pickCrossBorderLabel(step.labels, language)}
+                        </div>
+                        <div style={{ fontSize: 14, color: '#64748b', marginBottom: 4 }}>
+                          {pickCrossBorderLabel(step.detail, language)}
+                        </div>
+                        {step.note && step.state !== 'pending' ? (
+                          <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>{step.note}</div>
+                        ) : null}
+                        <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                          {step.event_time && step.state !== 'pending' ? formatTrackDate(step.event_time) : stateLabel}
+                        </div>
+                        <span style={{
+                          display: 'inline-block',
+                          marginTop: 6,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          borderRadius: 8,
+                          padding: '3px 8px',
+                          background: step.state === 'current' ? '#FEF3C7' : step.state === 'pending' ? '#F1F5F9' : '#EEF6F7',
+                          color: step.state === 'pending' ? '#94a3b8' : '#1E6F7A',
+                        }}>
+                          {stateLabel}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* 查询结果 */}
           {trackingResult && (

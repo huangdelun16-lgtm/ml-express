@@ -176,6 +176,13 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.9)',
   },
+  statusSubtext: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.88)',
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 12,
+  },
   card: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 20,
@@ -294,6 +301,44 @@ export const styles = StyleSheet.create({
   trackingTime: {
     fontSize: 12,
     color: '#94a3b8',
+  },
+  trackingStatePill: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: '#EEF6F7',
+  },
+  trackingStatePillCurrent: {
+    backgroundColor: '#FEF3C7',
+  },
+  trackingStatePillPending: {
+    backgroundColor: '#F1F5F9',
+  },
+  trackingStatePillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1E6F7A',
+  },
+  trackingStatePillTextMuted: {
+    color: '#94a3b8',
+  },
+  trackingStatusMuted: {
+    color: '#94a3b8',
+    fontWeight: '700',
+  },
+  trackingDotCurrent: {
+    backgroundColor: '#F59E0B',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+  },
+  trackingDotDone: {
+    backgroundColor: '#2C98A6',
+  },
+  trackingLineDone: {
+    backgroundColor: '#99D5DC',
   },
   mapContainer: {
     height: 300,

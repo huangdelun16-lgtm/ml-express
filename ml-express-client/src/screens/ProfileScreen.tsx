@@ -34,6 +34,7 @@ import {
   ClayGlobe,
   ClayInfo,
   ClayGear,
+  ClayTrash,
 } from '../components/ProfileClayIcons';
 import {
   checkAndroidAppUpdate,
@@ -91,8 +92,13 @@ export default function ProfileScreen({ navigation }: any) {
     delivered: 0,
     pendingPay: 0,
     pendingAccept: 0,
+    awaitingPickup: 0,
+    packing: 0,
+    pickedUp: 0,
     awaitingDelivery: 0,
     delivering: 0,
+    shipping: 0,
+    deliveredReady: 0,
     afterSale: 0,
     cancelled: 0,
     deliveredIds: [] as string[],
@@ -388,8 +394,13 @@ export default function ProfileScreen({ navigation }: any) {
           delivered: 0,
           pendingPay: 0,
           pendingAccept: 0,
+          awaitingPickup: 0,
+          packing: 0,
+          pickedUp: 0,
           awaitingDelivery: 0,
           delivering: 0,
+          shipping: 0,
+          deliveredReady: 0,
           afterSale: 0,
           cancelled: 0,
           deliveredIds: [],
@@ -506,8 +517,13 @@ export default function ProfileScreen({ navigation }: any) {
           delivered: stats.delivered,
           pendingPay: stats.pendingPay || 0,
           pendingAccept: stats.pendingAccept || 0,
+          awaitingPickup: stats.awaitingPickup || 0,
+          packing: stats.packing || 0,
+          pickedUp: stats.pickedUp || 0,
           awaitingDelivery: stats.awaitingDelivery || 0,
           delivering: stats.delivering || 0,
+          shipping: stats.shipping || 0,
+          deliveredReady: stats.deliveredReady || 0,
           afterSale: stats.afterSale || 0,
           cancelled: stats.cancelled || 0,
           deliveredIds: stats.deliveredIds || [],
@@ -1201,9 +1217,12 @@ export default function ProfileScreen({ navigation }: any) {
 
         <MyOrdersBar
           counts={{
-            accept: orderStats.pendingAccept + orderStats.pendingPay,
-            pickup: Math.max(0, orderStats.awaitingDelivery - orderStats.pendingAccept),
-            ship: orderStats.delivering,
+            accept: orderStats.pendingAccept,
+            pay: orderStats.pendingPay,
+            pack: orderStats.packing,
+            pickup: orderStats.awaitingPickup,
+            picked: orderStats.pickedUp,
+            ship: orderStats.shipping,
             done: orderStats.delivered,
             cancel: orderStats.cancelled,
           }}
@@ -1247,8 +1266,8 @@ export default function ProfileScreen({ navigation }: any) {
             <>
               <View style={me.menuDivider} />
               <TouchableOpacity style={me.menuRow} onPress={handleDeleteAccount}>
-                <View style={[me.menuIcon, { backgroundColor: '#FEF2F2' }]}>
-                  <Ionicons name="trash-outline" size={22} color="#ef4444" />
+                <View style={[me.menuIcon, me.menuIconDanger]}>
+                  <ClayTrash size={26} />
                 </View>
                 <Text style={[me.menuLabel, { color: '#ef4444' }]}>{t.deleteAccount}</Text>
                 <Ionicons name="chevron-forward" size={18} color="#FECACA" />

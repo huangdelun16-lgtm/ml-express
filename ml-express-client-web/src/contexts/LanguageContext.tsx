@@ -14,7 +14,7 @@ const translations: any = {
     nav: {
       home: '首页',
       services: '服务',
-      tracking: '包裹跟踪',
+      tracking: '追踪订单',
       contact: '联系我们',
       mall: '同城商场',
       cart: '购物车',
@@ -29,7 +29,7 @@ const translations: any = {
         { title: '填写订单', content: '点击“立即下单”，填写准确的寄件人和收件人信息。' },
         { title: '选择服务', content: '根据您的需求选择包裹类型和配送速度。' },
         { title: '提交订单', content: '确认价格后提交订单，系统将为您匹配最近的骑手。' },
-        { title: '实时追踪', content: '通过“包裹跟踪”实时查看骑手位置和配送进度。' }
+        { title: '实时追踪', content: '通过“追踪订单”实时查看同城配送进度，也可查询跨境物流单号。' }
       ]
     },
     hero: {
@@ -38,7 +38,7 @@ const translations: any = {
       cta: '立即下单',
       mall: '同城商场',
       cart: '购物车',
-      trackPlaceholder: '输入运单号，一键查询物流',
+      trackPlaceholder: '订单号 / 快递单号 / 入库单号',
       trackBtn: '查询',
       stats: [
         { value: '5 分钟', label: '极速接单' },
@@ -56,11 +56,11 @@ const translations: any = {
       affordable: '价格实惠'
     },
     tracking: {
-      title: '包裹跟踪',
-      placeholder: '请输入包裹单号',
+      title: '追踪订单',
+      placeholder: '订单号 / 快递单号 / 入库单号',
       track: '查询',
-      notFound: '未找到包裹信息',
-      packageInfo: '包裹信息',
+      notFound: '未找到订单',
+      packageInfo: '订单信息',
       trackingNumber: '单号',
       status: '状态',
       location: '当前位置',
@@ -83,6 +83,16 @@ const translations: any = {
       hoursAgo: '{n} 小时前',
       courierOnTheWay: '骑手已出发',
       courierBusyHint: '骑手正在配送其他包裹，开始配送您的包裹后即可查看位置',
+      subtitle: '输入订单号、快递单号或入库单号查询',
+      crossBorderBadge: '跨境物流',
+      inboundBarcode: '入库单号',
+      expressBarcode: '快递单号',
+      destination: '目的地',
+      productName: '商品',
+      trackingHistory: '追踪历史',
+      historyCurrent: '进行中',
+      historyPending: '尚未发生',
+      historyDone: '已完成',
     },
     cart: {
       title: '我的购物车',
@@ -546,7 +556,7 @@ const translations: any = {
       selectType: '请选择包裹类型'
     },
     ui: {
-      packageTracking: '包裹跟踪',
+      packageTracking: '追踪订单',
       lightningDelivery: '极速配送',
       secureReliable: '安全可靠',
       smartService: '智能服务',
@@ -629,7 +639,7 @@ const translations: any = {
     nav: {
       home: 'Home',
       services: 'Services',
-      tracking: 'Tracking',
+      tracking: 'Track Order',
       contact: 'Contact',
       mall: 'City Mall',
       cart: 'Cart',
@@ -653,7 +663,7 @@ const translations: any = {
       cta: 'Order Now',
       mall: 'City Mall',
       cart: 'Cart',
-      trackPlaceholder: 'Enter tracking number',
+      trackPlaceholder: 'Order ID, express waybill, or inbound barcode',
       trackBtn: 'Track',
       stats: [
         { value: '5 min', label: 'Fast pickup' },
@@ -671,11 +681,11 @@ const translations: any = {
       affordable: 'Affordable'
     },
     tracking: {
-      title: 'Package Tracking',
-      placeholder: 'Enter tracking number',
+      title: 'Track Order',
+      placeholder: 'Order ID / express waybill / inbound barcode',
       track: 'Track',
-      notFound: 'Package not found',
-      packageInfo: 'Package Information',
+      notFound: 'Order not found',
+      packageInfo: 'Order information',
       trackingNumber: 'Number',
       status: 'Status',
       location: 'Current Location',
@@ -698,6 +708,16 @@ const translations: any = {
       hoursAgo: '{n} hr ago',
       courierOnTheWay: 'Courier is on the way',
       courierBusyHint: 'Courier is delivering other packages. Location appears when yours is next.',
+      subtitle: 'Search by order ID, express waybill, or inbound barcode',
+      crossBorderBadge: 'Cross-border',
+      inboundBarcode: 'Inbound barcode',
+      expressBarcode: 'Express waybill',
+      destination: 'Destination',
+      productName: 'Product',
+      trackingHistory: 'Tracking history',
+      historyCurrent: 'In progress',
+      historyPending: 'Not yet',
+      historyDone: 'Completed',
     },
     cart: {
       title: 'My Cart',
@@ -1161,7 +1181,7 @@ const translations: any = {
       selectType: 'Select Package Type'
     },
     ui: {
-      packageTracking: 'Package Tracking',
+      packageTracking: 'Track Order',
       lightningDelivery: 'Lightning Delivery',
       secureReliable: 'Secure & Reliable',
       smartService: 'Smart Service',
@@ -1268,7 +1288,7 @@ const translations: any = {
       cta: 'အော်ဒါတင်မည်',
       mall: 'စျေးဝယ်စင်တာ',
       cart: 'စျေးဝယ်လှည်း',
-      trackPlaceholder: 'ပို့ဆောင်မှုနံပါတ် ထည့်ပါ',
+      trackPlaceholder: 'အော်ဒါ / express / inbound barcode',
       trackBtn: 'ရှာဖွေ',
       stats: [
         { value: '၅ မိနစ်', label: 'မြန်ဆန်စွာ လက်ခံ' },
@@ -1287,10 +1307,10 @@ const translations: any = {
     },
     tracking: {
       title: 'အော်ဒါခြေရာခံ',
-      placeholder: 'ထုပ်ပိုးနံပါတ်ကို ထည့်ပါ',
+      placeholder: 'အော်ဒါ / express / inbound barcode',
       track: 'ရှာဖွေပါ',
-      notFound: 'ထုပ်ပိုးအချက်အလက် မတွေ့ပါ',
-      packageInfo: 'ထုပ်ပိုးအချက်အလက်',
+      notFound: 'အော်ဒါမတွေ့ပါ',
+      packageInfo: 'အော်ဒါအချက်အလက်',
       trackingNumber: 'နံပါတ်',
       status: 'အခြေအနေ',
       location: 'လက်ရှိတည်နေရာ',
@@ -1313,6 +1333,16 @@ const translations: any = {
       hoursAgo: '{n} နာရီ အကြာက',
       courierOnTheWay: 'ပေးပို့သူ ထွက်လာပြီး',
       courierBusyHint: 'ပေးပို့သူသည် အခြားထုပ်ပိုးများကို ပို့ဆောင်နေသည်',
+      subtitle: 'အော်ဒါ / express / inbound barcode ဖြင့် ရှာဖွေပါ',
+      crossBorderBadge: 'နယ်စပ်ဖြတ်ကျော်',
+      inboundBarcode: 'ဂိုဒေါင်ဝင်ကုဒ်',
+      expressBarcode: 'အမြန်ပို့ကုဒ်',
+      destination: 'ဦးတည်ရာ',
+      productName: 'ကုန်ပစ္စည်း',
+      trackingHistory: 'ခြေရာခံမှတ်တမ်း',
+      historyCurrent: 'ဆောင်ရွက်ဆဲ',
+      historyPending: 'မရောက်သေး',
+      historyDone: 'ပြီးပါပြီ',
     },
     cart: {
       title: 'စျေးဝယ်လှည်း',
@@ -1776,7 +1806,7 @@ const translations: any = {
       selectType: 'ပစ္စည်းအမျိုးအစားကို ရွေးချယ်ပါ'
     },
     ui: {
-      packageTracking: 'ထုပ်ပိုးခြင်း စောင့်ကြည့်ခြင်း',
+      packageTracking: 'အော်ဒါခြေရာခံ',
       lightningDelivery: 'မြန်ဆန်သော ပို့ဆောင်မှု',
       secureReliable: 'လုံခြုံ ယုံကြည်စိတ်ချရသော',
       smartService: 'ဉာဏ်ရည်တု ဝန်ဆောင်မှု',

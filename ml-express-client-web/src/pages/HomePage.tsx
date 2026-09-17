@@ -1276,18 +1276,11 @@ const HomePage: React.FC = () => {
 
   const handleHeroTrack = () => {
     handleNavigation('/tracking');
-    if (heroTrackingInput.trim()) {
-      window.setTimeout(() => {
-        const input = document.querySelector<HTMLInputElement>(
-          '#landing-tracking input[type="text"], #landing-tracking input:not([type="hidden"])'
-        );
-        if (input) {
-          input.value = heroTrackingInput.trim();
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.focus();
-        }
-      }, 450);
-    }
+    const code = heroTrackingInput.trim();
+    if (!code) return;
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('mle-track-order', { detail: code }));
+    }, 450);
   };
 
   // 生成二维码

@@ -1,51 +1,20 @@
-import React, { useId } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import Svg, { Circle, Defs, Ellipse, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useApp } from '../contexts/AppContext';
-import { ClayBox, ClayClipboard, ClayScooter } from './ProfileClayIcons';
+import {
+  ClayBox,
+  ClayWallet,
+  ClayShoppingBag,
+  ClayClipboard,
+  ClayMapBoard,
+  ClayScooter,
+  ClayCheckSeal,
+  ClayCancelSeal,
+} from './ProfileClayIcons';
+import { COMPLETED_STATUS_FILTER } from '../utils/orderStatusFilter';
 
-const TEAL = '#2C98A6';
 const NAVY = '#1A2B48';
 const MUTED = '#8A94A6';
-
-function SealIcon({ kind, size = 40 }: { kind: 'done' | 'cancel'; size?: number }) {
-  const id = `s${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
-  const hi = kind === 'done' ? '#7EE0EA' : '#D5DCE3';
-  const mid = kind === 'done' ? TEAL : '#94A3B8';
-  const lo = kind === 'done' ? '#176978' : '#64748B';
-  return (
-    <Svg width={size} height={size} viewBox="0 0 64 64">
-      <Defs>
-        <RadialGradient id={`${id}g`} cx="34%" cy="28%" r="70%">
-          <Stop offset="0" stopColor={hi} />
-          <Stop offset="0.5" stopColor={mid} />
-          <Stop offset="1" stopColor={lo} />
-        </RadialGradient>
-      </Defs>
-      <Ellipse cx="32" cy="56" rx="14" ry="4" fill={lo} opacity="0.18" />
-      <Circle cx="32" cy="30" r="22" fill={`url(#${id}g)`} />
-      <Ellipse cx="24" cy="22" rx="8" ry="5" fill="#FFFFFF" opacity="0.35" />
-      {kind === 'done' ? (
-        <Path
-          d="M21 31 L28 38 L44 22"
-          fill="none"
-          stroke="#FFFFFF"
-          strokeWidth="5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      ) : (
-        <Path
-          d="M23 21 L41 39 M41 21 L23 39"
-          fill="none"
-          stroke="#FFFFFF"
-          strokeWidth="5"
-          strokeLinecap="round"
-        />
-      )}
-    </Svg>
-  );
-}
 
 const ITEMS = [
   {
@@ -56,11 +25,32 @@ const ITEMS = [
     render: (size: number) => <ClayBox size={size} />,
   },
   {
+    key: 'pay',
+    label: { zh: '待收款', en: 'To pay', my: 'ငွေကောက်ရန်' },
+    filter: '待收款',
+    muted: false,
+    render: (size: number) => <ClayWallet size={size} />,
+  },
+  {
+    key: 'pack',
+    label: { zh: '打包中', en: 'Packing', my: 'ထုပ်ပိုးနေ' },
+    filter: '打包中',
+    muted: false,
+    render: (size: number) => <ClayShoppingBag size={size} />,
+  },
+  {
     key: 'pickup',
     label: { zh: '待取件', en: 'Pickup', my: 'ထုပ်ယူရန်' },
     filter: '待取件',
     muted: false,
     render: (size: number) => <ClayClipboard size={size} />,
+  },
+  {
+    key: 'picked',
+    label: { zh: '已取件', en: 'Picked up', my: 'ထုပ်ယူပြီး' },
+    filter: '已取件',
+    muted: false,
+    render: (size: number) => <ClayMapBoard size={size} />,
   },
   {
     key: 'ship',
@@ -72,16 +62,16 @@ const ITEMS = [
   {
     key: 'done',
     label: { zh: '已完成', en: 'Done', my: 'ပြီးပါပြီ' },
-    filter: '已送达',
+    filter: COMPLETED_STATUS_FILTER,
     muted: false,
-    render: (size: number) => <SealIcon kind="done" size={size} />,
+    render: (size: number) => <ClayCheckSeal size={size} />,
   },
   {
     key: 'cancel',
     label: { zh: '已取消', en: 'Cancelled', my: 'ပယ်ဖျက်ပြီး' },
     filter: '已取消',
     muted: true,
-    render: (size: number) => <SealIcon kind="cancel" size={size} />,
+    render: (size: number) => <ClayCancelSeal size={size} />,
   },
 ] as const;
 
@@ -110,7 +100,7 @@ export default function MyOrdersBar({
         </TouchableOpacity>
       </View>
 
-      <View style={styles.row}>
+      <View style={styles.grid}>
         {ITEMS.map((item) => {
           const n = counts?.[item.key] ?? 0;
           return (
@@ -121,15 +111,18 @@ export default function MyOrdersBar({
               activeOpacity={0.82}
             >
               <View style={styles.iconStage}>
+                <View style={styles.iconGlass} />
                 <View style={styles.iconShadow} />
-                <View style={styles.iconLift}>{item.render(40)}</View>
+                <View style={styles.iconLift}>{item.render(36)}</View>
                 {n > 0 ? (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>{n > 99 ? '99+' : String(n)}</Text>
                   </View>
                 ) : null}
               </View>
-              <Text style={[styles.label, item.muted && styles.labelMuted]}>{item.label[lang]}</Text>
+              <Text style={[styles.label, item.muted && styles.labelMuted]} numberOfLines={1}>
+                {item.label[lang]}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -142,9 +135,9 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
     borderRadius: 24,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     paddingTop: 16,
-    paddingBottom: 14,
+    paddingBottom: 6,
     marginBottom: 16,
     shadowColor: '#1A2B48',
     shadowOpacity: 0.06,
@@ -156,28 +149,45 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
-    paddingHorizontal: 4,
+    marginBottom: 10,
+    paddingHorizontal: 6,
   },
   title: { fontSize: 17, fontWeight: '800', color: NAVY, letterSpacing: -0.2 },
   all: { fontSize: 13, color: MUTED, fontWeight: '600' },
-  row: { flexDirection: 'row' },
-  item: { flex: 1, alignItems: 'center', gap: 7 },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  item: {
+    width: '25%',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
   iconStage: {
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
+  iconGlass: {
+    position: 'absolute',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(236,253,250,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.9)',
+  },
   iconShadow: {
     position: 'absolute',
-    bottom: 2,
-    width: 28,
+    bottom: 4,
+    width: 30,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#2C98A6',
-    opacity: 0.12,
+    backgroundColor: '#0F766E',
+    opacity: 0.14,
   },
   iconLift: {
     alignItems: 'center',
@@ -203,6 +213,6 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-  label: { fontSize: 12, color: NAVY, fontWeight: '600' },
+  label: { fontSize: 11, color: NAVY, fontWeight: '600' },
   labelMuted: { color: MUTED },
 });

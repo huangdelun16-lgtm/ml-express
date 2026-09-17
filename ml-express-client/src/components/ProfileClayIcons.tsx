@@ -11,9 +11,13 @@ import Svg, {
 
 type SizeProps = { size?: number };
 
-const TEAL_HI = '#8AE8F2';
+const TEAL_HI = '#B8F4FF';
 const TEAL = '#2C98A6';
-const TEAL_LO = '#176978';
+const TEAL_LO = '#0F766E';
+const EMERALD_HI = '#A7F3D0';
+const EMERALD = '#34D399';
+const EMERALD_LO = '#047857';
+const GLASS = '#F4FEFF';
 
 function gid(raw: string) {
   return `p${raw.replace(/[^a-zA-Z0-9]/g, '')}`;
@@ -112,19 +116,29 @@ export function ClayCoupon({ size = 40 }: SizeProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
-        <SvgGradient id={`${id}g`} x1="0.2" y1="0" x2="0.9" y2="1">
-          {tealStops()}
+        <SvgGradient id={`${id}g`} x1="0.12" y1="0.08" x2="0.92" y2="1">
+          <Stop offset="0" stopColor={TEAL_HI} />
+          <Stop offset="0.42" stopColor={EMERALD} />
+          <Stop offset="1" stopColor={TEAL_LO} />
+        </SvgGradient>
+        <SvgGradient id={`${id}side`} x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor="#115E59" />
+          <Stop offset="1" stopColor="#042F2E" />
         </SvgGradient>
       </Defs>
-      <Ellipse cx="32" cy="56" rx="16" ry="4" fill="#2C98A6" opacity="0.14" />
+      <Ellipse cx="33" cy="57" rx="16" ry="3.6" fill={TEAL_LO} opacity="0.22" />
+      <Path
+        d="M13 25 C13 21 16 19 20 19 L47 22 C51 22 54 24 54 28 L54 33 C50 33 48 36 48 37 C48 38 50 41 54 41 L54 46 C54 50 51 52 47 52 L20 49 C16 49 13 47 13 43 L13 38 C17 38 19 35 19 34 C19 33 17 30 13 30 Z"
+        fill={`url(#${id}side)`}
+      />
       <Path
         d="M10 22 C10 18 14 16 18 16 L46 16 C50 16 54 18 54 22 L54 28 C50 28 48 31 48 32 C48 33 50 36 54 36 L54 42 C54 46 50 48 46 48 L18 48 C14 48 10 46 10 42 L10 36 C14 36 16 33 16 32 C16 31 14 28 10 28 Z"
         fill={`url(#${id}g)`}
       />
-      <Ellipse cx="32" cy="32" rx="1.6" ry="14" fill="#FFFFFF" opacity="0.4" />
-      <Circle cx="24" cy="32" r="4" fill="#F4FEFF" />
-      <Circle cx="40" cy="32" r="4" fill="#F4FEFF" />
-      <Ellipse cx="22" cy="22" rx="7" ry="3.2" fill="#FFFFFF" opacity="0.32" />
+      <Ellipse cx="32" cy="32" rx="1.2" ry="13" fill="#FFFFFF" opacity="0.28" />
+      <Circle cx="24" cy="32" r="4.2" fill={GLASS} opacity="0.92" />
+      <Circle cx="40" cy="32" r="4.2" fill={GLASS} opacity="0.92" />
+      <Ellipse cx="21" cy="22" rx="8" ry="3.4" fill="#FFFFFF" opacity="0.42" />
     </Svg>
   );
 }
@@ -134,17 +148,22 @@ export function ClayCoin({ size = 40 }: SizeProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
-        <RadialGradient id={`${id}c`} cx="35%" cy="30%" r="70%">
-          <Stop offset="0" stopColor="#FFF3C4" />
-          <Stop offset="0.45" stopColor="#F5C84A" />
-          <Stop offset="1" stopColor="#D49214" />
+        <RadialGradient id={`${id}c`} cx="32%" cy="26%" r="72%">
+          <Stop offset="0" stopColor="#FFF7D1" />
+          <Stop offset="0.38" stopColor="#F5C84A" />
+          <Stop offset="1" stopColor="#B45309" />
         </RadialGradient>
+        <SvgGradient id={`${id}rim`} x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor="#FDE68A" />
+          <Stop offset="1" stopColor="#92400E" />
+        </SvgGradient>
       </Defs>
-      <Ellipse cx="32" cy="56" rx="16" ry="4" fill="#D49214" opacity="0.18" />
-      <Ellipse cx="32" cy="34" rx="20" ry="20" fill={`url(#${id}c)`} />
-      <Ellipse cx="32" cy="34" rx="13" ry="13" fill="#FFE9A0" />
-      <Path d="M32 24 L36 32 L45 33 L38 39 L40 48 L32 43 L24 48 L26 39 L19 33 L28 32 Z" fill="#F5C84A" />
-      <Ellipse cx="24" cy="26" rx="7" ry="4" fill="#FFFFFF" opacity="0.4" />
+      <Ellipse cx="34" cy="57" rx="15" ry="3.4" fill="#92400E" opacity="0.22" />
+      <Ellipse cx="34" cy="38" rx="19" ry="16.5" fill={`url(#${id}rim)`} />
+      <Ellipse cx="31" cy="32" rx="19" ry="16.5" fill={`url(#${id}c)`} />
+      <Ellipse cx="31" cy="32" rx="12" ry="10.4" fill="#FFE9A0" opacity="0.55" />
+      <Path d="M31 23 L34 31 L43 32 L36 37 L38 45 L31 41 L24 45 L26 37 L19 32 L28 31 Z" fill="#F59E0B" opacity="0.9" />
+      <Ellipse cx="24" cy="26" rx="7" ry="3.6" fill="#FFFFFF" opacity="0.48" />
     </Svg>
   );
 }
@@ -154,18 +173,24 @@ export function ClayHeart({ size = 40 }: SizeProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
-        <SvgGradient id={`${id}h`} x1="0.2" y1="0" x2="0.8" y2="1">
-          <Stop offset="0" stopColor="#FF9AA8" />
-          <Stop offset="0.5" stopColor="#F43F5E" />
-          <Stop offset="1" stopColor="#BE123C" />
+        <SvgGradient id={`${id}h`} x1="0.18" y1="0.05" x2="0.85" y2="1">
+          <Stop offset="0" stopColor="#FECACA" />
+          <Stop offset="0.4" stopColor="#F43F5E" />
+          <Stop offset="1" stopColor="#9F1239" />
         </SvgGradient>
       </Defs>
-      <Ellipse cx="32" cy="56" rx="14" ry="4" fill="#BE123C" opacity="0.14" />
+      <Ellipse cx="33" cy="57" rx="14" ry="3.3" fill="#9F1239" opacity="0.2" />
+      <Path
+        d="M34 52 C21 43 12 32 16 22 C19 16 27 15 33 23 C39 15 47 16 50 22 C54 32 47 43 34 52 Z"
+        fill="#9F1239"
+        opacity="0.35"
+      />
       <Path
         d="M32 50 C18 40 10 30 14 20 C17 14 26 14 32 22 C38 14 47 14 50 20 C54 30 46 40 32 50 Z"
         fill={`url(#${id}h)`}
       />
-      <Ellipse cx="24" cy="24" rx="6" ry="4" fill="#FFFFFF" opacity="0.38" />
+      <Ellipse cx="24" cy="23" rx="6.5" ry="4" fill="#FFFFFF" opacity="0.5" />
+      <Ellipse cx="38" cy="26" rx="3" ry="2" fill="#FFFFFF" opacity="0.22" />
     </Svg>
   );
 }
@@ -175,17 +200,23 @@ export function ClayPin({ size = 40 }: SizeProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
-        <RadialGradient id={`${id}p`} cx="34%" cy="28%" r="70%">
+        <RadialGradient id={`${id}p`} cx="32%" cy="24%" r="72%">
           <Stop offset="0" stopColor={TEAL_HI} />
-          <Stop offset="0.5" stopColor={TEAL} />
+          <Stop offset="0.45" stopColor={EMERALD} />
           <Stop offset="1" stopColor={TEAL_LO} />
         </RadialGradient>
+        <RadialGradient id={`${id}glass`} cx="38%" cy="30%" r="70%">
+          <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.95" />
+          <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0.12" />
+        </RadialGradient>
       </Defs>
-      <Ellipse cx="32" cy="58" rx="12" ry="4" fill="#2C98A6" opacity="0.16" />
-      <Path d="M32 30 L42 56 L22 56 Z" fill={TEAL_LO} />
+      <Ellipse cx="33" cy="58" rx="12" ry="3.2" fill={TEAL_LO} opacity="0.24" />
+      <Path d="M34 32 L44 55 L24 54 Z" fill={TEAL_LO} />
+      <Path d="M32 30 L42 54 L22 54 Z" fill="#115E59" />
+      <Circle cx="34" cy="26" r="16" fill="#0F766E" opacity="0.28" />
       <Circle cx="32" cy="24" r="16" fill={`url(#${id}p)`} />
-      <Circle cx="32" cy="24" r="6.5" fill="#FFFFFF" />
-      <Ellipse cx="26" cy="18" rx="5" ry="3" fill="#FFFFFF" opacity="0.4" />
+      <Circle cx="32" cy="24" r="7" fill={`url(#${id}glass)`} />
+      <Ellipse cx="26" cy="18" rx="5.5" ry="3.2" fill="#FFFFFF" opacity="0.55" />
     </Svg>
   );
 }
@@ -215,24 +246,29 @@ export function ClayBox({ size = 44 }: SizeProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
-        <SvgGradient id={`${id}t`} x1="0.2" y1="1" x2="0.8" y2="0">
-          <Stop offset="0" stopColor="#FFE9C4" />
+        <SvgGradient id={`${id}t`} x1="0.15" y1="1" x2="0.85" y2="0">
+          <Stop offset="0" stopColor="#FFF4D6" />
           <Stop offset="1" stopColor="#F0C078" />
         </SvgGradient>
-        <SvgGradient id={`${id}f`} x1="0" y1="0" x2="0.2" y2="1">
-          <Stop offset="0" stopColor="#F6D7A8" />
+        <SvgGradient id={`${id}f`} x1="0" y1="0" x2="0.35" y2="1">
+          <Stop offset="0" stopColor="#F8DEAE" />
           <Stop offset="1" stopColor="#D59A4A" />
         </SvgGradient>
         <SvgGradient id={`${id}s`} x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor="#C98A3C" />
-          <Stop offset="1" stopColor="#8F5A1E" />
+          <Stop offset="1" stopColor="#7A4414" />
+        </SvgGradient>
+        <SvgGradient id={`${id}tape`} x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor={TEAL_HI} />
+          <Stop offset="1" stopColor={TEAL_LO} />
         </SvgGradient>
       </Defs>
-      <Ellipse cx="32" cy="56" rx="16" ry="4" fill="#8F5A1E" opacity="0.16" />
-      <Path d="M12 28 L32 18 L52 28 L32 38 Z" fill={`url(#${id}t)`} />
-      <Path d="M12 28 L32 38 L32 54 L12 44 Z" fill={`url(#${id}s)`} />
-      <Path d="M32 38 L52 28 L52 44 L32 54 Z" fill={`url(#${id}f)`} />
-      <Path d="M22 26 L42 26 L42 30 L22 30 Z" fill="#FFFFFF" opacity="0.3" />
+      <Ellipse cx="33" cy="57" rx="16" ry="3.4" fill="#7A4414" opacity="0.22" />
+      <Path d="M14 30 L34 20 L54 30 L34 40 Z" fill={`url(#${id}t)`} />
+      <Path d="M14 30 L34 40 L34 55 L14 45 Z" fill={`url(#${id}s)`} />
+      <Path d="M34 40 L54 30 L54 45 L34 55 Z" fill={`url(#${id}f)`} />
+      <Path d="M24 27 L44 27 L44 31 L24 31 Z" fill={`url(#${id}tape)`} />
+      <Path d="M20 26 L28 22 L28 26 L20 30 Z" fill="#FFFFFF" opacity="0.38" />
     </Svg>
   );
 }
@@ -277,24 +313,29 @@ export function ClayScooter({ size = 44 }: SizeProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
-        <SvgGradient id={`${id}s`} x1="0.2" y1="0" x2="0.9" y2="1">
-          {tealStops()}
+        <SvgGradient id={`${id}s`} x1="0.12" y1="0.08" x2="0.9" y2="1">
+          <Stop offset="0" stopColor={TEAL_HI} />
+          <Stop offset="0.5" stopColor={EMERALD} />
+          <Stop offset="1" stopColor={TEAL_LO} />
         </SvgGradient>
         <RadialGradient id={`${id}t`} cx="35%" cy="30%" r="70%">
-          <Stop offset="0" stopColor="#64748B" />
+          <Stop offset="0" stopColor="#94A3B8" />
           <Stop offset="1" stopColor="#0F172A" />
         </RadialGradient>
       </Defs>
-      <Ellipse cx="32" cy="58" rx="18" ry="4" fill="#2C98A6" opacity="0.14" />
-      <Circle cx="18" cy="48" r="8" fill={`url(#${id}t)`} />
-      <Circle cx="18" cy="48" r="3.5" fill="#E2E8F0" />
-      <Circle cx="46" cy="48" r="7" fill={`url(#${id}t)`} />
-      <Circle cx="46" cy="48" r="3" fill="#E2E8F0" />
-      <Path d="M16 42 C24 36 40 36 48 42 L50 46 C40 42 24 42 14 46 Z" fill={`url(#${id}s)`} />
-      <Path d="M44 28 L48 42 L44 44 L40 30 Z" fill="#D5EEF3" />
-      <Ellipse cx="32" cy="30" rx="8" ry="9" fill={`url(#${id}s)`} />
-      <Circle cx="32" cy="20" r="6" fill="#F2C094" />
-      <Path d="M26 18 C28 12 38 12 38 18 Z" fill={`url(#${id}s)`} />
+      <Ellipse cx="33" cy="58" rx="18" ry="3.4" fill={TEAL_LO} opacity="0.2" />
+      <Circle cx="20" cy="49" r="8.2" fill={`url(#${id}t)`} />
+      <Circle cx="18" cy="47" r="8" fill={`url(#${id}t)`} />
+      <Circle cx="18" cy="47" r="3.2" fill="#E2E8F0" />
+      <Circle cx="48" cy="49" r="7.2" fill={`url(#${id}t)`} />
+      <Circle cx="46" cy="47" r="7" fill={`url(#${id}t)`} />
+      <Circle cx="46" cy="47" r="2.8" fill="#E2E8F0" />
+      <Path d="M16 41 C25 34 41 34 50 41 L52 45 C41 40 24 40 14 45 Z" fill={`url(#${id}s)`} />
+      <Path d="M44 26 L49 41 L45 43 L40 28 Z" fill="#D5EEF3" />
+      <Ellipse cx="33" cy="29" rx="8" ry="9" fill={`url(#${id}s)`} />
+      <Circle cx="33" cy="19" r="6" fill="#F2C094" />
+      <Path d="M27 17 C29 11 39 11 39 17 Z" fill={`url(#${id}s)`} />
+      <Ellipse cx="28" cy="26" rx="4" ry="2.2" fill="#FFFFFF" opacity="0.38" />
     </Svg>
   );
 }
@@ -304,16 +345,20 @@ export function ClayClipboard({ size = 44 }: SizeProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
-        <SvgGradient id={`${id}c`} x1="0.2" y1="0" x2="0.9" y2="1">
-          {tealStops()}
+        <SvgGradient id={`${id}c`} x1="0.14" y1="0.06" x2="0.9" y2="1">
+          <Stop offset="0" stopColor={TEAL_HI} />
+          <Stop offset="0.5" stopColor={TEAL} />
+          <Stop offset="1" stopColor={TEAL_LO} />
         </SvgGradient>
       </Defs>
-      <Ellipse cx="32" cy="56" rx="14" ry="4" fill="#2C98A6" opacity="0.14" />
+      <Ellipse cx="33" cy="57" rx="14" ry="3.3" fill={TEAL_LO} opacity="0.22" />
+      <Path d="M21 18 L49 20 C53 20 55 22 55 26 L55 51 C55 55 53 57 49 57 L21 55 C17 55 15 53 15 49 L15 24 C15 20 17 18 21 18 Z" fill="#115E59" />
       <Path d="M18 16 L46 16 C50 16 52 18 52 22 L52 50 C52 54 50 56 46 56 L18 56 C14 56 12 54 12 50 L12 22 C12 18 14 16 18 16 Z" fill={`url(#${id}c)`} />
-      <Path d="M24 12 L40 12 C42 12 44 14 44 16 L44 20 L20 20 L20 16 C20 14 22 12 24 12 Z" fill="#F4FEFF" />
-      <Path d="M20 28 L44 28 L44 32 L20 32 Z" fill="#F4FEFF" opacity="0.7" />
-      <Path d="M20 36 L40 36 L40 40 L20 40 Z" fill="#F4FEFF" opacity="0.55" />
-      <Path d="M20 44 L36 44 L36 48 L20 48 Z" fill="#F4FEFF" opacity="0.4" />
+      <Path d="M24 11 L40 11 C42 11 44 13 44 15 L44 20 L20 20 L20 15 C20 13 22 11 24 11 Z" fill={GLASS} />
+      <Path d="M20 28 L44 28 L44 32 L20 32 Z" fill={GLASS} opacity="0.72" />
+      <Path d="M20 36 L40 36 L40 40 L20 40 Z" fill={GLASS} opacity="0.52" />
+      <Path d="M20 44 L36 44 L36 48 L20 48 Z" fill={GLASS} opacity="0.36" />
+      <Ellipse cx="24" cy="22" rx="7" ry="3" fill="#FFFFFF" opacity="0.32" />
     </Svg>
   );
 }
@@ -323,16 +368,20 @@ export function ClayHeadset({ size = 44 }: SizeProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
-        <SvgGradient id={`${id}h`} x1="0.2" y1="0" x2="0.9" y2="1">
-          {tealStops()}
+        <SvgGradient id={`${id}h`} x1="0.14" y1="0.06" x2="0.9" y2="1">
+          <Stop offset="0" stopColor={TEAL_HI} />
+          <Stop offset="0.48" stopColor={EMERALD} />
+          <Stop offset="1" stopColor={TEAL_LO} />
         </SvgGradient>
       </Defs>
-      <Ellipse cx="32" cy="56" rx="14" ry="4" fill="#2C98A6" opacity="0.14" />
-      <Path d="M16 34 C16 18 48 18 48 34" fill={`url(#${id}h)`} />
+      <Ellipse cx="33" cy="57" rx="14" ry="3.3" fill={TEAL_LO} opacity="0.22" />
+      <Path d="M16 34 C16 17 48 17 48 34" stroke={TEAL_HI} strokeWidth="7" fill="none" strokeLinecap="round" />
+      <Ellipse cx="18" cy="40" rx="8" ry="12" fill="#115E59" />
       <Ellipse cx="16" cy="38" rx="8" ry="12" fill={`url(#${id}h)`} />
+      <Ellipse cx="50" cy="40" rx="8" ry="12" fill="#115E59" />
       <Ellipse cx="48" cy="38" rx="8" ry="12" fill={`url(#${id}h)`} />
-      <Path d="M44 46 C44 52 38 56 32 56 C30 56 28 55 28 53 C28 51 30 50 32 50 C36 50 40 48 40 44 Z" fill="#1A7A86" />
-      <Ellipse cx="22" cy="32" rx="5" ry="3" fill="#FFFFFF" opacity="0.35" />
+      <Path d="M44 46 C44 52 38 56 32 56 C30 56 28 55 28 53 C28 51 30 50 32 50 C36 50 40 48 40 44 Z" fill="#134E4A" />
+      <Ellipse cx="14" cy="32" rx="4.5" ry="3" fill="#FFFFFF" opacity="0.42" />
     </Svg>
   );
 }
@@ -342,14 +391,18 @@ export function ClayGlobe({ size = 28 }: SizeProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
-        <SvgGradient id={`${id}g`} x1="0.2" y1="0" x2="0.9" y2="1">
-          {tealStops()}
-        </SvgGradient>
+        <RadialGradient id={`${id}g`} cx="32%" cy="26%" r="74%">
+          <Stop offset="0" stopColor={TEAL_HI} />
+          <Stop offset="0.45" stopColor={EMERALD} />
+          <Stop offset="1" stopColor={TEAL_LO} />
+        </RadialGradient>
       </Defs>
+      <Ellipse cx="34" cy="54" rx="16" ry="3.2" fill={TEAL_LO} opacity="0.2" />
+      <Circle cx="34" cy="34" r="22" fill="#115E59" opacity="0.35" />
       <Circle cx="32" cy="32" r="22" fill={`url(#${id}g)`} />
-      <Ellipse cx="32" cy="32" rx="8" ry="22" fill="#FFFFFF" opacity="0.18" />
+      <Ellipse cx="32" cy="32" rx="8" ry="22" fill="#FFFFFF" opacity="0.16" />
       <Ellipse cx="32" cy="32" rx="22" ry="8" fill="#FFFFFF" opacity="0.12" />
-      <Ellipse cx="24" cy="22" rx="7" ry="4" fill="#FFFFFF" opacity="0.35" />
+      <Ellipse cx="24" cy="22" rx="7" ry="4" fill="#FFFFFF" opacity="0.42" />
     </Svg>
   );
 }
@@ -359,14 +412,97 @@ export function ClayInfo({ size = 28 }: SizeProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
-        <SvgGradient id={`${id}i`} x1="0.2" y1="0" x2="0.9" y2="1">
-          {tealStops()}
+        <RadialGradient id={`${id}i`} cx="32%" cy="26%" r="74%">
+          <Stop offset="0" stopColor={TEAL_HI} />
+          <Stop offset="0.5" stopColor={TEAL} />
+          <Stop offset="1" stopColor={TEAL_LO} />
+        </RadialGradient>
+      </Defs>
+      <Ellipse cx="34" cy="54" rx="16" ry="3.2" fill={TEAL_LO} opacity="0.2" />
+      <Circle cx="34" cy="34" r="22" fill="#115E59" opacity="0.32" />
+      <Circle cx="32" cy="32" r="22" fill={`url(#${id}i)`} />
+      <Circle cx="32" cy="20" r="4" fill={GLASS} />
+      <Path d="M28 28 L36 28 L36 48 L28 48 Z" fill={GLASS} />
+      <Ellipse cx="24" cy="22" rx="7" ry="4" fill="#FFFFFF" opacity="0.38" />
+    </Svg>
+  );
+}
+
+export function ClayCheckSeal({ size = 40 }: SizeProps) {
+  const id = gid(useId());
+  return (
+    <Svg width={size} height={size} viewBox="0 0 64 64">
+      <Defs>
+        <RadialGradient id={`${id}g`} cx="32%" cy="24%" r="72%">
+          <Stop offset="0" stopColor={TEAL_HI} />
+          <Stop offset="0.45" stopColor={EMERALD} />
+          <Stop offset="1" stopColor={TEAL_LO} />
+        </RadialGradient>
+      </Defs>
+      <Ellipse cx="34" cy="57" rx="14" ry="3.3" fill={TEAL_LO} opacity="0.22" />
+      <Circle cx="34" cy="32" r="22" fill="#115E59" opacity="0.3" />
+      <Circle cx="32" cy="30" r="22" fill={`url(#${id}g)`} />
+      <Ellipse cx="24" cy="22" rx="8" ry="5" fill="#FFFFFF" opacity="0.42" />
+      <Path
+        d="M21 31 L28 38 L44 22"
+        fill="none"
+        stroke={GLASS}
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function ClayCancelSeal({ size = 40 }: SizeProps) {
+  const id = gid(useId());
+  return (
+    <Svg width={size} height={size} viewBox="0 0 64 64">
+      <Defs>
+        <RadialGradient id={`${id}g`} cx="32%" cy="24%" r="72%">
+          <Stop offset="0" stopColor="#F1F5F9" />
+          <Stop offset="0.45" stopColor="#94A3B8" />
+          <Stop offset="1" stopColor="#475569" />
+        </RadialGradient>
+      </Defs>
+      <Ellipse cx="34" cy="57" rx="14" ry="3.3" fill="#475569" opacity="0.2" />
+      <Circle cx="34" cy="32" r="22" fill="#334155" opacity="0.28" />
+      <Circle cx="32" cy="30" r="22" fill={`url(#${id}g)`} />
+      <Ellipse cx="24" cy="22" rx="8" ry="5" fill="#FFFFFF" opacity="0.38" />
+      <Path
+        d="M23 21 L41 39 M41 21 L23 39"
+        fill="none"
+        stroke={GLASS}
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+export function ClayTrash({ size = 28 }: SizeProps) {
+  const id = gid(useId());
+  return (
+    <Svg width={size} height={size} viewBox="0 0 64 64">
+      <Defs>
+        <SvgGradient id={`${id}b`} x1="0.15" y1="0.08" x2="0.9" y2="1">
+          <Stop offset="0" stopColor="#FECACA" />
+          <Stop offset="0.45" stopColor="#F43F5E" />
+          <Stop offset="1" stopColor="#9F1239" />
+        </SvgGradient>
+        <SvgGradient id={`${id}lid`} x1="0.2" y1="0" x2="0.8" y2="1">
+          <Stop offset="0" stopColor="#FFE4E6" />
+          <Stop offset="1" stopColor="#E11D48" />
         </SvgGradient>
       </Defs>
-      <Circle cx="32" cy="32" r="22" fill={`url(#${id}i)`} />
-      <Circle cx="32" cy="20" r="4" fill="#F4FEFF" />
-      <Path d="M28 28 L36 28 L36 48 L28 48 Z" fill="#F4FEFF" />
-      <Ellipse cx="24" cy="22" rx="7" ry="4" fill="#FFFFFF" opacity="0.3" />
+      <Ellipse cx="33" cy="57" rx="14" ry="3.2" fill="#9F1239" opacity="0.22" />
+      <Path d="M20 22 L44 22 L42 52 C42 55 40 56 37 56 L27 56 C24 56 22 55 22 52 Z" fill="#9F1239" opacity="0.35" />
+      <Path d="M18 20 L46 20 L44 50 C44 53 42 54 39 54 L25 54 C22 54 20 53 20 50 Z" fill={`url(#${id}b)`} />
+      <Path d="M14 16 L50 16 C52 16 53 18 53 20 L11 20 C11 18 12 16 14 16 Z" fill={`url(#${id}lid)`} />
+      <Path d="M28 12 L36 12 C38 12 39 13 39 15 L39 16 L25 16 L25 15 C25 13 26 12 28 12 Z" fill="#FB7185" />
+      <Path d="M26 28 L28 46 M32 28 L32 46 M38 28 L36 46" stroke="#FFE4E6" strokeWidth="2.4" strokeLinecap="round" opacity="0.75" />
+      <Ellipse cx="22" cy="24" rx="6" ry="3" fill="#FFFFFF" opacity="0.35" />
     </Svg>
   );
 }

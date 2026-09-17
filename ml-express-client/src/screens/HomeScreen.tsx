@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Linking,
   Image,
+  ActivityIndicator,
   Dimensions,
   RefreshControl,
   Platform,
@@ -21,9 +22,21 @@ import TutorialModal from '../components/TutorialModal';
 import HotlinePickerModal from '../components/HotlinePickerModal';
 import BrandRider from '../components/BrandRider';
 import HomeToolsSection from '../components/HomeToolsSection';
+import NearbyDealsSection from '../components/NearbyDealsSection';
+import type { NearbyDealProduct } from '../services/clientApi/nearbyDealService';
+import {
+  accountGpsStorageId,
+  capturePhoneGps,
+  loadSavedAccountGps,
+  resolvePlaceLabel,
+  saveAccountGps,
+  type AccountGpsFix,
+} from '../services/clientApi/customerGpsService';
+import { feedbackService } from '../services/FeedbackService';
 import {
   ClayBook,
   ClayPagodas,
+  ClayPin,
   ProfileAvatar3D,
 } from '../components/ProfileClayIcons';
 import { packageService, bannerService, Banner } from '../services/supabase';
@@ -104,6 +117,9 @@ export default function HomeScreen({ navigation }: any) {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [showTutorialModal, setShowTutorialModal] = useState(false);
   const [showHotlineModal, setShowHotlineModal] = useState(false);
+  const [gpsFix, setGpsFix] = useState<AccountGpsFix | null>(null);
+  const [gpsStatus, setGpsStatus] = useState<'locating' | 'denied' | 'error' | 'ready'>('locating');
+  const gpsAutoLocateAlive = useRef(true);
 
   const displayBanners = banners.length > 0 ? banners : FALLBACK_BANNERS;
   const totalBanners = displayBanners.length;
@@ -131,6 +147,11 @@ export default function HomeScreen({ navigation }: any) {
       supportHint: '在线为您服务',
       promoUntil: '活动至 2026年1月',
       newBadge: 'NEW',
+      gpsLocating: '正在读取这台手机的 GPS…',
+      gpsDenied: '需要定位权限，才能按你的位置推荐附近优惠',
+      gpsError: '定位失败，点图标重新读取 GPS',
+      gpsReady: '已绑定这台手机位置',
+      gpsAccuracy: '精度',
     },
     en: {
       slogan: 'City flash · 30 min delivery',
@@ -154,6 +175,11 @@ export default function HomeScreen({ navigation }: any) {
       supportHint: 'We are online for you',
       promoUntil: 'Until Jan 2026',
       newBadge: 'NEW',
+      gpsLocating: 'Reading GPS on this phone…',
+      gpsDenied: 'Location permission is required for nearby deals',
+      gpsError: 'Could not locate. Tap the pin to retry',
+      gpsReady: 'This phone is pinned',
+      gpsAccuracy: 'Accuracy',
     },
     my: {
       slogan: 'မြို့တွင်း · ၃၀ မိနစ်',
@@ -177,6 +203,11 @@ export default function HomeScreen({ navigation }: any) {
       supportHint: 'အွန်လိုင်းမှ ကူညီပေးပါသည်',
       promoUntil: '၂၀၂၆ ဇန်နဝါရီ အထိ',
       newBadge: 'NEW',
+      gpsLocating: 'ဤဖုန်း GPS ဖတ်နေသည်…',
+      gpsDenied: 'အနီးအနား လျှော့စျေးအတွက် တည်နေရာခွင့်ပြုချက် လိုအပ်သည်',
+      gpsError: 'တည်နေရာ မရပါ။ ပင်ကိုနှိပ်၍ GPS ယူပါ',
+      gpsReady: 'ဤဖုန်း တည်နေရာ ချိတ်ပြီး',
+      gpsAccuracy: 'တိကျမှု',
     },
   }[language];
 
@@ -260,10 +291,68 @@ export default function HomeScreen({ navigation }: any) {
     }
   };
 
+  const locateAccountGps = useCallback(async (opts?: { silent?: boolean }) => {
+    const accountId = accountGpsStorageId(userId, isGuest);
+    if (!accountId) return;
+    setGpsStatus('locating');
+    const captured = await capturePhoneGps();
+    if (opts?.silent && !gpsAutoLocateAlive.current) return;
+    if (!captured.ok) {
+      setGpsStatus(captured.reason === 'denied' ? 'denied' : 'error');
+      if (!opts?.silent) {
+        feedbackService.warning(captured.reason === 'denied' ? t.gpsDenied : t.gpsError);
+      }
+      return;
+    }
+    const placeLabel = await resolvePlaceLabel(captured.coords);
+    if (opts?.silent && !gpsAutoLocateAlive.current) return;
+    const fix: AccountGpsFix = {
+      userId: accountId,
+      latitude: captured.coords.latitude,
+      longitude: captured.coords.longitude,
+      accuracyM: captured.accuracyM,
+      placeLabel,
+      updatedAt: new Date().toISOString(),
+    };
+    setGpsFix(fix);
+    setGpsStatus('ready');
+    await saveAccountGps(fix);
+    if (!opts?.silent) feedbackService.success(t.gpsReady);
+  }, [userId, isGuest, t.gpsDenied, t.gpsError, t.gpsReady]);
+
+  useEffect(() => {
+    const accountId = accountGpsStorageId(userId, isGuest);
+    if (!accountId) return;
+    let cancelled = false;
+    gpsAutoLocateAlive.current = true;
+    void (async () => {
+      const saved = await loadSavedAccountGps(accountId);
+      if (cancelled) return;
+      if (saved) {
+        setGpsFix(saved);
+        setGpsStatus('ready');
+      }
+      if (cancelled) return;
+      await locateAccountGps({ silent: true });
+    })();
+    return () => {
+      cancelled = true;
+      gpsAutoLocateAlive.current = false;
+    };
+  }, [userId, isGuest, locateAccountGps]);
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadUserData(), loadBanners()]);
+    await Promise.all([loadUserData(), loadBanners(), locateAccountGps({ silent: true })]);
     setRefreshing(false);
+  };
+
+  const openNearbyDeal = (deal: NearbyDealProduct) => {
+    navigation.navigate('MerchantProducts', {
+      storeId: deal.storeId,
+      storeName: deal.storeName,
+      highlightProductId: deal.id,
+    });
   };
 
   const requireLogin = () => {
@@ -338,13 +427,33 @@ export default function HomeScreen({ navigation }: any) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TEAL} colors={[TEAL]} />}
       >
         <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) + 4 }]}>
-          <View style={styles.logoTile}>
-            <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
-          </View>
-          <View style={styles.brandCol}>
-            <Text style={styles.brandName}>MARKET LINK</Text>
-            <Text style={styles.brandSub}>EXPRESS</Text>
-            <Text style={styles.slogan}>{t.slogan}</Text>
+          <TouchableOpacity
+            style={styles.gpsTile}
+            onPress={() => void locateAccountGps({ silent: false })}
+            activeOpacity={0.82}
+            accessibilityRole="button"
+          >
+            <View style={styles.gpsHalo} />
+            {gpsStatus === 'locating' ? (
+              <ActivityIndicator size="small" color={TEAL} />
+            ) : (
+              <ClayPin size={34} />
+            )}
+          </TouchableOpacity>
+          <View style={styles.gpsCol}>
+            <Text style={styles.gpsHint} numberOfLines={2}>
+              {gpsStatus === 'locating'
+                ? t.gpsLocating
+                : gpsStatus === 'denied'
+                  ? t.gpsDenied
+                  : gpsStatus === 'error'
+                    ? t.gpsError
+                    : `${gpsFix?.placeLabel || t.gpsReady}${
+                        gpsFix?.accuracyM != null
+                          ? ` · ${t.gpsAccuracy} ${Math.round(gpsFix.accuracyM)}m`
+                          : ''
+                      }`}
+            </Text>
           </View>
           <TouchableOpacity
             style={styles.helloPill}
@@ -358,7 +467,7 @@ export default function HomeScreen({ navigation }: any) {
               {avatarSrc ? (
                 <Image source={{ uri: avatarSrc }} style={styles.helloAvatarImg} />
               ) : (
-                <ProfileAvatar3D size={28} />
+                <ProfileAvatar3D size={26} />
               )}
             </View>
           </TouchableOpacity>
@@ -410,6 +519,18 @@ export default function HomeScreen({ navigation }: any) {
           onTrack={() => navigation.navigate('TrackOrder')}
           onSupport={handleCallHotline}
         />
+
+        <NearbyDealsSection
+          language={language}
+          origin={
+            gpsFix
+              ? { latitude: gpsFix.latitude, longitude: gpsFix.longitude }
+              : null
+          }
+          gpsStatus={gpsStatus}
+          onRequestLocate={() => void locateAccountGps({ silent: false })}
+          onOpenProduct={openNearbyDeal}
+        />
       </ScrollView>
 
       <TutorialModal isVisible={showTutorialModal} onClose={() => setShowTutorialModal(false)} />
@@ -446,9 +567,9 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     gap: 10,
   },
-  logoTile: {
-    width: 52,
-    height: 52,
+  gpsTile: {
+    width: 48,
+    height: 48,
     borderRadius: 16,
     backgroundColor: CARD,
     alignItems: 'center',
@@ -456,61 +577,54 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...cardShadow,
   },
-  logo: {
-    width: 44,
-    height: 44,
+  gpsHalo: {
+    position: 'absolute',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(44,152,166,0.12)',
   },
-  brandCol: {
+  gpsCol: {
     flex: 1,
     minWidth: 0,
+    marginRight: 4,
   },
-  brandName: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: NAVY,
-    letterSpacing: 0.2,
-  },
-  brandSub: {
-    marginTop: -1,
-    fontSize: 15,
-    fontWeight: '800',
-    color: TEAL,
-    letterSpacing: 0.6,
-  },
-  slogan: {
-    marginTop: 2,
-    fontSize: 11,
+  gpsHint: {
+    fontSize: 12,
     color: MUTED,
     fontWeight: '600',
+    lineHeight: 16,
   },
   helloPill: {
-    maxWidth: 132,
+    flexShrink: 0,
+    maxWidth: 118,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: CARD,
     borderRadius: 999,
-    paddingLeft: 10,
-    paddingRight: 4,
-    paddingVertical: 4,
-    gap: 6,
+    paddingLeft: 8,
+    paddingRight: 3,
+    paddingVertical: 3,
+    gap: 5,
     ...cardShadow,
   },
   helloText: {
     flexShrink: 1,
-    fontSize: 12,
+    maxWidth: 72,
+    fontSize: 11,
     fontWeight: '700',
     color: NAVY,
   },
   helloAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     overflow: 'hidden',
     backgroundColor: '#E7F7F9',
   },
   helloAvatarImg: {
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
   },
   tutorialCard: {
     marginHorizontal: 16,
