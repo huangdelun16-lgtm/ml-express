@@ -52,6 +52,11 @@ function resolveExtraSupabaseUrl(envUrl) {
   return String(envUrl || SUPABASE_UPSTREAM_URL).trim();
 }
 
+function pluginName(plugin) {
+  if (Array.isArray(plugin)) return plugin[0];
+  return plugin;
+}
+
 module.exports = ({ config }) => {
   const expoConfig = { ...(config ?? baseConfig.expo ?? baseConfig) };
 
@@ -65,13 +70,32 @@ module.exports = ({ config }) => {
     process.env.GOOGLE_PLACES_API_KEY ||
     mapsKey
   ).trim();
+  // Native Android MapView only accepts a Maps SDK Android key.
+  // Never substitute the Places HTTP key from .env / EAS extra.
+  const androidMapsSdkKey = (
+    process.env.EXPO_PUBLIC_GOOGLE_MAPS_SDK_ANDROID_KEY ||
+    (expoConfig.android &&
+      expoConfig.android.config &&
+      expoConfig.android.config.googleMaps &&
+      expoConfig.android.config.googleMaps.apiKey) ||
+    ''
+  ).trim();
   const supabaseUrl = resolveExtraSupabaseUrl(process.env.EXPO_PUBLIC_SUPABASE_URL || '');
   const supabaseAnonKey = (
     process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY
   ).trim();
 
+  const plugins = (expoConfig.plugins || []).filter((plugin) => pluginName(plugin) !== 'react-native-maps');
+  plugins.push([
+    'react-native-maps',
+    {
+      ...(androidMapsSdkKey ? { androidGoogleMapsApiKey: androidMapsSdkKey } : {}),
+    },
+  ]);
+
   return {
     ...expoConfig,
+    plugins,
     ios: {
       ...(expoConfig.ios || {}),
       config: {
@@ -83,14 +107,14 @@ module.exports = ({ config }) => {
       ...(expoConfig.android || {}),
       config: {
         ...((expoConfig.android && expoConfig.android.config) || {}),
-        ...(mapsKey
+        ...(androidMapsSdkKey
           ? {
               googleMaps: {
                 ...(((expoConfig.android &&
                   expoConfig.android.config &&
                   expoConfig.android.config.googleMaps) ||
                   {})),
-                apiKey: mapsKey,
+                apiKey: androidMapsSdkKey,
               },
             }
           : {}),

@@ -19,6 +19,7 @@
     - [6.8 进行中订单、聊天未读、拨打骑手](#68-进行中订单聊天未读拨打骑手)
 7. [会员 App `ml-express-client`](#7-会员-app-ml-express-client)
     - [7.9 会员订单查询（PostgREST 拆查）](#79-会员订单查询postgrest-拆查)
+    - [7.10 Google Maps 与 Cloud Console（必读）](#710-google-maps-与-cloud-console必读)
 8. [商家 App `ml-express-merchant-app`](#8-商家-app-ml-express-merchant-app)
     - [8.9 进行中订单与聊天 REST 轮询](#89-进行中订单与聊天-rest-轮询)
 9. [骑手/员工 App `ml-express-mobile-app`](#9-骑手员工-app-ml-express-mobile-app)
@@ -39,6 +40,7 @@
 17. [常见问题与排障](#17-常见问题与排障)
     - [17.8 会员 App 订单为空](#178-会员-app我的订单全部-0-单)
     - [17.10 部署后线上变成旧版](#1710-部署后线上变成旧版)
+    - [17.11 会员 App Android 地图米色空白](#1711-会员-app-android-地图米色空白)
 18. [给 AI / 维护者的改代码提示](#18-给-ai--维护者的改代码提示)
 19. [常用文件速查](#19-常用文件速查)
 20. [版本与分支](#20-版本与分支)
@@ -157,7 +159,7 @@ ml-express/                          # 仓库根 = Admin Web（market-link-expre
 | 商家 Web | `https://mlexpress-merchants.com` | 目录 `ml-express-merchant-web`；站点 `mlexpress-merchant`；同源 `/__sb/` |
 | Inventory App Support | `https://market-link-express.com/support` | App Store Support URL |
 | Inventory iOS / Android | App Store / 内测 APK `com.mlexpress.inventory` | EAS，当前 **2.1.0 (35)** |
-| 会员 App | `com.mlexpress.client` | EAS **2.8.1 (75)**；原生 REST 走 `market-link-express.com/__sb/` |
+| 会员 App | `com.mlexpress.client` | EAS **2.8.4 (78)**；原生 REST 走 `market-link-express.com/__sb/`；Android 地图见 **§7.10** |
 | 商家 App | `com.mlexpress.merchants` | EAS **2.5.5 (25)**；原生 REST 走 `mlexpress-merchants.com/__sb/` |
 | 骑手 App | `com.mlexpress.courier` | EAS **2.4.5 (83)**；原生 REST 走 `admin-market-link-express.com/__sb/` |
 | Inventory 原生 | 同上 Admin 域 `/__sb/` | `nativeSupabaseUrl.ts`；**必须尾斜杠** |
@@ -205,7 +207,7 @@ App / 浏览器
 | **`/`（仓库根）** | Web | **管理后台**：订单、用户、财务、跟踪、告警、合伙店铺、报表、跨境物流 | CRA + TS + React Router **v6** | **2.2.4** | Netlify（根目录） |
 | **`ml-express-client-web/`** | Web | **会员端网站**：首页、商城、购物车、账户、Support | CRA + TS + React Router **v7** | **0.1.0** | Netlify |
 | **`ml-express-merchant-web/`** | Web | **商家端网站**：门店订单/商品/对账 | CRA + TS + React Router **v7** | **0.1.0** | Netlify |
-| **`ml-express-client/`** | Mobile | **会员 App** `com.mlexpress.client` | Expo SDK 57 / RN 0.86 | **2.8.1 (75)** | EAS |
+| **`ml-express-client/`** | Mobile | **会员 App** `com.mlexpress.client` | Expo SDK 57 / RN 0.86 | **2.8.4 (78)** | EAS |
 | **`ml-express-merchant-app/`** | Mobile | **商家 App** `com.mlexpress.merchants` | Expo SDK 57 / RN 0.86 | **2.5.5 (25)** | EAS |
 | **`ml-express-mobile-app/`** | Mobile | **骑手/员工端** `com.mlexpress.courier` | Expo SDK 57 / RN 0.86 | **2.4.5 (83)** | EAS |
 | **`ml-express-inventory-app/`** | Mobile | **中转站库存 App** `com.mlexpress.inventory` | Expo SDK 57 + Supabase Auth JWT + `/__sb` + 蓝牙打印 | **2.1.0 (35)** | EAS |
@@ -383,7 +385,7 @@ App / 浏览器
 |-----|------|------|--------------|-------|--------------------|----------|
 | Inventory | `ml-express-inventory-app/` | **~57.0.20** | **0.86.3** | **19.2.3** | **15.15.4** | 2.1.0 (35) |
 | 商家 App | `ml-express-merchant-app/` | **~57.0.20** | **0.86.3** | **19.2.3** | **15.15.4** | 2.5.5 (25) |
-| 会员 App | `ml-express-client/` | **~57.0.20** | **0.86.3** | **19.2.3** | **15.15.4** | 2.8.1 (75) |
+| 会员 App | `ml-express-client/` | **~57.0.20** | **0.86.3** | **19.2.3** | **15.15.4** | 2.8.4 (78) |
 | 骑手 STAFF | `ml-express-mobile-app/` | **~57.0.20** | **0.86.3** | **19.2.3** | **15.15.4** | 2.4.5 (83) |
 
 **官方升级（勿绕开）**
@@ -787,7 +789,7 @@ cd ml-express-merchant-web && npm run deploy:netlify
 | 项 | 值 |
 |----|-----|
 | 包名 | `com.mlexpress.client` |
-| 版本 | **2.8.1**（iOS build **75** / Android versionCode **75**） |
+| 版本 | **2.8.4**（iOS build **78** / Android versionCode **78**） |
 | 技术 | Expo SDK 57 + RN 0.86.3 + React 19.2.3 + React Navigation 6（见 §3.2） |
 | Deep link | `ml-express-client://`、`https://mlexpress.com` |
 | EAS | projectId `80b0873d-1d76-429e-8c79-738a817d8a15` |
@@ -825,7 +827,7 @@ ml-express-client/
 └── docs/sql/                   # client_android_latest_release.sql
 ```
 
-**密钥约定**：`EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` / `EXPO_PUBLIC_GOOGLE_PLACES_API_KEY` 放 `.env`（本地）或 EAS Secrets；`android/keystore.properties` 放上传密钥密码。勿把 Maps Key、keystore 密码写入 `app.json` / `gradle.properties`。
+**密钥约定**：Places HTTP Key（`EXPO_PUBLIC_GOOGLE_PLACES_API_KEY`）放 `.env` / EAS Secrets，**不要**写进 Manifest。Android **Maps SDK** Key 必须写进 `AndroidManifest.xml` + `app.json` 的 `android.config.googleMaps` + `react-native-maps` 插件（见 §7.10）。`android/keystore.properties` 放上传密钥密码，勿提交。勿把 Places HTTP Key 或 keystore 密码写入 `gradle.properties`。
 
 ### 7.3 数据层
 
@@ -890,6 +892,69 @@ npm run build:apk:gradle                            # 本地 Gradle APK
 列表页：访客/`id=guest` **故意不拉单**；已登录每次进入「我的订单」Tab `useFocusEffect` 再拉。查询失败只打日志，界面仍可能显示空态。
 
 对照：会员 Web `getPackagesByUser` 也匹配收发件人电话，但仍有一段拼 `.or()` 的遗留写法，App 已拆开。
+
+### 7.10 Google Maps 与 Cloud Console（必读）
+
+**已验证**：会员 Android APK **2.8.4 (78)** 选点 / 追踪底图可用（2026-09-18）。iOS / Mac 选点走 **Apple MapKit**（`MapView` 的 `provider` 为 `undefined`），**不走**下面这把 Android Key，所以 Mac 正常不能证明 Android Key 配好了。
+
+**Expo Go 打不开原生 Google 底图。** 必须装 EAS APK / Play 包。
+
+#### 两把 Key，用途不同
+
+| 用途 | 真正读取位置 | Key 特征 | Cloud Console 限制 |
+|------|----------------|----------|--------------------|
+| 原生 `MapView` 底图 | `AndroidManifest.xml` → `com.google.android.geo.API_KEY`；`react-native-maps` 插件 `androidGoogleMapsApiKey` | 与商家端同一把 **Maps SDK for Android** Key（末尾 **`HSJqc`**） | **Android apps** + 包名 + SHA-1 |
+| 搜索框 Places HTTP | `.env` / EAS `EXPO_PUBLIC_GOOGLE_PLACES_API_KEY` → JS `extra.googlePlacesApiKey` | Places Web Service Key（末尾 **`6Pn0`**） | **不要**设成 Android apps（否则 `REQUEST_DENIED`） |
+
+GCP 项目：**`ml-express-473205`**。旧客户端清单 Key（末尾 **`0XJI`**）也是 Android 限制 Key；2.8.4 已改用商家端那把 `HSJqc`（商家 2.5.6 已验证能出图）。`app.config.js` 用 `EXPO_PUBLIC_GOOGLE_MAPS_SDK_ANDROID_KEY`（或 `app.json` `android.config.googleMaps.apiKey`）写 Manifest，**禁止**把 Places HTTP Key 灌进原生清单。
+
+EAS `apk` profile 必须 `"environment": "production"`，才会带上这些 Secrets。
+
+#### Cloud Console：Maps SDK Android Key（末尾 `HSJqc`）
+
+路径：Google Cloud Console → 项目 `ml-express-473205` → API 和服务 → 凭据 → 对应 Key。
+
+**API 限制**（须勾选，尤其第一项）：
+
+- **Maps SDK for Android**（底图瓦片，缺了就是米色空白）
+- Places API
+- Geocoding API
+- Directions API
+- Distance Matrix API
+- Maps JavaScript API
+- Maps 3D SDK for Android
+
+后两项对原生 `MapView` 不是必须，可留着。搜索框不走这把 Key。
+
+**应用限制**：选 **Android apps**（不要选 None / Websites / IP）。
+
+**Android 应用列表**（2026-09-18 已核对，包名 + SHA-1 必须成对）：
+
+| 包名 | SHA-1 证书指纹 | 说明 |
+|------|----------------|------|
+| `com.mlexpress.client` | `AA:FA:1E:8C:F7:B1:ED:5C:97:DE:C2:87:AB:89:5A:5F:E7:88:13:97` | 会员 EAS / Play **上传密钥**。侧载 2.8.4 APK 的签名就是这个（`docs/ANDROID_SIGNING.md`） |
+| `com.mlexpress.merchants` | `41:77:2A:B0:08:C6:7B:CD:5C:87:26:DC:50:AA:05:E5:F4:65:E8:B3` | 商家 App |
+| `com.mlexpress.courier` | `8E:05:84:E7:07:02:08:17:E5:F8:FE:3B:8F:19:3C:5A:76:CD:FE:B8` | 骑手 Play **应用签名密钥** |
+| `com.mlexpress.courier` | `69:3F:AD:55:66:A7:0C:83:AA:A2:E5:1B:6C:4C:08:3B:6C:54:AC:AF` | 骑手另一套签名（EAS / 上传） |
+
+保存后等 **2–5 分钟**再生效。
+
+**Play 商店安装**（不是侧载 APK）时，设备上跑的是 Play **应用签名密钥**，和上传密钥不同。若商店包米色，到 Play Console → 应用完整性 抄 **应用签名密钥 SHA-1**，再给 `com.mlexpress.client` 加一条。侧载 EAS APK 不需要这一条。
+
+#### 仓库落点
+
+| 文件 | 作用 |
+|------|------|
+| `ml-express-client/android/app/src/main/AndroidManifest.xml` | 原生 `geo.API_KEY`（`HSJqc`） |
+| `ml-express-client/app.json` | `android.config.googleMaps.apiKey` + 插件 `react-native-maps` |
+| `ml-express-client/app.config.js` | 原生 Key 与 Places Key 分流；插件 props 必须带 `androidGoogleMapsApiKey`，否则 prebuild 会**删掉** Manifest 里的 Key |
+| `ml-express-client/src/components/placeOrder/MapModal.tsx` | Android：`PROVIDER_GOOGLE`、延迟挂载、`googleRenderer: 'LEGACY'`；iOS：Apple 地图 |
+| `ml-express-client/src/screens/TrackOrderScreen.tsx` | 追踪页同样 `PROVIDER_GOOGLE` + LEGACY |
+
+#### Android 选点实现要点
+
+- 不要同时受控 `region` + `initialRegion`（Android 容易一直米色）。
+- Modal 里的 `MapView` 等 Modal 显示后再挂载（约 400ms），外层 `collapsable={false}`。
 
 ---
 
@@ -1879,6 +1944,16 @@ Admin 本机打包 Edge `supabase-bff` 需要 Deno **^2.4.2**（仓库 `netlify-
 | Expo（含 Inventory） | `EXPO_PUBLIC_*` + `app.config.js` `extra` | 会员/商家 Maps Key；Inventory 生产默认走 `/__sb`；`EXPO_PUBLIC_SUPABASE_DIRECT=1` 仅 VPN |
 | Netlify Functions / Edge | Dashboard | `SUPABASE_SERVICE_ROLE_KEY`、`JWT_SECRET` 等；Edge 转发不需要把 service role 暴露给浏览器 |
 
+会员 App Google Maps 相关 EAS **production** 变量（apk profile 必须挂这个 environment）：
+
+| 变量 | 用途 |
+|------|------|
+| `EXPO_PUBLIC_GOOGLE_MAPS_SDK_ANDROID_KEY` | 原生 Android `MapView`（末尾 `HSJqc`，写入 Manifest / 插件） |
+| `EXPO_PUBLIC_GOOGLE_PLACES_API_KEY` | 搜索框 Places HTTP（末尾 `6Pn0`，勿设 Android 应用限制） |
+| `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` | JS `extra`；**不要**用它覆盖 Android Manifest |
+
+完整限制表见 **§7.10**。
+
 **注意**：CRA 的 `REACT_APP_*` 与 Expo 的 `EXPO_PUBLIC_*` **不互通**，各 app 独立配置。
 
 ---
@@ -1964,6 +2039,23 @@ Realtime 过不了 Netlify。商家看 `MerchantOrderContext` / AppContext 进�
 2. `restoreSiteDeploy` 回到该部署；浏览器强制刷新。
 3. 以后只在**对应子目录**跑 `npm run deploy:netlify`，不要 `--trigger`。
 
+### 17.11 会员 App Android 地图米色空白
+
+**现象**：取件地址弹层下面一大块奶油色/米色，没有转圈；搜索框可能仍可用；**Mac / iOS 正常**。
+
+**根因**：Android `MapView` 已布局成功（所以不是转圈），但 Google **拒绝发瓦片**。iOS 选点走 Apple 地图，不读 Android Key。Expo Go 也读不到你们清单里的 Key。
+
+**处理**：
+
+1. 装 EAS **2.8.4 (78)+** APK，不要用 Expo Go 测原生底图。
+2. Cloud Console 打开末尾 **`HSJqc`** 那把 Key（项目 `ml-express-473205`），按 **§7.10** 核：已开 **Maps SDK for Android**、应用限制 = Android apps、存在 `com.mlexpress.client` + SHA-1 `AA:FA:1E:8C:F7:B1:ED:5C:97:DE:C2:87:AB:89:5A:5F:E7:88:13:97`。
+3. 改限制后点 Save，等 2–5 分钟。
+4. 从 Play 商店装的包还要额外加 **应用签名密钥** SHA-1（见 §7.10）。
+
+不要把 Places HTTP Key（`6Pn0`）写进 `AndroidManifest`。
+
+---
+
 ---
 
 ## 18. 给 AI / 维护者的改代码提示
@@ -1980,7 +2072,7 @@ Realtime 过不了 Netlify。商家看 `MerchantOrderContext` / AppContext 进�
 10. **改计费/商品审核/充值 QR**：City 计费只改 `/shared/src`；**跨境路线/客户单价**改 `crossBorderRoutePricing.ts` + Inventory `crossBorderPricing.ts`（不走 `/shared`）。
 11. **改 Supabase schema**：新增 migration，同步 §14.4；**不要擅自 `supabase db push`**。
 12. **Inventory EAS 发布**：改 `app.json` version/buildNumber + `eas build`；Support URL 保持可访问。改完 Inventory JS 须用户 **重载 Expo / 重装 IPA**，热更未带上拦截器会再现 RLS。
-12b. **会员 App EAS 发布**：有原生 `android/` `ios/`，必须同步 `build.gradle` / `Info.plist` / `pbxproj`，否则商店仍是旧 versionCode。订单查询改 `clientApi/packageService.ts` + `customerPackageQuery.ts`，勿再把 description/email 塞进同一 `.or()`。
+12b. **会员 App EAS 发布**：有原生 `android/` `ios/`，必须同步 `build.gradle` / `Info.plist` / `pbxproj`，否则商店仍是旧 versionCode。订单查询改 `clientApi/packageService.ts` + `customerPackageQuery.ts`，勿再把 description/email 塞进同一 `.or()`。Android 地图改 Key / SHA-1 见 **§7.10**；`apk` profile 须 `environment: production`。
 13. **改打印**：`tsplLabelBuilder.ts` + `bleLabelPrinter.ts` / `bluetoothThermalPrinter.ts` + `printerService.ts`。
 14. **勿提交** `.env`、keystore、`.temp/`、`upload-release.keystore`；仅用户要求时 commit。
 15. **改 Google Play 媒体权限**：client / **商家 App** 的 `app.json blockedPermissions` + `utils/mediaAccess.ts` + `AndroidManifest.xml tools:node="remove"`。
@@ -1991,7 +2083,7 @@ Realtime 过不了 Netlify。商家看 `MerchantOrderContext` / AppContext 进�
 18. **会员 App 勿恢复商家运营入口**；密钥勿写进客户端明文。
 19. **改商家 App 提示/日志**：非确认走 `feedbackService`；生产门禁 `installProductionConsoleGate`；勿擅自加 Sentry。
 20. **商家 App 勿恢复会员注册/商城/购物车**；**保留**首页「立即下单」（电话订餐代客下单）与地址簿。
-21. **商家 App 登录**走 `merchant-password`，勿恢复客户端明文密码比对；Maps Key 只放 `.env` / EAS Secrets。
+21. **商家 App 登录**走 `merchant-password`，勿恢复客户端明文密码比对；Places HTTP Key 只放 `.env` / EAS Secrets；Android 底图 Key 见 §7.10。
 22. **改商家 App 业务 API**：改 `merchantApi/*`；`supabase.ts` 只做 barrel（与会员 `clientApi`、骑手 `staffApi` 同一手法）。
 23. **改会员/商家 Web 提示/日志**：非确认走 `feedbackService`；生产门禁 `installProductionConsoleGate`；确认/破坏性继续 `window.confirm`。会员 Web 已有 Sentry 可保留；**勿给商家 Web 加 Sentry**。
 24. **改 Admin Web 提示/日志**：非确认走 `feedbackService`；生产门禁 `installProductionConsoleGate`；确认/破坏性继续 `window.confirm`；**勿给 Admin 加 Sentry / 粒子背景 / 改 Router v6**。
@@ -2048,6 +2140,7 @@ Realtime 过不了 Netlify。商家看 `MerchantOrderContext` / AppContext 进�
 | 四端 Expo 原生栈 | **§3.2**；各 `app.json` plugins + `expo-splash-screen` |
 | 合伙店铺（不含中转站） | `DeliveryStoreManagement.tsx` |
 | 会员 App 我的订单为空 | **§7.9**、**§17.8**；`customerPackageQuery.ts`、`packageService.fetchCustomerPackages` |
+| 会员 App Android 地图 / Cloud Console | **§7.10**、**§17.11**；`MapModal.tsx`、`AndroidManifest.xml` `geo.API_KEY` |
 | 商家进行中单 / 未读 / 拨号 | **§6.8**、**§8.9**；`merchantInProgressOrders.ts`、`chatUnread.ts`、`dialPhone.ts` |
 | STAFF 新单不响 | **§9.11**；`courierNewOrderMonitor.ts` |
 | 会员 App 媒体权限 / 选图 | `ml-express-client/src/utils/mediaAccess.ts`、`app.json blockedPermissions` |
@@ -2067,7 +2160,7 @@ Realtime 过不了 Netlify。商家看 `MerchantOrderContext` / AppContext 进�
 | 项目 | 版本 | Build / Code | 备注 |
 |------|------|--------------|------|
 | 管理后台（根） | **2.2.4** | — | `package.json`；生产域 `admin-market-link-express.com` |
-| ml-express-client | **2.8.1** | **75** | `app.json` **且** 原生 `android/` `ios/`；含订单拆查修复 |
+| ml-express-client | **2.8.4** | **78** | `app.json` **且** 原生 `android/` `ios/`；Android 地图 Cloud Console 见 **§7.10** |
 | ml-express-merchant-app | **2.5.5** | **25** | 以 `app.json` 为准（`package.json` 可能滞后）；有提交的 `android/`/`ios/` |
 | ml-express-mobile-app | **2.4.5** | **83** | STAFF 骑手端；新单 REST 轮询 |
 | ml-express-inventory-app | **2.1.0** | **35** | JWT + `/__sb`；到站三步；客户编码计费 |
@@ -2171,7 +2264,7 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 2. 会员「我的订单」必须拆查 `customer_id` / description / email / **收发件人电话**；不要拼带 `[]` `.` `+` 的 `.or()`。
 3. 会员出包有原生工程，versionCode 改三处：`app.json` + Gradle + Info.plist/pbxproj。
 4. 商家 Web 登录仍是客户端比对密码；商家 App 走 `merchant-password`。不要在未授权时改登录。
-5. 版本锚点：会员 **2.8.1 (75)**、骑手 **2.4.5 (83)**、商家 App **2.5.5 (25)**、Inventory **2.1.0 (35)**。四端 Expo **SDK 57**（§3.2）。
+5. 版本锚点：会员 **2.8.4 (78)**、骑手 **2.4.5 (83)**、商家 App **2.5.5 (25)**、Inventory **2.1.0 (35)**。四端 Expo **SDK 57**（§3.2）。会员 Android 地图 Cloud Console 见 **§7.10**。
 
 ### 22.6 改代码入口（最短路径）
 
@@ -2183,7 +2276,7 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 | Admin Toast / 生产日志 | `FeedbackService`、`GlobalToast`、`LoggerService`、`src/index.tsx`（无 Sentry） |
 | Admin 认证 | `src/services/authService.ts`、`netlify/functions/admin-password.js`、`verify-admin.js` |
 | Admin 跨境 | `CrossBorderLogisticsPage` + `inventory-admin-*` Functions（只链 Inventory，Admin HMAC ≠ Inventory JWT） |
-| 会员 App | `ml-express-client/src/`（clientApi / screens）；订单查询 **§7.9** |
+| 会员 App | `ml-express-client/src/`（clientApi / screens）；订单查询 **§7.9**；Android 地图 **§7.10** |
 | 会员 Web | §5 + FeedbackService / LoggerService（保留既有 Sentry） |
 | 商家 App | §8 + `merchantApi/` + `merchantAuthService` + FeedbackService / LoggerService |
 | 商家 Web | §6 + FeedbackService / LoggerService（无 Sentry） |
@@ -2219,7 +2312,8 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 - 商家 Web：勿擅自加 `@sentry/react`。
 - Admin Web：非确认提示走 `feedbackService`；勿各页再挂本地 Toast；勿擅自加 Sentry / 粒子背景 / 改 Router v6。
 - 商家 App：勿恢复会员注册/商城/购物车；**保留**电话订餐「立即下单」。
-- 商家 App：勿改回客户端明文密码登录；勿把 Maps Key 写回 `app.json`。
+- 商家 App：勿改回客户端明文密码登录；Places HTTP Key 只放 `.env` / EAS Secrets；Android Maps SDK Key 必须在 Manifest / `react-native-maps` 插件（§7.10）。
+- 会员 App：勿把 Places HTTP Key 写进 `AndroidManifest`；勿用 Expo Go 测原生 Google 底图（§7.10）。
 - 商家 App：勿在 Android 选图时申请 `READ_MEDIA_*` / `READ_EXTERNAL_STORAGE`（走 Photo Picker，见 §8.7）。
 - 会员订单查询：勿把 `customer_email` / `[客户ID:]` / 电话 `+` 拼进同一段 PostgREST `.or()`（见 §7.9）。
 - **三站 Web**：勿 `netlify deploy --trigger` / 按 GitHub `main` 重建生产；勿在仓库根发会员/商家站（见 §15.3）。
@@ -2237,4 +2331,4 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 
 ---
 
-*最后更新：2026-09-06 — 记录四端 Expo SDK 57 原生栈（§3.2）与跨境签收锁汇率（§10.13 / §11.5）；版本锚点商家 2.5.5 (25)、骑手 2.4.5 (83)。细节以仓库当前文件为准。*
+*最后更新：2026-09-18 — 记录会员 App 2.8.4 (78) Android 地图与 Google Cloud Console 配置（§7.10 / §17.11）。细节以仓库当前文件为准。*

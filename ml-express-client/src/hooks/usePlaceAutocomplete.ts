@@ -12,7 +12,6 @@ import {
   nextSearchRequestId,
   placesLanguage,
   resolveMapPlaceSearchStatus,
-  searchOpenPlaces,
   shouldSearchMapPlaces,
 } from '../utils/mapPlaceSearch';
 
@@ -192,7 +191,7 @@ export function usePlaceAutocomplete({
 
             const status = String(data?.status || '').toUpperCase();
             if (status === 'REQUEST_DENIED' || status === 'OVER_QUERY_LIMIT') {
-              LoggerService.warn('Google Places 当前不可用，将尝试备用搜索');
+              LoggerService.warn('Google Places 当前不可用');
               break;
             }
 
@@ -209,9 +208,7 @@ export function usePlaceAutocomplete({
           }
         }
 
-        const openHits = await searchOpenPlaces(query, languageRef.current, loc);
-        if (isStaleSearchRequest(requestId, requestIdRef.current)) return;
-        applyStatus(requestId, openHits.length > 0 ? 'success' : 'empty', openHits);
+        applyStatus(requestId, 'error');
       } catch (error) {
         if (isStaleSearchRequest(requestId, requestIdRef.current)) return;
         if ((error as { name?: string })?.name === 'TimeoutError') {

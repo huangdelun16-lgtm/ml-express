@@ -1,6 +1,6 @@
 {
   "name": "ml-express-client",
-  "version": "2.8.1",
+  "version": "2.8.4",
   "main": "index.js",
   "scripts": {
     "sync:shared": "node ../shared/sync.mjs --out src/services/_shared",
@@ -21,7 +21,8 @@
     "download:ios": "eas build:download --platform ios --latest",
     "download:aab": "eas build:download --platform android --latest",
     "build:apk:gradle": "cd android && ./gradlew assembleRelease",
-    "download:apk": "eas build:download --platform android --latest"
+    "download:apk": "eas build:download --platform android --latest",
+    "eas-build-post-install": "chmod -R a+x node_modules/hermes-compiler/hermesc node_modules/react-native/sdks/hermesc 2>/dev/null || true"
   },
   "dependencies": {
     "@babel/runtime": "^7.25.0",
@@ -62,8 +63,8 @@
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
-    "babel-preset-expo": "~57.0.0",
     "@types/react": "~19.2.4",
+    "babel-preset-expo": "~57.0.0",
     "eas-cli": "^16.28.0",
     "typescript": "~6.0.3"
   },

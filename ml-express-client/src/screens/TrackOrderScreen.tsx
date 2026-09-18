@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import LoggerService from '../services/LoggerService';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, RefreshControl, Animated, Alert, Linking, BackHandler, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, RefreshControl, Alert, Linking, BackHandler, Platform } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, AnimatedRegion } from 'react-native-maps';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -80,16 +80,13 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   const [courierPhone, setCourierPhone] = useState<string | null>(null);
   const [riderLocation, setRiderLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const [estimatedTime, setEstimatedTime] = useState<number | null>(null); // 🚀 新增：预计剩余时间（分钟）
-  const [deliveryPhotos, setDeliveryPhotos] = useState<any[]>([]); // 🚀 新增：配送照片状态
-  
-  // 🚀 优化：平滑移动动画
+  const [deliveryPhotos, setDeliveryPhotos] = useState<any[]>([]);
   const riderAnimatedLocation = useRef(new AnimatedRegion({
     latitude: 16.8661,
     longitude: 96.1951,
     latitudeDelta: 0,
     longitudeDelta: 0,
   })).current;
-
   const [isOnline, setIsOnline] = useState(true);
   const [mapError, setMapError] = useState(false);
   const [mapMounted, setMapMounted] = useState(false);
@@ -600,6 +597,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
             <MapView
               ref={mapRef}
               provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+              {...(Platform.OS === 'android' ? { googleRenderer: 'LEGACY' as const } : {})}
               style={StyleSheet.absoluteFill}
               mapType="standard"
               loadingEnabled
@@ -609,8 +607,8 @@ export default function TrackOrderScreen({ navigation, route }: any) {
               rotateEnabled={false}
               onMapReady={handleMapReady}
               initialRegion={{
-                latitude: Number(packageData.sender_latitude) || 16.8661,
-                longitude: Number(packageData.sender_longitude) || 96.1951,
+                latitude: Number(packageData.sender_latitude) || Number(riderLocation?.latitude) || 21.9588,
+                longitude: Number(packageData.sender_longitude) || Number(riderLocation?.longitude) || 96.0891,
                 latitudeDelta: 0.05,
                 longitudeDelta: 0.05,
               }}
@@ -618,8 +616,8 @@ export default function TrackOrderScreen({ navigation, route }: any) {
               {!!packageData.sender_latitude && !!packageData.sender_longitude ? (
                 <Marker
                   coordinate={{
-                    latitude: packageData.sender_latitude,
-                    longitude: packageData.sender_longitude,
+                    latitude: Number(packageData.sender_latitude),
+                    longitude: Number(packageData.sender_longitude),
                   }}
                   title="发货点"
                   pinColor={TEAL}
@@ -628,8 +626,8 @@ export default function TrackOrderScreen({ navigation, route }: any) {
               {!!packageData.receiver_latitude && !!packageData.receiver_longitude ? (
                 <Marker
                   coordinate={{
-                    latitude: packageData.receiver_latitude,
-                    longitude: packageData.receiver_longitude,
+                    latitude: Number(packageData.receiver_latitude),
+                    longitude: Number(packageData.receiver_longitude),
                   }}
                   title="我的位置"
                   pinColor="#ef4444"
@@ -651,8 +649,8 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                   coordinates={[
                     riderLocation,
                     {
-                      latitude: packageData.receiver_latitude,
-                      longitude: packageData.receiver_longitude,
+                      latitude: Number(packageData.receiver_latitude),
+                      longitude: Number(packageData.receiver_longitude),
                     },
                   ]}
                   strokeColor={TEAL}

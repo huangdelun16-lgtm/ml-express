@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,11 +18,10 @@ import { useApp } from '../contexts/AppContext';
 import { addressService, AddressItem } from '../services/supabase';
 import { theme } from '../config/theme';
 import Toast from '../components/Toast';
-import { common } from '../i18n';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapModal from '../components/placeOrder/MapModal';
-import { useLanguageStyles } from '../hooks/useLanguageStyles';
 import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLanguageStyles } from '../hooks/useLanguageStyles';
 import * as Location from 'expo-location';
 
 const baseStyles = StyleSheet.create({
@@ -150,7 +149,6 @@ const baseStyles = StyleSheet.create({
 
 export default function AddressBookScreen({ navigation, route }: any) {
   const { language } = useApp();
-  const c = common(language);
   const [loading, setLoading] = useState(true);
   const [addresses, setAddresses] = useState<AddressItem[]>([]);
   const [userId, setUserId] = useState<string>('');
@@ -160,15 +158,13 @@ export default function AddressBookScreen({ navigation, route }: any) {
 
   const styles = useLanguageStyles(baseStyles);
 
-  // 翻译内容 (MapModal 需要)
   const currentT = useMemo(() => ({
-    senderAddress: c.senderAddress,
-    receiverAddress: c.receiverAddress,
-    coordinates: c.coordinates,
-    useCurrentLocation: c.useCurrentLocation
-  }), [c]);
+    senderAddress: language === 'zh' ? '寄件地址' : language === 'en' ? 'Sender Address' : 'ပို့သူလိပ်စာ',
+    receiverAddress: language === 'zh' ? '收件地址' : language === 'en' ? 'Receiver Address' : 'လက်ခံသူလိပ်စာ',
+    coordinates: language === 'zh' ? '坐标' : language === 'en' ? 'Coordinates' : 'ကိုဩဒိနိတ်',
+    useCurrentLocation: language === 'zh' ? '使用当前位置' : language === 'en' ? 'Use Current Location' : 'လက်ရှိတည်နေရာသုံးမည်',
+  }), [language]);
 
-  // 地图选择相关
   const [showMapSelector, setShowMapSelector] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState({
     latitude: 21.9588,
@@ -375,31 +371,38 @@ export default function AddressBookScreen({ navigation, route }: any) {
     }
   };
 
+  const openMapSelector = () => {
+    if (formData.latitude && formData.longitude) {
+      setSelectedLocation({
+        latitude: formData.latitude,
+        longitude: formData.longitude,
+      });
+    }
+    setMapAddressInput(formData.address_text || '');
+    setShowMapSelector(true);
+  };
+
   const handleConfirmMapLocation = async () => {
     let finalAddress = mapAddressInput.trim();
-    
-    // 如果没有输入地址，则使用反向地理编码
     if (!finalAddress) {
       try {
         const address = await Location.reverseGeocodeAsync({
           latitude: selectedLocation.latitude,
           longitude: selectedLocation.longitude,
         });
-
-        if (address && address[0]) {
+        if (address?.[0]) {
           const addr = address[0];
           finalAddress = `${addr.street || ''} ${addr.district || ''} ${addr.city || ''} ${addr.region || ''}`.trim();
         }
-      } catch (e) {
-        console.error('Reverse geocode error:', e);
+      } catch {
+        // keep empty and fall through
       }
     }
-    
     setFormData({
       ...formData,
       address_text: finalAddress,
       latitude: selectedLocation.latitude,
-      longitude: selectedLocation.longitude
+      longitude: selectedLocation.longitude,
     });
     setShowMapSelector(false);
   };
@@ -408,14 +411,13 @@ export default function AddressBookScreen({ navigation, route }: any) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
-
       const location = await Location.getCurrentPositionAsync();
       setSelectedLocation({
         latitude: location.coords.latitude,
-        longitude: location.coords.longitude
+        longitude: location.coords.longitude,
       });
-    } catch (e) {
-      console.error('Get current location error:', e);
+    } catch {
+      // ignore
     }
   };
 
@@ -484,7 +486,7 @@ export default function AddressBookScreen({ navigation, route }: any) {
         </LinearGradient>
       </TouchableOpacity>
 
-      <Modal visible={showModal && !showMapSelector} animationType="slide" transparent>
+      <Modal visible={showModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -545,7 +547,7 @@ export default function AddressBookScreen({ navigation, route }: any) {
 
               <TouchableOpacity 
                 style={styles.mapBtn} 
-                onPress={() => setShowMapSelector(true)}
+                onPress={openMapSelector}
               >
                 <Ionicons name="map-outline" size={20} color="#1E6F7A" />
                 <Text style={styles.mapBtnText}>{t.selectOnMap}</Text>
@@ -566,34 +568,34 @@ export default function AddressBookScreen({ navigation, route }: any) {
             <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
               <Text style={styles.saveBtnText}>{t.save}</Text>
             </TouchableOpacity>
+
+            <MapModal
+              visible={showMapSelector}
+              language={language as any}
+              styles={styles}
+              currentT={currentT}
+              mapType="receiver"
+              selectedLocation={selectedLocation}
+              selectedPlace={selectedPlace}
+              mapAddressInput={mapAddressInput}
+              showSuggestions={showSuggestions}
+              autocompleteSuggestions={autocompleteSuggestions}
+              searchStatus={searchStatus}
+              onRetrySearch={retrySearch}
+              onClose={() => setShowMapSelector(false)}
+              onConfirm={handleConfirmMapLocation}
+              onAddressInputChange={handleMapAddressInputChange}
+              onMapAddressInputChange={setMapAddressInput}
+              onUseCurrentLocation={handleUseCurrentLocation}
+              onSelectSuggestion={handleSelectSuggestion}
+              onSetShowSuggestions={setShowSuggestions}
+              onLocationChange={setSelectedLocation}
+              onPlaceChange={setSelectedPlace}
+              markerTitle={t.selectOnMap}
+            />
           </View>
         </View>
       </Modal>
-
-      <MapModal
-        visible={showMapSelector}
-        language={language as any}
-        styles={styles}
-        currentT={currentT}
-        mapType="receiver"
-        selectedLocation={selectedLocation}
-        selectedPlace={selectedPlace}
-        mapAddressInput={mapAddressInput}
-        showSuggestions={showSuggestions}
-        autocompleteSuggestions={autocompleteSuggestions}
-        searchStatus={searchStatus}
-        onRetrySearch={retrySearch}
-        onClose={() => setShowMapSelector(false)}
-        onConfirm={handleConfirmMapLocation}
-        onAddressInputChange={handleMapAddressInputChange}
-        onMapAddressInputChange={setMapAddressInput}
-        onUseCurrentLocation={handleUseCurrentLocation}
-        onSelectSuggestion={handleSelectSuggestion}
-        onSetShowSuggestions={setShowSuggestions}
-        onLocationChange={setSelectedLocation}
-        onPlaceChange={setSelectedPlace}
-        markerTitle={t.selectOnMap}
-      />
 
       <Toast
         visible={toastVisible}

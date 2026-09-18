@@ -1,9 +1,8 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import LoggerService from './../../services/LoggerService';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Platform, ActivityIndicator, BackHandler, Dimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import type { MapPlaceSearchStatus } from '../../utils/mapPlaceSearch';
-import MapView, { Marker, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import AutocompleteSuggestionItem from './AutocompleteSuggestionItem';
 
 interface MapModalProps {
@@ -61,13 +60,6 @@ const MapModal = memo<MapModalProps>(({
   onPlaceChange,
   markerTitle,
 }) => {
-  const insets = useSafeAreaInsets();
-  const mapRef = useRef<MapView>(null);
-  const skipNextAnimateRef = useRef(true);
-  const lastAnimatedRef = useRef({ latitude: 0, longitude: 0 });
-  const [attachMap, setAttachMap] = useState(false);
-  const [mapReady, setMapReady] = useState(false);
-
   const handleMapPress = useCallback((e: any) => {
     onLocationChange(e.nativeEvent.coordinate);
     onPlaceChange(null);
@@ -103,7 +95,6 @@ const MapModal = memo<MapModalProps>(({
 
   const handleInputBlur = useCallback(() => {
     setTimeout(() => {
-      // 失败/空结果/加载中要留下拉，否则「重试」会被 200ms 后的关闭冲掉
       if (searchStatus === 'loading' || searchStatus === 'empty' || searchStatus === 'error') {
         return;
       }
@@ -111,7 +102,12 @@ const MapModal = memo<MapModalProps>(({
     }, 200);
   }, [onSetShowSuggestions, searchStatus]);
 
-  const mapRegion = useMemo<Region>(() => {
+  const mapRef = useRef<MapView>(null);
+  const lastAnimatedKeyRef = useRef('');
+  const [attachMap, setAttachMap] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+
+  const mapRegion = useMemo(() => {
     const lat = selectedLocation?.latitude || 21.9588;
     const lng = selectedLocation?.longitude || 96.0891;
     return {
@@ -126,40 +122,20 @@ const MapModal = memo<MapModalProps>(({
     if (!visible) {
       setAttachMap(false);
       setMapReady(false);
-      skipNextAnimateRef.current = true;
+      lastAnimatedKeyRef.current = '';
       return;
     }
-    const delay = Platform.OS === 'android' ? 450 : 50;
+    const delay = Platform.OS === 'android' ? 400 : 0;
     const timer = setTimeout(() => setAttachMap(true), delay);
     return () => clearTimeout(timer);
   }, [visible]);
 
   useEffect(() => {
-    if (!visible) return undefined;
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      onClose();
-      return true;
-    });
-    return () => sub.remove();
-  }, [onClose, visible]);
-
-  useEffect(() => {
-    if (!mapReady || !attachMap) return;
-    const lat = mapRegion.latitude;
-    const lng = mapRegion.longitude;
-    if (skipNextAnimateRef.current) {
-      skipNextAnimateRef.current = false;
-      lastAnimatedRef.current = { latitude: lat, longitude: lng };
-      return;
-    }
-    if (
-      Math.abs(lastAnimatedRef.current.latitude - lat) < 0.00001 &&
-      Math.abs(lastAnimatedRef.current.longitude - lng) < 0.00001
-    ) {
-      return;
-    }
-    lastAnimatedRef.current = { latitude: lat, longitude: lng };
-    mapRef.current?.animateToRegion(mapRegion, 350);
+    if (!attachMap || Platform.OS !== 'android' || !mapReady) return;
+    const key = `${mapRegion.latitude.toFixed(5)},${mapRegion.longitude.toFixed(5)}`;
+    if (key === lastAnimatedKeyRef.current) return;
+    lastAnimatedKeyRef.current = key;
+    mapRef.current?.animateToRegion(mapRegion, 250);
   }, [attachMap, mapReady, mapRegion]);
 
   const mapTitle = useMemo(() => {
@@ -195,23 +171,17 @@ const MapModal = memo<MapModalProps>(({
 
   const status = searchStatus || (showSuggestions && autocompleteSuggestions.length > 0 ? 'success' : 'idle');
   const showDropdown = showSuggestions && status !== 'idle';
-  const markerCoordinate = {
-    latitude: selectedLocation.latitude || 21.9588,
-    longitude: selectedLocation.longitude || 96.0891,
-  };
-
-  if (!visible) return null;
-
-  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
   return (
-    <View
-      style={[localStyles.overlay, { width: screenWidth, height: screenHeight }]}
-      pointerEvents="auto"
-      collapsable={false}
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      hardwareAccelerated={Platform.OS === 'android'}
+      onRequestClose={onClose}
     >
-      <View style={styles.mapModalContainer} collapsable={false}>
-        <View style={[styles.mapHeader, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 50 : 24) }]}>
+      <View style={styles.mapModalContainer}>
+        <View style={styles.mapHeader}>
           <TouchableOpacity onPress={onClose}>
             <Text style={styles.mapCloseButton}>✕</Text>
           </TouchableOpacity>
@@ -243,9 +213,9 @@ const MapModal = memo<MapModalProps>(({
               />
             ) : null}
           </View>
-          
-          <TouchableOpacity 
-            onPress={onUseCurrentLocation} 
+
+          <TouchableOpacity
+            onPress={onUseCurrentLocation}
             style={{
               marginTop: 12,
               flexDirection: 'row',
@@ -322,41 +292,65 @@ const MapModal = memo<MapModalProps>(({
           ) : null}
         </View>
 
-        <View style={localStyles.mapWrap} collapsable={false}>
-          {visible && attachMap ? (
-            <MapView
-              ref={mapRef}
-              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-              style={localStyles.mapFill}
-              initialRegion={mapRegion}
-              showsUserLocation
-              showsMyLocationButton={false}
-              showsCompass
-              loadingEnabled
-              moveOnMarkerPress={false}
-              toolbarEnabled={false}
-              pitchEnabled={false}
-              rotateEnabled={false}
-              mapType="standard"
-              onPress={handleMapPress}
-              onPoiClick={handlePoiClick}
-              onMapReady={() => {
-                setMapReady(true);
-                if (__DEV__) {
-                  LoggerService.debug('地图已准备就绪');
-                }
-              }}
-            >
-              <Marker
-                coordinate={markerCoordinate}
-                draggable
-                onDragEnd={handleMarkerDragEnd}
-                title={markerTitle || '选择的位置'}
-                description={markerTitle ? '店铺注册位置' : '拖动或点击地图调整位置'}
-              />
-            </MapView>
+        <View style={[styles.map, { overflow: 'hidden' }]} collapsable={false}>
+          {attachMap ? (
+            <>
+              <MapView
+                ref={mapRef}
+                provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+                {...(Platform.OS === 'android' ? { googleRenderer: 'LEGACY' as const } : {})}
+                style={{ flex: 1 }}
+                initialRegion={mapRegion}
+                {...(Platform.OS === 'ios' ? { region: mapRegion } : {})}
+                showsUserLocation={true}
+                showsMyLocationButton={false}
+                showsCompass={true}
+                showsScale={true}
+                loadingEnabled={true}
+                moveOnMarkerPress={false}
+                toolbarEnabled={false}
+                mapType="standard"
+                onPress={handleMapPress}
+                onPoiClick={handlePoiClick}
+                onMapReady={() => {
+                  setMapReady(true);
+                  if (__DEV__) {
+                    LoggerService.debug('地图已准备就绪');
+                  }
+                }}
+              >
+                {selectedLocation && (
+                  <Marker
+                    coordinate={{
+                      latitude: selectedLocation.latitude || 21.9588,
+                      longitude: selectedLocation.longitude || 96.0891
+                    }}
+                    draggable
+                    onDragEnd={handleMarkerDragEnd}
+                    title={markerTitle || '选择的位置'}
+                    description={markerTitle ? '店铺注册位置' : '拖动或点击地图调整位置'}
+                  />
+                )}
+              </MapView>
+              {!mapReady ? (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <ActivityIndicator size="large" color="#2C98A6" />
+                </View>
+              ) : null}
+            </>
           ) : (
-            <View style={[localStyles.mapFill, localStyles.mapPlaceholder]}>
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
               <ActivityIndicator size="large" color="#2C98A6" />
             </View>
           )}
@@ -381,32 +375,10 @@ const MapModal = memo<MapModalProps>(({
           </View>
         )}
       </View>
-    </View>
+    </Modal>
   );
 });
 
 MapModal.displayName = 'MapModal';
-
-const localStyles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 9999,
-    elevation: 9999,
-    backgroundColor: '#ffffff',
-  },
-  mapWrap: {
-    flex: 1,
-    minHeight: 240,
-    backgroundColor: '#e8eef2',
-    overflow: 'hidden',
-  },
-  mapFill: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  mapPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
 
 export default MapModal;

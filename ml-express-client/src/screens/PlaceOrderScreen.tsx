@@ -23,7 +23,6 @@ import { useLoading } from '../contexts/LoadingContext';
 import { useCart, summarizeCustomerRemarks, getCartItemLineKey, CartItem } from '../contexts/CartContext';
 import { packageService, systemSettingsService, supabase, Product } from '../services/supabase';
 import { databaseService } from '../services/DatabaseService';
-import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
 import { FadeInView } from '../components/Animations';
 import { MoneyIcon } from '../components/Icon';
 import { useLanguageStyles } from '../hooks/useLanguageStyles';
@@ -40,11 +39,12 @@ import ReceiverForm from '../components/placeOrder/ReceiverForm';
 import PackageInfo from '../components/placeOrder/PackageInfo';
 import DeliveryOptions from '../components/placeOrder/DeliveryOptions';
 import PriceCalculation from '../components/placeOrder/PriceCalculation';
-import MapModal from '../components/placeOrder/MapModal';
 import OrderWizardProgress, { OrderWizardStepIndex } from '../components/placeOrder/OrderWizardProgress';
 import OrderQrModal from '../components/placeOrder/OrderQrModal';
 import ScheduledTimePickerModal from '../components/placeOrder/ScheduledTimePickerModal';
 import PackageTypeInfoModal from '../components/placeOrder/PackageTypeInfoModal';
+import MapModal from '../components/placeOrder/MapModal';
+import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
 import { promptGuestLogin } from '../utils/guestSession';
 
 const TEAL = '#2C98A6';
@@ -229,15 +229,15 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   const [calculatedPrice, setCalculatedPrice] = useState('0');
   const [calculatedDistance, setCalculatedDistance] = useState(0);
   const [cartTotal, setCartTotal] = useState(0);
-  
-  // 地图相关
+
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapType, setMapType] = useState<'sender' | 'receiver'>('sender');
   const [selectedLocation, setSelectedLocation] = useState({
     latitude: 21.9588,
     longitude: 96.0891,
   });
-  
+  const [selectedPlace, setSelectedPlace] = useState<any>(null);
+
   // 坐标状态 - 用于保存寄件人和收件人的精确坐标
   const [senderCoordinates, setSenderCoordinates] = useState<{lat: number, lng: number} | null>(null);
   const [receiverCoordinates, setReceiverCoordinates] = useState<{lat: number, lng: number} | null>(null);
@@ -250,9 +250,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
-  
-  // 地图POI相关
-  const [selectedPlace, setSelectedPlace] = useState<any>(null);
 
   // 表单验证状态
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -320,23 +317,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     setErrors(prev => ({ ...prev, [field]: error }));
   }, [senderName, senderPhone, senderAddress, receiverName, receiverPhone, receiverAddress, validateField]);
 
-  const {
-    mapAddressInput,
-    setMapAddressInput,
-    autocompleteSuggestions,
-    showSuggestions,
-    setShowSuggestions,
-    searchStatus,
-    handleMapAddressInputChange,
-    handleSelectSuggestion,
-    retrySearch,
-  } = usePlaceAutocomplete({
-    language: language as 'zh' | 'en' | 'my',
-    selectedLocation,
-    onLocationChange: setSelectedLocation,
-    onPlaceChange: setSelectedPlace,
-  });
-  
   // QR码模态框
   const [showQRCodeModal, setShowQRCodeModal] = useState(false);
   const [qrOrderId, setQrOrderId] = useState('');
@@ -373,6 +353,22 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   });
 
   const currentT = getPlaceOrderCopy(language);
+  const {
+    mapAddressInput,
+    setMapAddressInput,
+    autocompleteSuggestions,
+    showSuggestions,
+    setShowSuggestions,
+    searchStatus,
+    handleMapAddressInputChange,
+    handleSelectSuggestion,
+    retrySearch,
+  } = usePlaceAutocomplete({
+    language: language as 'zh' | 'en' | 'my',
+    selectedLocation,
+    onLocationChange: setSelectedLocation,
+    onPlaceChange: setSelectedPlace,
+  });
   const wizardStepLabels: string[] =
     (currentT as { wizardSteps?: string[] }).wizardSteps ?? ['地址', '包裹', '配送', '确认'];
 
@@ -661,39 +657,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   }, [useMyInfo, userName, userPhone]);
 
   // 计算价格
-  // 使用当前位置（在地图Modal中）- 优化：使用缓存和超时
-  const useCurrentLocationInMap = async () => {
-    try {
-      showLoading('获取位置中...');
-      
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        hideLoading();
-        Alert.alert('提示', '需要位置权限才能使用此功能');
-        return;
-      }
-
-      // 设置超时和优化选项
-      const locationPromise = Location.getCurrentPositionAsync();
-      void locationPromise.catch(() => undefined);
-      
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('获取位置超时')), 5000) // 5秒超时
-      );
-      
-      const location = await Promise.race([locationPromise, timeoutPromise]) as any;
-      setSelectedLocation({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      });
-      
-      hideLoading();
-    } catch (error) {
-      hideLoading();
-      errorService.handleError(error, { context: 'PlaceOrderScreen.handleUseCurrentLocation' });
-    }
-  };
-
   // 使用当前位置（在表单中）
   const useCurrentLocation = async () => {
     try {
@@ -735,136 +698,92 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     }
   };
 
-  // 打开地图选择器 - 优化：先打开地图，异步获取位置
+  // 打开地图选择器（与商家端相同：RN Modal + 原生 MapView）
   const openMapSelector = useCallback(async (type: 'sender' | 'receiver') => {
     try {
       setMapType(type);
-      
-      // 如果已有地址，填充到输入框
       if (type === 'sender' && senderAddress) {
-        const addressLines = senderAddress.split('\n');
-        const addressWithoutCoords = addressLines.filter(line => !line.includes('📍')).join('\n');
+        const addressWithoutCoords = senderAddress.split('\n').filter((line) => !line.includes('📍')).join('\n');
         setMapAddressInput(addressWithoutCoords);
-        // 如果已有坐标，使用已有坐标
-        if (senderCoordinates && senderCoordinates.lat && senderCoordinates.lng) {
+        if (senderCoordinates?.lat && senderCoordinates?.lng) {
           setSelectedLocation({
             latitude: senderCoordinates.lat,
             longitude: senderCoordinates.lng,
           });
           setShowMapModal(true);
-          return; // 直接使用已有坐标，不需要获取当前位置
+          return;
         }
       } else if (type === 'receiver' && receiverAddress) {
-        const addressLines = receiverAddress.split('\n');
-        const addressWithoutCoords = addressLines.filter(line => !line.includes('📍')).join('\n');
+        const addressWithoutCoords = receiverAddress.split('\n').filter((line) => !line.includes('📍')).join('\n');
         setMapAddressInput(addressWithoutCoords);
-        // 如果已有坐标，使用已有坐标
-        if (receiverCoordinates && receiverCoordinates.lat && receiverCoordinates.lng) {
+        if (receiverCoordinates?.lat && receiverCoordinates?.lng) {
           setSelectedLocation({
             latitude: receiverCoordinates.lat,
             longitude: receiverCoordinates.lng,
           });
           setShowMapModal(true);
-          return; // 直接使用已有坐标，不需要获取当前位置
+          return;
         }
       } else {
         setMapAddressInput('');
       }
-      
-      // 默认位置：曼德勒（缅甸主要城市）
-      const defaultLocation = {
-        latitude: 21.9588,
-        longitude: 96.0891,
-      };
-      
-      // 先使用默认位置打开地图（立即响应）
-      setSelectedLocation(defaultLocation);
+
+      setSelectedLocation({ latitude: 21.9588, longitude: 96.0891 });
       setShowMapModal(true);
-      
-      // 异步获取当前位置（不阻塞UI）
+
       (async () => {
         try {
           const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status !== 'granted') {
-            LoggerService.debug('位置权限未授予，使用默认位置');
-            return;
-          }
-
-          // 设置超时，避免等待太久
+          if (status !== 'granted') return;
           const locationPromise = Location.getCurrentPositionAsync();
           void locationPromise.catch(() => undefined);
-          
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('获取位置超时')), 3000) // 3秒超时
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('获取位置超时')), 3000),
           );
-          
-          const location = await Promise.race([locationPromise, timeoutPromise]) as any;
-          const currentLocation = {
+          const location = (await Promise.race([locationPromise, timeoutPromise])) as any;
+          setSelectedLocation({
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
-          };
-          
-          // 更新地图位置（如果获取成功）
-          setSelectedLocation(currentLocation);
+          });
         } catch (error) {
           LoggerService.debug('获取当前位置失败，使用默认位置:', error);
-          // 使用默认位置，不显示错误提示
         }
       })();
     } catch (error) {
       errorService.handleError(error, { context: 'PlaceOrderScreen.handleOpenMap', silent: true });
-      // 即使出错也打开地图，使用默认位置
       setShowMapModal(true);
     }
-  }, [senderAddress, receiverAddress, senderCoordinates, receiverCoordinates]);
+  }, [receiverAddress, receiverCoordinates, senderAddress, senderCoordinates, setMapAddressInput]);
 
-  // 确认地图位置
   const confirmMapLocation = useCallback(async () => {
     try {
       showLoading('获取地址中...');
-      
-      // 优先使用输入框中的地址
       let finalAddress = mapAddressInput.trim();
-      
-      // 如果没有输入地址，则使用反向地理编码
       if (!finalAddress) {
         const address = await Location.reverseGeocodeAsync({
           latitude: selectedLocation.latitude,
           longitude: selectedLocation.longitude,
         });
-
-        if (address && address[0]) {
+        if (address?.[0]) {
           const addr = address[0];
           finalAddress = `${addr.street || ''} ${addr.district || ''} ${addr.city || ''} ${addr.region || ''}`.trim();
         }
       }
-      
-      // 如果还是没有地址，使用坐标
       if (!finalAddress) {
         finalAddress = `${selectedLocation.latitude}, ${selectedLocation.longitude}`;
       }
-      
-      // 保存坐标和地址
       const coords = {
         lat: selectedLocation.latitude,
-        lng: selectedLocation.longitude
+        lng: selectedLocation.longitude,
       };
-      
+      const addressWithCoords = `${finalAddress}\n📍 ${currentT.coordinates}: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
       if (mapType === 'sender') {
-        // 将地址和坐标一起添加到输入框
-        const addressWithCoords = `${finalAddress}\n📍 ${currentT.coordinates}: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
         setSenderAddress(addressWithCoords);
         setSenderCoordinates(coords);
-        LoggerService.debug('✅ 寄件地址坐标已保存:', coords);
       } else {
-        // 将地址和坐标一起添加到输入框
-        const addressWithCoords = `${finalAddress}\n📍 ${currentT.coordinates}: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
         setReceiverAddress(addressWithCoords);
         setReceiverCoordinates(coords);
-        LoggerService.debug('✅ 收件地址坐标已保存:', coords);
       }
-      
-      // 清空地图地址输入框
       setMapAddressInput('');
       setShowMapModal(false);
       hideLoading();
@@ -872,7 +791,45 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       hideLoading();
       errorService.handleError(error, { context: 'PlaceOrderScreen.handleReverseGeocode' });
     }
-  }, [mapAddressInput, selectedLocation, mapType, currentT.coordinates, setSenderAddress, setReceiverAddress, setSenderCoordinates, setReceiverCoordinates, setMapAddressInput, setShowMapModal, showLoading, hideLoading]);
+  }, [
+    currentT.coordinates,
+    hideLoading,
+    mapAddressInput,
+    mapType,
+    selectedLocation,
+    setMapAddressInput,
+    setReceiverAddress,
+    setReceiverCoordinates,
+    setSenderAddress,
+    setSenderCoordinates,
+    showLoading,
+  ]);
+
+  const useCurrentLocationInMap = useCallback(async () => {
+    try {
+      showLoading('获取位置中...');
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        hideLoading();
+        Alert.alert('提示', '需要位置权限才能使用此功能');
+        return;
+      }
+      const locationPromise = Location.getCurrentPositionAsync();
+      void locationPromise.catch(() => undefined);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('获取位置超时')), 5000),
+      );
+      const location = (await Promise.race([locationPromise, timeoutPromise])) as any;
+      setSelectedLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+      hideLoading();
+    } catch (error) {
+      hideLoading();
+      errorService.handleError(error, { context: 'PlaceOrderScreen.handleUseCurrentLocation' });
+    }
+  }, [hideLoading, showLoading]);
 
   // 使用Haversine公式计算两点之间的距离（公里）
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
@@ -2100,10 +2057,10 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         onUseCurrentLocation={useCurrentLocationInMap}
         onSelectSuggestion={handleSelectSuggestion}
         onSetShowSuggestions={setShowSuggestions}
-        onLocationChange={(coords) => setSelectedLocation(coords)}
+        onLocationChange={setSelectedLocation}
         onPlaceChange={setSelectedPlace}
       />
-      
+
       <PackageTypeInfoModal
         visible={showPackageTypeInfo}
         styles={styles}

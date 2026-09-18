@@ -730,7 +730,7 @@ export const ui = StyleSheet.create({
   hero: {
     height: MAP_HERO,
     backgroundColor: '#d8eef1',
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   heroScrim: {
     position: 'absolute',
