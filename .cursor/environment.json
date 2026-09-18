@@ -1,0 +1,16 @@
+{
+  "name": "MARKET LINK EXPRESS - Admin Web",
+  "install": "bash .cursor/cloud-agent-install.sh",
+  "terminals": [
+    {
+      "name": "admin-web",
+      "command": "BROWSER=none PORT=3000 npm start"
+    }
+  ],
+  "ports": [
+    {
+      "name": "Admin Web",
+      "port": 3000
+    }
+  ]
+}
