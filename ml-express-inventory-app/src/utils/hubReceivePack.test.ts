@@ -139,4 +139,38 @@ describe('hubReceivePack', () => {
     expect(merged.hub_received_at).toBe('2026-08-25T00:00:00Z');
     expect(resolveHubReceiveStep(merged, 'LSO')).toBe(2);
   });
+
+  it('确认入库后忽略仍显示在途的订单 GET', () => {
+    const confirmed = pack(
+      [
+        {
+          id: '1',
+          order_barcode: 'LSO260801001',
+          order_name: 'A',
+          destination_code: 'LSO',
+          status: 'hub_received',
+          pack_barcode: 'RUI26LSO20001',
+          qty: 1,
+        },
+      ] as PkgTrackingDetail['orders'],
+      { status: 'hub_received' },
+    );
+    const staleFetch = pack(
+      [
+        {
+          id: '1',
+          order_barcode: 'LSO260801001',
+          order_name: 'A',
+          destination_code: 'LSO',
+          status: 'in_transit',
+          pack_barcode: 'RUI26LSO20001',
+          qty: 1,
+        },
+      ] as PkgTrackingDetail['orders'],
+      { status: 'hub_received' },
+    );
+    const merged = preferConfirmedHubReceivePack(confirmed, staleFetch);
+    expect(merged.orders[0].status).toBe('hub_received');
+    expect(resolveHubReceiveStep(merged, 'LSO')).toBe(3);
+  });
 });

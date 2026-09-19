@@ -31,6 +31,7 @@ import {
   listPackableItems,
 } from '../services/inventoryService';
 import { canMarkCustomerSigned } from '../utils/customerSign';
+import BatchSignInvoiceModal from '../components/BatchSignInvoiceModal';
 import CustomerSignFlowModal, { type CustomerSignFlowRequest } from '../components/CustomerSignFlowModal';
 import {
   collectSameCustomerPeers,
@@ -92,6 +93,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const [openExceptionCodes, setOpenExceptionCodes] = useState<Set<string>>(new Set());
   const [orderBarcodeRequireDone, setOrderBarcodeRequireDone] = useState(false);
   const [signRequest, setSignRequest] = useState<CustomerSignFlowRequest | null>(null);
+  const [invoiceVisible, setInvoiceVisible] = useState(false);
   const [packSuccessInfo, setPackSuccessInfo] = useState<{
     name: string;
     barcode: string;
@@ -276,6 +278,21 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     void openCustomerSign(selectedItems);
   };
 
+  const handleOpenInvoice = () => {
+    if (!store) return;
+    const validationError = validateBatchSignSelection(selectedItems);
+    if (validationError) {
+      feedbackService.notify(
+        t.common.tip,
+        validationError === 'batchSignEmpty'
+          ? t.items.batchSignEmpty
+          : t.items.batchSignMixedCustomer,
+      );
+      return;
+    }
+    setInvoiceVisible(true);
+  };
+
   const openPackModal = () => {
     if (selectedIds.size === 0) {
       feedbackService.notify(t.common.tip, t.items.alertSelectPack);
@@ -349,86 +366,90 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
 
   return (
     <View style={styles.root}>
-      <View style={styles.toolbar}>
-        <TextInput
-          style={styles.search}
-          placeholder={
-            listMode === 'pack' ? t.items.searchPack : t.items.searchList
-          }
-          placeholderTextColor="#94a3b8"
-          value={search}
-          onChangeText={setSearch}
-          onSubmitEditing={() => {
-            const nextSearch = search.trim();
-            if (nextSearch === debouncedSearch) void load(true);
-            else setDebouncedSearch(nextSearch);
-          }}
-          returnKeyType="search"
-          accessibilityLabel={t.common.search}
-        />
-        {listMode === 'normal' ? (
-          <Pressable
-            style={styles.addBtn}
-            onPress={() => navigation.navigate('ItemForm')}
-            accessibilityRole="button"
-            accessibilityLabel={t.items.newBtn}
-          >
-            <Text style={styles.addText}>{t.items.newBtn}</Text>
-          </Pressable>
-        ) : null}
-      </View>
-
-      <View style={styles.onlineBannerWrap}>
-        <OnlineRequiredBanner />
-      </View>
-
-      {incompleteOnly ? (
-        <View style={styles.incompleteBanner}>
-          <Text style={styles.incompleteBannerText}>{t.items.incompleteFilterBanner}</Text>
-        </View>
-      ) : null}
-
-      <RegionFilterBar value={filterRegion} onChange={setFilterRegion} />
-
-      <ItemsModeBar
-        listMode={listMode}
-        selectedCount={selectedIds.size}
-        onEnterPack={() => {
-          setFilterRegion('');
-          setListMode('pack');
-        }}
-        onEnterSign={() => {
-          setFilterRegion('');
-          setListMode('sign');
-        }}
-        onCancel={exitSelectMode}
-        onOpenPack={openPackModal}
-        onBatchSign={handleBatchSign}
-      />
-
-      {loadError ? (
-        <View style={styles.inlineError}>
-          <Text style={styles.errorText}>{loadError}</Text>
-          <Pressable
-            style={styles.retryBtn}
-            onPress={() => void load(true)}
-            accessibilityRole="button"
-            accessibilityLabel={t.common.retry}
-          >
-            <Text style={styles.retryBtnText}>{t.common.retry}</Text>
-          </Pressable>
-        </View>
-      ) : loading && items.length > 0 && !refreshing ? (
-        <View style={styles.inlineLoading}>
-          <ActivityIndicator size="small" color="#38bdf8" />
-          <Text style={styles.stateText}>{t.common.loading}</Text>
-        </View>
-      ) : null}
-
       <FlatList
         data={displayedItems}
         keyExtractor={(it) => it.id}
         contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          <View>
+            <View style={styles.toolbar}>
+              <TextInput
+                style={styles.search}
+                placeholder={
+                  listMode === 'pack' ? t.items.searchPack : t.items.searchList
+                }
+                placeholderTextColor="#94a3b8"
+                value={search}
+                onChangeText={setSearch}
+                onSubmitEditing={() => {
+                  const nextSearch = search.trim();
+                  if (nextSearch === debouncedSearch) void load(true);
+                  else setDebouncedSearch(nextSearch);
+                }}
+                returnKeyType="search"
+                accessibilityLabel={t.common.search}
+              />
+              {listMode === 'normal' ? (
+                <Pressable
+                  style={styles.addBtn}
+                  onPress={() => navigation.navigate('ItemForm')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t.items.newBtn}
+                >
+                  <Text style={styles.addText}>{t.items.newBtn}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            <View style={styles.onlineBannerWrap}>
+              <OnlineRequiredBanner />
+            </View>
+
+            {incompleteOnly ? (
+              <View style={styles.incompleteBanner}>
+                <Text style={styles.incompleteBannerText}>{t.items.incompleteFilterBanner}</Text>
+              </View>
+            ) : null}
+
+            <RegionFilterBar value={filterRegion} onChange={setFilterRegion} />
+
+            <ItemsModeBar
+              listMode={listMode}
+              selectedCount={selectedIds.size}
+              onEnterPack={() => {
+                setFilterRegion('');
+                setListMode('pack');
+              }}
+              onEnterSign={() => {
+                setFilterRegion('');
+                setListMode('sign');
+              }}
+              onCancel={exitSelectMode}
+              onOpenPack={openPackModal}
+              onBatchSign={handleBatchSign}
+              onOpenInvoice={handleOpenInvoice}
+            />
+
+            {loadError ? (
+              <View style={styles.inlineError}>
+                <Text style={styles.errorText}>{loadError}</Text>
+                <Pressable
+                  style={styles.retryBtn}
+                  onPress={() => void load(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t.common.retry}
+                >
+                  <Text style={styles.retryBtnText}>{t.common.retry}</Text>
+                </Pressable>
+              </View>
+            ) : loading && items.length > 0 && !refreshing ? (
+              <View style={styles.inlineLoading}>
+                <ActivityIndicator size="small" color="#38bdf8" />
+                <Text style={styles.stateText}>{t.common.loading}</Text>
+              </View>
+            ) : null}
+          </View>
+        }
         onRefresh={async () => {
           setRefreshing(true);
           try {
@@ -591,6 +612,15 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         data={orderBarcodeData}
         onClose={closeOrderBarcode}
         onDone={orderBarcodeRequireDone ? handlePackBarcodeDone : undefined}
+      />
+
+      <BatchSignInvoiceModal
+        visible={invoiceVisible}
+        selectedItems={selectedItems}
+        knownItems={items}
+        store={store}
+        hubCode={hubCode}
+        onClose={() => setInvoiceVisible(false)}
       />
 
       <CustomerSignFlowModal

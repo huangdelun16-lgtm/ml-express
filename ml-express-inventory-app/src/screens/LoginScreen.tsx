@@ -16,6 +16,7 @@ import {
 import Text from '../components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
+import { MYANMAR_FONT_REGULAR } from '../utils/myanmarText';
 import { LOGIN_LOGO } from '../constants/branding';
 import { INVENTORY_PRIVACY_URL, INVENTORY_SUPPORT_URL } from '../constants/support';
 import LanguageSelector from '../components/LanguageSelector';
@@ -32,7 +33,8 @@ const LOGO_MAX_WIDTH = 170;
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const myanmarUi = language === 'my';
   const [storeCode, setStoreCode] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -105,9 +107,9 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{t.login.cardTitle}</Text>
-
-            <Text style={styles.accountNote}>{t.login.accountAccess}</Text>
+            <Text style={styles.cardTitle} myanmarWeight="bold">
+              {t.login.cardTitle}
+            </Text>
 
             {!configured ? (
               <View style={styles.warnBox}>
@@ -127,8 +129,12 @@ export default function LoginScreen() {
             <View style={styles.field}>
               <Text style={styles.label}>{t.login.storeCode}</Text>
               <TextInput
-                style={[styles.input, storeFocused && styles.inputFocused]}
-                placeholder={t.login.storeCodePlaceholder}
+                style={[
+                  styles.input,
+                  myanmarUi && styles.inputMyanmar,
+                  storeFocused && styles.inputFocused,
+                ]}
+                placeholder=""
                 placeholderTextColor="#64748b"
                 autoCapitalize="characters"
                 autoCorrect={false}
@@ -148,9 +154,10 @@ export default function LoginScreen() {
                   style={[
                     styles.input,
                     styles.passwordInput,
+                    myanmarUi && styles.inputMyanmar,
                     passwordFocused && styles.inputFocused,
                   ]}
-                  placeholder={t.login.passwordPlaceholder}
+                  placeholder=""
                   placeholderTextColor="#64748b"
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
@@ -182,18 +189,13 @@ export default function LoginScreen() {
                 {loading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.btnText}>{t.login.submit}</Text>
+                  <Text style={styles.btnText} myanmarWeight="bold">
+                    {t.login.submit}
+                  </Text>
                 )}
               </View>
             </Pressable>
           </View>
-
-          <Pressable
-            style={styles.supportLink}
-            onPress={() => void Linking.openURL(INVENTORY_SUPPORT_URL)}
-          >
-            <Text style={styles.supportLinkText}>{t.login.partnerAccessLink}</Text>
-          </Pressable>
 
           <Pressable
             style={styles.secondaryLink}
@@ -208,8 +210,6 @@ export default function LoginScreen() {
           >
             <Text style={styles.secondaryLinkText}>{t.login.privacyLink}</Text>
           </Pressable>
-
-          <Text style={styles.footer}>{t.login.footer}</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -292,13 +292,8 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: 0.3,
-    marginBottom: 10,
-  },
-  accountNote: {
-    color: '#94a3b8',
-    fontSize: 12,
-    lineHeight: 18,
-    marginBottom: 16,
+    marginBottom: 18,
+    lineHeight: 30,
   },
   warnBox: {
     backgroundColor: 'rgba(251, 191, 36, 0.08)',
@@ -326,6 +321,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 8,
     marginLeft: 2,
+    lineHeight: 22,
   },
   input: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -336,6 +332,12 @@ const styles = StyleSheet.create({
     color: '#f8fafc',
     borderWidth: 1,
     borderColor: 'rgba(148, 163, 184, 0.18)',
+  },
+  inputMyanmar: {
+    fontFamily: MYANMAR_FONT_REGULAR,
+    fontSize: 15,
+    lineHeight: 26,
+    paddingVertical: Platform.OS === 'ios' ? 16 : 14,
   },
   inputFocused: {
     borderColor: 'rgba(56, 189, 248, 0.55)',
@@ -366,7 +368,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   btnInner: {
-    paddingVertical: 16,
+    paddingVertical: 18,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
@@ -377,28 +379,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontSize: 16,
     letterSpacing: 0.4,
-  },
-  footer: {
-    color: '#475569',
-    fontSize: 11,
+    lineHeight: 26,
     textAlign: 'center',
-    lineHeight: 17,
-    marginTop: 12,
-    letterSpacing: 0.2,
-  },
-  supportLink: {
-    marginTop: 16,
-    alignSelf: 'center',
-    paddingVertical: 4,
-  },
-  supportLinkText: {
-    color: '#38bdf8',
-    fontSize: 13,
-    fontWeight: '800',
-    textDecorationLine: 'underline',
   },
   secondaryLink: {
-    marginTop: 8,
+    marginTop: 16,
     alignSelf: 'center',
     paddingVertical: 2,
   },
@@ -407,5 +392,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     textDecorationLine: 'underline',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

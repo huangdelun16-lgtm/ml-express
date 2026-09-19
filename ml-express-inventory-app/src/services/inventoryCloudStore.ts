@@ -323,8 +323,23 @@ export async function listItemsForScope(
 }
 
 export async function listMovementsForItem(itemId: string): Promise<StockMovement[]> {
-  const snapshot = await ensureCache(undefined, undefined, { includeMovements: true });
-  return snapshot.movements.filter((movement) => movement.item_id === itemId);
+  return listMovementsForItems([itemId]);
+}
+
+export async function listMovementsForItems(itemIds: string[]): Promise<StockMovement[]> {
+  const unique = [...new Set(itemIds.filter(Boolean))];
+  if (unique.length === 0) return [];
+  const rows = await fetchCloudMovementsForItems(unique);
+  const movements = rows.map(rowToMovement);
+  if (cache) {
+    const seen = new Set(cache.movements.map((movement) => movement.id));
+    const extra = movements.filter((movement) => !seen.has(movement.id));
+    if (extra.length > 0) {
+      cache = { ...cache, movements: [...cache.movements, ...extra] };
+      cacheHasMovements = true;
+    }
+  }
+  return movements;
 }
 
 /** 只查单个商品的流水类型，避免为判断「是否已入库」拉全站流水 */

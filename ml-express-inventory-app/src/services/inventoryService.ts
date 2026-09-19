@@ -13,6 +13,7 @@ import {
   getItemByBarcode as cloudGetItemByBarcode,
   getItemById as cloudGetItemById, getInventorySnapshot, inventoryItemFromCloudRow,
   listMovementsForItem as cloudListMovementsForItem,
+  listMovementsForItems as cloudListMovementsForItems,
   listPacks, loadShipmentsAtomic, mergePackagingStockInIntoCache, packDetailFromCloudPackRow,
   refreshCache, upsertItem as cloudUpsertItem, ensurePackInCacheByBarcode,
 } from './inventoryCloudStore';
@@ -46,6 +47,7 @@ import { canEditItemCustomerProfileAsync } from '../utils/itemCustomerProfileEdi
 import { todayIsoDate } from '../utils/dateFormat';
 import { resolveTripNumberPrefix } from '../utils/tripNumber';
 import { inventoryOperationId } from '../utils/inventoryReliability';
+import { verifyOutboundPacksForLoad } from '../utils/verifyOutboundPacks';
 import { parseTransportFeeFromLoadNote } from '../utils/truckRouteFee';
 import {
   parseInboundMovementNote,
@@ -482,7 +484,12 @@ export async function getPackedShipmentById(id: string): Promise<PackedShipmentD
 }
 
 export async function getPackedShipmentByBarcode(code: string): Promise<PackedShipmentDetail | null> {
-  return (await listPacks()).find((p) => p.bundle_barcode.toUpperCase() === code.trim().toUpperCase()) ?? null;
+  const normalized = code.trim().toUpperCase();
+  if (!normalized) return null;
+  const cached = (await listPacks()).find((p) => p.bundle_barcode.toUpperCase() === normalized);
+  if (cached) return cached;
+  const { items } = await all(undefined, false);
+  return ensurePackInCacheByBarcode(normalized, items);
 }
 
 export async function getPackedShipmentByBundleItemId(id: string): Promise<PackedShipmentDetail | null> {
@@ -571,12 +578,8 @@ export async function listOutboundPackages(scope?: { store: InventoryStoreSessio
       cloud_status: statuses[pack.bundle_barcode.trim().toUpperCase()] ?? null,
     }),
   );
-  if (scope?.store) {
-    await Promise.allSettled(
-      candidates.map((pack) => ensureCloudPackRegistered(pack, scope.store!)),
-    );
-  }
-  return candidates;
+  if (!scope?.store) return candidates;
+  return verifyOutboundPacksForLoad(candidates, scope.store, ensureCloudPackRegistered);
 }
 
 export async function cancelPackedShipment(
@@ -688,31 +691,19 @@ export async function listMovements(limit = 100): Promise<StockMovement[]> {
   return movements.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, limit);
 }
 
-export async function getItemDetail(id: string): Promise<InventoryItemDetail | null> {
-  const item = await getItemById(id);
-  if (!item) return null;
-  const { items, packs } = await all(undefined, false);
-  const moves = await cloudListMovementsForItem(id);
+function buildItemDetail(
+  item: InventoryItem,
+  moves: StockMovement[],
+  pack: PackedShipmentDetail | null,
+): InventoryItemDetail {
   const inboundMoves = moves.filter((m) => m.type === 'in');
   const inbound = pickPrimaryInboundMovement(inboundMoves);
   const parsedNote = parseInboundMovementNote(inbound?.note ?? '');
-
-  let pack =
-    findParentPackForItem(item, packs, items) ??
-    (item.packed_bundle_barcode?.trim()
-      ? await ensurePackInCacheByBarcode(item.packed_bundle_barcode, items)
-      : null) ??
-    (await getPackedShipmentByBundleItemId(id)) ??
-    (await getPackedShipmentContainingItem(id));
-
   const feeFields = pickInboundFeeFields(
     ...inboundMoves.map((row) => row.note),
     pack?.note,
     item.note,
   );
-  const totalFee = feeFields.totalFee;
-  const paymentLabel = feeFields.paymentLabel;
-
   const signReceipt = item.customer_signed_at?.trim()
     ? {
         signPhone: item.customer_sign_phone?.trim() ?? '',
@@ -740,12 +731,64 @@ export async function getItemDetail(id: string): Promise<InventoryItemDetail | n
     inbound_store_name: inbound?.origin_store_name ?? '',
     inbound_note: parsedNote.userNote ?? inbound?.note ?? '',
     inbound_movement_note: inbound?.note ?? '',
-    total_fee: totalFee,
-    payment_label: paymentLabel,
+    total_fee: feeFields.totalFee,
+    payment_label: feeFields.paymentLabel,
     sign_receipt: signReceipt,
     pack,
   };
 }
+
+async function resolveDetailPack(
+  item: InventoryItem,
+  packs: PackedShipmentDetail[],
+  items: InventoryItem[],
+): Promise<PackedShipmentDetail | null> {
+  return (
+    findParentPackForItem(item, packs, items) ??
+    (item.packed_bundle_barcode?.trim()
+      ? await ensurePackInCacheByBarcode(item.packed_bundle_barcode, items)
+      : null) ??
+    packs.find((row) => row.bundle_item_id === item.id) ??
+    packs.find((row) => row.items.some((line) => line.item_id === item.id)) ??
+    null
+  );
+}
+
+export async function getItemDetails(ids: string[]): Promise<InventoryItemDetail[]> {
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+  if (unique.length === 0) return [];
+  const { items, packs } = await all(undefined, false);
+  const byId = new Map(items.map((item) => [item.id, item]));
+  await Promise.all(
+    unique
+      .filter((id) => !byId.has(id))
+      .map(async (id) => {
+        const item = await getItemById(id);
+        if (item) byId.set(id, item);
+      }),
+  );
+  const resolvedItems = unique.map((id) => byId.get(id)).filter((item): item is InventoryItem => Boolean(item));
+  const allMoves = await cloudListMovementsForItems(resolvedItems.map((item) => item.id));
+  const movesByItem = new Map<string, StockMovement[]>();
+  for (const move of allMoves) {
+    const list = movesByItem.get(move.item_id) ?? [];
+    list.push(move);
+    movesByItem.set(move.item_id, list);
+  }
+  const details: InventoryItemDetail[] = [];
+  for (const item of resolvedItems) {
+    const pack = await resolveDetailPack(item, packs, items);
+    details.push(buildItemDetail(item, movesByItem.get(item.id) ?? [], pack));
+  }
+  return details;
+}
+
+export async function getItemDetail(id: string): Promise<InventoryItemDetail | null> {
+  const [detail] = await getItemDetails([id]);
+  return detail ?? null;
+}
+
+export { ensureCloudPackRegistered };
 
 export async function trackOrderByCode(code: string): Promise<TrackOrderResult | null> {
   const item = await getItemByBarcode(code);

@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useTranslation } from '../i18n';
+import Text from './AppText';
 import PhoneBarcodeScanModal from './PhoneBarcodeScanModal';
+import { MYANMAR_FONT_REGULAR } from '../utils/myanmarText';
 import { normalizeScanCode, vibrateScanSuccess } from '../utils/barcodeScan';
 
 type CameraScanOptions = {
@@ -54,7 +56,7 @@ export default function ScanInputBar({
   scanBtnLabel,
   tone = 'light',
 }: Props) {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const inputRef = useRef<TextInput>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -104,6 +106,7 @@ export default function ScanInputBar({
       style={({ pressed }) => [
         styles.scanBtn,
         dark && styles.scanBtnDark,
+        language === 'my' && styles.scanBtnMyanmar,
         pressed && (dark ? styles.scanBtnDarkPressed : styles.scanBtnPressed),
         busy && styles.scanBtnDisabled,
       ]}
@@ -113,7 +116,9 @@ export default function ScanInputBar({
       accessibilityLabel={resolvedScanLabel}
     >
       <Text style={styles.scanIcon}>📷</Text>
-      <Text style={[styles.scanText, dark && styles.scanTextDark]}>{resolvedScanLabel}</Text>
+      <Text style={[styles.scanText, dark && styles.scanTextDark]} myanmarWeight="bold" numberOfLines={2}>
+        {resolvedScanLabel}
+      </Text>
     </Pressable>
   );
 
@@ -125,6 +130,7 @@ export default function ScanInputBar({
           styles.input,
           dark && styles.inputDark,
           (showCamera || onScanPress) && styles.inputWithScan,
+          language === 'my' && styles.inputMyanmar,
         ]}
         value={value}
         onChangeText={onChangeText}
@@ -160,14 +166,18 @@ export default function ScanInputBar({
   return (
     <View style={[styles.wrap, dark && styles.wrapDark]}>
       {resolvedLabel ? (
-        <Text style={[styles.label, dark && styles.labelDark]}>{resolvedLabel}</Text>
+        <Text style={[styles.label, dark && styles.labelDark]} myanmarWeight="semibold">
+          {resolvedLabel}
+        </Text>
       ) : null}
       <View style={styles.inputRow}>
         {inputField}
         {showCamera || onScanPress ? scanButton : null}
       </View>
       {resolvedHint ? (
-        <Text style={[styles.hint, dark && styles.hintDark]}>{resolvedHint}</Text>
+        <Text style={[styles.hint, dark && styles.hintDark]} myanmarWeight="regular">
+          {resolvedHint}
+        </Text>
       ) : null}
 
       {showCamera ? (
@@ -219,6 +229,12 @@ const styles = StyleSheet.create({
     borderColor: '#3b82f6',
     color: '#0f172a',
   },
+  inputMyanmar: {
+    fontFamily: MYANMAR_FONT_REGULAR,
+    fontSize: 16,
+    lineHeight: 28,
+    paddingVertical: 12,
+  },
   inputDark: {
     backgroundColor: '#0f172a',
     borderColor: '#475569',
@@ -250,6 +266,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#1d4ed8',
   },
+  scanBtnMyanmar: { maxWidth: 108, minWidth: 80, paddingHorizontal: 8 },
   scanBtnDark: {
     borderWidth: 0,
     minWidth: 78,

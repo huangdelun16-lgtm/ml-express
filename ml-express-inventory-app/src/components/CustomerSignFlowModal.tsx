@@ -13,7 +13,7 @@ import Text from './AppText';
 import SignaturePad from './SignaturePad';
 import type { InventoryStoreSession } from '../services/authService';
 import { feedbackService } from '../services/FeedbackService';
-import { getItemDetail, markCustomerSigned } from '../services/inventoryService';
+import { getItemDetail, getItemDetails, markCustomerSigned } from '../services/inventoryService';
 import type { InventoryItemDetail } from '../types/inventory';
 import type {
   CustomerSignPickupType,
@@ -111,12 +111,11 @@ export default function CustomerSignFlowModal({
 
     void (async () => {
       try {
-        const [loadedRows, rate] = await Promise.all([
-          Promise.all(itemIds.map((id) => getItemDetail(id))),
+        const [loadedDetails, rate] = await Promise.all([
+          getItemDetails(itemIds),
           fetchCrossBorderFxRate(),
         ]);
         if (cancelled) return;
-        const loadedDetails = loadedRows.filter((row): row is InventoryItemDetail => Boolean(row));
         const loaded = loadedDetails[0];
         if (!loaded) throw svc('orderNotFoundOrDeleted');
         // 只签收加载成功的行，避免漏载兄弟件时用第一件的费用去锁汇/提交

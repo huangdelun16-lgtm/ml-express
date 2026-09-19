@@ -12,11 +12,14 @@ export function containsMyanmarText(text?: string | null): boolean {
   return MYANMAR_CHAR_RE.test(text);
 }
 
+/** 缅文版相对中文/英文缩小两号，避免 Noto Myanmar 撑爆表单 */
+export const MYANMAR_FONT_SIZE_STEP = 2;
+
 export function myanmarFontStyle(
   text?: string | null,
   weight: 'regular' | 'semibold' | 'bold' = 'regular',
   force = false,
-): Pick<TextStyle, 'fontFamily' | 'lineHeight'> | undefined {
+): Pick<TextStyle, 'fontFamily'> | undefined {
   if (!force && !containsMyanmarText(text)) return undefined;
   const fontFamily =
     weight === 'bold'
@@ -24,7 +27,35 @@ export function myanmarFontStyle(
       : weight === 'semibold'
         ? MYANMAR_FONT_SEMIBOLD
         : MYANMAR_FONT_REGULAR;
-  return { fontFamily, lineHeight: 28 };
+  return { fontFamily };
+}
+
+/** 自定义缅文字体不能叠 800/900 字重，否则 iOS 会回退系统字体并把字形叠在一起 */
+export function myanmarCompatStyle(
+  weight: 'regular' | 'semibold' | 'bold' = 'regular',
+): Pick<TextStyle, 'fontWeight' | 'letterSpacing'> {
+  return {
+    fontWeight: weight === 'bold' ? '700' : weight === 'semibold' ? '600' : '400',
+    letterSpacing: 0,
+  };
+}
+
+export function myanmarTypeAdjust(base?: TextStyle): TextStyle | undefined {
+  const next: TextStyle = { includeFontPadding: true };
+  if (typeof base?.fontSize === 'number') {
+    next.fontSize = Math.max(base.fontSize - MYANMAR_FONT_SIZE_STEP, 10);
+  }
+  const readableLine =
+    typeof next.fontSize === 'number' ? Math.round(next.fontSize * 1.85) : undefined;
+  if (readableLine != null) {
+    next.lineHeight = Math.max(
+      readableLine,
+      typeof base?.lineHeight === 'number' ? base.lineHeight : 0,
+    );
+  } else if (typeof base?.lineHeight === 'number') {
+    next.lineHeight = Math.max(base.lineHeight, 22);
+  }
+  return next;
 }
 
 export type TextRun = { text: string; myanmar: boolean };

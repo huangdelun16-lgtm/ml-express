@@ -16,6 +16,8 @@ import type { InventoryItem } from '../types/inventory';
 import { generateUniqueInboundBarcode } from '../utils/inboundBarcode';
 import { formatSpec, formatWeight, parseSpec, parseWeight } from '../utils/itemFieldFormat';
 import { inboundDateToIso, todayInMyanmar } from '../utils/stockInDate';
+import { hasInboundScanDraft } from '../utils/inboundLeaveDraft';
+import { useInboundLeaveGuard } from '../hooks/useInboundLeaveGuard';
 import { destinationFromCustomerCode, normalizePackDestination } from '../constants/destinationOptions';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import {
@@ -74,6 +76,19 @@ export default function StockInScreen({ route, navigation }: Props) {
   const [lookupHint, setLookupHint] = useState('');
   const [customerLookupHint, setCustomerLookupHint] = useState('');
   const [scanLoading, setScanLoading] = useState(false);
+
+  const hasScanDraft = hasInboundScanDraft({
+    scanCode: scan,
+    hasMatchedItem: Boolean(item),
+  });
+  const { requestLeave } = useInboundLeaveGuard({
+    navigation,
+    shouldConfirm: hasScanDraft,
+    title: t.stockIn.leaveDraftTitle,
+    message: fmt(t.stockIn.leaveDraftBody, { count: hasScanDraft ? 1 : 0 }),
+    stayLabel: t.stockIn.leaveDraftStay,
+    leaveLabel: t.stockIn.leaveDraftLeave,
+  });
 
   const applyCustomerRegistry = useCallback(
     (match: Parameters<typeof applyCrossBorderCustomerToForm>[0]) => {
@@ -241,8 +256,8 @@ export default function StockInScreen({ route, navigation }: Props) {
   };
 
   const handleCancel = () => {
-    if (step === 1) {
-      navigation.goBack();
+    if (hasScanDraft || step === 1) {
+      requestLeave();
       return;
     }
     setStep((s) => (s === 3 ? 2 : 1));
@@ -387,15 +402,15 @@ export default function StockInScreen({ route, navigation }: Props) {
   return (
     <KeyboardAvoidingView
       style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' && !Platform.isPad ? 'padding' : undefined}
     >
-      <InboundWizardHeader title={t.stockIn.title} step={step} stepLabels={stepLabels} />
-
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
+      <InboundWizardHeader step={step} stepLabels={stepLabels} />
         <OnlineRequiredBanner />
         {step === 1 ? (
           <StockInStepScan

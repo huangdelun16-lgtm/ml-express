@@ -14,17 +14,30 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import DestinationPickerField from '../components/DestinationPickerField';
 import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import PkgPickerField from '../components/PkgPickerField';
+import ScanInputBar from '../components/ScanInputBar';
 import StockOutSuccessModal, { type StockOutSuccessData } from '../components/StockOutSuccessModal';
 import { useAuth } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useTranslation, resolveAppError } from '../i18n';
-import { applyTruckLoadOutbound, listOutboundPackages } from '../services/inventoryService';
+import {
+  applyTruckLoadOutbound,
+  ensureCloudPackRegistered,
+  getItemByBarcode,
+  getPackedShipmentByBarcode,
+  getPackedShipmentContainingItem,
+  listOutboundPackages,
+} from '../services/inventoryService';
 import { feedbackService } from '../services/FeedbackService';
 import { refreshCache } from '../services/inventoryCloudStore';
 import type { PackedShipmentDetail } from '../types/inventory';
 import OutboundDateField from '../components/OutboundDateField';
 import { formatDisplayDate, isValidIsoDate, todayIsoDate } from '../utils/dateFormat';
 import { sanitizeNumberInput, sumPackageWeightsKg } from '../utils/itemFieldFormat';
+import {
+  classifyUnresolvedTruckLoadScan,
+  matchPendingTruckLoadScan,
+  type TruckLoadScanReject,
+} from '../utils/matchTruckLoadScan';
 import { resolveStoreOriginLabel, listOutboundDestinationOptions, isOwnStationOutboundDestination } from '../utils/storeZone';
 import { fetchTruckRouteFee, formatTruckRouteLabel } from '../utils/truckRouteFee';
 import { peekNextTripNumber } from '../services/tripNumberService';
@@ -45,6 +58,8 @@ export default function StockOutScreen({ navigation }: Props) {
   const [feeLoading, setFeeLoading] = useState(false);
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
+  const [scanInput, setScanInput] = useState('');
+  const [scanBusy, setScanBusy] = useState(false);
   const [successData, setSuccessData] = useState<StockOutSuccessData | null>(null);
 
   const originLabel = store ? resolveStoreOriginLabel(store) : '';
@@ -139,10 +154,93 @@ export default function StockOutScreen({ navigation }: Props) {
     });
   };
 
+  const addScannedPack = (pack: PackedShipmentDetail) => {
+    let duplicate = false;
+    setSelectedIds((prev) => {
+      if (prev.has(pack.id)) {
+        duplicate = true;
+        return prev;
+      }
+      const next = new Set(prev);
+      next.add(pack.id);
+      return next;
+    });
+    if (duplicate) {
+      feedbackService.info(t.stockOut.scanLoadDuplicate);
+      return;
+    }
+    feedbackService.info(fmt(t.stockOut.scanLoadAdded, { code: pack.bundle_barcode }));
+  };
+
+  const rejectScan = (reason: TruckLoadScanReject) => {
+    const message =
+      reason === 'already_selected'
+        ? t.stockOut.scanLoadDuplicate
+        : reason === 'not_inbound'
+          ? t.stockOut.scanLoadNotInbound
+          : reason === 'not_packed'
+            ? t.stockOut.scanLoadNotPacked
+            : reason === 'already_loaded'
+              ? t.stockOut.scanLoadAlreadyLoaded
+              : t.stockOut.scanLoadNotFound;
+    feedbackService.notify(t.common.tip, message);
+  };
+
+  const handleScanLoad = async (raw: string) => {
+    if (scanBusy || loading) return;
+    setScanInput('');
+    const pending = matchPendingTruckLoadScan(raw, packs, selectedIds);
+    if (pending.kind === 'hit') {
+      addScannedPack(pending.pack);
+      return;
+    }
+    if (pending.reason === 'already_selected') {
+      rejectScan('already_selected');
+      return;
+    }
+
+    setScanBusy(true);
+    try {
+      const item = await getItemByBarcode(raw);
+      let pack = await getPackedShipmentByBarcode(raw);
+      if (!pack && item) {
+        pack = await getPackedShipmentContainingItem(item.id);
+        if (!pack && item.packed_bundle_barcode?.trim()) {
+          pack = await getPackedShipmentByBarcode(item.packed_bundle_barcode);
+        }
+      }
+      const listed = pack
+        ? packs.find(
+            (row) =>
+              row.id === pack!.id ||
+              row.bundle_barcode.trim().toUpperCase() === pack!.bundle_barcode.trim().toUpperCase(),
+          )
+        : undefined;
+      if (listed) {
+        addScannedPack(listed);
+        return;
+      }
+      if (pack && store) {
+        const registered = await ensureCloudPackRegistered(pack, store).catch(() => false);
+        if (registered) {
+          addScannedPack(pack);
+          setPacks((prev) => (prev.some((row) => row.id === pack.id) ? prev : [...prev, pack]));
+          return;
+        }
+      }
+      rejectScan(classifyUnresolvedTruckLoadScan({ item, pack }));
+    } catch (e: unknown) {
+      feedbackService.notify(t.common.fail, resolveAppError(t, e));
+    } finally {
+      setScanBusy(false);
+    }
+  };
+
   const clearSelection = () => setSelectedIds(new Set());
 
   const resetForm = () => {
     setSelectedIds(new Set());
+    setScanInput('');
     setDestination('');
     setOutboundDate(todayIsoDate());
     setTransportFee('');
@@ -252,6 +350,24 @@ export default function StockOutScreen({ navigation }: Props) {
         <Text style={styles.title}>{t.stockOut.title}</Text>
         <Text style={styles.subtitle}>{t.stockOut.subtitle}</Text>
         <OnlineRequiredBanner />
+
+        <ScanInputBar
+          value={scanInput}
+          onChangeText={setScanInput}
+          onSubmit={(code) => void handleScanLoad(code)}
+          busy={scanBusy || loading || loadingPacks}
+          scanBtnLabel={t.scanInput.cameraContinuous}
+          tone="dark"
+          label={t.stockOut.scanLoadLabel}
+          hint={t.stockOut.scanLoadHint}
+          placeholder={t.stockOut.scanLoadPlaceholder}
+          cameraScan={{
+            title: t.stockOut.scanLoadCameraTitle,
+            subtitle: t.stockOut.scanLoadCameraSubtitle,
+            continuous: true,
+            scannedCount: selectedIds.size,
+          }}
+        />
 
         <View style={styles.formCard}>
           <PkgPickerField

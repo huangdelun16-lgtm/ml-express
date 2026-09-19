@@ -40,6 +40,7 @@ import type { OrderTrackingRecord, PkgTrackingDetail } from '../types/tracking';
 import {
   isDestinationHubPack,
   listPendingPackInboundOrders,
+  preferConfirmedHubReceivePack,
 } from '../utils/hubReceivePack';
 import { collectArrivalNotifyTargets, type ArrivalNotifyTarget } from '../utils/arrivalNotify';
 import { resolveStoreHubCode } from '../utils/storeZone';
@@ -199,7 +200,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
       }
 
       const refreshed = await getPkgTrackingDetail(pkg.pack_barcode).catch(() => null);
-      const latest = refreshed ?? pkg;
+      const latest = preferConfirmedHubReceivePack(pkg, refreshed);
       setActivePack(latest);
       await applyOrderSuccess(latest, { skipPackImport: true });
 
@@ -717,7 +718,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
         // 批量入库已成功，刷新失败仍进入车费步骤
       }
       const refreshed = await getPkgTrackingDetail(latest.pack_barcode).catch(() => null);
-      if (refreshed) setActivePack(refreshed);
+      setActivePack(preferConfirmedHubReceivePack(latest, refreshed));
       const successMsg = fmt(t.hubReceive.batchInboundSuccessMsg, { count: pendingOrders.length });
       setModalSuccess(successMsg);
       showTaskSuccess(t.hubReceive.batchInboundSuccess, successMsg);
@@ -794,7 +795,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
         allowCompleted: true,
       });
       const updated = await getPkgTrackingDetail(activePack.pack_barcode);
-      if (updated) setActivePack(updated);
+      if (updated) setActivePack(preferConfirmedHubReceivePack(activePack, updated));
       setMessage(fmt(t.hubReceive.manualReleaseDone, { count: releasedCount }));
     } catch (e: unknown) {
       setError(resolveAppError(t, e));

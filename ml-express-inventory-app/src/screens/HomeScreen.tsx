@@ -132,7 +132,7 @@ export default function HomeScreen({ navigation }: HomeProps) {
     { id: 'overview', label: t.home.tabOverview, icon: '🏠' },
     { id: 'outbound', label: t.home.tabOutbound, icon: '📤' },
     { id: 'inbound', label: t.home.tabInbound, icon: '✅' },
-    { id: 'more', label: t.home.tabMore, icon: '⋯' },
+    { id: 'more', label: t.home.tabMore, icon: 'grid' },
   ];
 
   const headerMeta = [storeCode, hubCode ? regionDisplayLabel(hubCode) : '']
@@ -364,12 +364,27 @@ export default function HomeScreen({ navigation }: HomeProps) {
               accessibilityState={{ selected: active }}
               accessibilityLabel={item.label}
             >
-              <Text style={[styles.tabIcon, active && styles.tabIconActive]}>{item.icon}</Text>
+              {item.icon === 'grid' ? (
+                <MoreGridIcon active={active} />
+              ) : (
+                <Text style={[styles.tabIcon, active && styles.tabIconActive]}>{item.icon}</Text>
+              )}
               <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{item.label}</Text>
             </Pressable>
           );
         })}
       </View>
+    </View>
+  );
+}
+
+function MoreGridIcon({ active }: { active: boolean }) {
+  const color = active ? '#7dd3fc' : '#94a3b8';
+  return (
+    <View style={styles.moreGrid} accessibilityElementsHidden>
+      {[0, 1, 2, 3].map((i) => (
+        <View key={i} style={[styles.moreDot, { backgroundColor: color }]} />
+      ))}
     </View>
   );
 }
@@ -431,6 +446,19 @@ const styles = StyleSheet.create({
   },
   tabIcon: { fontSize: 18, opacity: 0.55 },
   tabIconActive: { opacity: 1 },
+  moreGrid: {
+    width: 18,
+    height: 18,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignContent: 'space-between',
+  },
+  moreDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 2,
+  },
   tabLabel: {
     color: '#64748b',
     fontSize: 11,

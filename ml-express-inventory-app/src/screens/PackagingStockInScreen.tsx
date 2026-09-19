@@ -38,6 +38,8 @@ import {
   sanitizeNumberInput,
 } from '../utils/itemFieldFormat';
 import { inboundBarcodeTimestampFromPackDate, inboundDateToIso, todayInMyanmar } from '../utils/stockInDate';
+import { hasInboundScanDraft } from '../utils/inboundLeaveDraft';
+import { useInboundLeaveGuard } from '../hooks/useInboundLeaveGuard';
 import { destinationFromCustomerCode, normalizePackDestination } from '../constants/destinationOptions';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import {
@@ -123,6 +125,15 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     () => lines.reduce((sum, line) => sum + line.count, 0),
     [lines],
   );
+  const hasScanDraft = hasInboundScanDraft({ scannedLineCount: lines.length });
+  const { requestLeave } = useInboundLeaveGuard({
+    navigation,
+    shouldConfirm: hasScanDraft,
+    title: t.stockIn.leaveDraftTitle,
+    message: fmt(t.stockIn.leaveDraftBody, { count: lines.length }),
+    stayLabel: t.stockIn.leaveDraftStay,
+    leaveLabel: t.stockIn.leaveDraftLeave,
+  });
 
   const specStr = useMemo(
     () => formatSpec({ l: specL, w: specW, h: specH }),
@@ -310,8 +321,8 @@ export default function PackagingStockInScreen({ navigation }: Props) {
   };
 
   const handleCancel = () => {
-    if (step === 1) {
-      navigation.goBack();
+    if (hasScanDraft || step === 1) {
+      requestLeave();
       return;
     }
     setStep((s) => (s === 3 ? 2 : 1));
@@ -473,20 +484,19 @@ export default function PackagingStockInScreen({ navigation }: Props) {
   return (
     <KeyboardAvoidingView
       style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' && !Platform.isPad ? 'padding' : undefined}
     >
-      <InboundWizardHeader
-        title={t.packagingStockIn.title}
-        step={step}
-        stepLabels={stepLabels}
-        accent="amber"
-      />
-
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
+      <InboundWizardHeader
+        step={step}
+        stepLabels={stepLabels}
+        accent="amber"
+      />
         <OnlineRequiredBanner />
 
         {step === 1 ? (

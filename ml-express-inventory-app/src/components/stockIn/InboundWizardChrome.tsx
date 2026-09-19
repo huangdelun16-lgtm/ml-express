@@ -1,5 +1,6 @@
 import React from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import Text from '../AppText';
 import { colors, radius, space } from '../../theme';
 
 export type WizardStep = 1 | 2 | 3;
@@ -39,12 +40,11 @@ const ACCENT = {
 };
 
 export function InboundWizardHeader({
-  title,
   step,
   stepLabels,
   accent = 'emerald',
 }: {
-  title: string;
+  title?: string;
   step: WizardStep;
   stepLabels: Record<WizardStep, string>;
   accent?: WizardAccent;
@@ -52,7 +52,6 @@ export function InboundWizardHeader({
   const palette = ACCENT[accent];
   return (
     <View style={styles.header}>
-      <Text style={styles.title}>{title}</Text>
       <View style={styles.stepRow}>
         {([1, 2, 3] as WizardStep[]).map((n) => (
           <View key={n} style={styles.stepItem}>
@@ -62,13 +61,17 @@ export function InboundWizardHeader({
                 step >= n && { backgroundColor: palette.stepDotActive },
               ]}
             >
-              <Text style={[styles.stepDotText, step >= n && styles.stepDotTextActive]}>{n}</Text>
+              <Text style={[styles.stepDotText, step >= n && styles.stepDotTextActive]} myanmarWeight="bold">
+                {n}
+              </Text>
             </View>
             <Text
               style={[
                 styles.stepLabel,
                 step === n && { color: palette.stepLabelActive },
               ]}
+              myanmarWeight="semibold"
+              numberOfLines={3}
             >
               {stepLabels[n]}
             </Text>
@@ -116,7 +119,13 @@ export function InboundWizardFooter({
         accessibilityRole="button"
         accessibilityLabel={cancelLabel}
       >
-        <Text style={[styles.cancelBtnText, { color: palette.cancelText }]}>{cancelLabel}</Text>
+        <Text
+          style={[styles.cancelBtnText, { color: palette.cancelText }]}
+          myanmarWeight="bold"
+          numberOfLines={2}
+        >
+          {cancelLabel}
+        </Text>
       </Pressable>
       <Pressable
         style={[
@@ -142,6 +151,8 @@ export function InboundWizardFooter({
               fontWeight: palette.nextFontWeight,
             },
           ]}
+          myanmarWeight="bold"
+          numberOfLines={2}
         >
           {primaryLabel}
         </Text>
@@ -151,40 +162,54 @@ export function InboundWizardFooter({
 }
 
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.md },
-  title: { color: colors.text, fontSize: 22, fontWeight: '900', marginBottom: space.md },
+  header: { paddingHorizontal: space.lg, paddingTop: space.xs, paddingBottom: space.sm },
   stepRow: { flexDirection: 'row', gap: space.sm },
-  stepItem: { flex: 1, alignItems: 'center', gap: space.xs },
+  stepItem: { flex: 1, alignItems: 'center', gap: 4, minWidth: 0 },
   stepDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepDotText: { color: colors.muted, fontWeight: '900', fontSize: 13 },
+  stepDotText: { color: colors.muted, fontWeight: '900', fontSize: 12 },
   stepDotTextActive: { color: colors.white },
-  stepLabel: { color: colors.muted2, fontSize: 10, fontWeight: '700', textAlign: 'center' },
+  stepLabel: {
+    color: colors.muted2,
+    fontSize: 11,
+    lineHeight: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    width: '100%',
+  },
   footer: {
     flexDirection: 'row',
     gap: 10,
     paddingHorizontal: space.lg,
-    paddingVertical: space.md,
+    paddingVertical: space.sm,
     borderTopWidth: 1,
     backgroundColor: colors.bg,
   },
   cancelBtn: {
     flex: 1,
-    paddingVertical: 14,
+    minWidth: 0,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    minHeight: 48,
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.borderMuted,
   },
-  cancelBtnText: { fontWeight: '800', fontSize: 15 },
+  cancelBtnText: { fontWeight: '800', fontSize: 14, textAlign: 'center' },
   nextBtn: {
-    paddingVertical: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    minHeight: 48,
     alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 0,
   },
-  nextBtnText: { fontWeight: '800' },
+  nextBtnText: { fontWeight: '800', textAlign: 'center' },
 });

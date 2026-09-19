@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Text from './AppText';
 import { PACK_DESTINATION_OPTIONS, regionDisplayLabel } from '../constants/destinationOptions';
 import { useTranslation } from '../i18n';
 
@@ -17,7 +18,9 @@ export default function RegionFilterBar({ value, onChange }: Props) {
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>{t.forms.filterRegion}</Text>
+      <Text style={styles.title} myanmarWeight="bold">
+        {t.forms.filterRegion}
+      </Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -31,7 +34,9 @@ export default function RegionFilterBar({ value, onChange }: Props) {
               style={[styles.chip, active && styles.chipOn]}
               onPress={() => onChange(opt.code)}
             >
-              <Text style={[styles.chipText, active && styles.chipTextOn]}>{opt.label}</Text>
+              <Text style={[styles.chipText, active && styles.chipTextOn]} myanmarWeight="bold">
+                {opt.label}
+              </Text>
             </Pressable>
           );
         })}

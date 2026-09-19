@@ -1,9 +1,23 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from '../screens/HomeScreen';
+import AppText from '../components/AppText';
 import { useTranslation } from '../i18n';
 import { MYANMAR_FONT_BOLD } from '../utils/myanmarText';
 import { colors } from '../theme';
+
+function MyanmarStackTitle({ children }: { children?: React.ReactNode }) {
+  const title = typeof children === 'string' ? children : '';
+  return (
+    <AppText
+      myanmarWeight="bold"
+      numberOfLines={2}
+      style={{ color: colors.text, fontSize: 16, textAlign: 'center', maxWidth: 260 }}
+    >
+      {title}
+    </AppText>
+  );
+}
 
 export type RootStackParamList = {
   Home: undefined;
@@ -33,8 +47,12 @@ export default function AppNavigator() {
     headerTintColor: colors.text,
     headerTitleStyle:
       language === 'my'
-        ? { fontFamily: MYANMAR_FONT_BOLD, fontWeight: '800' as const }
+        ? { fontFamily: MYANMAR_FONT_BOLD, fontWeight: '800' as const, fontSize: 15 }
         : { fontWeight: '800' as const },
+    headerTitleAlign: 'center' as const,
+    ...(language === 'my'
+      ? { headerTitle: ({ children }: { children?: React.ReactNode }) => <MyanmarStackTitle>{children}</MyanmarStackTitle> }
+      : {}),
     contentStyle: { backgroundColor: colors.bgDeep },
   };
 
@@ -45,11 +63,15 @@ export default function AppNavigator() {
         component={HomeScreen}
         options={{ headerShown: false }}
       />
-      <Stack.Screen name="StockIn" getComponent={() => require('../screens/StockInScreen').default} options={{ title: t.nav.stockIn }} />
+      <Stack.Screen
+        name="StockIn"
+        getComponent={() => require('../screens/StockInScreen').default}
+        options={{ title: t.nav.stockIn, headerBackButtonMenuEnabled: false }}
+      />
       <Stack.Screen
         name="PackagingStockIn"
         getComponent={() => require('../screens/PackagingStockInScreen').default}
-        options={{ title: t.nav.packagingStockIn }}
+        options={{ title: t.nav.packagingStockIn, headerBackButtonMenuEnabled: false }}
       />
       <Stack.Screen name="StockOut" getComponent={() => require('../screens/StockOutScreen').default} options={{ title: t.nav.stockOut }} />
       <Stack.Screen name="HubReceive" getComponent={() => require('../screens/HubReceiveScreen').default} options={{ title: t.nav.hubReceive }} />

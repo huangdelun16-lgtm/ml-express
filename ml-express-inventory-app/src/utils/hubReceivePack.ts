@@ -49,25 +49,53 @@ export function hasUnreleasedTransitOrders(pack: PkgTrackingDetail, hubCode: str
   );
 }
 
+const ORDER_STATUS_RANK: Record<string, number> = {
+  in_transit: 0,
+  hub_received: 1,
+  released_at_hub: 2,
+  completed: 3,
+  cancelled: 3,
+};
+
+function preferFresherOrders(
+  confirmed: PkgTrackingDetail['orders'],
+  fetched: PkgTrackingDetail['orders'],
+): PkgTrackingDetail['orders'] {
+  const confirmedById = new Map(confirmed.map((order) => [order.id, order]));
+  return fetched.map((order) => {
+    const local = confirmedById.get(order.id);
+    if (!local) return order;
+    return (ORDER_STATUS_RANK[local.status] ?? 0) >= (ORDER_STATUS_RANK[order.status] ?? 0)
+      ? local
+      : order;
+  });
+}
+
 /** 刚确认到站后，GET 可能仍返回 in_transit（/__sb 代理缓存）；保留 RPC 已确认状态以便进入第 2 步 */
 export function preferConfirmedHubReceivePack(
   confirmed: PkgTrackingDetail,
   fetched: PkgTrackingDetail | null | undefined,
 ): PkgTrackingDetail {
   if (!fetched) return confirmed;
-  if (confirmed.status !== 'in_transit' && fetched.status === 'in_transit') {
-    return {
-      ...fetched,
-      status: confirmed.status,
-      hub_received_at: confirmed.hub_received_at ?? fetched.hub_received_at,
-      hub_received_by_store_code:
-        confirmed.hub_received_by_store_code ?? fetched.hub_received_by_store_code,
-      hub_received_by_store_name:
-        confirmed.hub_received_by_store_name ?? fetched.hub_received_by_store_name,
-      updated_at: confirmed.updated_at || fetched.updated_at,
-    };
-  }
-  return fetched;
+  const stalePackStatus = confirmed.status !== 'in_transit' && fetched.status === 'in_transit';
+  const orders = preferFresherOrders(confirmed.orders, fetched.orders);
+  const ordersChanged = orders.some((order, index) => order.status !== fetched.orders[index]?.status);
+  if (!stalePackStatus && !ordersChanged) return fetched;
+  return {
+    ...fetched,
+    status: stalePackStatus ? confirmed.status : fetched.status,
+    hub_received_at: stalePackStatus
+      ? confirmed.hub_received_at ?? fetched.hub_received_at
+      : fetched.hub_received_at,
+    hub_received_by_store_code: stalePackStatus
+      ? confirmed.hub_received_by_store_code ?? fetched.hub_received_by_store_code
+      : fetched.hub_received_by_store_code,
+    hub_received_by_store_name: stalePackStatus
+      ? confirmed.hub_received_by_store_name ?? fetched.hub_received_by_store_name
+      : fetched.hub_received_by_store_name,
+    updated_at: stalePackStatus ? confirmed.updated_at || fetched.updated_at : fetched.updated_at,
+    orders,
+  };
 }
 
 /** 到站现场 3 步：1 确认到站 → 2 入库/分拨 → 3 支付车费 */

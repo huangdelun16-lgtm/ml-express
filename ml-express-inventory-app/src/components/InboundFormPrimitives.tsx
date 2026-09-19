@@ -1,6 +1,9 @@
 import React, { type Ref } from 'react';
-import { StyleSheet, Text, TextInput, type TextInputProps, View } from 'react-native';
+import { StyleSheet, TextInput, type TextInputProps, View } from 'react-native';
+import Text from './AppText';
+import { useLanguage } from '../contexts/LanguageContext';
 import { colors, radius } from '../theme';
+import { MYANMAR_FONT_REGULAR, MYANMAR_FONT_SIZE_STEP } from '../utils/myanmarText';
 
 export function InboundFormSection({
   title,
@@ -15,7 +18,9 @@ export function InboundFormSection({
     <View style={styles.section}>
       <View style={styles.sectionHead}>
         <View style={[styles.sectionDot, { backgroundColor: accent }]} />
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text style={styles.sectionTitle} myanmarWeight="bold">
+          {title}
+        </Text>
       </View>
       <View style={[styles.sectionBody, { borderLeftColor: accent }]}>{children}</View>
     </View>
@@ -51,9 +56,20 @@ export function InboundFormField({
   blurOnSubmit?: boolean;
   autoCapitalize?: TextInputProps['autoCapitalize'];
 }) {
+  const { language } = useLanguage();
+  const myanmarInput =
+    language === 'my'
+      ? {
+          fontFamily: MYANMAR_FONT_REGULAR,
+          fontSize: Math.max(16 - MYANMAR_FONT_SIZE_STEP, 12),
+        }
+      : null;
+
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label} myanmarWeight="semibold">
+        {label}
+      </Text>
       <TextInput
         ref={inputRef}
         style={[
@@ -61,6 +77,7 @@ export function InboundFormField({
           multiline && styles.inputMulti,
           !editable && styles.inputReadonly,
           mono && styles.mono,
+          myanmarInput,
         ]}
         value={value}
         onChangeText={onChange}

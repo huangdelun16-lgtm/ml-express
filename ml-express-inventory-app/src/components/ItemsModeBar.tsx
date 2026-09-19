@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import Text from './AppText';
 import { useTranslation } from '../i18n';
 
 export type ItemsListMode = 'normal' | 'pack' | 'sign';
@@ -12,6 +13,7 @@ type Props = {
   onCancel: () => void;
   onOpenPack: () => void;
   onBatchSign: () => void;
+  onOpenInvoice: () => void;
 };
 
 export default function ItemsModeBar({
@@ -22,6 +24,7 @@ export default function ItemsModeBar({
   onCancel,
   onOpenPack,
   onBatchSign,
+  onOpenInvoice,
 }: Props) {
   const { t, fmt } = useTranslation();
 
@@ -35,7 +38,9 @@ export default function ItemsModeBar({
             accessibilityRole="button"
             accessibilityLabel={t.items.packBtn}
           >
-            <Text style={styles.packBtnText}>{t.items.packBtn}</Text>
+            <Text style={styles.packBtnText} myanmarWeight="bold">
+              {t.items.packBtn}
+            </Text>
           </Pressable>
           <Pressable
             style={styles.signSelectBtn}
@@ -43,7 +48,9 @@ export default function ItemsModeBar({
             accessibilityRole="button"
             accessibilityLabel={t.items.batchSignBtn}
           >
-            <Text style={styles.signSelectBtnText}>{t.items.batchSignBtn}</Text>
+            <Text style={styles.signSelectBtnText} myanmarWeight="bold">
+              {t.items.batchSignBtn}
+            </Text>
           </Pressable>
         </>
       ) : listMode === 'pack' ? (
@@ -56,7 +63,9 @@ export default function ItemsModeBar({
           >
             <Text style={styles.ghostBtnText}>{t.items.cancelSelect}</Text>
           </Pressable>
-          <Text style={styles.packHint}>{t.items.packHint}</Text>
+          <Text style={styles.packHint} myanmarWeight="regular">
+            {t.items.packHint}
+          </Text>
           <Pressable
             style={[styles.packBtn, selectedCount === 0 && styles.packBtnDisabled]}
             onPress={onOpenPack}
@@ -64,7 +73,9 @@ export default function ItemsModeBar({
             accessibilityRole="button"
             accessibilityLabel={fmt(t.items.nextStep, { count: selectedCount })}
           >
-            <Text style={styles.packBtnText}>{fmt(t.items.nextStep, { count: selectedCount })}</Text>
+            <Text style={styles.packBtnText} myanmarWeight="bold">
+              {fmt(t.items.nextStep, { count: selectedCount })}
+            </Text>
           </Pressable>
         </>
       ) : (
@@ -77,7 +88,20 @@ export default function ItemsModeBar({
           >
             <Text style={styles.ghostBtnText}>{t.items.cancelSelect}</Text>
           </Pressable>
-          <Text style={styles.packHint}>{t.items.signSelectHint}</Text>
+          <Text style={styles.packHint} myanmarWeight="regular">
+            {t.items.signSelectHint}
+          </Text>
+          <Pressable
+            style={[styles.invoiceBtn, selectedCount === 0 && styles.packBtnDisabled]}
+            onPress={onOpenInvoice}
+            disabled={selectedCount === 0}
+            accessibilityRole="button"
+            accessibilityLabel={t.items.invoiceBtn}
+          >
+            <Text style={styles.invoiceBtnText} myanmarWeight="bold">
+              {t.items.invoiceBtn}
+            </Text>
+          </Pressable>
           <Pressable
             style={[styles.signActionBtn, selectedCount === 0 && styles.packBtnDisabled]}
             onPress={onBatchSign}
@@ -85,7 +109,7 @@ export default function ItemsModeBar({
             accessibilityRole="button"
             accessibilityLabel={fmt(t.items.batchSignConfirm, { count: selectedCount })}
           >
-            <Text style={styles.signActionBtnText}>
+            <Text style={styles.signActionBtnText} myanmarWeight="bold">
               {fmt(t.items.batchSignConfirm, { count: selectedCount })}
             </Text>
           </Pressable>
@@ -121,6 +145,13 @@ const styles = StyleSheet.create({
     borderColor: '#059669',
   },
   signSelectBtnText: { color: '#6ee7b7', fontWeight: '800', fontSize: 14 },
+  invoiceBtn: {
+    backgroundColor: '#0369a1',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  invoiceBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   signActionBtn: {
     backgroundColor: '#059669',
     borderRadius: 10,

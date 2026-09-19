@@ -1,7 +1,8 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import PackagingStockInBarcodeText from './PackagingStockInBarcodeText';
 import PaidStampWatermark from './PaidStampWatermark';
+import Text from './AppText';
 import { useTranslation } from '../i18n';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import type { InventoryItemListRow } from '../types/inventory';
