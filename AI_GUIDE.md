@@ -158,10 +158,10 @@ ml-express/                          # 仓库根 = Admin Web（market-link-expre
 | 管理后台 | **`https://admin-market-link-express.com`** | **仓库根** CRA + Functions + Edge `/__sb`；站点 `admin-market-link-express` |
 | 商家 Web | `https://mlexpress-merchants.com` | 目录 `ml-express-merchant-web`；站点 `mlexpress-merchant`；同源 `/__sb/` |
 | Inventory App Support | `https://market-link-express.com/support` | App Store Support URL |
-| Inventory iOS / Android | App Store / 内测 APK `com.mlexpress.inventory` | EAS，当前 **2.1.0 (35)** |
+| Inventory iOS / Android | App Store / 内测 APK `com.mlexpress.inventory` | EAS，当前 **2.2.1 (42)** |
 | 会员 App | `com.mlexpress.client` | EAS **2.8.4 (78)**；原生 REST 走 `market-link-express.com/__sb/`；Android 地图见 **§7.10** |
 | 商家 App | `com.mlexpress.merchants` | EAS **2.5.5 (25)**；原生 REST 走 `mlexpress-merchants.com/__sb/` |
-| 骑手 App | `com.mlexpress.courier` | EAS **2.4.5 (83)**；原生 REST 走 `admin-market-link-express.com/__sb/` |
+| 骑手 App | `com.mlexpress.courier` | EAS **2.5.0 (87)**；原生 REST 走 `admin-market-link-express.com/__sb/`；规划路线地图见 **§7.10** |
 | Inventory 原生 | 同上 Admin 域 `/__sb/` | `nativeSupabaseUrl.ts`；**必须尾斜杠** |
 | Supabase 上游 | `uopkyuluxnrewvlmutam.supabase.co` | 全端共用同一项目；缅甸客户端勿直连 |
 | Cloudflare 备份 | `ml-supabase-proxy.huangdelun16.workers.dev` | 仅诊断/备份；**生产 Admin 勿拨其 WS** |
@@ -209,8 +209,8 @@ App / 浏览器
 | **`ml-express-merchant-web/`** | Web | **商家端网站**：门店订单/商品/对账 | CRA + TS + React Router **v7** | **0.1.0** | Netlify |
 | **`ml-express-client/`** | Mobile | **会员 App** `com.mlexpress.client` | Expo SDK 57 / RN 0.86 | **2.8.4 (78)** | EAS |
 | **`ml-express-merchant-app/`** | Mobile | **商家 App** `com.mlexpress.merchants` | Expo SDK 57 / RN 0.86 | **2.5.5 (25)** | EAS |
-| **`ml-express-mobile-app/`** | Mobile | **骑手/员工端** `com.mlexpress.courier` | Expo SDK 57 / RN 0.86 | **2.4.5 (83)** | EAS |
-| **`ml-express-inventory-app/`** | Mobile | **中转站库存 App** `com.mlexpress.inventory` | Expo SDK 57 + Supabase Auth JWT + `/__sb` + 蓝牙打印 | **2.1.0 (35)** | EAS |
+| **`ml-express-mobile-app/`** | Mobile | **骑手/员工端** `com.mlexpress.courier` | Expo SDK 57 / RN 0.86 | **2.5.0 (87)** | EAS |
+| **`ml-express-inventory-app/`** | Mobile | **中转站库存 App** `com.mlexpress.inventory` | Expo SDK 57 + Supabase Auth JWT + `/__sb` + 蓝牙打印 | **2.2.1 (42)** | EAS |
 | **`shared/`** | 共享源 | 跨端纯逻辑单一源 | TS | — | sync 进各 app |
 | **`netlify/`** | 服务端 | Functions + Edge `supabase-bff` | Node | — | `/__sb` |
 | **`cloudflare/supabase-proxy/`** | 边缘 | Worker 备份代理 | JS | — | `deploy:supabase-proxy` |
@@ -333,7 +333,7 @@ App / 浏览器
 | **认证** | `admin_accounts` + Netlify `admin-password`（**无客户端明文密码兜底**）+ `ensure-courier-auth` |
 | **导航** | Stack + 双 Tab：Admin（Dashboard/Map/Scan/Profile）vs Courier（MyTasks/Map/Scan/Profile） |
 | **技术** | Expo SDK 57 / RN 0.86.3 / React 19.2.3（四端对齐，见 §3.2） |
-| **部署** | EAS projectId `9831d961-…`；`build:aab`；版本 **2.4.5 (83)**；新单 REST 轮询（§9.11） |
+| **部署** | EAS projectId `9831d961-…`；`build:aab`；版本 **2.5.0 (87)**；新单 REST 轮询（§9.11） |
 
 ### 3.1.7 Inventory 中转站 App（`ml-express-inventory-app/`）
 
@@ -383,10 +383,10 @@ App / 浏览器
 
 | App | 目录 | Expo | React Native | React | `react-native-svg` | 版本锚点 |
 |-----|------|------|--------------|-------|--------------------|----------|
-| Inventory | `ml-express-inventory-app/` | **~57.0.20** | **0.86.3** | **19.2.3** | **15.15.4** | 2.1.0 (35) |
+| Inventory | `ml-express-inventory-app/` | **~57.0.20** | **0.86.3** | **19.2.3** | **15.15.4** | 2.2.1 (42) |
 | 商家 App | `ml-express-merchant-app/` | **~57.0.20** | **0.86.3** | **19.2.3** | **15.15.4** | 2.5.5 (25) |
 | 会员 App | `ml-express-client/` | **~57.0.20** | **0.86.3** | **19.2.3** | **15.15.4** | 2.8.4 (78) |
-| 骑手 STAFF | `ml-express-mobile-app/` | **~57.0.20** | **0.86.3** | **19.2.3** | **15.15.4** | 2.4.5 (83) |
+| 骑手 STAFF | `ml-express-mobile-app/` | **~57.0.20** | **0.86.3** | **19.2.3** | **15.15.4** | 2.5.0 (87) |
 
 **官方升级（勿绕开）**
 
@@ -956,6 +956,8 @@ EAS `apk` profile 必须 `"environment": "production"`，才会带上这些 Secr
 - 不要同时受控 `region` + `initialRegion`（Android 容易一直米色）。
 - Modal 里的 `MapView` 等 Modal 显示后再挂载（约 400ms），外层 `collapsable={false}`。
 
+骑手端 `InAppNavigationModal`（「手动规划路线」）必须走 Google `MapView` 底图，**禁止**再盖 `UrlTile`（Carto / OSM）。缅甸打不开 `basemaps.cartocdn.com`，`shouldReplaceMapContent` 会把已出图的 Google 瓦片换成空白米色。骑手包名 `com.mlexpress.courier` 的两条 SHA-1 已列在上表。
+
 ---
 
 ## 8. 商家 App `ml-express-merchant-app`
@@ -1063,7 +1065,7 @@ Realtime 过不了 Netlify `/__sb`。商家 App 前台约 12s / 后台约 30s �
 |----|-----|
 | 包名 | `com.mlexpress.courier` |
 | 显示名 | MARKET LINK STAFF |
-| 版本 | **2.4.5**（iOS build **83** / Android versionCode **83**） |
+| 版本 | **2.5.0**（iOS build **87** / Android versionCode **87**） |
 | 技术 | Expo SDK 57 + RN 0.86.3 + React 19.2.3（见 §3.2） |
 | Scheme | `ml-express-staff://` |
 | EAS | projectId `9831d961-…` |
@@ -1207,7 +1209,7 @@ Realtime WS 不能经 Netlify rewrite 升级。骑手新单靠：
 |----|-----|
 | 包名 | iOS/Android `com.mlexpress.inventory` |
 | App Store 名 | **ML Inventory** |
-| 版本 | **2.1.0**（iOS build **35** / Android versionCode **35**） |
+| 版本 | **2.2.1**（iOS build **42** / Android versionCode **42**） |
 | 技术 | Expo SDK 57 + RN 0.86.3 + React 19.2.3（见 §3.2）；`runtimeVersion.policy: appVersion` |
 | 登录 | Edge Function `inventory-store-login` → Supabase Auth JWT |
 | JWT claims | `inventory_store_code`、`inventory_hub_code` 等 |
@@ -2162,8 +2164,8 @@ Realtime 过不了 Netlify。商家看 `MerchantOrderContext` / AppContext 进�
 | 管理后台（根） | **2.2.4** | — | `package.json`；生产域 `admin-market-link-express.com` |
 | ml-express-client | **2.8.4** | **78** | `app.json` **且** 原生 `android/` `ios/`；Android 地图 Cloud Console 见 **§7.10** |
 | ml-express-merchant-app | **2.5.5** | **25** | 以 `app.json` 为准（`package.json` 可能滞后）；有提交的 `android/`/`ios/` |
-| ml-express-mobile-app | **2.4.5** | **83** | STAFF 骑手端；新单 REST 轮询 |
-| ml-express-inventory-app | **2.1.0** | **35** | JWT + `/__sb`；到站三步；客户编码计费 |
+| ml-express-mobile-app | **2.5.0** | **87** | STAFF 骑手端；规划路线走 Google 底图（§7.10） |
+| ml-express-inventory-app | **2.2.1** | **42** | JWT + `/__sb`；到站三步；客户编码计费 |
 | ml-express-client-web | **0.1.0** | — | `market-link-express.com` |
 | ml-express-merchant-web | **0.1.0** | — | `mlexpress-merchants.com` |
 
@@ -2247,7 +2249,7 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 3. **扫码主路径**：取件扫包裹码，送达扫 `STORE_`；地图 → 详情 `openScan`。
 4. **体验**：Toast 统一非确认提示；`MyTasks` SectionList；地图离屏停定位。
 5. **生产**：console 门禁 + `LoggerService` + Sentry。
-6. 版本锚点：**2.4.5 (83)**；Expo SDK 57（§3.2）；详述见 **§9**、**§9.11**。
+6. 版本锚点：**2.5.0 (87)**；Expo SDK 57（§3.2）；详述见 **§9**、**§9.11**。
 
 ### 22.4 Inventory 决策快照
 
@@ -2264,7 +2266,7 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 2. 会员「我的订单」必须拆查 `customer_id` / description / email / **收发件人电话**；不要拼带 `[]` `.` `+` 的 `.or()`。
 3. 会员出包有原生工程，versionCode 改三处：`app.json` + Gradle + Info.plist/pbxproj。
 4. 商家 Web 登录仍是客户端比对密码；商家 App 走 `merchant-password`。不要在未授权时改登录。
-5. 版本锚点：会员 **2.8.4 (78)**、骑手 **2.4.5 (83)**、商家 App **2.5.5 (25)**、Inventory **2.1.0 (35)**。四端 Expo **SDK 57**（§3.2）。会员 Android 地图 Cloud Console 见 **§7.10**。
+5. 版本锚点：会员 **2.8.4 (78)**、骑手 **2.5.0 (87)**、商家 App **2.5.5 (25)**、Inventory **2.2.1 (42)**。四端 Expo **SDK 57**（§3.2）。会员 Android 地图 Cloud Console 见 **§7.10**。
 
 ### 22.6 改代码入口（最短路径）
 

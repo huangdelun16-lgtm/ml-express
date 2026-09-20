@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Pressable,
   RefreshControl,
@@ -34,7 +35,8 @@ import { resolveFinancePeriod } from '../utils/yangonFinancePeriod';
 import AppText from '../components/AppText';
 import CrossBorderManualEntryModal from '../components/CrossBorderManualEntryModal';
 import FinanceLedgerRow from '../components/finance/FinanceLedgerRow';
-import FinanceSummaryHero from '../components/finance/FinanceSummaryHero';
+import FinanceSummaryHero, { FinanceLedgerChrome } from '../components/finance/FinanceSummaryHero';
+import { useFinanceSummarySheet } from '../hooks/useFinanceSummarySheet';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { colors, space } from '../theme';
 import { regionDisplayLabel } from '../constants/destinationOptions';
@@ -75,6 +77,7 @@ export default function CrossBorderFinanceScreen() {
   const [deletingId, setDeletingId] = useState('');
   const [exporting, setExporting] = useState(false);
   const [mmkPerCny, setMmkPerCny] = useState<number | null>(null);
+  const summarySheet = useFinanceSummarySheet();
 
   const tabs = useMemo(
     (): { key: FinanceTabKey; label: string }[] => [
@@ -371,86 +374,98 @@ export default function CrossBorderFinanceScreen() {
           </AppText>
         </View>
       ) : (
+        <View style={styles.body}>
+          <View style={styles.topBlock}>
+            <View style={styles.periodRow}>
+              {(['all', 'day', 'month'] as const).map((kind) => (
+                <Pressable
+                  key={kind}
+                  style={[styles.periodChip, periodKind === kind && styles.periodChipOn]}
+                  onPress={() => setPeriodKind(kind)}
+                >
+                  <AppText
+                    style={[styles.periodChipText, periodKind === kind && styles.periodChipTextOn]}
+                    myanmarWeight="bold"
+                  >
+                    {kind === 'all'
+                      ? t.crossBorderFinance.periodAll
+                      : kind === 'day'
+                        ? t.crossBorderFinance.periodDay
+                        : t.crossBorderFinance.periodMonth}
+                  </AppText>
+                </Pressable>
+              ))}
+            </View>
+            <AppText style={styles.periodTz} myanmarWeight="regular">
+              {t.crossBorderFinance.periodTz}
+            </AppText>
+            {periodKind !== 'all' ? (
+              <View style={styles.closeBox}>
+                <AppText style={styles.closeStatus} myanmarWeight="semibold">
+                  {settlement?.status === 'submitted'
+                    ? t.crossBorderFinance.settlementSubmitted
+                    : settlement?.status === 'confirmed'
+                      ? t.crossBorderFinance.settlementConfirmed
+                      : settlement?.status === 'rejected'
+                        ? fmt(t.crossBorderFinance.settlementRejected, {
+                            reason: settlement.rejected_reason || '',
+                          })
+                        : periodLocked
+                          ? t.crossBorderFinance.periodLocked
+                          : ''}
+                </AppText>
+                {!periodLocked ? (
+                  <Pressable
+                    style={[styles.closeBtn, submittingClose && styles.closeBtnDisabled]}
+                    disabled={submittingClose}
+                    onPress={onSubmitClose}
+                  >
+                    <AppText style={styles.closeBtnText} myanmarWeight="bold">
+                      {periodKind === 'day'
+                        ? t.crossBorderFinance.submitDayClose
+                        : t.crossBorderFinance.submitMonthClose}
+                    </AppText>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
+            <FinanceSummaryHero
+              operatorName={operatorName ?? t.common.thisStation}
+              hubCode={hubCode}
+              displayedCount={displayed.length}
+              netBalance={netBalance}
+              summary={summary}
+              onAddManual={() => {
+                if (!periodLocked) setManualModalVisible(true);
+              }}
+              onExport={() => void onExportExcel()}
+              exporting={exporting}
+              mmkPerCny={mmkPerCny}
+              entries={entries}
+              expanded={summarySheet.open}
+              progress={summarySheet.progress}
+              panelHeight={summarySheet.panelHeight}
+              onPanelHeight={summarySheet.setPanelHeight}
+              onToggleExpanded={summarySheet.toggle}
+              panHandlers={summarySheet.panHandlers}
+            />
+          </View>
+          <View style={styles.listWrap}>
         <FlatList
           data={displayed}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           ListHeaderComponent={
             <View>
-              <View style={styles.periodRow}>
-                {(['all', 'day', 'month'] as const).map((kind) => (
-                  <Pressable
-                    key={kind}
-                    style={[styles.periodChip, periodKind === kind && styles.periodChipOn]}
-                    onPress={() => setPeriodKind(kind)}
-                  >
-                    <AppText
-                      style={[styles.periodChipText, periodKind === kind && styles.periodChipTextOn]}
-                      myanmarWeight="bold"
-                    >
-                      {kind === 'all'
-                        ? t.crossBorderFinance.periodAll
-                        : kind === 'day'
-                          ? t.crossBorderFinance.periodDay
-                          : t.crossBorderFinance.periodMonth}
-                    </AppText>
-                  </Pressable>
-                ))}
-              </View>
-              <AppText style={styles.periodTz} myanmarWeight="regular">
-                {t.crossBorderFinance.periodTz}
-              </AppText>
-              {periodKind !== 'all' ? (
-                <View style={styles.closeBox}>
-                  <AppText style={styles.closeStatus} myanmarWeight="semibold">
-                    {settlement?.status === 'submitted'
-                      ? t.crossBorderFinance.settlementSubmitted
-                      : settlement?.status === 'confirmed'
-                        ? t.crossBorderFinance.settlementConfirmed
-                        : settlement?.status === 'rejected'
-                          ? fmt(t.crossBorderFinance.settlementRejected, {
-                              reason: settlement.rejected_reason || '',
-                            })
-                          : periodLocked
-                            ? t.crossBorderFinance.periodLocked
-                            : ''}
-                  </AppText>
-                  {!periodLocked ? (
-                    <Pressable
-                      style={[styles.closeBtn, submittingClose && styles.closeBtnDisabled]}
-                      disabled={submittingClose}
-                      onPress={onSubmitClose}
-                    >
-                      <AppText style={styles.closeBtnText} myanmarWeight="bold">
-                        {periodKind === 'day'
-                          ? t.crossBorderFinance.submitDayClose
-                          : t.crossBorderFinance.submitMonthClose}
-                      </AppText>
-                    </Pressable>
-                  ) : null}
-                </View>
-              ) : null}
-              <FinanceSummaryHero
-                operatorName={operatorName ?? t.common.thisStation}
-                hubCode={hubCode}
-                displayedCount={displayed.length}
-                netBalance={netBalance}
-                summary={summary}
+              <FinanceLedgerChrome
                 tabs={tabs}
                 tab={tab}
                 tabCounts={tabCounts}
                 error={error}
                 loading={loading}
                 displayedLength={displayed.length}
-                onAddManual={() => {
-                  if (!periodLocked) setManualModalVisible(true);
-                }}
-                onExport={() => void onExportExcel()}
-                exporting={exporting}
                 onTabChange={setTab}
                 onRetry={() => void load()}
-                mmkPerCny={mmkPerCny}
-                entries={entries}
               />
               {tab === 'agency' && agencyOutstanding.length > 0 && !periodLocked ? (
                 <View style={styles.remitBox}>
@@ -515,6 +530,19 @@ export default function CrossBorderFinanceScreen() {
             />
           )}
         />
+            <Animated.View
+              pointerEvents={summarySheet.open ? 'auto' : 'none'}
+              style={[styles.listDim, { opacity: summarySheet.progress }]}
+            >
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                onPress={() => summarySheet.setOpenTo(false)}
+                accessibilityRole="button"
+                accessibilityLabel={t.crossBorderFinance.summaryCollapse}
+              />
+            </Animated.View>
+          </View>
+        </View>
       )}
 
       <CrossBorderManualEntryModal
@@ -531,6 +559,18 @@ export default function CrossBorderFinanceScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  body: { flex: 1 },
+  topBlock: { paddingHorizontal: space.lg, paddingTop: 8 },
+  listWrap: { flex: 1, position: 'relative' },
+  listDim: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(2, 6, 23, 0.62)',
+    zIndex: 2,
+  },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   loadingText: { color: colors.muted, marginTop: 14, fontSize: 14, fontWeight: '600' },
   list: { paddingHorizontal: space.lg, paddingBottom: 32 },

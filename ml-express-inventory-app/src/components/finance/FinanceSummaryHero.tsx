@@ -1,5 +1,13 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  type GestureResponderHandlers,
+} from 'react-native';
 import { useTranslation } from '../../i18n';
 import { regionDisplayLabel } from '../../constants/destinationOptions';
 import { colors, radius, space } from '../../theme';
@@ -8,8 +16,9 @@ import {
   formatMmkWithUnit,
   type FinanceTabKey,
 } from '../../utils/crossBorderFinanceTabs';
-import { formatCnyAmount, formatMmkAmount, mmkToCny } from '../../utils/crossBorderFx';
+import { formatCnyAmount, formatMmkAmount } from '../../utils/crossBorderFx';
 import { sumSettledCustomerCny } from '../../utils/crossBorderFxLock';
+import { buildFinanceCapsuleLine, buildFinanceHeroView } from '../../utils/financeHeroSummary';
 import type { FinanceLedgerEntry } from '../../types/financeLedger';
 import AppText from '../AppText';
 
@@ -64,232 +73,44 @@ function MetricTile({
   );
 }
 
-function customerMetric(mmk: number, rate: number | null): { value: string; subValue: string | null } {
-  const cny = mmkToCny(mmk, rate);
-  if (cny == null) {
-    return { value: `${formatMmk(mmk)} MMK`, subValue: null };
-  }
-  return {
-    value: `¥${formatCnyAmount(cny)}`,
-    subValue: `${formatMmkAmount(mmk)} MMK`,
-  };
+function ExpandChevron({ progress }: { progress: Animated.Value }) {
+  const rotate = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['45deg', '-135deg'],
+  });
+  const nudge = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-3, 3],
+  });
+  return (
+    <View style={styles.chevronBox} accessibilityElementsHidden>
+      <Animated.View style={[styles.chevronGlyph, { marginTop: nudge, transform: [{ rotate }] }]} />
+    </View>
+  );
 }
 
-function customerMetricFromCny(mmk: number, cny: number | null): { value: string; subValue: string | null } {
-  if (cny == null) {
-    return { value: `${formatMmk(mmk)} MMK`, subValue: null };
-  }
-  return {
-    value: `¥${formatCnyAmount(cny)}`,
-    subValue: `${formatMmkAmount(mmk)} MMK`,
-  };
-}
-
-export default function FinanceSummaryHero({
-  operatorName,
-  hubCode,
-  displayedCount,
-  netBalance,
-  summary,
+export function FinanceLedgerChrome({
   tabs,
   tab,
   tabCounts,
   error,
   loading,
   displayedLength,
-  onAddManual,
-  onExport,
-  exporting,
   onTabChange,
   onRetry,
-  mmkPerCny,
-  entries,
 }: {
-  operatorName: string;
-  hubCode: string;
-  displayedCount: number;
-  netBalance: number;
-  summary: Summary;
   tabs: { key: FinanceTabKey; label: string }[];
   tab: FinanceTabKey;
   tabCounts: Record<FinanceTabKey, number>;
   error: string;
   loading: boolean;
   displayedLength: number;
-  onAddManual: () => void;
-  onExport: () => void;
-  exporting?: boolean;
   onTabChange: (next: FinanceTabKey) => void;
   onRetry: () => void;
-  mmkPerCny?: number | null;
-  entries?: FinanceLedgerEntry[];
 }) {
-  const { t, fmt } = useTranslation();
-  const rate = mmkPerCny ?? null;
-  const customerLedgerMmk =
-    summary.collectedTotal + summary.pendingInflowTotal + summary.manualIncomeTotal;
-  const myanmarLedgerMmk =
-    summary.transportUnpaidTotal + summary.transportPaidTotal + summary.manualExpenseTotal;
-  const settledCny = sumSettledCustomerCny(entries ?? []);
-  const pendingCny = mmkToCny(summary.pendingInflowTotal, rate);
-  const manualCny = mmkToCny(summary.manualIncomeTotal, rate);
-  const collectedReady = summary.collectedTotal <= 0 || settledCny != null;
-  const floatingReady = summary.pendingInflowTotal + summary.manualIncomeTotal <= 0 || rate != null;
-  const customerCny =
-    collectedReady && floatingReady
-      ? (summary.collectedTotal > 0 ? settledCny ?? 0 : 0) + (pendingCny ?? 0) + (manualCny ?? 0)
-      : null;
-  const collected = customerMetricFromCny(summary.collectedTotal, settledCny);
-  const pending = customerMetric(summary.pendingInflowTotal, rate);
-  const manualIncome = customerMetric(summary.manualIncomeTotal, rate);
-  const positive = netBalance >= 0;
-
+  const { t } = useTranslation();
   return (
-    <View style={styles.headerBlock}>
-      <View style={styles.heroCard}>
-        <View style={styles.heroMeta}>
-          <View style={styles.heroTitleBlock}>
-            <AppText style={styles.heroEyebrow} myanmarWeight="semibold">
-              {fmt(t.crossBorderFinance.heroHub, {
-                name: operatorName,
-                hub: regionDisplayLabel(hubCode),
-              })}
-            </AppText>
-          </View>
-          <View style={styles.countChip}>
-            <AppText style={styles.countChipText} myanmarWeight="bold">
-              {fmt(t.common.recordsCount, { count: displayedCount })}
-            </AppText>
-          </View>
-        </View>
-
-        {customerCny != null ? (
-          <View style={styles.splitLedgers}>
-            <View style={styles.splitCol}>
-              <AppText style={styles.netLabel} myanmarWeight="semibold">
-                {t.crossBorderFinance.customerLedger}
-              </AppText>
-              <AppText style={[styles.netValue, styles.netValueSplit, styles.netPositive]} myanmarWeight="bold">
-                ¥{formatCnyAmount(customerCny)}
-              </AppText>
-              <AppText style={styles.netHint} myanmarWeight="regular">
-                {fmt(t.crossBorderFinance.bookedMmk, { amount: formatMmkAmount(customerLedgerMmk) })}
-              </AppText>
-            </View>
-            <View style={styles.splitCol}>
-              <AppText style={styles.netLabel} myanmarWeight="semibold">
-                {t.crossBorderFinance.myanmarLedger}
-              </AppText>
-              <AppText style={[styles.netValue, styles.netValueSplit, styles.netNegative]} myanmarWeight="bold">
-                {formatMmkWithUnit(myanmarLedgerMmk)}
-              </AppText>
-              <AppText style={styles.netHint} myanmarWeight="regular">
-                {t.crossBorderFinance.myanmarLedgerHint}
-              </AppText>
-            </View>
-          </View>
-        ) : (
-          <>
-            <AppText style={styles.netLabel} myanmarWeight="semibold">
-              {t.crossBorderFinance.balance}
-            </AppText>
-            <AppText
-              style={[styles.netValue, positive ? styles.netPositive : styles.netNegative]}
-              myanmarWeight="bold"
-            >
-              {positive ? '+' : '−'}
-              {formatMmkWithUnit(Math.abs(netBalance))}
-            </AppText>
-            <AppText style={styles.netHint} myanmarWeight="regular">
-              {t.crossBorderFinance.balanceFormula}
-            </AppText>
-          </>
-        )}
-
-        <View style={styles.actionRow}>
-          <Pressable
-            style={({ pressed }) => [styles.addManualBtn, pressed && styles.btnPressed]}
-            onPress={onAddManual}
-          >
-            <AppText style={styles.addManualBtnText} myanmarWeight="bold">
-              {t.crossBorderFinance.addManual}
-            </AppText>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [
-              styles.exportBtn,
-              exporting && styles.exportBtnDisabled,
-              pressed && !exporting && styles.btnPressed,
-            ]}
-            onPress={onExport}
-            disabled={Boolean(exporting)}
-          >
-            {exporting ? (
-              <ActivityIndicator color={colors.slateSoft} size="small" />
-            ) : (
-              <AppText style={styles.exportBtnText} myanmarWeight="bold">
-                {t.crossBorderFinance.exportCsv}
-              </AppText>
-            )}
-          </Pressable>
-        </View>
-
-        <View style={styles.metricsGrid}>
-          <MetricTile
-            label={t.crossBorderFinance.collected}
-            value={collected.value}
-            subValue={collected.subValue}
-            prefix="+"
-            tone="in"
-          />
-          <MetricTile
-            label={t.crossBorderFinance.transportUnpaid}
-            value={`${formatMmk(summary.transportUnpaidTotal)} MMK`}
-            prefix="−"
-            tone="out"
-          />
-          <MetricTile
-            label={t.crossBorderFinance.transportPaid}
-            value={`${formatMmk(summary.transportPaidTotal)} MMK`}
-            tone="neutral"
-          />
-          <MetricTile
-            label={t.crossBorderFinance.pendingInflow}
-            value={pending.value}
-            subValue={pending.subValue}
-            prefix="+"
-            tone="in"
-          />
-          <MetricTile
-            label={t.crossBorderFinance.manualIncome}
-            value={manualIncome.value}
-            subValue={manualIncome.subValue}
-            prefix="+"
-            tone="in"
-          />
-          <MetricTile
-            label={t.crossBorderFinance.manualExpense}
-            value={`${formatMmk(summary.manualExpenseTotal)} MMK`}
-            prefix="−"
-            tone="out"
-          />
-        </View>
-
-        {summary.agencyPayableTotal > 0 ? (
-          <View style={styles.agencyBar}>
-            <View style={styles.agencyTick} />
-            <AppText style={styles.agencyHint} myanmarWeight="semibold">
-              {fmt(t.crossBorderFinance.agencyHint, {
-                amount: formatMmkWithUnit(summary.agencyPayableTotal),
-              })}
-            </AppText>
-          </View>
-        ) : null}
-        <AppText style={styles.syncHint} myanmarWeight="regular">
-          {t.crossBorderFinance.syncHint}
-        </AppText>
-      </View>
-
+    <View>
       <ScrollView
         horizontal
         nestedScrollEnabled
@@ -302,17 +123,10 @@ export default function FinanceSummaryHero({
           return (
             <Pressable
               key={tabItem.key}
-              style={({ pressed }) => [
-                styles.tab,
-                active && styles.tabOn,
-                pressed && styles.btnPressed,
-              ]}
+              style={({ pressed }) => [styles.tab, active && styles.tabOn, pressed && styles.btnPressed]}
               onPress={() => onTabChange(tabItem.key)}
             >
-              <AppText
-                style={[styles.tabText, active && styles.tabTextOn]}
-                myanmarWeight="bold"
-              >
+              <AppText style={[styles.tabText, active && styles.tabTextOn]} myanmarWeight="bold">
                 {tabItem.label}
               </AppText>
               {count > 0 ? (
@@ -353,32 +167,369 @@ export default function FinanceSummaryHero({
   );
 }
 
+export default function FinanceSummaryHero({
+  operatorName,
+  hubCode,
+  displayedCount,
+  netBalance,
+  summary,
+  onAddManual,
+  onExport,
+  exporting,
+  mmkPerCny,
+  entries,
+  expanded,
+  progress,
+  panelHeight,
+  onPanelHeight,
+  onToggleExpanded,
+  panHandlers,
+}: {
+  operatorName: string;
+  hubCode: string;
+  displayedCount: number;
+  netBalance: number;
+  summary: Summary;
+  onAddManual: () => void;
+  onExport: () => void;
+  exporting?: boolean;
+  mmkPerCny?: number | null;
+  entries?: FinanceLedgerEntry[];
+  expanded: boolean;
+  progress: Animated.Value;
+  panelHeight: number;
+  onPanelHeight: (height: number) => void;
+  onToggleExpanded: () => void;
+  panHandlers: GestureResponderHandlers;
+}) {
+  const { t, fmt } = useTranslation();
+  const rate = mmkPerCny ?? null;
+  const settledCny = sumSettledCustomerCny(entries ?? []);
+  const view = buildFinanceHeroView(summary, settledCny, rate);
+  const capsule = buildFinanceCapsuleLine(view, netBalance);
+  const { collected, pending, manualIncome } = view;
+  const positive = netBalance >= 0;
+  const panelMax = Math.max(panelHeight, 1);
+
+  return (
+    <Animated.View
+      {...panHandlers}
+      style={[
+        styles.heroShell,
+        {
+          borderRadius: progress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [radius.pill, radius.xl],
+          }),
+          marginBottom: progress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [10, 12],
+          }),
+        },
+      ]}
+    >
+      <Pressable
+        onPress={onToggleExpanded}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        accessibilityLabel={
+          expanded ? t.crossBorderFinance.summaryCollapse : t.crossBorderFinance.summaryExpand
+        }
+        style={({ pressed }) => [styles.capsuleRow, pressed && styles.btnPressed]}
+      >
+        <View style={styles.capsuleAccent} />
+        <View style={styles.capsuleAmounts}>
+          {capsule.kind === 'split' ? (
+            <>
+              <AppText
+                style={[styles.capsuleAmt, styles.netPositive]}
+                numberOfLines={1}
+                myanmarWeight="bold"
+              >
+                ¥{formatCnyAmount(capsule.customerCny)}
+              </AppText>
+              <AppText style={styles.capsuleSep} myanmarWeight="semibold">
+                ·
+              </AppText>
+              <AppText
+                style={[styles.capsuleAmt, styles.netNegative]}
+                numberOfLines={1}
+                myanmarWeight="bold"
+              >
+                {formatMmkWithUnit(capsule.myanmarLedgerMmk)}
+              </AppText>
+            </>
+          ) : (
+            <AppText
+              style={[styles.capsuleAmt, positive ? styles.netPositive : styles.netNegative]}
+              numberOfLines={1}
+              myanmarWeight="bold"
+            >
+              {positive ? '+' : '−'}
+              {formatMmkWithUnit(Math.abs(capsule.netBalance))}
+            </AppText>
+          )}
+        </View>
+        <View style={styles.countChip}>
+          <AppText style={styles.countChipText} myanmarWeight="bold">
+            {fmt(t.common.recordsCount, { count: displayedCount })}
+          </AppText>
+        </View>
+        <ExpandChevron progress={progress} />
+      </Pressable>
+
+      <Animated.View
+        pointerEvents={expanded ? 'auto' : 'none'}
+        style={[
+          styles.panelClip,
+          {
+            height: progress.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, panelMax],
+            }),
+            opacity: progress,
+          },
+        ]}
+      >
+        <View
+          style={[styles.panelBody, styles.panelMeasure]}
+          collapsable={false}
+          onLayout={(event) => onPanelHeight(event.nativeEvent.layout.height)}
+        >
+          <AppText style={styles.heroEyebrow} myanmarWeight="semibold">
+            {fmt(t.crossBorderFinance.heroHub, {
+              name: operatorName,
+              hub: regionDisplayLabel(hubCode),
+            })}
+          </AppText>
+
+          {view.customerCny != null ? (
+            <View style={styles.splitLedgers}>
+              <View style={styles.splitCol}>
+                <AppText style={styles.netLabel} myanmarWeight="semibold">
+                  {t.crossBorderFinance.customerLedger}
+                </AppText>
+                <AppText
+                  style={[styles.netValue, styles.netValueSplit, styles.netPositive]}
+                  myanmarWeight="bold"
+                >
+                  ¥{formatCnyAmount(view.customerCny)}
+                </AppText>
+                <AppText style={styles.netHint} myanmarWeight="regular">
+                  {fmt(t.crossBorderFinance.bookedMmk, { amount: formatMmkAmount(view.customerLedgerMmk) })}
+                </AppText>
+              </View>
+              <View style={styles.splitCol}>
+                <AppText style={styles.netLabel} myanmarWeight="semibold">
+                  {t.crossBorderFinance.myanmarLedger}
+                </AppText>
+                <AppText
+                  style={[styles.netValue, styles.netValueSplit, styles.netNegative]}
+                  myanmarWeight="bold"
+                >
+                  {formatMmkWithUnit(view.myanmarLedgerMmk)}
+                </AppText>
+                <AppText style={styles.netHint} myanmarWeight="regular">
+                  {t.crossBorderFinance.myanmarLedgerHint}
+                </AppText>
+              </View>
+            </View>
+          ) : (
+            <>
+              <AppText style={styles.netLabel} myanmarWeight="semibold">
+                {t.crossBorderFinance.balance}
+              </AppText>
+              <AppText
+                style={[styles.netValue, positive ? styles.netPositive : styles.netNegative]}
+                myanmarWeight="bold"
+              >
+                {positive ? '+' : '−'}
+                {formatMmkWithUnit(Math.abs(netBalance))}
+              </AppText>
+              <AppText style={styles.netHint} myanmarWeight="regular">
+                {t.crossBorderFinance.balanceFormula}
+              </AppText>
+            </>
+          )}
+
+          <View style={styles.actionRow}>
+            <Pressable
+              style={({ pressed }) => [styles.addManualBtn, pressed && styles.btnPressed]}
+              onPress={onAddManual}
+            >
+              <AppText style={styles.addManualBtnText} myanmarWeight="bold">
+                {t.crossBorderFinance.addManual}
+              </AppText>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.exportBtn,
+                exporting && styles.exportBtnDisabled,
+                pressed && !exporting && styles.btnPressed,
+              ]}
+              onPress={onExport}
+              disabled={Boolean(exporting)}
+            >
+              {exporting ? (
+                <ActivityIndicator color={colors.slateSoft} size="small" />
+              ) : (
+                <AppText style={styles.exportBtnText} myanmarWeight="bold">
+                  {t.crossBorderFinance.exportCsv}
+                </AppText>
+              )}
+            </Pressable>
+          </View>
+
+          <View style={styles.metricsGrid}>
+            <MetricTile
+              label={t.crossBorderFinance.collected}
+              value={collected.value}
+              subValue={collected.subValue}
+              prefix="+"
+              tone="in"
+            />
+            <MetricTile
+              label={t.crossBorderFinance.transportUnpaid}
+              value={`${formatMmk(summary.transportUnpaidTotal)} MMK`}
+              prefix="−"
+              tone="out"
+            />
+            <MetricTile
+              label={t.crossBorderFinance.transportPaid}
+              value={`${formatMmk(summary.transportPaidTotal)} MMK`}
+              tone="neutral"
+            />
+            <MetricTile
+              label={t.crossBorderFinance.pendingInflow}
+              value={pending.value}
+              subValue={pending.subValue}
+              prefix="+"
+              tone="in"
+            />
+            <MetricTile
+              label={t.crossBorderFinance.manualIncome}
+              value={manualIncome.value}
+              subValue={manualIncome.subValue}
+              prefix="+"
+              tone="in"
+            />
+            <MetricTile
+              label={t.crossBorderFinance.manualExpense}
+              value={`${formatMmk(summary.manualExpenseTotal)} MMK`}
+              prefix="−"
+              tone="out"
+            />
+          </View>
+
+          {summary.agencyPayableTotal > 0 ? (
+            <View style={styles.agencyBar}>
+              <View style={styles.agencyTick} />
+              <AppText style={styles.agencyHint} myanmarWeight="semibold">
+                {fmt(t.crossBorderFinance.agencyHint, {
+                  amount: formatMmkWithUnit(summary.agencyPayableTotal),
+                })}
+              </AppText>
+            </View>
+          ) : null}
+          <AppText style={styles.syncHint} myanmarWeight="regular">
+            {t.crossBorderFinance.syncHint}
+          </AppText>
+          <View style={styles.closeHandleHit} accessibilityElementsHidden>
+            <View style={styles.closeHandle} />
+          </View>
+        </View>
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
-  headerBlock: { paddingTop: 2 },
-  heroCard: {
+  heroShell: {
     backgroundColor: colors.card,
-    borderRadius: radius.xl,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 14,
-    marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: 'hidden',
   },
-  heroMeta: {
+  panelClip: {
+    overflow: 'hidden',
+  },
+  panelMeasure: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+  },
+  capsuleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginBottom: 14,
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 44,
+    paddingLeft: 6,
+    paddingRight: 12,
+    paddingVertical: 6,
   },
-  heroTitleBlock: { flex: 1, minWidth: 0 },
+  capsuleAccent: {
+    width: 3,
+    height: 22,
+    borderRadius: 2,
+    backgroundColor: colors.financeGreen,
+  },
+  capsuleAmounts: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  capsuleAmt: {
+    fontSize: 13,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+    flexShrink: 1,
+  },
+  capsuleSep: {
+    color: colors.muted2,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  chevronBox: {
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chevronGlyph: {
+    width: 7,
+    height: 7,
+    borderRightWidth: 2,
+    borderBottomWidth: 2,
+    borderColor: colors.slateSoft,
+  },
+  panelBody: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  closeHandleHit: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 10,
+    paddingBottom: 6,
+  },
+  closeHandle: {
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.borderMuted,
+  },
   heroEyebrow: {
     color: colors.muted,
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.2,
     lineHeight: 18,
+    marginBottom: 12,
   },
   countChip: {
     backgroundColor: 'rgba(148,163,184,0.12)',

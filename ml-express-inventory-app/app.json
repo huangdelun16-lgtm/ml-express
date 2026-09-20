@@ -2,7 +2,7 @@
   "expo": {
     "name": "ML Inventory",
     "slug": "ml-express-inventory",
-    "version": "2.2.0",
+    "version": "2.2.1",
     "scheme": "ml-express-inventory",
     "orientation": "default",
     "icon": "./assets/icon.png",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.inventory",
-      "buildNumber": "41",
+      "buildNumber": "42",
       "infoPlist": {
         "NSCameraUsageDescription": "ML Inventory uses the camera to scan barcodes and photograph damaged or exception packages at transit stations.",
         "NSPhotoLibraryUsageDescription": "ML Inventory uses the photo library to attach exception evidence photos and save invoices.",
@@ -32,7 +32,7 @@
         "backgroundColor": "#0f172a"
       },
       "package": "com.mlexpress.inventory",
-      "versionCode": 41,
+      "versionCode": 42,
       "permissions": [
         "CAMERA",
         "android.permission.CAMERA",

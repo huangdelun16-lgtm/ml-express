@@ -580,6 +580,8 @@ const zh = {
     customerLedgerHint: '已收 + 待入账 + 其它收入（人民币）',
     myanmarLedgerHint: '车费 + 其它支出（缅币）',
     bookedMmk: '入账 {amount} MMK',
+    summaryExpand: '展开费用摘要',
+    summaryCollapse: '收起费用摘要',
   },
   manualEntry: {
     title: '其它开销',
@@ -1695,6 +1697,8 @@ const en: typeof zh = {
     customerLedgerHint: 'Collected + pending + other income (CNY)',
     myanmarLedgerHint: 'Truck fees + other expense (MMK)',
     bookedMmk: 'Booked {amount} MMK',
+    summaryExpand: 'Show fee summary',
+    summaryCollapse: 'Hide fee summary',
   },
   manualEntry: {
     title: 'Other expense',
@@ -2808,6 +2812,8 @@ const my: typeof zh = {
     customerLedgerHint: 'ကောက်ခံပြီး + ရရန်ကျန် + အခြား၀င်ငွေ (CNY)',
     myanmarLedgerHint: 'ကားခ + အခြားအသုံးစရိတ် (MMK)',
     bookedMmk: 'စာရင်းသွင်း {amount} MMK',
+    summaryExpand: 'အနှစ်ချုပ် ဖွင့်ရန်',
+    summaryCollapse: 'အနှစ်ချုပ် ပိတ်ရန်',
   },
   manualEntry: {
     title: 'အခြားကုန်ကျ',
