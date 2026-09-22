@@ -142,7 +142,7 @@ export default function PackageManagementScreen({ navigation }: any) {
         deliveryTime
       );
       
-      if (success) {
+      if (success.ok) {
         // 更新本地状态
         const updatedPackages = packages.map(pkg => 
           pkg.id === selectedPackage.id 
@@ -157,7 +157,12 @@ export default function PackageManagementScreen({ navigation }: any) {
         setPackages(updatedPackages);
         calculateStatistics(updatedPackages);
         
-        feedbackService.notify('成功', `包裹状态已更新为 "${newStatus}"`);
+        feedbackService.notify(
+          success.queued ? '待同步' : '成功',
+          success.queued
+            ? '已保存到待同步队列，联网后自动上传'
+            : `包裹状态已更新为 "${newStatus}"`,
+        );
       } else {
         feedbackService.notify('错误', '状态更新失败，请重试');
       }
@@ -253,7 +258,7 @@ export default function PackageManagementScreen({ navigation }: any) {
           deliveryTime
         );
         
-        if (success) successCount++;
+        if (success.ok) successCount++;
       }
       
       if (successCount > 0) {

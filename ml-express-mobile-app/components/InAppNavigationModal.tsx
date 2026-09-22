@@ -9,8 +9,9 @@ import {
   Platform,
   Dimensions,
   BackHandler,
+  Alert,
 } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,7 +23,9 @@ import {
   type ComputedRoute,
   type RouteCoordinate,
 } from '../services/routingService';
-import { openGoogleMapsDrivingNavigation } from '../utils/googleMapsNavigation';
+import { openGoogleMapsDrivingNavigation, planGoogleMapsDrivingRoute } from '../utils/googleMapsNavigation';
+import { GOOGLE_MAPS_MAX_STOPS } from '../utils/googleMapsRouteLimit';
+import { riderActionCopy } from '../utils/riderActionCopy';
 import { sequenceLabelForIndex } from '../utils/routeSequenceLabels';
 import { startRouteNavigationSession } from '../services/routeNavigationSession';
 import {
@@ -298,30 +301,49 @@ export default function InAppNavigationModal({
   const handleGoogleNav = useCallback(async () => {
     if (!destinationStop || orderedStops.length === 0) return;
 
-    await startRouteNavigationSession(
-      orderedStops.map((s, i) => ({
-        id: s.id,
-        latitude: s.latitude,
-        longitude: s.longitude,
-        sequenceLabel: sequenceLabelForIndex(i),
-        title: s.title,
-        originBadge: s.badge,
-      })),
-      language,
-    );
-
-    await openGoogleMapsDrivingNavigation({
+    const copy = riderActionCopy(language);
+    const plan = planGoogleMapsDrivingRoute({
       origin: origin ? { lat: origin.latitude, lng: origin.longitude } : undefined,
-      destination: {
-        lat: destinationStop.latitude,
-        lng: destinationStop.longitude,
-      },
-      waypoints: intermediateStops.map((s) => ({
-        lat: s.latitude,
-        lng: s.longitude,
-      })),
+      stops: orderedStops.map((s) => ({ lat: s.latitude, lng: s.longitude })),
     });
-  }, [origin, destinationStop, orderedStops, intermediateStops, language]);
+    if (!plan) return;
+
+    const launch = async () => {
+      const navigableStops = plan.truncated
+        ? orderedStops.slice(0, plan.navigableStopCount)
+        : orderedStops;
+      await startRouteNavigationSession(
+        navigableStops.map((s, i) => ({
+          id: s.id,
+          latitude: s.latitude,
+          longitude: s.longitude,
+          sequenceLabel: sequenceLabelForIndex(i),
+          title: s.title,
+          originBadge: s.badge,
+        })),
+        language,
+      );
+      await openGoogleMapsDrivingNavigation({
+        origin: plan.origin,
+        destination: plan.destination,
+        waypoints: plan.waypoints,
+      });
+    };
+
+    if (plan.truncated) {
+      Alert.alert(
+        copy.googleNavTruncatedTitle,
+        copy.googleNavTruncatedBody(plan.navigableStopCount, plan.remainingStopCount),
+        [
+          { text: copy.cancel, style: 'cancel' },
+          { text: copy.googleNavContinue, onPress: () => void launch() },
+        ],
+      );
+      return;
+    }
+
+    await launch();
+  }, [origin, destinationStop, orderedStops, language]);
 
   const title = manualPlanning
     ? language === 'zh'
@@ -440,6 +462,7 @@ export default function InAppNavigationModal({
               key={`route-map-${mapEpoch}`}
               ref={mapRef}
               provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+              {...(Platform.OS === 'android' ? { googleRenderer: 'LEGACY' as const } : {})}
               style={{ width: mapSize.width, height: mapSize.height }}
               mapType="standard"
               showsTraffic={false}
@@ -447,7 +470,7 @@ export default function InAppNavigationModal({
               showsMyLocationButton={Platform.OS === 'android'}
               pitchEnabled={false}
               rotateEnabled
-              loadingEnabled={false}
+              loadingEnabled
               toolbarEnabled={false}
               initialRegion={{
                 latitude: origin?.latitude || destinationStop?.latitude || poolStops[0]?.latitude || 21.9588,
@@ -479,13 +502,6 @@ export default function InAppNavigationModal({
                 }
               }}
             >
-              <UrlTile
-                urlTemplate="https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
-                maximumZ={19}
-                flipY={false}
-                shouldReplaceMapContent
-                zIndex={-1}
-              />
               {polylineCoords.length >= 2 ? (
                 <Polyline
                   coordinates={polylineCoords}
@@ -613,16 +629,6 @@ export default function InAppNavigationModal({
                   <Text style={styles.collapseBtnText}>{collapseLabel}</Text>
                 </TouchableOpacity>
               </View>
-              {manualPlanning ? (
-                <Text style={styles.manualHint} numberOfLines={2}>
-                  {language === 'zh'
-                    ? '地图点未选站点即可加入；绿圈为建议下一站。已选站点请用列表调整。'
-                    : language === 'en'
-                      ? 'Tap unselected stops to add. Green = suggested next. Reorder in the list.'
-                      : 'မရွေးရသေးသော မှတ်တိုင်ကို နှိပ်ပြီး ထည့်ပါ။ အစိမ်းရောင် = အကြံပြုသည့် နောက်တစ်ခု။'}
-                </Text>
-              ) : null}
-
               {loadingRoute ? (
                 <ActivityIndicator color="#3b82f6" style={{ marginVertical: 8 }} />
               ) : route && canStartNav ? (
@@ -646,19 +652,15 @@ export default function InAppNavigationModal({
                       : ''}
                   </Text>
                 </>
-              ) : manualPlanning ? (
+              ) : manualPlanning && orderedStops.length > 0 ? (
                 <Text style={styles.statsSub}>
                   {language === 'zh'
-                    ? orderedStops.length === 0
-                      ? '点地图或列表加第一站，或点「最近优先」一键排线'
-                      : `已选 ${orderedStops.length}/${poolStops.length} 站 · ${orderedStops
-                          .map((_, i) => sequenceLabelForIndex(i))
-                          .join('→')}`
-                    : orderedStops.length === 0
-                      ? 'Add first stop, or tap Nearest-first'
-                      : `${orderedStops.length}/${poolStops.length} · ${orderedStops
-                          .map((_, i) => sequenceLabelForIndex(i))
-                          .join('→')}`}
+                    ? `已选 ${orderedStops.length}/${poolStops.length} 站 · ${orderedStops
+                        .map((_, i) => sequenceLabelForIndex(i))
+                        .join('→')}`
+                    : `${orderedStops.length}/${poolStops.length} · ${orderedStops
+                        .map((_, i) => sequenceLabelForIndex(i))
+                        .join('→')}`}
                 </Text>
               ) : null}
 
@@ -734,15 +736,12 @@ export default function InAppNavigationModal({
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>
-              {canStartNav ? (
-                <Text style={styles.voiceHint}>
-                  {orderedStops.length > 10
-                    ? language === 'zh'
-                      ? '⚠️ Google Maps 一次最多约 10 站，将按前段途经点导航'
-                      : '⚠️ Maps may only keep the first ~10 stops'
-                    : language === 'zh'
-                      ? '🔊 到达各站时将自动语音播报'
-                      : '🔊 Voice alert at each stop'}
+              {orderedStops.length > GOOGLE_MAPS_MAX_STOPS ? (
+                <Text style={styles.statsSub}>
+                  {riderActionCopy(language).googleNavTruncatedBody(
+                    GOOGLE_MAPS_MAX_STOPS,
+                    orderedStops.length - GOOGLE_MAPS_MAX_STOPS,
+                  )}
                 </Text>
               ) : null}
             </View>
@@ -1018,11 +1017,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  manualHint: { fontSize: 13, color: '#475569', marginBottom: 8, lineHeight: 18 },
   statsMain: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
   statsTraffic: { fontSize: 14, fontWeight: '600', color: '#dc2626' },
   statsSub: { fontSize: 13, color: '#64748b', marginTop: 4 },
-  voiceHint: { fontSize: 11, color: '#64748b', marginTop: 8, textAlign: 'center' },
   googleNavBtn: { marginTop: 10, borderRadius: 12, overflow: 'hidden' },
   googleNavBtnDisabled: { opacity: 0.85 },
   googleNavGradient: {

@@ -249,6 +249,24 @@ export const locationService = {
     } catch (err) {
       logger.error('停止后台追踪失败:', err);
     }
-  }
+  },
+
+  /** 退出登录前停 GPS，并尽量把骑手标为离线（须在 AsyncStorage.clear 之前调用） */
+  async stopTrackingAndMarkCourierOffline() {
+    await this.stopBackgroundTracking();
+    try {
+      const courierId = await AsyncStorage.getItem('currentCourierId');
+      if (!courierId) return;
+      await supabase
+        .from('couriers')
+        .update({
+          status: 'inactive',
+          last_active: new Date().toISOString(),
+        })
+        .eq('id', courierId);
+    } catch (err) {
+      logger.warn('退出时标记骑手离线失败', err);
+    }
+  },
 };
 

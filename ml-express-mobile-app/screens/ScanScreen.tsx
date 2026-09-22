@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions, CameraType } from 'expo-camera';
 import { useIsFocused } from '@react-navigation/native';
-import { packageService } from '../services/supabase';
+import { packageService, deliveryStoreService } from '../services/supabase';
 import { feedbackService } from '../services/feedbackService';
 import { logger } from '../services/LoggerService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,10 +24,15 @@ import {
   isPickupFlowStatus,
   isDeliveryActionStatus,
 } from '../utils/packageStatusNormalize';
+import { PACKAGE_STATUS } from '../constants/packageStatus';
 import {
   classifyScanCode,
   parseStoreReceiveCode,
 } from '../utils/scanCodeHelpers';
+import { isWriteOk, isWriteQueued, pendingWriteUserMessage } from '../utils/pendingWrite';
+import { riderActionCopy } from '../utils/riderActionCopy';
+import { distanceMeters, matchPackagesForStoreReceive } from '../utils/storeReceiveMatch';
+import { locationService } from '../services/locationService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -39,7 +44,6 @@ export default function ScanScreen({ navigation }: any) {
   const [manualInput, setManualInput] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
   const [currentCourierName, setCurrentCourierName] = useState('');
-  const [currentCourierId, setCurrentCourierId] = useState('');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(true);
@@ -112,34 +116,33 @@ export default function ScanScreen({ navigation }: any) {
       searchPackage: 'Search Package',
     },
     my: {
-      // 缅文版使用英文，但字体会缩小2号
-      headerTitle: '📦 Smart Scan',
-      headerSubtitle: 'Quick scan packages · Transfer codes',
-      scanButton: '📷 Scan',
-      inputButton: '⌨️ Input',
-      checkingPermission: 'Checking camera permission...',
-      pleaseWait: 'Please wait',
-      needPermission: 'Camera permission required',
-      permissionDesc: 'Scanning package QR codes and transfer codes requires camera access',
-      grantPermission: 'Grant Permission',
-      networkNotConnected: 'Network not connected',
-      checkNetwork: 'Please check your network connection and try again',
-      ok: 'OK',
-      cameraError: 'Camera Error',
-      cameraNotGranted: 'Camera permission not granted',
-      grantCameraPermission: 'Please grant camera permission to use scan feature',
-      alignFrame: 'Align with frame',
-      alignFrameDesc: 'Align QR code or barcode with the scanning frame',
-      qrCode: 'QR Code',
-      barcode: 'Barcode',
-      transferCode: 'Transfer Code',
-      processing: 'Processing...',
-      processingDesc: 'Querying package information',
-      scanSuccess: 'Scan Success',
-      rescan: '🔄 Rescan',
-      manualInputTitle: 'Manually enter package ID or transfer code',
-      inputPlaceholder: 'e.g.: PKG001 or TCABC1234',
-      searchPackage: 'Search Package',
+      headerTitle: '📦 စမတ် စကင်န်',
+      headerSubtitle: 'ပါဆယ် · လွှဲကုဒ် အမြန်စကင်န်',
+      scanButton: '📷 စကင်န်',
+      inputButton: '⌨️ ရိုက်ထည့်',
+      checkingPermission: 'ကင်မရာခွင့်ပြုချက် စစ်နေသည်...',
+      pleaseWait: 'ခဏစောင့်ပါ',
+      needPermission: 'ကင်မရာခွင့်ပြုချက် လိုအပ်သည်',
+      permissionDesc: 'ပါဆယ် QR နှင့် လွှဲကုဒ် စကင်န်ဖတ်ရန် ကင်မရာ လိုအပ်သည်',
+      grantPermission: 'ခွင့်ပြုရန်',
+      networkNotConnected: 'ကွန်ရက် မချိတ်ရသေးပါ',
+      checkNetwork: 'ကွန်ရက်ချိတ်ပြီး ထပ်ကြိုးစားပါ',
+      ok: 'ရပါပြီ',
+      cameraError: 'ကင်မရာ အမှား',
+      cameraNotGranted: 'ကင်မရာခွင့်ပြုချက် မရသေးပါ',
+      grantCameraPermission: 'စကင်န်သုံးရန် ကင်မရာခွင့်ပြုချက် ပေးပါ',
+      alignFrame: 'ဘောင်နှင့် ညှိပါ',
+      alignFrameDesc: 'QR သို့မဟုတ် ဘားကုဒ်ကို ဘောင်အတွင်း ထားပါ',
+      qrCode: 'QR ကုဒ်',
+      barcode: 'ဘားကုဒ်',
+      transferCode: 'လွှဲကုဒ်',
+      processing: 'လုပ်ဆောင်နေသည်...',
+      processingDesc: 'ပါဆယ်အချက်အလက် ရှာနေသည်',
+      scanSuccess: 'စကင်န် အောင်မြင်ပါပြီ',
+      rescan: '🔄 ထပ်စကင်န်ဖတ်',
+      manualInputTitle: 'ပါဆယ်နံပါတ် သို့မဟုတ် လွှဲကုဒ် ရိုက်ထည့်ပါ',
+      inputPlaceholder: 'ဥပမာ: PKG001 သို့မဟုတ် TCABC1234',
+      searchPackage: 'ပါဆယ်ရှာရန်',
     },
   };
 
@@ -215,9 +218,7 @@ export default function ScanScreen({ navigation }: any) {
   const loadCurrentCourierInfo = async () => {
     try {
       const userName = await AsyncStorage.getItem('currentUserName') || '';
-      const userId = await AsyncStorage.getItem('currentUser') || '';
       setCurrentCourierName(userName);
-      setCurrentCourierId(userId);
     } catch (error) {
       logger.error('加载骑手信息失败', error);
     }
@@ -324,14 +325,8 @@ export default function ScanScreen({ navigation }: any) {
   };
 
   const searchPackage = async (packageId: string) => {
+    const copy = riderActionCopy(language);
     try {
-      if (!isOnline) {
-        Alert.alert('网络未连接', '请检查网络连接后重试', [
-          { text: '确定', onPress: resetScanState },
-        ]);
-        return;
-      }
-
       const kind = classifyScanCode(packageId);
 
       if (kind === 'store') {
@@ -341,13 +336,12 @@ export default function ScanScreen({ navigation }: any) {
 
       const foundPackage = await packageService.findPackageByScanCode(packageId);
       if (!foundPackage) {
-        feedbackService.warning(
-          language === 'zh'
-            ? '未找到该包裹，请确认编号或中转码'
-            : 'Package not found. Check ID or transfer code.',
-        );
+        feedbackService.warning(!isOnline ? copy.packageNotFoundOffline : copy.packageNotFound);
         resetScanState();
         return;
+      }
+      if (!isOnline) {
+        feedbackService.info(copy.offlineCacheHint);
       }
 
       const ns = normalizePackageStatusZh(foundPackage.status);
@@ -360,16 +354,14 @@ export default function ScanScreen({ navigation }: any) {
           ns === '已送达' ||
           (ns === '配送中' && !foundPackage.courier);
         if (canAssign || ns === '已送达' || raw === '待派送') {
-          const statusText = ns === '已送达' ? (language === 'zh' ? '已到达中转站' : 'At station') : foundPackage.status;
+          const statusText = ns === '已送达' ? copy.atStation : foundPackage.status;
           Alert.alert(
-            language === 'zh' ? '确认领取中转包裹' : 'Claim transfer package',
-            language === 'zh'
-              ? `包裹：${foundPackage.id}\n状态：${statusText}\n中转码：${packageId}\n\n是否分配给：${currentCourierName}？`
-              : `Package: ${foundPackage.id}\nStatus: ${statusText}\nAssign to ${currentCourierName}?`,
+            copy.claimTransferTitle,
+            copy.claimTransferBody(foundPackage.id, statusText, packageId, currentCourierName),
             [
-              { text: language === 'zh' ? '取消' : 'Cancel', onPress: resetScanState },
+              { text: copy.cancel, onPress: resetScanState },
               {
-                text: language === 'zh' ? '确认分配' : 'Assign',
+                text: copy.assignConfirm,
                 onPress: async () => {
                   await assignPackageToCourier(foundPackage);
                 },
@@ -382,14 +374,12 @@ export default function ScanScreen({ navigation }: any) {
 
       if (isPickupFlowStatus(ns)) {
         Alert.alert(
-          language === 'zh' ? '确认取件' : 'Confirm pickup',
-          language === 'zh'
-            ? `包裹：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n\n确认后状态将更新为「已取件」`
-            : `Package: ${foundPackage.id}\nReceiver: ${foundPackage.receiver_name}\n\nConfirm to mark as picked up.`,
+          copy.confirmPickupTitle,
+          copy.confirmPickupScanBody(foundPackage.id, foundPackage.receiver_name),
           [
-            { text: language === 'zh' ? '取消' : 'Cancel', onPress: resetScanState },
+            { text: copy.cancel, onPress: resetScanState },
             {
-              text: language === 'zh' ? '确认取件' : 'Confirm',
+              text: copy.confirmPickupTitle,
               onPress: async () => {
                 await confirmPickup(foundPackage);
               },
@@ -401,13 +391,11 @@ export default function ScanScreen({ navigation }: any) {
 
       if (ns === '打包中' || ns === '待确认') {
         Alert.alert(
-          language === 'zh' ? '暂不可取件' : 'Not ready',
-          language === 'zh'
-            ? `包裹 ${foundPackage.id} 状态为「${foundPackage.status}」，请等待商家备货完成。`
-            : `Package ${foundPackage.id} is still packing. Wait for merchant.`,
+          copy.notReadyTitle,
+          copy.notReadyBody(foundPackage.id, foundPackage.status),
           [
-            { text: language === 'zh' ? '查看详情' : 'Open', onPress: () => openPackageDetail(foundPackage.id) },
-            { text: language === 'zh' ? '继续扫码' : 'Rescan', onPress: resetScanState },
+            { text: copy.viewDetail, onPress: () => openPackageDetail(foundPackage.id) },
+            { text: copy.continueScan, onPress: resetScanState },
           ],
         );
         return;
@@ -415,39 +403,31 @@ export default function ScanScreen({ navigation }: any) {
 
       if (isDeliveryActionStatus(ns)) {
         Alert.alert(
-          language === 'zh' ? '继续配送' : 'Continue delivery',
-          language === 'zh'
-            ? `包裹 ${foundPackage.id} 状态：${foundPackage.status}\n请打开详情完成拍照或扫码送达。`
-            : `Package ${foundPackage.id} (${foundPackage.status}). Open detail to deliver.`,
+          copy.continueDeliveryTitle,
+          copy.continueDeliveryBody(foundPackage.id, foundPackage.status),
           [
             {
-              text: language === 'zh' ? '去送达' : 'Deliver',
+              text: copy.goDeliver,
               onPress: () => openPackageDetail(foundPackage.id),
             },
-            { text: language === 'zh' ? '继续扫码' : 'Rescan', style: 'cancel', onPress: resetScanState },
+            { text: copy.continueScan, style: 'cancel', onPress: resetScanState },
           ],
         );
         return;
       }
 
       if (ns === '已送达' || ns === '已完成') {
-        feedbackService.info(
-          language === 'zh'
-            ? `包裹 ${foundPackage.id} 已送达`
-            : `Package ${foundPackage.id} already delivered`,
-        );
+        feedbackService.info(copy.alreadyDelivered(foundPackage.id));
         resetScanState();
         return;
       }
 
       Alert.alert(
-        language === 'zh' ? '无法在此扫码操作' : 'Cannot action here',
-        language === 'zh'
-          ? `包裹 ${foundPackage.id} 状态：${foundPackage.status}\n请打开任务详情处理。`
-          : `Package ${foundPackage.id}: ${foundPackage.status}`,
+        copy.cannotActionTitle,
+        copy.cannotActionBody(foundPackage.id, foundPackage.status),
         [
-          { text: language === 'zh' ? '查看详情' : 'Open', onPress: () => openPackageDetail(foundPackage.id) },
-          { text: language === 'zh' ? '继续扫码' : 'Rescan', onPress: resetScanState },
+          { text: copy.viewDetail, onPress: () => openPackageDetail(foundPackage.id) },
+          { text: copy.continueScan, onPress: resetScanState },
         ],
       );
     } catch (error: any) {
@@ -455,13 +435,9 @@ export default function ScanScreen({ navigation }: any) {
       const errorMessage = error?.message || '';
       if (/Network|connection|gateway|timeout/i.test(errorMessage)) {
         setNetworkError('网络连接失败，请检查网络后重试');
-        feedbackService.warning(
-          language === 'zh' ? '无法连接服务器，请检查网络' : 'Cannot reach server. Check network.',
-        );
+        feedbackService.warning(copy.networkUnreachable);
       } else {
-        feedbackService.error(
-          language === 'zh' ? '查询包裹失败，请稍后重试' : 'Failed to look up package',
-        );
+        feedbackService.error(copy.lookupFailed);
       }
       resetScanState();
     }
@@ -473,66 +449,281 @@ export default function ScanScreen({ navigation }: any) {
   };
 
   const assignPackageToCourier = async (pkg: any) => {
+    const copy = riderActionCopy(language);
     try {
+      const courierName = currentCourierName.trim();
+      if (!courierName) {
+        feedbackService.error(copy.courierNameMissing);
+        resetScanState();
+        return;
+      }
+
       const success = await packageService.updatePackageStatus(
         pkg.id,
-        '派送中',
+        PACKAGE_STATUS.IN_TRANSIT,
         pkg.pickup_time,
         undefined,
-        currentCourierId,
+        courierName,
         pkg.transfer_code,
       );
 
-      if (success) {
+      if (isWriteOk(success)) {
         Alert.alert(
-          language === 'zh' ? '分配成功' : 'Assigned',
-          language === 'zh'
-            ? `包裹 ${pkg.id} 已分配给 ${currentCourierName}`
-            : `Package ${pkg.id} assigned to ${currentCourierName}`,
+          isWriteQueued(success) ? copy.savedOfflineTitle : copy.assignSuccess,
+          pendingWriteUserMessage(
+            language,
+            success,
+            copy.assignedBody(pkg.id, currentCourierName),
+            copy.assignedBody(pkg.id, currentCourierName),
+            copy.assignedBody(pkg.id, currentCourierName),
+          ),
           [
             {
-              text: language === 'zh' ? '去配送' : 'Open',
+              text: copy.goDeliverOpen,
               onPress: () => openPackageDetail(pkg.id),
             },
-            { text: language === 'zh' ? '继续扫码' : 'Rescan', onPress: resetScanState },
+            { text: copy.continueScan, onPress: resetScanState },
           ],
         );
       } else {
-        feedbackService.error(language === 'zh' ? '分配失败，请重试' : 'Assign failed');
+        feedbackService.error(copy.assignFailed);
         resetScanState();
       }
     } catch (error) {
       logger.error('分配包裹失败', error);
-      feedbackService.error(language === 'zh' ? '分配包裹失败' : 'Assign failed');
+      feedbackService.error(copy.assignFailed);
       resetScanState();
     }
   };
 
   const handleStoreReceiveCode = async (receiveCode: string) => {
+    const copy = riderActionCopy(language);
     try {
       const parsed = parseStoreReceiveCode(receiveCode);
       if (!parsed) {
-        feedbackService.warning(
-          language === 'zh' ? '收件码格式无法识别' : 'Invalid store receive code',
-        );
+        feedbackService.warning(copy.invalidStoreCode);
         resetScanState();
         return;
       }
 
-      Alert.alert(
-        language === 'zh' ? '店长收件码' : 'Store receive code',
-        language === 'zh'
-          ? `店铺代码：${parsed.storeCode || parsed.storeId}\n\n请打开对应包裹详情，使用「扫码送达」扫描此码完成送达。`
-          : `Store: ${parsed.storeCode || parsed.storeId}\n\nOpen package detail → Scan to deliver with this code.`,
-        [{ text: language === 'zh' ? '继续扫码' : 'Rescan', onPress: resetScanState }],
-      );
+      const { deviceHealthService } = require('../services/deviceHealthService');
+      const health = await deviceHealthService.performFullCheck();
+      if (health.location.isMocked) {
+        feedbackService.warning(copy.mockLocationScan);
+        resetScanState();
+        return;
+      }
+
+      const courierName = currentCourierName.trim();
+      if (!courierName) {
+        feedbackService.error(copy.courierNameMissingScan);
+        resetScanState();
+        return;
+      }
+
+      const courierPackages = await packageService.getPackagesForCourier(courierName);
+      const deliverable = courierPackages.filter((pkg) => {
+        const ns = normalizePackageStatusZh(pkg.status);
+        return isDeliveryActionStatus(ns) || ns === '异常上报';
+      });
+
+      if (deliverable.length === 0) {
+        feedbackService.warning(copy.storeReceiveNone);
+        resetScanState();
+        return;
+      }
+
+      let storeName = parsed.storeCode || parsed.storeId;
+      let storeLat: number | null = null;
+      let storeLng: number | null = null;
+      try {
+        const storeDetails = await deliveryStoreService.getStoreById(parsed.storeId);
+        if (storeDetails?.store_name) storeName = storeDetails.store_name;
+        if (Number.isFinite(storeDetails?.latitude) && Number.isFinite(storeDetails?.longitude)) {
+          storeLat = Number(storeDetails!.latitude);
+          storeLng = Number(storeDetails!.longitude);
+        }
+      } catch {
+        /* store name is optional */
+      }
+
+      const bound = matchPackagesForStoreReceive(deliverable, parsed.storeId, receiveCode);
+      const candidates = bound.length ? bound : deliverable;
+
+      const finishOne = (pkg: (typeof deliverable)[0]) =>
+        void completeStoreDelivery(pkg, receiveCode, parsed.storeId, storeName, storeLat, storeLng);
+
+      if (candidates.length === 1) {
+        Alert.alert(copy.storeReceiveTitle, copy.storeReceiveConfirmOne(candidates[0].id, storeName), [
+          { text: copy.cancel, style: 'cancel', onPress: resetScanState },
+          { text: copy.confirm, onPress: () => finishOne(candidates[0]) },
+        ]);
+        return;
+      }
+
+      if (bound.length > 1) {
+        Alert.alert(copy.storeReceiveTitle, copy.storeReceiveConfirmMany(bound.length, storeName), [
+          { text: copy.cancel, style: 'cancel', onPress: resetScanState },
+          { text: copy.storeReceiveDeliverFirst, onPress: () => finishOne(bound[0]) },
+          {
+            text: copy.storeReceiveDeliverAll,
+            onPress: () => void completeStoreDeliveryBatch(bound, receiveCode, parsed.storeId, storeName, storeLat, storeLng),
+          },
+        ]);
+        return;
+      }
+
+      Alert.alert(copy.storeReceiveTitle, copy.storeReceiveUnmatched(deliverable.length, storeName), [
+        { text: copy.cancel, style: 'cancel', onPress: resetScanState },
+        {
+          text: copy.storeReceiveOpenDetail,
+          onPress: () => openPackageDetail(candidates[0].id),
+        },
+        { text: copy.confirm, onPress: () => finishOne(candidates[0]) },
+      ]);
     } catch (error) {
-      feedbackService.error(language === 'zh' ? '处理收件码失败' : 'Failed to handle store code');
+      logger.error('处理收件码失败', error);
+      feedbackService.error(copy.scanHandlingFailed);
       resetScanState();
     }
   };
 
+  const ensureStoreDeliveryDistance = async (
+    pkg: { receiver_latitude?: number; receiver_longitude?: number },
+    storeLat: number | null,
+    storeLng: number | null,
+  ): Promise<boolean> => {
+    const copy = riderActionCopy(language);
+    const coords = await locationService.getCurrentLocation(language);
+    const target =
+      storeLat != null && storeLng != null
+        ? { latitude: storeLat, longitude: storeLng }
+        : pkg.receiver_latitude != null && pkg.receiver_longitude != null
+          ? { latitude: Number(pkg.receiver_latitude), longitude: Number(pkg.receiver_longitude) }
+          : null;
+    if (!coords || !target) return true;
+    const dist = distanceMeters(coords, target);
+    if (dist > 200) {
+      feedbackService.warning(copy.tooFarScan(Math.round(dist)));
+      return false;
+    }
+    return true;
+  };
+
+  const completeStoreDelivery = async (
+    pkg: { id: string; courier?: string; status?: string; receiver_latitude?: number; receiver_longitude?: number; description?: string },
+    receiveCode: string,
+    storeId: string,
+    storeName: string,
+    storeLat: number | null,
+    storeLng: number | null,
+  ) => {
+    const copy = riderActionCopy(language);
+    try {
+      if (!(await ensureStoreDeliveryDistance(pkg, storeLat, storeLng))) {
+        resetScanState();
+        return;
+      }
+      const success = await packageService.updatePackageStatus(
+        pkg.id,
+        '已送达',
+        undefined,
+        new Date().toISOString(),
+        currentCourierName || pkg.courier,
+        undefined,
+        { storeId, storeName, receiveCode },
+      );
+      if (!isWriteOk(success)) {
+        feedbackService.error(copy.deliveryUpdateFailed);
+        resetScanState();
+        return;
+      }
+      if (normalizePackageStatusZh(pkg.status) === '异常上报') {
+        try {
+          const { supabase } = require('../services/supabase');
+          await supabase
+            .from('packages')
+            .update({ description: (pkg.description || '') + ' [异常转送中转站]' })
+            .eq('id', pkg.id);
+        } catch {
+          /* non-blocking */
+        }
+      }
+      feedbackService.success(
+        pendingWriteUserMessage(language, success, copy.deliveredToStore(storeName), copy.deliveredToStore(storeName), copy.deliveredToStore(storeName)),
+      );
+      Alert.alert(
+        isWriteQueued(success) ? copy.savedOfflineTitle : copy.deliveredTitle,
+        pendingWriteUserMessage(
+          language,
+          success,
+          copy.deliveredToStoreBody(storeName),
+          copy.deliveredToStoreBody(storeName),
+          copy.deliveredToStoreBody(storeName),
+        ),
+        [
+          { text: copy.goDeliver, onPress: () => openPackageDetail(pkg.id) },
+          { text: copy.continueScan, onPress: resetScanState },
+        ],
+      );
+    } catch (error) {
+      logger.error('店长码送达失败', error);
+      feedbackService.error(copy.deliveryUpdateFailed);
+      resetScanState();
+    }
+  };
+
+  const completeStoreDeliveryBatch = async (
+    pkgs: Array<{ id: string; courier?: string; status?: string; receiver_latitude?: number; receiver_longitude?: number; description?: string }>,
+    receiveCode: string,
+    storeId: string,
+    storeName: string,
+    storeLat: number | null,
+    storeLng: number | null,
+  ) => {
+    const copy = riderActionCopy(language);
+    let okCount = 0;
+    let queued = false;
+    for (const pkg of pkgs) {
+      if (!(await ensureStoreDeliveryDistance(pkg, storeLat, storeLng))) {
+        resetScanState();
+        return;
+      }
+      const success = await packageService.updatePackageStatus(
+        pkg.id,
+        '已送达',
+        undefined,
+        new Date().toISOString(),
+        currentCourierName || pkg.courier,
+        undefined,
+        { storeId, storeName, receiveCode },
+      );
+      if (isWriteOk(success)) {
+        okCount += 1;
+        if (isWriteQueued(success)) queued = true;
+      }
+    }
+    if (okCount === 0) {
+      feedbackService.error(copy.deliveryUpdateFailed);
+      resetScanState();
+      return;
+    }
+    const result = queued ? { ok: true, queued: true } : { ok: true };
+    Alert.alert(
+      queued ? copy.savedOfflineTitle : copy.deliveredTitle,
+      pendingWriteUserMessage(
+        language,
+        result,
+        copy.deliveredToStoreBody(`${storeName} ×${okCount}`),
+        copy.deliveredToStoreBody(`${storeName} ×${okCount}`),
+        copy.deliveredToStoreBody(`${storeName} ×${okCount}`),
+      ),
+      [{ text: copy.continueScan, onPress: resetScanState }],
+    );
+  };
+
   const confirmPickup = async (packageData: any) => {
+    const copy = riderActionCopy(language);
     try {
       const pickupTime = new Date().toLocaleString('zh-CN');
       const courierName = currentCourierName || '未知骑手';
@@ -545,38 +736,46 @@ export default function ScanScreen({ navigation }: any) {
         courierName,
       );
 
-      if (success) {
+      if (isWriteOk(success)) {
         feedbackService.success(
-          language === 'zh'
-            ? `取件成功：${packageData.id}`
-            : `Picked up: ${packageData.id}`,
+          pendingWriteUserMessage(
+            language,
+            success,
+            copy.pickupSuccessId(packageData.id),
+            copy.pickupSuccessId(packageData.id),
+            copy.pickupSuccessId(packageData.id),
+          ),
         );
         Alert.alert(
-          language === 'zh' ? '取件成功' : 'Pickup done',
-          language === 'zh'
-            ? `包裹 ${packageData.id} 已取件。下一步可去详情导航并送达。`
-            : `Package ${packageData.id} picked up. Open detail to navigate & deliver.`,
+          isWriteQueued(success) ? copy.savedOfflineTitle : copy.pickupSuccessTitle,
+          pendingWriteUserMessage(
+            language,
+            success,
+            copy.pickupNextSteps(packageData.id),
+            copy.pickupNextSteps(packageData.id),
+            copy.pickupNextSteps(packageData.id),
+          ),
           [
             {
-              text: language === 'zh' ? '去配送' : 'Deliver',
+              text: copy.goDeliver,
               onPress: () => openPackageDetail(packageData.id),
             },
-            { text: language === 'zh' ? '继续扫码' : 'Rescan', onPress: resetScanState },
+            { text: copy.continueScan, onPress: resetScanState },
           ],
         );
       } else {
-        feedbackService.error(language === 'zh' ? '取件失败，请重试' : 'Pickup failed');
+        feedbackService.error(copy.pickupFailedRetry);
         resetScanState();
       }
     } catch (error) {
-      feedbackService.error(language === 'zh' ? '取件失败，请检查网络' : 'Pickup failed. Check network.');
+      feedbackService.error(copy.pickupFailedNetwork);
       resetScanState();
     }
   };
 
   const handleManualSearch = async () => {
     if (!manualInput.trim()) {
-      feedbackService.notify('提示', '请输入包裹编号');
+      feedbackService.notify(riderActionCopy(language).noticeTitle, riderActionCopy(language).enterPackageId);
       return;
     }
     await searchPackage(manualInput.trim());

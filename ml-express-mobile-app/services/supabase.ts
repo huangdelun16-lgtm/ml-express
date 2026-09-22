@@ -4,6 +4,15 @@ import { cacheService } from './cacheService';
 import { detectViolationsAsync } from './detectViolations';
 import { supabase } from './staffApi/supabaseClient';
 import { TERMINAL_EXCLUDED_STATUSES } from '../constants/packageStatus';
+import { isOfflineQueueStuck, shouldSkipOfflineQueueItem } from '../utils/offlineQueuePolicy';
+import { feedbackService } from './feedbackService';
+import { findPackageInListByScanCode } from '../utils/scanCodeHelpers';
+import {
+  pendingWriteFailed,
+  pendingWriteQueuedResult,
+  pendingWriteSynced,
+  type PendingWriteResult,
+} from '../utils/pendingWrite';
 import type {
   Package,
   AuditLog,
@@ -24,6 +33,21 @@ export type {
   Notification,
 } from './staffApi/types';
 export { adminAccountService } from './staffApi/adminAccountService';
+export type { PendingWriteResult } from '../utils/pendingWrite';
+
+let lastOfflineStuckAlertAt = 0;
+const OFFLINE_STUCK_ALERT_MS = 60_000;
+
+function notifyOfflineQueueStuck(count: number) {
+  const now = Date.now();
+  if (now - lastOfflineStuckAlertAt < OFFLINE_STUCK_ALERT_MS) return;
+  lastOfflineStuckAlertAt = now;
+  feedbackService.warning(
+    count > 1
+      ? `${count} 条离线记录同步失败，将自动继续重试`
+      : '有离线记录同步失败，将自动继续重试',
+  );
+}
 
 // 缓存键名
 const CACHE_KEYS = {
@@ -343,7 +367,7 @@ export const packageService = {
     storeInfo?: { storeId: string; storeName: string; receiveCode: string },
     courierLocation?: { latitude: number; longitude: number },
     options?: { fromSync?: boolean }
-  ): Promise<boolean> {
+  ): Promise<PendingWriteResult> {
     const queuePayload = {
       packageId: id,
       type: 'status' as const,
@@ -362,11 +386,11 @@ export const packageService = {
 
     if (treatOffline) {
       if (options?.fromSync) {
-        return false;
+        return pendingWriteFailed();
       }
       console.log('📶 网络不可用，状态更新已加入待同步队列');
-      await cacheService.queueUpdate(queuePayload);
-      return true;
+      const queued = await cacheService.queueUpdate(queuePayload);
+      return queued ? pendingWriteQueuedResult() : pendingWriteFailed();
     }
 
     const ok = await this._applyPackageStatusRemote(
@@ -382,11 +406,11 @@ export const packageService = {
 
     if (!ok && !options?.fromSync) {
       console.warn('📶 服务端更新失败，已加入待同步队列');
-      await cacheService.queueUpdate(queuePayload);
-      return true;
+      const queued = await cacheService.queueUpdate(queuePayload);
+      return queued ? pendingWriteQueuedResult() : pendingWriteFailed();
     }
 
-    return ok;
+    return ok ? pendingWriteSynced() : pendingWriteFailed();
   },
 
   /**
@@ -513,16 +537,14 @@ export const packageService = {
 
     console.log(`🔄 正在同步 ${queue.length} 条离线记录...`);
 
+    let stuckCount = 0;
     for (const item of queue) {
-      if (item.retryCount > 5) {
-        console.warn(`⚠️ 记录 ${item.id} 重试次数过多，跳过`);
-        continue;
-      }
+      if (shouldSkipOfflineQueueItem(item.retryCount)) continue;
 
       try {
         let success = false;
         if (item.type === 'status') {
-          success = await this.updatePackageStatus(
+          const result = await this.updatePackageStatus(
             item.packageId,
             item.status!,
             item.pickupTime,
@@ -533,12 +555,17 @@ export const packageService = {
             item.courierLocation,
             { fromSync: true }
           );
+          success = result.ok;
         } else if (item.type === 'photo' && item.photoData) {
-          success = await deliveryPhotoService.saveDeliveryPhoto({
-            packageId: item.packageId,
-            ...item.photoData,
-            courierName: item.courierName || '未知',
-          });
+          const result = await deliveryPhotoService.saveDeliveryPhoto(
+            {
+              packageId: item.packageId,
+              ...item.photoData,
+              courierName: item.courierName || '未知',
+            },
+            { fromSync: true },
+          );
+          success = result.ok;
         }
 
         if (success) {
@@ -546,11 +573,17 @@ export const packageService = {
           console.log(`✅ 成功同步离线记录: ${item.id}`);
         } else {
           await cacheService.incrementRetry(item.id);
+          if (isOfflineQueueStuck((item.retryCount || 0) + 1)) stuckCount += 1;
         }
       } catch (error) {
         console.warn('同步离线记录失败:', error);
         await cacheService.incrementRetry(item.id);
+        if (isOfflineQueueStuck((item.retryCount || 0) + 1)) stuckCount += 1;
       }
+    }
+
+    if (stuckCount > 0) {
+      notifyOfflineQueueStuck(stuckCount);
     }
   },
 
@@ -581,6 +614,13 @@ export const packageService = {
     const code = String(raw || '').trim();
     if (!code || code.startsWith('STORE_')) return null;
 
+    const netState = await NetInfo.fetch();
+    const treatOffline =
+      !netState.isConnected || netState.isInternetReachable === false;
+    if (treatOffline) {
+      return this.findPackageInLocalCaches(code);
+    }
+
     try {
       const byId = await this.getPackageById(code);
       if (byId) return byId;
@@ -604,8 +644,39 @@ export const packageService = {
       return null;
     } catch (err) {
       console.error('扫码查找包裹失败:', err);
-      return null;
+      return this.findPackageInLocalCaches(code);
     }
+  },
+
+  async findPackageInLocalCaches(code: string): Promise<Package | null> {
+    const lists: Package[][] = [];
+    try {
+      const cached = await cacheService.getCachedPackages({ allowExpired: true });
+      if (cached?.length) lists.push(cached);
+    } catch {
+      /* ignore */
+    }
+    try {
+      const all = await AsyncStorage.getItem(CACHE_KEYS.PACKAGES);
+      if (all) lists.push(JSON.parse(all) as Package[]);
+    } catch {
+      /* ignore */
+    }
+    try {
+      const name = ((await AsyncStorage.getItem('currentUserName')) || '').trim();
+      if (name) {
+        const raw = await AsyncStorage.getItem(`${CACHE_KEYS.PACKAGES}_courier_${name}`);
+        if (raw) lists.push(JSON.parse(raw) as Package[]);
+      }
+    } catch {
+      /* ignore */
+    }
+
+    for (const list of lists) {
+      const hit = findPackageInListByScanCode(list, code);
+      if (hit) return hit;
+    }
+    return null;
   },
 
   /**
@@ -1202,13 +1273,18 @@ export const deliveryPhotoService = {
     latitude?: number;
     longitude?: number;
     locationName?: string;
-  }): Promise<boolean> {
+  }, options?: { fromSync?: boolean }): Promise<PendingWriteResult> {
     try {
       // 🚀 离线支持逻辑
       const netState = await NetInfo.fetch();
-      if (!netState.isConnected) {
+      const treatOffline =
+        !netState.isConnected || netState.isInternetReachable === false;
+      if (treatOffline) {
+        if (options?.fromSync) {
+          return pendingWriteFailed();
+        }
         console.log('📶 检测到离线状态，正在缓存照片上传...');
-        await cacheService.queueUpdate({
+        const queued = await cacheService.queueUpdate({
           packageId: photoData.packageId,
           type: 'photo',
           courierName: photoData.courierName,
@@ -1221,7 +1297,7 @@ export const deliveryPhotoService = {
             locationName: photoData.locationName
           }
         });
-        return true;
+        return queued ? pendingWriteQueuedResult() : pendingWriteFailed();
       }
 
       // 生成照片URL（使用data URL格式）
@@ -1245,15 +1321,15 @@ export const deliveryPhotoService = {
 
       if (error) {
         console.error('保存配送照片失败:', error);
-        return false;
+        return pendingWriteFailed();
       }
 
       console.log('✅ 配送照片保存成功，URL已生成');
       // 服务端保留 7 天：Supabase cleanup_expired_delivery_photos + Netlify cleanup-delivery-photos 定时任务
-      return true;
+      return pendingWriteSynced();
     } catch (err) {
       console.error('保存配送照片异常:', err);
-      return false;
+      return pendingWriteFailed();
     }
   },
 

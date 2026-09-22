@@ -1,6 +1,6 @@
 {
   "name": "market-link-express-mobile",
-  "version": "2.4.5",
+  "version": "2.5.0",
   "description": "MARKET LINK STAFF - 缅甸专业快递骑手端",
   "main": "index.ts",
   "scripts": {
@@ -10,7 +10,9 @@
     "android": "expo run:android",
     "android:setup": "./run-android.sh",
     "ios": "expo run:ios",
-    "build:aab": "npx --yes eas-cli@latest build --platform android --profile production --clear-cache"
+    "build:aab": "npx --yes eas-cli@latest build --platform android --profile production --clear-cache",
+    "build:apk": "npx --yes eas-cli@latest build --platform android --profile apk",
+    "eas-build-post-install": "chmod -R a+x node_modules/hermes-compiler/hermesc node_modules/react-native/sdks/hermesc 2>/dev/null || true"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

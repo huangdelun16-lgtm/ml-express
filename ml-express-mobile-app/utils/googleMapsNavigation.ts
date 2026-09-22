@@ -1,9 +1,39 @@
 import { Linking, Platform } from 'react-native';
+import { splitGoogleMapsStops } from './googleMapsRouteLimit';
 
 type LatLng = { lat: number; lng: number };
 
 function fmt(point: LatLng): string {
   return `${point.lat},${point.lng}`;
+}
+
+export type GoogleMapsNavPlan = {
+  origin?: LatLng;
+  destination: LatLng;
+  waypoints: LatLng[];
+  truncated: boolean;
+  remainingStopCount: number;
+  navigableStopCount: number;
+};
+
+/** 将骑手站点裁成 Google Maps 能吃下的一段（先走前 10 站，不跳到最后一站）。 */
+export function planGoogleMapsDrivingRoute(options: {
+  origin?: LatLng;
+  stops: LatLng[];
+}): GoogleMapsNavPlan | null {
+  const { origin, stops } = options;
+  if (!stops.length) return null;
+  const { navigable, remaining, truncated } = splitGoogleMapsStops(stops);
+  const destination = navigable[navigable.length - 1];
+  const waypoints = navigable.slice(0, -1);
+  return {
+    origin,
+    destination,
+    waypoints,
+    truncated,
+    remainingStopCount: remaining.length,
+    navigableStopCount: navigable.length,
+  };
 }
 
 /** 优先打开 Google Maps 语音导航；失败时回退 Web / Apple Maps */
@@ -24,7 +54,7 @@ export async function openGoogleMapsDrivingNavigation(options: {
   if (origin) {
     const originStr = fmt(origin);
     if (waypoints.length > 0) {
-      const wp = waypoints.slice(0, 9).map(fmt).join('|');
+      const wp = waypoints.map(fmt).join('|');
       candidates.push(
         `comgooglemaps://?saddr=${originStr}&daddr=${dest}&waypoints=${wp}&directionsmode=driving`,
       );

@@ -120,7 +120,7 @@ export const cacheService = {
   /**
    * 从离线缓存获取包裹数据
    */
-  async getCachedPackages(): Promise<Package[] | null> {
+  async getCachedPackages(opts?: { allowExpired?: boolean }): Promise<Package[] | null> {
     try {
       const cachedData = await AsyncStorage.getItem(PACKAGES_CACHE_KEY);
       const timestamp = await AsyncStorage.getItem(CACHE_TIMESTAMP_KEY);
@@ -128,7 +128,7 @@ export const cacheService = {
       if (!cachedData || !timestamp) return null;
 
       const cacheAge = Date.now() - parseInt(timestamp);
-      if (cacheAge > CACHE_EXPIRY) {
+      if (cacheAge > CACHE_EXPIRY && !opts?.allowExpired) {
         console.log('⚠️ 离线缓存已过期');
         return null;
       }

@@ -445,7 +445,7 @@ const MyTasksScreen: React.FC = () => {
           onPress: async () => {
             try {
               const success = await packageService.updatePackageStatus(selectedPackage.id, '待取件');
-              if (success) {
+              if (success.ok) {
                 Alert.alert(
                   language === 'zh' ? '成功' : language === 'en' ? 'Success' : 'အောင်မြင်ပါသည်',
                   language === 'zh' ? '收款确认成功！' : 'Payment confirmed!',
@@ -525,7 +525,7 @@ const MyTasksScreen: React.FC = () => {
                 currentCourierName
               );
 
-              if (success) {
+              if (success.ok) {
                 Alert.alert(
                   language === 'zh' ? '成功' : language === 'en' ? 'Success' : 'အောင်မြင်ပါသည်',
                   language === 'zh' ? '已确认取件' : language === 'en' ? 'Pickup confirmed' : 'ကောက်ယူမှုကိုအတည်ပြုပြီးပါပြီ'
@@ -583,8 +583,12 @@ const MyTasksScreen: React.FC = () => {
         currentCourierName
       );
 
-      if (success) {
-        Alert.alert('配送完成！', '包裹已成功送达', [{
+      if (success.ok) {
+        Alert.alert(
+          success.queued ? '已保存待同步' : '配送完成！',
+          success.queued
+            ? '已保存到待同步队列，联网后自动上传。请勿重复操作。'
+            : '包裹已成功送达', [{
           text: '确定',
           onPress: async () => {
             setShowPhotoModal(false);
@@ -684,7 +688,7 @@ const MyTasksScreen: React.FC = () => {
             undefined,
             currentCourierName,
           );
-          if (success) {
+          if (success.ok) {
             feedbackService.success(
               language === 'zh' ? '取件成功' : 'Picked up',
             );
@@ -781,7 +785,7 @@ const MyTasksScreen: React.FC = () => {
           { storeId, storeName, receiveCode: data },
         );
 
-        if (success) {
+        if (success.ok) {
           if (isAnomalyResolution) {
             try {
               await supabase

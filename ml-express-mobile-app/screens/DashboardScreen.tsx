@@ -17,7 +17,7 @@ import { packageService, supabase, notificationService, Notification } from '../
 import { useApp } from '../contexts/AppContext';
 import * as Location from 'expo-location';
 import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
-import { syncCourierLocationToSupabase } from '../services/locationService';
+import { syncCourierLocationToSupabase, locationService } from '../services/locationService';
 import { Alert } from 'react-native';
 import { feedbackService } from '../services/feedbackService';
 import {
@@ -269,7 +269,7 @@ export default function DashboardScreen({ navigation }: any) {
 
   const handleLogout = async () => {
     try {
-      // 清除所有存储的数据
+      await locationService.stopTrackingAndMarkCourierOffline();
       await AsyncStorage.clear();
       
       // 重置导航栈到登录页面

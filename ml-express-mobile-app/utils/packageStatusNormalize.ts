@@ -21,7 +21,7 @@ export function normalizePackageStatusZh(status?: string | null): string {
   if (t.includes("已取消")) return PACKAGE_STATUS.CANCELLED;
   if (t.includes("已完成")) return PACKAGE_STATUS.COMPLETED;
   if (t.includes("异常上报")) return PACKAGE_STATUS.EXCEPTION;
-  if (t.includes("配送进行中") || t.includes("配送中"))
+  if (t.includes("配送进行中") || t.includes("配送中") || t.includes("派送中"))
     return PACKAGE_STATUS.IN_TRANSIT;
   if (t.includes("已取件")) return PACKAGE_STATUS.PICKED_UP;
   if (t.includes("待收款")) return PACKAGE_STATUS.PENDING_COD;

@@ -2,7 +2,7 @@
   "expo": {
     "name": "MARKET LINK STAFF",
     "slug": "MarketLinkStaffApp",
-    "version": "2.4.5",
+    "version": "2.5.0",
     "scheme": "ml-express-staff",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.courier",
-      "buildNumber": "83",
+      "buildNumber": "87",
       "infoPlist": {
         "CFBundleDisplayName": "MARKET LINK STAFF",
         "CFBundleName": "MARKET LINK STAFF",
@@ -29,7 +29,7 @@
         ]
       },
       "config": {
-        "googleMapsApiKey": ""
+        "googleMapsApiKey": "AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc"
       }
     },
     "android": {
@@ -38,7 +38,7 @@
         "backgroundColor": "#2c5282"
       },
       "package": "com.mlexpress.courier",
-      "versionCode": 83,
+      "versionCode": 87,
       "permissions": [
         "CAMERA",
         "ACCESS_FINE_LOCATION",
@@ -47,7 +47,7 @@
       ],
       "config": {
         "googleMaps": {
-          "apiKey": ""
+          "apiKey": "AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc"
         }
       },
       "blockedPermissions": [
@@ -67,6 +67,12 @@
         "expo-camera",
         {
           "cameraPermission": "需要访问相机以扫描包裹二维码和中转码。"
+        }
+      ],
+      [
+        "react-native-maps",
+        {
+          "androidGoogleMapsApiKey": "AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc"
         }
       ],
       [

@@ -84,6 +84,11 @@ function resolveExtraSupabaseUrl(envUrl) {
   }
   return (envUrl || SUPABASE_UPSTREAM_URL).trim();
 }
+function pluginName(plugin) {
+  if (Array.isArray(plugin)) return plugin[0];
+  return plugin;
+}
+
 module.exports = ({ config }) => {
   const expoConfig = baseConfig.expo || {};
 
@@ -92,6 +97,14 @@ module.exports = ({ config }) => {
     (expoConfig.android?.config?.googleMaps?.apiKey) ||
     (expoConfig.ios?.config?.googleMapsApiKey) ||
     '';
+  const androidMapsSdkKey = (
+    process.env.EXPO_PUBLIC_GOOGLE_MAPS_SDK_ANDROID_KEY ||
+    (expoConfig.android &&
+      expoConfig.android.config &&
+      expoConfig.android.config.googleMaps &&
+      expoConfig.android.config.googleMaps.apiKey) ||
+    ''
+  ).trim();
 
   const supabaseUrl = resolveExtraSupabaseUrl(process.env.EXPO_PUBLIC_SUPABASE_URL || '');
   const supabaseAnonKey =
@@ -100,13 +113,19 @@ module.exports = ({ config }) => {
     process.env.EXPO_PUBLIC_NETLIFY_URL ||
     'https://admin-market-link-express.netlify.app';
 
-  const plugins = [...(expoConfig.plugins || [])];
+  const plugins = (expoConfig.plugins || []).filter((plugin) => pluginName(plugin) !== 'react-native-maps');
   if (!plugins.some((p) => p === '@sentry/react-native/expo' || (Array.isArray(p) && p[0] === '@sentry/react-native/expo'))) {
     plugins.push('@sentry/react-native/expo');
   }
   if (!plugins.some((p) => p === withForceIosLocationUsageDescriptions)) {
     plugins.push(withForceIosLocationUsageDescriptions);
   }
+  plugins.push([
+    'react-native-maps',
+    {
+      ...(androidMapsSdkKey ? { androidGoogleMapsApiKey: androidMapsSdkKey } : {}),
+    },
+  ]);
 
   const baseInfoPlist = expoConfig.ios?.infoPlist || {};
   const backgroundModes = [
@@ -130,7 +149,7 @@ module.exports = ({ config }) => {
       config: {
         ...(expoConfig.android?.config || {}),
         googleMaps: {
-          apiKey: googleMapsApiKey,
+          apiKey: androidMapsSdkKey || googleMapsApiKey,
         },
       },
     },

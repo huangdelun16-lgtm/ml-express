@@ -49,6 +49,17 @@ export function scanMatchesPackage(
   return false;
 }
 
+export function findPackageInListByScanCode<T extends {
+  id?: string;
+  sender_code?: string | null;
+  transfer_code?: string | null;
+  store_receive_code?: string | null;
+}>(packages: T[] | null | undefined, raw: string): T | null {
+  const code = normalizeScanPayload(raw);
+  if (!code || code.startsWith('STORE_')) return null;
+  return packages?.find((pkg) => scanMatchesPackage(code, pkg)) || null;
+}
+
 export function isDeliveryStoreScan(data: string): boolean {
   return classifyScanCode(data) === 'store';
 }

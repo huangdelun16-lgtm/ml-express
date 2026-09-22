@@ -344,27 +344,7 @@ export default function ProfileScreen({ navigation }: any) {
           style: 'destructive',
           onPress: async () => {
             try {
-              // 如果是骑手，更新快递员状态为离线
-              const userPosition = await AsyncStorage.getItem('currentUserPosition');
-              if (userPosition === '骑手' || userPosition === '骑手队长') {
-                try {
-                  const courierId = await AsyncStorage.getItem('currentCourierId');
-                  if (courierId) {
-                    await supabase
-                      .from('couriers')
-                      .update({ 
-                        last_active: new Date().toISOString(),
-                        status: 'inactive'
-                      })
-                      .eq('id', courierId);
-                    console.log('✅ 快递员状态已更新为离线');
-                  }
-                } catch (error) {
-                  console.error('更新快递员离线状态失败:', error);
-                }
-              }
-              
-              // 清除所有存储的数据
+              await locationService.stopTrackingAndMarkCourierOffline();
               await AsyncStorage.clear();
               
               // 重置导航栈到登录页面

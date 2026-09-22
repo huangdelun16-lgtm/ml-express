@@ -30,6 +30,9 @@ import { useApp } from '../contexts/AppContext';
 import { packageService, Package, supabase, deliveryPhotoService } from '../services/supabase';
 import { feedbackService } from '../services/feedbackService';
 import { cacheService } from '../services/cacheService';
+import { imageUriToBase64 } from '../utils/imageUriToBase64';
+import { isWriteOk, isWriteQueued, pendingWriteUserMessage } from '../utils/pendingWrite';
+import { riderActionCopy } from '../utils/riderActionCopy';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppState, AppStateStatus, DeviceEventEmitter } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -159,6 +162,7 @@ const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: num
 
 export default function MapScreen({ navigation }: any) {
   const { language, t } = useApp();
+  const copy = riderActionCopy(language);
   const isFocused = useIsFocused();
   
   // 1. 状态定义
@@ -290,20 +294,20 @@ export default function MapScreen({ navigation }: any) {
   const getStatusDisplayText = useCallback((status: string) => {
     const s = normalizePackageStatusZh(status);
     switch (s) {
-      case '待取件': return language === 'zh' ? '待取件' : 'Pending';
-      case '待收款': return language === 'zh' ? '待收款' : 'Wait Collect';
-      case '待确认': return language === 'zh' ? '待确认' : 'Pending confirm';
-      case '打包中': return language === 'zh' ? '打包中' : 'Packing';
-      case '已取件': return language === 'zh' ? '已取件' : 'Picked Up';
-      case '配送中': return language === 'zh' ? '配送中' : 'Delivering';
+      case '待取件': return copy.statusLabel('待取件');
+      case '待收款': return copy.statusLabel('待收款');
+      case '待确认': return copy.statusLabel('待确认');
+      case '打包中': return copy.statusLabel('打包中');
+      case '已取件': return copy.statusLabel('已取件');
+      case '配送中': return copy.statusLabel('配送中');
       case '已送达':
       case '已完成':
-        return language === 'zh' ? '已送达' : 'Delivered';
-      case '异常上报': return language === 'zh' ? '异常上报' : 'Anomaly Reported';
-      case '已取消': return language === 'zh' ? '已取消' : 'Cancelled';
+        return copy.statusLabel('已送达');
+      case '异常上报': return copy.statusLabel('异常上报');
+      case '已取消': return copy.statusLabel('已取消');
       default: return s;
     }
-  }, [language]);
+  }, [copy]);
 
   /** 配送中（Delivering）：已在送往收件人途中，路线预览不显示取货点 */
   const routePreviewOmitsPickup = useCallback(
@@ -717,11 +721,18 @@ export default function MapScreen({ navigation }: any) {
       const id = await AsyncStorage.getItem('currentCourierId');
       if (!id) return;
       await supabase.from('couriers').update({ current_delivering_package_id: packageId }).eq('id', id);
-      await packageService.updatePackageStatus(packageId, '配送中', new Date().toLocaleString('zh-CN'));
+      const startResult = await packageService.updatePackageStatus(packageId, '配送中', new Date().toLocaleString('zh-CN'));
+      if (!isWriteOk(startResult)) {
+        feedbackService.error(copy.operationFailed);
+        return;
+      }
+      if (isWriteQueued(startResult)) {
+        feedbackService.success(pendingWriteUserMessage(language, startResult, copy.deliveryStarted, copy.deliveryStarted, copy.deliveryStarted));
+      }
       setCurrentDeliveringPackageId(packageId);
       loadPackages();
     } catch (e) { 
-      feedbackService.notify(language === 'zh' ? '错误' : language === 'en' ? 'Error' : 'အမှား', language === 'zh' ? '操作失败' : language === 'en' ? 'Operation failed' : 'လုပ်ဆောင်မှု မအောင်မြင်ပါ'); 
+      feedbackService.notify(copy.errorTitle, copy.operationFailed); 
     } finally {
       setLoading(false);
     }
@@ -739,7 +750,7 @@ export default function MapScreen({ navigation }: any) {
       const health = await deviceHealthService.performFullCheck();
       
       if (health.location.isMocked) {
-        feedbackService.notify(language === 'zh' ? '检测到异常' : 'Anomaly Detected', language === 'zh' ? '系统检测到您正在使用“模拟定位”，该操作已被禁止并已上报系统。' : 'Mock location detected. This action is prohibited and reported.');
+        feedbackService.notify(copy.mockLocationTitle, copy.mockLocationBody);
         // 上报给系统 (这里可以通过 reportAnomaly 实现)
         await packageService.reportAnomaly({
           packageId: pkg.id,
@@ -754,7 +765,7 @@ export default function MapScreen({ navigation }: any) {
 
       // 2. 🚀 电子围栏检查：检查距离
       if (!location) {
-        feedbackService.notify('提示', '无法获取您的当前位置，请确保 GPS 已开启');
+        feedbackService.notify(copy.noticeTitle, copy.gpsRequiredBody);
         return;
       }
 
@@ -769,9 +780,7 @@ export default function MapScreen({ navigation }: any) {
       console.log(`📍 距离目标点: ${distanceMeters.toFixed(2)} 米`);
 
       if (distanceMeters > 200) {
-        feedbackService.notify(language === 'zh' ? '距离过远' : 'Too Far', language === 'zh' 
-            ? `您距离送达点还剩 ${Math.round(distanceMeters)} 米，请到达目的地后再点击（需在 200 米范围内）。` 
-            : `You are ${Math.round(distanceMeters)}m away from destination. Please arrive before clicking (within 200m).`);
+        feedbackService.notify(copy.tooFarTitle, copy.tooFarFinish(Math.round(distanceMeters)));
         return;
       }
 
@@ -787,16 +796,22 @@ export default function MapScreen({ navigation }: any) {
 
   const handleManualPickup = useCallback(async (packageId: string) => {
     Alert.alert(
-      language === 'zh' ? '确认取件' : language === 'en' ? 'Confirm Pickup' : 'ပစ္စည်းလက်ခံရရှိကြောင်း အတည်ပြုပါ', 
-      language === 'zh' ? '确定已收到此包裹吗？' : language === 'en' ? 'Are you sure you have received this package?' : 'ဤပါဆယ်ထုပ်ကို လက်ခံရရှိသည်မှာ သေချာပါသလား?', 
+      copy.confirmPickupTitle,
+      copy.confirmPickupBody,
       [
-        { text: language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်ဖျက်ပါ', style: 'cancel' },
-        { text: language === 'zh' ? '确认' : language === 'en' ? 'Confirm' : 'အတည်ပြုပါ', onPress: async () => {
+        { text: copy.cancel, style: 'cancel' },
+        { text: copy.confirm, onPress: async () => {
           const name = await AsyncStorage.getItem('currentUserName') || '';
           const ok = await packageService.updatePackageStatus(packageId, '已取件', new Date().toLocaleString('zh-CN'), undefined, name);
-          if (ok) {
+          if (isWriteOk(ok)) {
             feedbackService.success(
-              language === 'zh' ? '已确认取件' : language === 'en' ? 'Pickup confirmed' : 'ကောက်ယူမှုကိုအတည်ပြုပြီးပါပြီ',
+              pendingWriteUserMessage(
+                language,
+                ok,
+                copy.pickupConfirmed,
+                copy.pickupConfirmed,
+                copy.pickupConfirmed,
+              ),
             );
             setStatusOverrides(prev => ({ ...prev, [packageId]: '已取件' }));
             setPackages(prev => {
@@ -810,9 +825,7 @@ export default function MapScreen({ navigation }: any) {
             }
       if (selectedPackageForMap?.id === packageId) setSelectedPackageForMap(prev => prev ? { ...prev, status: '已取件' } : null);
           } else {
-            feedbackService.error(
-              language === 'zh' ? '操作失败' : language === 'en' ? 'Operation failed' : 'လုပ်ဆောင်မှု မအောင်မြင်ပါ',
-            );
+            feedbackService.error(copy.operationFailed);
           }
         }}
       ]
@@ -1175,19 +1188,6 @@ export default function MapScreen({ navigation }: any) {
       }
   }, []);
 
-  const convertImageToBase64 = useCallback(async (uri: string): Promise<string> => {
-    try {
-      const res = await fetch(uri);
-      const blob = await res.blob();
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        const tid = setTimeout(() => reject(new Error('Timeout')), 8000);
-        reader.onloadend = () => { clearTimeout(tid); resolve((reader.result as string).split(',')[1]); };
-        reader.readAsDataURL(blob);
-      });
-    } catch (e) { return ''; }
-  }, []);
-
   const handleUploadPhoto = useCallback(async () => {
     if (!capturedPhoto || !currentPackageForDelivery) return;
     try {
@@ -1198,7 +1198,7 @@ export default function MapScreen({ navigation }: any) {
       const health = await deviceHealthService.performFullCheck();
       
       if (health.location.isMocked) {
-        feedbackService.notify('检测到异常', '系统检测到模拟定位，无法确认送达。');
+        feedbackService.notify(copy.mockLocationTitle, copy.mockLocationBody);
         return;
       }
 
@@ -1213,23 +1213,38 @@ export default function MapScreen({ navigation }: any) {
         );
 
         if (dist * 1000 > 200) {
-          feedbackService.notify('距离过远', `您当前距离目标点约 ${Math.round(dist * 1000)} 米，请到达目的地 200 米范围内再确认。`);
+          feedbackService.notify(copy.tooFarTitle, copy.tooFarConfirm(Math.round(dist * 1000)));
           return;
         }
       }
 
       const name = await AsyncStorage.getItem('currentUserName') || '未知';
-      const b64 = await convertImageToBase64(capturedPhoto);
-      await deliveryPhotoService.saveDeliveryPhoto({ 
-          packageId: currentPackageForDelivery.id,
-        photoBase64: b64, 
-        courierName: name, 
-        latitude: currentLoc?.coords.latitude || location?.latitude || 0, 
-        longitude: currentLoc?.coords.longitude || location?.longitude || 0, 
-          locationName: '配送位置'
-        });
+      const courierId = (await AsyncStorage.getItem('currentCourierId')) || undefined;
+      const b64 = await imageUriToBase64(capturedPhoto);
+      if (!b64) {
+        feedbackService.error(copy.photoReadFailed);
+        return;
+      }
+      const photoOk = await deliveryPhotoService.saveDeliveryPhoto({
+        packageId: currentPackageForDelivery.id,
+        photoBase64: b64,
+        courierName: name,
+        courierId,
+        latitude: currentLoc?.coords.latitude || location?.latitude || 0,
+        longitude: currentLoc?.coords.longitude || location?.longitude || 0,
+        locationName: '配送位置',
+      });
+      if (!isWriteOk(photoOk)) {
+        feedbackService.error(copy.photoUploadFailed);
+        return;
+      }
       const ok = await packageService.updatePackageStatus(currentPackageForDelivery.id, '已送达', undefined, new Date().toISOString(), name);
-      if (ok) {
+      if (isWriteOk(ok)) {
+        if (isWriteQueued(photoOk) || isWriteQueued(ok)) {
+          feedbackService.success(
+            pendingWriteUserMessage(language, { ok: true, queued: true }, copy.packageDelivered, copy.packageDelivered, copy.packageDelivered),
+          );
+        }
         console.log(`✅ [验证] 订单 ${currentPackageForDelivery.id} 状态更新成功`);
         
         // 🚀 强制再次拉取确认 (双保险)
@@ -1261,14 +1276,16 @@ export default function MapScreen({ navigation }: any) {
         setCapturedPhoto(null);
         setCurrentPackageForDelivery(null);
         if (isOnline) loadPackages(true);
-              }
+      } else {
+        feedbackService.error(copy.photoSavedStatusFailed);
+      }
     } finally { setUploadingPhoto(false); }
-  }, [capturedPhoto, currentPackageForDelivery, location, convertImageToBase64, loadPackages]);
+  }, [capturedPhoto, currentPackageForDelivery, location, language, isOnline, loadPackages]);
 
   const handleReportAnomaly = useCallback(async () => {
     if (!currentPackageForDelivery) return;
     if (!anomalyType || !anomalyDescription) {
-      feedbackService.notify('提示', '请选择异常类型并填写详细说明');
+      feedbackService.notify(copy.noticeTitle, copy.anomalyNeedFields);
       return;
     }
 
@@ -1291,9 +1308,9 @@ export default function MapScreen({ navigation }: any) {
         setStatusOverrides(prev => ({ ...prev, [currentPackageForDelivery.id]: '异常上报' }));
         
         Alert.alert(
-          language === 'zh' ? '提交成功' : 'Reported Successfully',
-          language === 'zh' ? '异常已报备，平台将介入处理。感谢您的配合！' : 'Anomaly reported. The platform will intervene. Thank you for your cooperation!',
-          [{ text: '确定', onPress: () => {
+          copy.anomalySuccessTitle,
+          copy.anomalySuccessBody,
+          [{ text: copy.ok, onPress: () => {
             setShowAnomalyModal(false);
             setAnomalyType('');
             setAnomalyDescription('');
@@ -1304,7 +1321,7 @@ export default function MapScreen({ navigation }: any) {
         throw new Error('Submit failed');
       }
     } catch (error) {
-      feedbackService.notify('失败', '提交报备失败，请重试');
+      feedbackService.notify(copy.failed, copy.anomalySubmitFailed);
     } finally {
       setReporting(false);
     }
@@ -1427,7 +1444,7 @@ export default function MapScreen({ navigation }: any) {
           id: `${p.id}-pickup`,
           latitude: Number(p.pickupCoords.lat),
           longitude: Number(p.pickupCoords.lng),
-          title: p.sender_name || (language === 'zh' ? '取货点' : 'Pickup'),
+          title: p.sender_name || copy.pickupPoint,
           subtitle: p.sender_address,
           badge: `P${pkgOrder}`,
           kind: 'pickup',
@@ -1438,7 +1455,7 @@ export default function MapScreen({ navigation }: any) {
           id: `${p.id}-delivery`,
           latitude: Number(p.deliveryCoords.lat),
           longitude: Number(p.deliveryCoords.lng),
-          title: p.receiver_name || (language === 'zh' ? '送货点' : 'Delivery'),
+          title: p.receiver_name || copy.dropPoint,
           subtitle: p.receiver_address,
           badge: `D${pkgOrder}`,
           kind: 'delivery',
@@ -1627,7 +1644,7 @@ export default function MapScreen({ navigation }: any) {
                     </View>
                     <View style={styles.pointContent}>
                       <Text style={styles.sectionTitle}>
-                        {language === 'zh' ? '取货点' : language === 'en' ? 'Pickup' : 'ပစ္စည်းယူရန်'}
+                        {copy.pickupPoint}
                       </Text>
                       <Text style={styles.senderName}>{item.sender_name}</Text>
                       <Text style={styles.address} numberOfLines={1}>{item.sender_address}</Text>
@@ -1646,7 +1663,7 @@ export default function MapScreen({ navigation }: any) {
                             handleSingleNavigate(
                               item.pickupCoords!.lat,
                               item.pickupCoords!.lng,
-                              item.sender_name || (language === 'zh' ? '取货点' : 'Pickup'),
+                              item.sender_name || copy.pickupPoint,
                               item.sender_address,
                               'P',
                             )
@@ -1668,7 +1685,7 @@ export default function MapScreen({ navigation }: any) {
                     </View>
                     <View style={styles.pointContent}>
                       <Text style={styles.sectionTitle}>
-                        {language === 'zh' ? '送货点' : language === 'en' ? 'Delivery' : 'ပစ္စည်းပို့ရန်'}
+                        {copy.dropPoint}
                       </Text>
                       <Text style={styles.receiverName}>{item.receiver_name}</Text>
                       <Text style={styles.address} numberOfLines={1}>{item.receiver_address}</Text>
@@ -1689,7 +1706,7 @@ export default function MapScreen({ navigation }: any) {
                             handleSingleNavigate(
                               item.deliveryCoords!.lat,
                               item.deliveryCoords!.lng,
-                              item.receiver_name || (language === 'zh' ? '送货点' : 'Delivery'),
+                              item.receiver_name || copy.dropPoint,
                               item.receiver_address,
                               'D',
                             )
@@ -1723,7 +1740,7 @@ export default function MapScreen({ navigation }: any) {
                   accessibilityLabel={t.a11yMapStartDelivery}
                 >
                   <Text style={styles.startDeliveryText}>
-                    🚀 {language === 'zh' ? '开始配送' : language === 'en' ? 'Start Delivery' : 'ပို့ဆောင်မှုစတင်'}
+                    🚀 {copy.startDelivery}
                   </Text>
                 </TouchableOpacity>
               ) : (
@@ -1734,7 +1751,7 @@ export default function MapScreen({ navigation }: any) {
                   accessibilityLabel={t.a11yMapFinishDelivery}
                 >
                   <Text style={styles.finishDeliveryText}>
-                      🏁 {language === 'zh' ? '完成配送' : language === 'en' ? 'Complete' : 'ပြီးမြောက်ပါ'}
+                      🏁 {copy.completeDelivery}
                   </Text>
                 </TouchableOpacity>
               )
@@ -1769,7 +1786,7 @@ export default function MapScreen({ navigation }: any) {
                     accessibilityLabel={t.a11yMapScanPickup}
                   >
                 <Text style={styles.placeholderText}>
-                      {language === 'zh' ? '扫码取件' : language === 'en' ? 'Scan' : 'စကင်န်ဖတ်ပါ'}
+                      {copy.scanPickup}
                 </Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
@@ -1779,7 +1796,7 @@ export default function MapScreen({ navigation }: any) {
                     accessibilityLabel={t.a11yMapManualPickup}
                   >
                     <Text style={styles.placeholderText}>
-                      {language === 'zh' ? '手动取件' : language === 'en' ? 'Manual' : 'ကိုယ်တိုင်ယူ'}
+                      {copy.manualPickup}
                 </Text>
                   </TouchableOpacity>
               </View>
@@ -1787,16 +1804,8 @@ export default function MapScreen({ navigation }: any) {
                 <View style={styles.completedButton}>
                   <Text style={styles.completedText}>
                     {effectiveStatus === '打包中'
-                      ? language === 'zh'
-                        ? '📦 商家备货中'
-                        : language === 'en'
-                          ? 'Merchant packing'
-                          : 'ထုပ်ပိုးနေသည်'
-                      : language === 'zh'
-                        ? '⏳ 待商家确认'
-                        : language === 'en'
-                          ? 'Awaiting merchant'
-                          : 'စောင့်ဆိုင်းနေသည်'}
+                      ? copy.merchantPacking
+                      : copy.awaitingMerchant}
                   </Text>
               </View>
             ) : (
@@ -2092,7 +2101,7 @@ export default function MapScreen({ navigation }: any) {
           <View style={styles.cameraModalContent}>
             <View style={styles.cameraModalHeader}>
               <Text style={styles.cameraModalTitle}>
-                {language === 'zh' ? '📸 配送操作' : language === 'en' ? '📸 Delivery' : '📸 ပို့ဆောင်မှု'}
+                {`📸 ${copy.deliveryOps}`}
               </Text>
               <TouchableOpacity
                 onPress={() => setShowCameraModal(false)}
@@ -2142,7 +2151,7 @@ export default function MapScreen({ navigation }: any) {
                   >
                     <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.gridBtnGradient}>
                       <Ionicons name="qr-code" size={28} color="white" />
-                      <Text style={styles.gridBtnText}>{language === 'zh' ? '扫码取件' : 'Scan'}</Text>
+                      <Text style={styles.gridBtnText}>{copy.scanPickup}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -2153,7 +2162,7 @@ export default function MapScreen({ navigation }: any) {
                   >
                     <LinearGradient colors={['#10b981', '#059669']} style={styles.gridBtnGradient}>
                       <Ionicons name="hand-right" size={28} color="white" />
-                      <Text style={styles.gridBtnText}>{language === 'zh' ? '手动取件' : 'Manual'}</Text>
+                      <Text style={styles.gridBtnText}>{copy.manualPickup}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -2164,7 +2173,7 @@ export default function MapScreen({ navigation }: any) {
                   >
                     <LinearGradient colors={['#ef4444', '#dc2626']} style={styles.gridBtnGradient}>
                       <Ionicons name="warning" size={28} color="white" />
-                      <Text style={styles.gridBtnText}>{language === 'zh' ? '异常上报' : 'Anomaly'}</Text>
+                      <Text style={styles.gridBtnText}>{copy.anomalyReport}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 </>
@@ -2178,7 +2187,7 @@ export default function MapScreen({ navigation }: any) {
                   >
                     <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.gridBtnGradient}>
                       <Ionicons name="camera" size={28} color="white" />
-                      <Text style={styles.gridBtnText}>{language === 'zh' ? '拍照送达' : 'Photo'}</Text>
+                      <Text style={styles.gridBtnText}>{copy.photoDeliver}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -2197,7 +2206,7 @@ export default function MapScreen({ navigation }: any) {
                   >
                     <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.gridBtnGradient}>
                       <Ionicons name="qr-code" size={28} color="white" />
-                      <Text style={styles.gridBtnText}>{language === 'zh' ? '扫码送达' : 'Scan'}</Text>
+                      <Text style={styles.gridBtnText}>{copy.scanDeliver}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -2208,7 +2217,7 @@ export default function MapScreen({ navigation }: any) {
                   >
                     <LinearGradient colors={['#ef4444', '#dc2626']} style={styles.gridBtnGradient}>
                       <Ionicons name="warning" size={28} color="white" />
-                      <Text style={styles.gridBtnText}>{language === 'zh' ? '异常上报' : 'Anomaly'}</Text>
+                      <Text style={styles.gridBtnText}>{copy.anomalyReport}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 </>
@@ -2228,7 +2237,7 @@ export default function MapScreen({ navigation }: any) {
                   <Ionicons name="warning" size={24} color="#ef4444" />
                 </View>
                 <Text style={[styles.modalTitle, { color: '#ef4444' }]}>
-                  {language === 'zh' ? '异常场景申报' : 'Anomaly Report'}
+                  {copy.anomalyTitle}
                 </Text>
               </View>
               <TouchableOpacity
@@ -2244,41 +2253,39 @@ export default function MapScreen({ navigation }: any) {
               {/* 引导语 */}
               <View style={{ backgroundColor: '#fef2f2', padding: 16, borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: '#fee2e2' }}>
                 <Text style={{ color: '#991b1b', fontSize: 13, lineHeight: 20, fontWeight: '600' }}>
-                  {language === 'zh' 
-                    ? '💡 遇到问题请先报备，平台将核实免责。严禁在未送达的情况下直接点击“确认送达”，虚假点击将面临平台重罚！' 
-                    : '💡 Please report issues first. The platform will verify and exempt liability. Do not mark as "Delivered" without actual delivery; false clicks result in heavy penalties!'}
+                  💡 {copy.anomalyPenaltyHint}
                 </Text>
               </View>
 
               {/* 异常类型选择 */}
               <Text style={{ fontSize: 12, fontWeight: '800', color: '#64748b', marginBottom: 12, textTransform: 'uppercase' }}>
-                🚩 {language === 'zh' ? '选择异常类型' : 'Anomaly Type'}
+                🚩 {copy.anomalyTypeLabel}
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-                {['联系不上收件人', '地址错误/无法送达', '收件人拒绝签收', '包裹损坏', '其他异常'].map((type) => (
+                {copy.anomalyTypes.map((type) => (
                   <TouchableOpacity 
-                    key={type}
-                    onPress={() => setAnomalyType(type)}
+                    key={type.value}
+                    onPress={() => setAnomalyType(type.value)}
                     accessibilityRole="button"
-                    accessibilityLabel={type}
-                    accessibilityState={{ selected: anomalyType === type }}
+                    accessibilityLabel={type.label}
+                    accessibilityState={{ selected: anomalyType === type.value }}
                     style={{
                       paddingHorizontal: 12,
                       paddingVertical: 8,
                       borderRadius: 10,
-                      backgroundColor: anomalyType === type ? '#fee2e2' : '#f8fafc',
+                      backgroundColor: anomalyType === type.value ? '#fee2e2' : '#f8fafc',
                       borderWidth: 1,
-                      borderColor: anomalyType === type ? '#ef4444' : '#e2e8f0',
+                      borderColor: anomalyType === type.value ? '#ef4444' : '#e2e8f0',
                     }}
                   >
-                    <Text style={{ color: anomalyType === type ? '#ef4444' : '#64748b', fontSize: 13, fontWeight: '600' }}>{type}</Text>
+                    <Text style={{ color: anomalyType === type.value ? '#ef4444' : '#64748b', fontSize: 13, fontWeight: '600' }}>{type.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
               {/* 详细说明 */}
               <Text style={{ fontSize: 12, fontWeight: '800', color: '#64748b', marginBottom: 12, textTransform: 'uppercase' }}>
-                📝 {language === 'zh' ? '详细说明' : 'Description'}
+                📝 {copy.anomalyDescLabel}
               </Text>
               <TextInput
                 style={{
@@ -2293,7 +2300,7 @@ export default function MapScreen({ navigation }: any) {
                   borderColor: '#e2e8f0',
                   marginBottom: 24,
                 }}
-                placeholder={language === 'zh' ? '请描述具体情况，如：拨打收件人电话3次未接通...' : 'Describe the situation...'}
+                placeholder={copy.anomalyPlaceholder}
                 placeholderTextColor="#94a3b8"
                 multiline
                 numberOfLines={4}
@@ -2314,7 +2321,7 @@ export default function MapScreen({ navigation }: any) {
                   ) : (
                     <>
                       <Ionicons name="send" size={20} color="white" />
-                      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>{language === 'zh' ? '提交报备' : 'Submit Report'}</Text>
+                      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>{copy.anomalySubmit}</Text>
                     </>
                   )}
                 </LinearGradient>
@@ -2352,8 +2359,8 @@ export default function MapScreen({ navigation }: any) {
                 <LinearGradient colors={['#10b981', '#059669']} style={styles.uploadButtonGradient}>
                     <Text style={styles.uploadButtonText}>
                     {uploadingPhoto 
-                      ? (language === 'zh' ? '正在上传...' : language === 'en' ? 'Uploading...' : 'တင်နေသည်...') 
-                      : (language === 'zh' ? '确认送达' : language === 'en' ? 'Confirm Delivery' : 'ပစ္စည်းရောက်ရှိကြောင်းအတည်ပြု')}
+                      ? copy.uploading
+                      : copy.confirmDeliver}
                     </Text>
                 </LinearGradient>
                 </TouchableOpacity>
