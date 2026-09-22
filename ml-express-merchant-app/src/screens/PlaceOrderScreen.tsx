@@ -59,8 +59,7 @@ import {
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const WIZARD_LAST_STEP: OrderWizardStepIndex = 3;
 
-import * as MediaLibrary from 'expo-media-library';
-import { ensureSaveToLibraryPermission } from '../utils/mediaAccess';
+import { ensureSaveToLibraryPermission, saveImageToLibrary } from '../utils/mediaAccess';
 import * as Sharing from 'expo-sharing'; // 即使没在package.json，有时expo自带
 import * as FileSystem from 'expo-file-system/legacy';
 import ViewShot, { captureRef } from 'react-native-view-shot';
@@ -172,7 +171,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
 
       // 保存到本地文件（可选，captureRef 返回的已经是本地临时文件）
       // 保存到相册
-      await MediaLibrary.saveToLibraryAsync(uri);
+      await saveImageToLibrary(uri);
       
       hideLoading();
       feedbackService.notify(

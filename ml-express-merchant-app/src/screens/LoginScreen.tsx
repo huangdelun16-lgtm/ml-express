@@ -31,8 +31,6 @@ export default function LoginScreen({ navigation }: any) {
       storeCode: '店铺代码',
       password: '密码',
       loginButton: '登录商户后台',
-      storeCodePlaceholder: '请输入您的店铺代码',
-      passwordPlaceholder: '请输入登录密码',
       loginSuccess: '商户登录成功',
       loginFailed: '登录失败',
       fillAllFields: '请填写完整信息',
@@ -51,8 +49,6 @@ export default function LoginScreen({ navigation }: any) {
       storeCode: 'Store Code',
       password: 'Password',
       loginButton: 'Login to Backoffice',
-      storeCodePlaceholder: 'Enter your store code',
-      passwordPlaceholder: 'Enter your password',
       loginSuccess: 'Merchant login successful',
       loginFailed: 'Login failed',
       fillAllFields: 'Please fill all fields',
@@ -71,8 +67,6 @@ export default function LoginScreen({ navigation }: any) {
       storeCode: 'ဆိုင်ကုဒ်',
       password: 'စကားဝှက်',
       loginButton: 'စီမံခန့်ခွဲမှုစနစ်သို့ ဝင်ရောက်ပါ',
-      storeCodePlaceholder: 'ဆိုင်ကုဒ်ထည့်ပါ',
-      passwordPlaceholder: 'စကားဝှက်ထည့်ပါ',
       loginSuccess: 'ကုန်သည်ဝင်ရောက်မှု အောင်မြင်သည်',
       loginFailed: 'ဝင်ရောက်မှုမအောင်မြင်',
       fillAllFields: 'အချက်အလက်များဖြည့်ပါ',
@@ -280,7 +274,7 @@ export default function LoginScreen({ navigation }: any) {
               <Text style={styles.label}>{currentT.storeCode}</Text>
               <TextInput
                 style={styles.input}
-                placeholder={currentT.storeCodePlaceholder}
+                placeholder=""
                 placeholderTextColor="#94a3b8"
                 value={email}
                 onChangeText={setEmail}
@@ -295,7 +289,7 @@ export default function LoginScreen({ navigation }: any) {
               <View style={styles.passwordContainer}>
                 <TextInput
                   style={styles.passwordInput}
-                  placeholder={currentT.passwordPlaceholder}
+                  placeholder=""
                   placeholderTextColor="#94a3b8"
                   value={password}
                   onChangeText={setPassword}

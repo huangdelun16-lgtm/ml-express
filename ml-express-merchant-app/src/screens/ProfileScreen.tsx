@@ -27,11 +27,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Speech from "expo-speech";
 import { Vibration } from "react-native";
-import { pickImageFromLibrary, takePhotoWithCamera, ensureSaveToLibraryPermission } from "../utils/mediaAccess";
+import { pickImageFromLibrary, takePhotoWithCamera, ensureSaveToLibraryPermission, saveImageToLibrary } from "../utils/mediaAccess";
 import { STORE_AVATAR_UPDATED, storeAvatarDisplayUri } from "../utils/storeAvatar";
-import * as MediaLibrary from "expo-media-library";
 import { useApp } from "../contexts/AppContext";
 import { useLoading } from "../contexts/LoadingContext";
 import {
@@ -44,6 +44,7 @@ import {
   supabase,
 } from "../services/supabase";
 import BackToHomeButton from "../components/BackToHomeButton";
+import MerchantPageHeader, { merchantExitLabel } from "../components/MerchantPageHeader";
 import { theme } from "../config/theme";
 import Skeleton, { StatsCardSkeleton } from "../components/Skeleton";
 import { printerService, PrinterSettings } from "../services/PrinterService";
@@ -254,6 +255,35 @@ const DateWheelPicker: React.FC<{
   );
 };
 
+function SettingGlyph({
+  name,
+  bg,
+  color,
+}: {
+  name: React.ComponentProps<typeof Ionicons>["name"];
+  bg: string;
+  color: string;
+}) {
+  return (
+    <View style={glyphWell}>
+      <View style={[glyphWellInner, { backgroundColor: bg }]}>
+        <Ionicons name={name} size={18} color={color} />
+      </View>
+    </View>
+  );
+}
+
+const glyphWell = {
+  marginRight: 12,
+} as const;
+const glyphWellInner = {
+  width: 36,
+  height: 36,
+  borderRadius: 11,
+  alignItems: "center" as const,
+  justifyContent: "center" as const,
+};
+
 export default function ProfileScreen({ navigation }: any) {
   const {
     language,
@@ -263,6 +293,7 @@ export default function ProfileScreen({ navigation }: any) {
     isGuest,
     setIsGuest,
   } = useApp();
+  const insets = useSafeAreaInsets();
   const { showLoading, hideLoading } = useLoading(); // 🚀 新增：加载状态控制
   const appVersion = Constants.expoConfig?.version ?? "1.1.0";
   const [refreshing, setRefreshing] = useState(false);
@@ -2332,7 +2363,7 @@ export default function ProfileScreen({ navigation }: any) {
 
       if (localUri) {
         console.log("正在保存到相册...", localUri);
-        await MediaLibrary.saveToLibraryAsync(localUri);
+        await saveImageToLibrary(localUri);
 
         hideLoading();
         feedbackService.notify(
@@ -2741,12 +2772,14 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   const renderUserCard = () => (
+    <View style={styles.userCardShell}>
     <LinearGradient
-      colors={theme.colors.gradients.blue}
+      colors={["#1e3a8a", "#2563eb", "#3b82f6"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.userCard}
     >
+      <View style={styles.userCardSheen} />
       <View style={styles.userHeaderRow}>
         <TouchableOpacity
           style={styles.avatarContainer}
@@ -2894,11 +2927,14 @@ export default function ProfileScreen({ navigation }: any) {
         )}
       </View>
     </LinearGradient>
+    </View>
   );
 
   const renderOrderStats = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{t.orderStats}</Text>
+      <Text style={[styles.sectionTitle, isDarkMode && styles.darkText]}>
+        {t.orderStats}
+      </Text>
       <View style={styles.statsGrid}>
         {loadingStats ? (
           <>
@@ -2912,54 +2948,50 @@ export default function ProfileScreen({ navigation }: any) {
             {
               label: t.totalOrders,
               value: orderStats.total,
-              color: "#3b82f6",
-              icon: "📦",
+              color: "#2563eb",
+              icon: "file-tray-full-outline" as const,
             },
             {
               label: t.pendingOrders,
               value: orderStats.pending,
-              color: "#f59e0b",
-              icon: "⏳",
+              color: "#d97706",
+              icon: "time-outline" as const,
             },
             {
               label: t.inTransitOrders,
               value: orderStats.inTransit,
-              color: "#8b5cf6",
-              icon: "🚚",
+              color: "#7c3aed",
+              icon: "bicycle-outline" as const,
             },
             {
               label: t.deliveredOrders,
               value: orderStats.delivered,
-              color: "#10b981",
-              icon: "✅",
+              color: "#059669",
+              icon: "checkmark-circle-outline" as const,
             },
           ].map((stat, index) => (
             <TouchableOpacity
               key={index}
-              style={styles.statCard}
+              style={[styles.statCard, isDarkMode && styles.darkCard]}
               onPress={() => navigation.navigate("MyOrders")}
-              activeOpacity={0.8}
+              activeOpacity={0.82}
             >
-              <LinearGradient
-                colors={[stat.color, `${stat.color}dd`]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.statGradient}
+              <View
+                style={[
+                  styles.statIconWell,
+                  { backgroundColor: `${stat.color}14` },
+                ]}
               >
-                <View style={styles.statContent}>
-                  <Text
-                    style={
-                      stat.icon === "📦"
-                        ? styles.statIcon
-                        : styles.statIconSmall
-                    }
-                  >
-                    {stat.icon}
-                  </Text>
-                  <Text style={styles.statValue}>{stat.value}</Text>
-                  <Text style={styles.statLabel}>{stat.label}</Text>
-                </View>
-              </LinearGradient>
+                <Ionicons name={stat.icon} size={20} color={stat.color} />
+              </View>
+              <Text style={[styles.statValue, { color: stat.color }]}>
+                {stat.value}
+              </Text>
+              <Text
+                style={[styles.statLabel, isDarkMode && styles.darkMutedText]}
+              >
+                {stat.label}
+              </Text>
             </TouchableOpacity>
           ))
         )}
@@ -3713,48 +3745,60 @@ export default function ProfileScreen({ navigation }: any) {
 
   const renderQuickActions = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{t.quickActions}</Text>
-      <View style={styles.actionGrid}>
+      <Text style={[styles.sectionTitle, isDarkMode && styles.darkText]}>
+        {t.quickActions}
+      </Text>
+      <View style={[styles.actionPanel, isDarkMode && styles.darkCard]}>
         {[
           {
             label: t.myProfile,
-            icon: "👤",
+            icon: "person-outline" as const,
             action: "profile",
-            color: "#3b82f6",
+            color: "#2563eb",
+            bg: "#eff6ff",
           },
           {
             label: t.addressManagement,
-            icon: "📍",
+            icon: "location-outline" as const,
             action: "address",
-            color: "#f59e0b",
+            color: "#d97706",
+            bg: "#fffbeb",
           },
           {
-            label: "通知中心",
-            icon: "🔔",
+            label: language === "zh" ? "通知中心" : language === "my" ? "အသိပေးချက်" : "Inbox",
+            icon: "notifications-outline" as const,
             action: "notifications",
-            color: "#8b5cf6",
+            color: "#7c3aed",
+            bg: "#f5f3ff",
           },
           {
             label: t.recharge,
-            icon: "💰",
+            icon: "wallet-outline" as const,
             action: "recharge",
-            color: "#10b981",
-          }, // 🚀 新增：充值按钮
+            color: "#059669",
+            bg: "#ecfdf5",
+          },
         ].map((action, index) => (
           <TouchableOpacity
             key={index}
             style={styles.actionCard}
             onPress={() => handleQuickAction(action.action)}
+            activeOpacity={0.8}
           >
             <View
               style={[
                 styles.actionIcon,
-                { backgroundColor: `${action.color}20` },
+                { backgroundColor: isDarkMode ? `${action.color}22` : action.bg },
               ]}
             >
-              <Text style={styles.actionIconText}>{action.icon}</Text>
+              <Ionicons name={action.icon} size={22} color={action.color} />
             </View>
-            <Text style={styles.actionLabel}>{action.label}</Text>
+            <Text
+              style={[styles.actionLabel, isDarkMode && styles.darkMutedText]}
+              numberOfLines={2}
+            >
+              {action.label}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -3766,6 +3810,9 @@ export default function ProfileScreen({ navigation }: any) {
       <Text style={[styles.sectionTitle, isDarkMode && styles.darkText]}>
         {t.settings}
       </Text>
+      <Text style={[styles.settingsGroup, isDarkMode && styles.darkMutedText]}>
+        {language === "zh" ? "偏好" : language === "my" ? "နှစ်သက်မှု" : "Preferences"}
+      </Text>
       <View
         style={[styles.settingsList, isDarkMode && styles.darkSettingsList]}
       >
@@ -3774,7 +3821,7 @@ export default function ProfileScreen({ navigation }: any) {
           style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}
         >
           <View style={styles.settingLeft}>
-            <Text style={styles.settingIcon}>🌐</Text>
+            <SettingGlyph name="globe-outline" bg="#eff6ff" color="#2563eb" />
             <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>
               {t.language}
             </Text>
@@ -3813,7 +3860,11 @@ export default function ProfileScreen({ navigation }: any) {
           style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}
         >
           <View style={styles.settingLeft}>
-            <Text style={styles.settingIcon}>{isDarkMode ? "🌙" : "☀️"}</Text>
+            <SettingGlyph
+              name={isDarkMode ? "moon-outline" : "sunny-outline"}
+              bg={isDarkMode ? "#1e3a8a" : "#fffbeb"}
+              color={isDarkMode ? "#93c5fd" : "#d97706"}
+            />
             <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>
               {language === "zh" ? "深色模式" : "Dark Mode"}
             </Text>
@@ -3825,6 +3876,14 @@ export default function ProfileScreen({ navigation }: any) {
             thumbColor={isDarkMode ? "#3b82f6" : "#f4f3f4"}
           />
         </View>
+      </View>
+
+      <Text style={[styles.settingsGroup, isDarkMode && styles.darkMutedText]}>
+        {language === "zh" ? "通知" : language === "my" ? "အသိပေးချက်" : "Alerts"}
+      </Text>
+      <View
+        style={[styles.settingsList, isDarkMode && styles.darkSettingsList]}
+      >
 
         {/* 消息中心 */}
         <TouchableOpacity
@@ -3832,7 +3891,11 @@ export default function ProfileScreen({ navigation }: any) {
           onPress={() => navigation.navigate("NotificationCenter")}
         >
           <View style={styles.settingLeft}>
-            <Text style={styles.settingIcon}>📩</Text>
+            <SettingGlyph
+              name="chatbubble-ellipses-outline"
+              bg="#f5f3ff"
+              color="#7c3aed"
+            />
             <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>
               {t.title === "账户"
                 ? "消息中心"
@@ -3841,9 +3904,11 @@ export default function ProfileScreen({ navigation }: any) {
                   : "အသိပေးချက်ဗဟို"}
             </Text>
           </View>
-          <Text style={[styles.settingArrow, isDarkMode && styles.darkText]}>
-            ›
-          </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={isDarkMode ? "#64748b" : "#cbd5e1"}
+          />
         </TouchableOpacity>
 
         {/* 通知设置 */}
@@ -3852,7 +3917,11 @@ export default function ProfileScreen({ navigation }: any) {
           onPress={openNotificationSettings}
         >
           <View style={styles.settingLeft}>
-            <Text style={styles.settingIcon}>🔔</Text>
+            <SettingGlyph
+              name="notifications-outline"
+              bg="#ecfdf5"
+              color="#059669"
+            />
             <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>
               {t.notifications}
             </Text>
@@ -3872,9 +3941,11 @@ export default function ProfileScreen({ navigation }: any) {
                 {notificationSettings.pushNotifications ? "ON" : "OFF"}
               </Text>
             </View>
-            <Text style={[styles.settingArrow, isDarkMode && styles.darkText]}>
-              ›
-            </Text>
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={isDarkMode ? "#64748b" : "#cbd5e1"}
+            />
           </View>
         </TouchableOpacity>
 
@@ -3885,7 +3956,7 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={handleOpenPrinterSettings}
           >
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>🔍</Text>
+              <SettingGlyph name="print-outline" bg="#eff6ff" color="#0284c7" />
               <Text
                 style={[styles.settingLabel, isDarkMode && styles.darkText]}
               >
@@ -3911,14 +3982,22 @@ export default function ProfileScreen({ navigation }: any) {
                   {connectedBluetooth ? "ON" : "OFF"}
                 </Text>
               </View>
-              <Text
-                style={[styles.settingArrow, isDarkMode && styles.darkText]}
-              >
-                ›
-              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={isDarkMode ? "#64748b" : "#cbd5e1"}
+              />
             </View>
           </TouchableOpacity>
         )}
+      </View>
+
+      <Text style={[styles.settingsGroup, isDarkMode && styles.darkMutedText]}>
+        {language === "zh" ? "账户" : language === "my" ? "အကောင့်" : "Account"}
+      </Text>
+      <View
+        style={[styles.settingsList, isDarkMode && styles.darkSettingsList]}
+      >
 
         {/* 关于我们 */}
         <TouchableOpacity
@@ -3926,14 +4005,20 @@ export default function ProfileScreen({ navigation }: any) {
           onPress={() => setShowAboutModal(true)}
         >
           <View style={styles.settingLeft}>
-            <Text style={styles.settingIcon}>ℹ️</Text>
+            <SettingGlyph
+              name="information-circle-outline"
+              bg="#f1f5f9"
+              color="#475569"
+            />
             <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>
               {t.aboutUs}
             </Text>
           </View>
-          <Text style={[styles.settingArrow, isDarkMode && styles.darkText]}>
-            ›
-          </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={isDarkMode ? "#64748b" : "#cbd5e1"}
+          />
         </TouchableOpacity>
 
         {/* 修改密码 */}
@@ -3943,16 +4028,22 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={() => setShowPasswordModal(true)}
           >
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>🔒</Text>
+              <SettingGlyph
+                name="lock-closed-outline"
+                bg="#fef2f2"
+                color="#dc2626"
+              />
               <Text
                 style={[styles.settingLabel, isDarkMode && styles.darkText]}
               >
                 {t.changePassword}
               </Text>
             </View>
-            <Text style={[styles.settingArrow, isDarkMode && styles.darkText]}>
-              ›
-            </Text>
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={isDarkMode ? "#64748b" : "#cbd5e1"}
+            />
           </TouchableOpacity>
         )}
 
@@ -3962,60 +4053,28 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, isDarkMode && styles.darkContainer]}>
-      <LinearGradient
-        colors={
-          isDarkMode
-            ? ["#0f172a", "#1e293b", "#0f172a"]
-            : ["#1e3a8a", "#2563eb", "#f8fafc"]
+      <MerchantPageHeader
+        title={
+          language === "zh"
+            ? "店铺资料"
+            : language === "my"
+              ? "ဆိုင်အချက်အလက်"
+              : "Store Info"
         }
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 0.4 }}
-        style={StyleSheet.absoluteFill}
+        subtitle={userName && userName !== "访客用户" ? userName : undefined}
+        topInset={insets.top}
+        exitLabel={merchantExitLabel(language)}
+        onExit={() => navigation.goBack()}
+        dark={isDarkMode}
       />
-      {/* 背景装饰性圆圈 */}
-      <View
-        style={{
-          position: "absolute",
-          top: -100,
-          right: -100,
-          width: 300,
-          height: 300,
-          borderRadius: 150,
-          backgroundColor: "rgba(255, 255, 255, 0.1)",
-          zIndex: 0,
-        }}
-      />
-      <View
-        style={{
-          position: "absolute",
-          top: 150,
-          left: -50,
-          width: 150,
-          height: 150,
-          borderRadius: 75,
-          backgroundColor: "rgba(255, 255, 255, 0.05)",
-          zIndex: 0,
-        }}
-      />
-
-      <View style={{ paddingTop: 60, paddingHorizontal: 20, marginBottom: 10 }}>
-        <Text style={{ color: "#ffffff", fontSize: 32, fontWeight: "800" }}>
-          {t.title}
-        </Text>
-        <View
-          style={{
-            height: 3,
-            width: 40,
-            backgroundColor: "#fbbf24",
-            borderRadius: 2,
-            marginTop: 8,
-          }}
-        />
-      </View>
 
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        style={[styles.sheet, isDarkMode && styles.darkSheet]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 16) + 28 },
+        ]}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -4037,8 +4096,13 @@ export default function ProfileScreen({ navigation }: any) {
         {renderSettings()}
 
         {!isGuest && (
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutButtonText}>🚪 {t.logout}</Text>
+          <TouchableOpacity
+            style={[styles.logoutButton, isDarkMode && styles.darkLogoutButton]}
+            onPress={handleLogout}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="log-out-outline" size={18} color="#dc2626" />
+            <Text style={styles.logoutButtonText}>{t.logout}</Text>
           </TouchableOpacity>
         )}
 
@@ -6292,13 +6356,49 @@ export default function ProfileScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background.default,
+    backgroundColor: "#1e3a8a",
   },
   darkContainer: {
     backgroundColor: "#0f172a",
   },
+  pageHeader: {
+    paddingHorizontal: 22,
+    paddingBottom: 28,
+  },
+  pageEyebrow: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.6,
+    marginBottom: 6,
+  },
+  pageTitle: {
+    color: "#ffffff",
+    fontSize: 28,
+    fontWeight: "800",
+    letterSpacing: -0.6,
+  },
+  pageSubtitle: {
+    marginTop: 6,
+    color: "rgba(255,255,255,0.62)",
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  sheet: {
+    flex: 1,
+    marginTop: -12,
+    backgroundColor: "#f8fafc",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+  },
+  darkSheet: {
+    backgroundColor: "#0f172a",
+  },
   darkText: {
     color: "#f8fafc",
+  },
+  darkMutedText: {
+    color: "#94a3b8",
   },
   darkCard: {
     backgroundColor: "#1e293b",
@@ -6326,17 +6426,28 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 40,
+    paddingTop: 16,
+  },
+  userCardShell: {
+    padding: 3,
+    borderRadius: 28,
+    backgroundColor: "rgba(37, 99, 235, 0.12)",
+    marginBottom: theme.spacing.xl,
   },
   userCard: {
-    borderRadius: 24,
-    padding: theme.spacing.l,
-    marginBottom: theme.spacing.xl,
-    shadowColor: "#1e3a8a",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    elevation: 10,
+    borderRadius: 25,
+    padding: 20,
+    overflow: "hidden",
+    position: "relative",
+  },
+  userCardSheen: {
+    position: "absolute",
+    top: -40,
+    right: -30,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   userHeaderRow: {
     flexDirection: "row",
@@ -6347,19 +6458,19 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   avatar: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    width: 76,
+    height: 76,
+    borderRadius: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.18)",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: theme.colors.white,
+    borderColor: "rgba(255,255,255,0.55)",
   },
   avatarImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 76,
+    height: 76,
+    borderRadius: 22,
   },
   avatarBusy: {
     position: 'absolute',
@@ -6375,15 +6486,17 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: -2,
     bottom: -2,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: theme.colors.white,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#2563eb",
   },
   avatarText: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: "bold",
     color: theme.colors.white,
   },
@@ -6401,13 +6514,15 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: theme.colors.white,
     marginRight: theme.spacing.s,
-    maxWidth: 150,
+    maxWidth: 168,
   },
   userBadge: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: theme.borderRadius.s,
+    backgroundColor: "rgba(255, 255, 255, 0.18)",
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
   },
   userBadgeText: {
     color: theme.colors.white,
@@ -6488,33 +6603,59 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "rgba(255, 255, 255, 0.16)",
     justifyContent: "center",
     alignItems: "center",
     marginLeft: theme.spacing.s,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
   },
   section: {
-    marginBottom: theme.spacing.xxl,
+    marginBottom: 22,
   },
   sectionTitle: {
-    fontSize: theme.typography.sizes.l,
-    fontWeight: "bold",
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.l,
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#0f172a",
+    marginBottom: 12,
+    letterSpacing: -0.3,
+  },
+  settingsGroup: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#94a3b8",
+    letterSpacing: 0.6,
+    marginTop: 4,
+    marginBottom: 8,
+    marginLeft: 4,
   },
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    paddingHorizontal: 2,
   },
   statCard: {
-    width: (width - 56) / 2,
-    marginBottom: 16,
-    borderRadius: 24,
+    width: (width - 52) / 2,
+    marginBottom: 12,
+    borderRadius: 20,
     backgroundColor: "white",
-    ...theme.shadows.medium,
-    overflow: "hidden",
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: "#eef2f7",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  statIconWell: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
   },
   statGradient: {
     flex: 1,
@@ -6534,20 +6675,30 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   statValue: {
-    fontSize: 28,
-    fontWeight: "900",
-    color: theme.colors.white,
-    marginBottom: 2,
-    textShadowColor: "rgba(0, 0, 0, 0.1)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#0f172a",
+    letterSpacing: -0.6,
   },
   statLabel: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: "rgba(255, 255, 255, 0.9)",
-    textAlign: "center",
-    letterSpacing: 0.5,
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748b",
+  },
+  actionPanel: {
+    flexDirection: "row",
+    backgroundColor: "#ffffff",
+    borderRadius: 22,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: "#eef2f7",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
   },
   actionGrid: {
     flexDirection: "row",
@@ -6555,63 +6706,62 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   actionCard: {
-    width: (width - 60) / 4,
+    flex: 1,
     alignItems: "center",
-    marginBottom: theme.spacing.l,
   },
   actionIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: theme.spacing.s,
-    shadowColor: "#1e3a8a",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 2,
+    marginBottom: 8,
   },
   actionIconText: {
     fontSize: 24,
   },
   actionLabel: {
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.text.secondary,
+    fontSize: 11,
+    color: "#475569",
     textAlign: "center",
+    fontWeight: "700",
+    lineHeight: 15,
   },
   settingsList: {
     backgroundColor: theme.colors.background.paper,
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: "hidden",
-    shadowColor: "#1e3a8a",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 5,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.8)",
+    borderColor: "#eef2f7",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
   },
   settingItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: theme.spacing.l,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.light,
+    borderBottomColor: "#f1f5f9",
   },
   settingLeft: {
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
+    marginRight: 8,
   },
   settingIcon: {
     fontSize: 20,
     marginRight: theme.spacing.m,
   },
   settingLabel: {
-    fontSize: theme.typography.sizes.m,
+    fontSize: 15,
     color: theme.colors.text.primary,
+    fontWeight: "600",
   },
   settingArrow: {
     fontSize: 20,
@@ -6625,49 +6775,57 @@ const styles = StyleSheet.create({
   notificationToggle: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 999,
     minWidth: 40,
     alignItems: "center",
   },
   notificationToggleText: {
     fontSize: 10,
-    fontWeight: "600",
+    fontWeight: "700",
     color: theme.colors.white,
   },
   languageButtons: {
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
   },
   languageButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: theme.colors.background.subtle,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#f1f5f9",
   },
   languageButtonActive: {
-    backgroundColor: theme.colors.primary.DEFAULT,
+    backgroundColor: "#2563eb",
   },
   languageButtonText: {
     fontSize: 12,
     color: theme.colors.text.secondary,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   languageButtonTextActive: {
     color: theme.colors.white,
   },
   logoutButton: {
-    backgroundColor: theme.colors.error.DEFAULT,
-    borderRadius: theme.borderRadius.l,
-    padding: theme.spacing.l,
+    backgroundColor: "#fef2f2",
+    borderRadius: 18,
+    paddingVertical: 14,
     alignItems: "center",
-    marginTop: theme.spacing.s,
-    marginBottom: theme.spacing.xxl,
-    ...theme.shadows.medium,
+    marginTop: 4,
+    marginBottom: theme.spacing.l,
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+  },
+  darkLogoutButton: {
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
+    borderColor: "rgba(248, 113, 113, 0.35)",
   },
   logoutButtonText: {
-    color: theme.colors.white,
-    fontSize: theme.typography.sizes.m,
-    fontWeight: "600",
+    color: "#dc2626",
+    fontSize: 15,
+    fontWeight: "700",
   },
   footer: {
     alignItems: "center",

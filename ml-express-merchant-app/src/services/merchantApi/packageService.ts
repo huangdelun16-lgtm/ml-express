@@ -4,6 +4,7 @@ import NotificationService from "../notificationService";
 import { errorService } from "../ErrorService";
 import { retry } from "../../utils/retry";
 import { getProductItemFeeMmkForPackage } from "../../utils/parseMerchantProductFee";
+import { summarizeMerchantOrderRows } from "../../utils/merchantOrderOverview";
 
 // 包裹服务
 export const packageService = {
@@ -319,37 +320,7 @@ export const packageService = {
           throw error;
         }
 
-        const stats = {
-          total: data?.length || 0,
-          pending:
-            data?.filter((p) =>
-              ["待确认", "待取件", "待收款"].includes(p.status),
-            ).length || 0,
-          pendingConfirm:
-            data?.filter((p) => p.status === "待确认").length || 0,
-          awaitingPickup:
-            data?.filter((p) => p.status === "待取件").length || 0,
-          processing: data?.filter((p) => p.status === "打包中").length || 0,
-          delivering: data?.filter((p) => p.status === "配送中").length || 0,
-          inTransit:
-            data?.filter((p) => ["已取件", "配送中"].includes(p.status))
-              .length || 0,
-          delivered: data?.filter((p) => p.status === "已送达").length || 0,
-          cancelled: data?.filter((p) => p.status === "已取消").length || 0,
-          urgent:
-            data?.filter(
-              (p) =>
-                p.delivery_speed === "急送达" || p.delivery_speed === "Urgent",
-            ).length || 0,
-          standard:
-            data?.filter(
-              (p) =>
-                p.delivery_speed === "普通配送" ||
-                p.delivery_speed === "Standard",
-            ).length || 0,
-        };
-
-        return stats;
+        return summarizeMerchantOrderRows(data);
       };
 
       try {
@@ -366,19 +337,7 @@ export const packageService = {
       }
     } catch (error) {
       LoggerService.error("获取订单统计失败:", error);
-      return {
-        total: 0,
-        pending: 0,
-        pendingConfirm: 0,
-        awaitingPickup: 0,
-        processing: 0,
-        delivering: 0,
-        inTransit: 0,
-        delivered: 0,
-        cancelled: 0,
-        urgent: 0,
-        standard: 0,
-      };
+      return summarizeMerchantOrderRows([]);
     }
   },
 

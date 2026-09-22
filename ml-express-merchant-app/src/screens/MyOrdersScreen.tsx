@@ -9,6 +9,7 @@ import { chatService } from '../services/chatService';
 import LoggerService from '../services/LoggerService';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BackToHomeButton from '../components/BackToHomeButton';
 import { errorService } from '../services/ErrorService';
 import { feedbackService } from '../services/FeedbackService';
@@ -25,6 +26,7 @@ import { type AppLang, getOrderListJourneyHint } from '../utils/orderJourney';
 import { dialCourierByAssignment } from '../utils/courierPhone';
 import { isCourierUnassigned } from '../services/_shared/dialPhone';
 import { filterOrdersBySearch } from '../utils/filterOrdersBySearch';
+import MerchantPageHeader, { merchantExitLabel } from '../components/MerchantPageHeader';
 import { printerService } from '../services/PrinterService';
 import { buildProductNamePriceMap } from '../utils/parseOrderPackingItems';
 import { batchAcceptOrders, acceptOrderToPacking } from '../services/packageBatchService';
@@ -72,6 +74,8 @@ interface Order {
 export default function MyOrdersScreen({ navigation, route }: any) {
   const { language } = useApp();
   const { showLoading, hideLoading } = useLoading();
+  const insets = useSafeAreaInsets();
+  const scrollY = useRef(new Animated.Value(0)).current;
   const [orders, setOrders] = useState<Order[]>([]);
   const [packingSlaMinutes, setPackingSlaMinutes] = useState<number | null>(null);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
@@ -127,6 +131,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
   // 🚀 新增：呼吸灯动画状态
   const pulseAnim = useRef(new Animated.Value(0)).current;
+  const [heroH, setHeroH] = useState(0);
 
   // 🚀 启动呼吸灯动画
   useEffect(() => {
@@ -151,7 +156,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   // 翻译
   const translations: any = {
     zh: {
-      title: '我的订单',
+      title: '订单列表',
       all: '全部',
       pending: '待取件',
       pickedUp: '已取件',
@@ -189,7 +194,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       selectedCount: '已选',
     },
     en: {
-      title: 'My Orders',
+      title: 'Orders',
       all: 'All',
       pending: 'Pending',
       pickedUp: 'Picked Up',
@@ -227,7 +232,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       selectedCount: 'Selected',
     },
     my: {
-      title: 'ကျွန်ုပ်၏ အော်ဒါများ',
+      title: 'အော်ဒါများ',
       all: 'အားလုံး',
       pending: 'စောင့်ဆိုင်းဆဲ',
       pickedUp: 'ထုပ်ယူပြီး',
@@ -296,6 +301,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     { key: 'all', label: t.all, color: '#6b7280' },
     { key: '待确认', label: language === 'zh' ? '待接单' : 'Pending', color: '#f97316' },
     { key: '打包中', label: language === 'zh' ? '打包中' : 'Packing', color: '#10b981' },
+    { key: '待收款', label: language === 'zh' ? '待收款' : language === 'my' ? 'ငွေကောက်ရန်' : 'To collect', color: '#d97706' },
     { key: '待取件', label: t.pending, color: '#f59e0b' },
     { key: '已取件', label: t.pickedUp, color: '#3b82f6' },
     { key: '配送中', label: t.inTransit, color: '#8b5cf6' },
@@ -642,6 +648,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     const statusMap: {[key: string]: string} = {
       '待确认': language === 'zh' ? '待接单' : 'Pending',
       '打包中': language === 'zh' ? '打包中' : 'Packing',
+      '待收款': language === 'zh' ? '待收款' : language === 'my' ? 'ငွေကောက်ရန်' : 'To collect',
       '待取件': t.statusTypes['pending'] || status,
       '已取件': t.statusTypes['picked_up'] || status,
       '配送中': t.statusTypes['in_transit'] || status,
@@ -976,17 +983,12 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   if (loading && !refreshing) {
     return (
       <View style={styles.container}>
-        <LinearGradient
-          colors={['#1e3a8a', '#2563eb', '#f8fafc']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 0.4 }}
-          style={StyleSheet.absoluteFill}
+        <MerchantPageHeader
+          title={t.title}
+          topInset={insets.top}
+          exitLabel={merchantExitLabel(language)}
+          onExit={() => navigation.goBack()}
         />
-        <View style={{ paddingTop: 60, paddingHorizontal: 20, marginBottom: 20 }}>
-          <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '800' }}>{t.title}</Text>
-          <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8 }} />
-        </View>
-        
         <View style={styles.content}>
           <View style={{ padding: 20 }}>
             <OrderSkeleton />
@@ -1000,57 +1002,81 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
     return (
       <View style={styles.container}>
-        <LinearGradient
-          colors={['#1e3a8a', '#2563eb', '#f8fafc']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 0.4 }}
-          style={StyleSheet.absoluteFill}
-        />
-        {/* 背景装饰性圆圈 */}
-        <View style={{
-          position: 'absolute',
-          top: -100,
-          right: -100,
-          width: 300,
-          height: 300,
-          borderRadius: 150,
-          backgroundColor: 'rgba(255, 255, 255, 0.1)',
-          zIndex: 0
-        }} />
-        <View style={{
-          position: 'absolute',
-          top: 150,
-          left: -50,
-          width: 150,
-          height: 150,
-          borderRadius: 75,
-          backgroundColor: 'rgba(255, 255, 255, 0.05)',
-          zIndex: 0
-        }} />
+      <Animated.View
+        style={[
+          styles.heroCollapse,
+          heroH > 0
+            ? {
+                height: scrollY.interpolate({
+                  inputRange: [0, heroH],
+                  outputRange: [heroH, 0],
+                  extrapolate: 'clamp',
+                }),
+                opacity: scrollY.interpolate({
+                  inputRange: [0, heroH * 0.55],
+                  outputRange: [1, 0],
+                  extrapolate: 'clamp',
+                }),
+              }
+            : null,
+        ]}
+      >
+        <MerchantPageHeader
+          title={t.title}
+          subtitle={`${t.all} ${orders.length} ${language === 'zh' ? '个订单' : language === 'en' ? 'Orders' : 'အော်ဒါ'}`}
+          topInset={insets.top}
+          exitLabel={merchantExitLabel(language)}
+          onExit={() => navigation.goBack()}
+          onLayout={(event) => {
+            const next = Math.round(event.nativeEvent.layout.height);
+            if (heroH === 0 && next > 80) setHeroH(next);
+          }}
+        >
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={18} color="rgba(255,255,255,0.7)" />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder={t.searchPlaceholder}
+              placeholderTextColor="rgba(255,255,255,0.55)"
+              style={styles.searchInput}
+              autoCorrect={false}
+              autoCapitalize="none"
+              clearButtonMode="while-editing"
+            />
+          </View>
+        </MerchantPageHeader>
+      </Animated.View>
 
-      <View style={{ paddingTop: 60, paddingHorizontal: 20, marginBottom: 10 }}>
-        <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '800' }}>{t.title}</Text>
-        <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8 }} />
-        <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 16, marginTop: 8 }}>
-          {t.all} {orders.length} {language === 'zh' ? '个订单' : language === 'en' ? 'Orders' : 'အော်ဒါ'}
-        </Text>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color="rgba(255,255,255,0.7)" />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder={t.searchPlaceholder}
-            placeholderTextColor="rgba(255,255,255,0.55)"
-            style={styles.searchInput}
-            autoCorrect={false}
-            autoCapitalize="none"
-            clearButtonMode="while-editing"
-          />
-        </View>
-        {userType === 'merchant' ? (
-          <View style={styles.batchBar}>
+      <Animated.View
+        style={[
+          styles.filtersSticky,
+          {
+            paddingTop: scrollY.interpolate({
+              inputRange: [0, Math.max(heroH, 1)],
+              outputRange: [6, insets.top + 6],
+              extrapolate: 'clamp',
+            }),
+          },
+        ]}
+      >
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.filtersStatusFill,
+            {
+              height: scrollY.interpolate({
+                inputRange: [0, Math.max(heroH, 1)],
+                outputRange: [0, insets.top],
+                extrapolate: 'clamp',
+              }),
+            },
+          ]}
+        />
+        <View style={styles.filtersInner}>
+          {userType === 'merchant' ? (
             <TouchableOpacity
-              style={styles.batchChip}
+              style={[styles.batchChip, styles.batchChipSticky, selectionMode && styles.batchChipPrint]}
               onPress={() => {
                 if (selectionMode) {
                   setSelectionMode(false);
@@ -1064,81 +1090,14 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                 {selectionMode ? t.batchDone : t.batch}
               </Text>
             </TouchableOpacity>
-            {selectionMode ? (
-              <>
-                <TouchableOpacity
-                  style={styles.batchChip}
-                  onPress={() =>
-                    setSelectedIds(new Set(pendingConfirmIds(filteredOrders)))
-                  }
-                >
-                  <Text style={styles.batchChipText}>{t.selectPending}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.batchChip}
-                  onPress={() =>
-                    setSelectedIds(new Set(printableIds(filteredOrders)))
-                  }
-                >
-                  <Text style={styles.batchChipText}>{t.selectPrintable}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.batchChip, styles.batchChipAccent]}
-                  disabled={
-                    batchBusy ||
-                    pendingConfirmIds(
-                      filteredOrders.filter((order) => selectedIds.has(order.id)),
-                    ).length === 0
-                  }
-                  onPress={() => void handleBatchAccept()}
-                >
-                  <Text style={styles.batchChipText}>
-                    {t.batchAccept} (
-                    {
-                      pendingConfirmIds(
-                        filteredOrders.filter((order) => selectedIds.has(order.id)),
-                      ).length
-                    }
-                    )
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.batchChip, styles.batchChipPrint]}
-                  disabled={
-                    batchBusy ||
-                    printableIds(
-                      filteredOrders.filter((order) => selectedIds.has(order.id)),
-                    ).length === 0
-                  }
-                  onPress={() => void handleBatchPrint()}
-                >
-                  <Text style={styles.batchChipText}>
-                    {t.batchPrint} (
-                    {
-                      printableIds(
-                        filteredOrders.filter((order) => selectedIds.has(order.id)),
-                      ).length
-                    }
-                    )
-                  </Text>
-                </TouchableOpacity>
-                <Text style={styles.batchCount}>
-                  {t.selectedCount} {selectedIds.size}
-                </Text>
-              </>
-            ) : null}
-          </View>
-        ) : null}
-      </View>
-
-      {/* 状态筛选器 */}
-      <View style={styles.filtersContainer}>
-        <ScrollView 
-          ref={scrollViewRef}
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersContent}
-        >
+          ) : null}
+          <ScrollView
+            ref={scrollViewRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filtersContent}
+            style={styles.filtersScroll}
+          >
           {statusFilters.map((filter) => {
             const categoryUnreadTotal = filter.key === 'all' ? 0 : orders
               .filter(o => o.status === filter.key)
@@ -1160,7 +1119,6 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                 }}
                 activeOpacity={0.7}
               >
-                {/* 🚀 呼吸灯光晕背景 */}
                 {hasUnread && (
                   <Animated.View 
                     style={[
@@ -1177,7 +1135,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                   colors={
                     selectedStatus === filter.key
                       ? [filter.color, filter.color + 'dd']
-                      : ['#ffffff', '#ffffff']
+                      : ['#ffffff', '#f8fafc']
                   }
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
@@ -1199,7 +1157,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                     <View
                       style={[
                         styles.filterBadge,
-                        { backgroundColor: selectedStatus === filter.key ? '#ffffff33' : filter.color + '33' },
+                        { backgroundColor: selectedStatus === filter.key ? '#ffffff33' : filter.color + '22' },
                       ]}
                     >
                       <Text
@@ -1213,7 +1171,6 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                     </View>
                   )}
                   
-                  {/* 🚀 显著的蓝色消息徽章 */}
                   {hasUnread && (
                     <Animated.View style={[
                       styles.filterUnreadBadge,
@@ -1228,13 +1185,81 @@ export default function MyOrdersScreen({ navigation, route }: any) {
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
-      </View>
+          </ScrollView>
+        </View>
+        {userType === 'merchant' && selectionMode ? (
+          <View style={styles.batchBar}>
+            <TouchableOpacity
+              style={styles.batchChip}
+              onPress={() =>
+                setSelectedIds(new Set(pendingConfirmIds(filteredOrders)))
+              }
+            >
+              <Text style={styles.batchChipText}>{t.selectPending}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.batchChip}
+              onPress={() =>
+                setSelectedIds(new Set(printableIds(filteredOrders)))
+              }
+            >
+              <Text style={styles.batchChipText}>{t.selectPrintable}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.batchChip, styles.batchChipAccent]}
+              disabled={
+                batchBusy ||
+                pendingConfirmIds(
+                  filteredOrders.filter((order) => selectedIds.has(order.id)),
+                ).length === 0
+              }
+              onPress={() => void handleBatchAccept()}
+            >
+              <Text style={styles.batchChipText}>
+                {t.batchAccept} (
+                {
+                  pendingConfirmIds(
+                    filteredOrders.filter((order) => selectedIds.has(order.id)),
+                  ).length
+                }
+                )
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.batchChip, styles.batchChipPrint]}
+              disabled={
+                batchBusy ||
+                printableIds(
+                  filteredOrders.filter((order) => selectedIds.has(order.id)),
+                ).length === 0
+              }
+              onPress={() => void handleBatchPrint()}
+            >
+              <Text style={styles.batchChipText}>
+                {t.batchPrint} (
+                {
+                  printableIds(
+                    filteredOrders.filter((order) => selectedIds.has(order.id)),
+                  ).length
+                }
+                )
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.batchCount}>
+              {t.selectedCount} {selectedIds.size}
+            </Text>
+          </View>
+        ) : null}
+      </Animated.View>
 
-      {/* 订单列表 */}
-      <ScrollView
+      <Animated.ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false },
+        )}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3b82f6']} />
         }
@@ -1505,7 +1530,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         )}
 
         <View style={{ height: 20 }} />
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* 🚀 打包核对单 Modal */}
       <PackingModal
@@ -1663,7 +1688,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#eef2f7',
   },
   content: {
     flex: 1,
@@ -1672,12 +1697,38 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#eef2f7',
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
     color: '#64748b',
+  },
+  heroCollapse: {
+    overflow: 'hidden',
+  },
+  heroShell: {
+    paddingHorizontal: 20,
+    paddingBottom: 18,
+  },
+  heroTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: -0.6,
+  },
+  heroAccent: {
+    height: 3,
+    width: 36,
+    backgroundColor: '#fbbf24',
+    borderRadius: 2,
+    marginTop: 8,
+  },
+  heroSubtitle: {
+    color: 'rgba(255, 255, 255, 0.82)',
+    fontSize: 14,
+    marginTop: 8,
+    fontWeight: '600',
   },
   header: {
     paddingTop: 60,
@@ -1724,15 +1775,21 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: 8,
-    marginTop: 12,
+    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
   batchChip: {
-    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+    backgroundColor: '#1e3a8a',
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
+  },
+  batchChipSticky: {
+    marginLeft: 16,
+    alignSelf: 'center',
   },
   batchChipAccent: {
     backgroundColor: '#f59e0b',
@@ -1748,7 +1805,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   batchCount: {
-    color: 'rgba(255,255,255,0.75)',
+    color: '#334155',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -1759,37 +1816,64 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#2563eb',
   },
+  filtersSticky: {
+    zIndex: 20,
+    backgroundColor: '#eef2f7',
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(148, 163, 184, 0.18)',
+  },
+  filtersStatusFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#1e3a8a',
+  },
+  filtersInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  filtersScroll: {
+    flex: 1,
+  },
   filtersContainer: {
     marginTop: -15,
     paddingBottom: 10,
   },
   filtersContent: {
-    paddingHorizontal: 20,
-    gap: 10,
+    paddingHorizontal: 12,
+    paddingRight: 20,
+    gap: 8,
+    alignItems: 'center',
   },
   filterChip: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#000',
+    borderRadius: 18,
+    overflow: 'visible',
+    shadowColor: '#1e3a8a',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   filterChipActive: {
-    shadowOpacity: 0.2,
-    elevation: 6,
+    shadowOpacity: 0.16,
+    elevation: 5,
   },
   filterChipGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 6,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.9)',
+    overflow: 'hidden',
   },
   filterChipText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
     color: '#64748b',
   },
   filterChipTextActive: {
@@ -1853,7 +1937,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 28,
   },
   emptyContainer: {
     marginTop: 60,
@@ -1896,16 +1982,16 @@ const styles = StyleSheet.create({
   },
   orderCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 18,
+    padding: 15,
+    marginBottom: 12,
     shadowColor: '#1e3a8a',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
+    elevation: 3,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
+    borderColor: '#e8eef6',
     position: 'relative',
   },
   // 🚀 新增：有未读消息的订单卡片样式

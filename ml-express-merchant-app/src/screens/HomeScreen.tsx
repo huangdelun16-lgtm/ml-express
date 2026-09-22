@@ -25,20 +25,27 @@ import Skeleton, {
 } from "../components/Skeleton";
 import { Ionicons } from "@expo/vector-icons";
 import {
+  merchantService,
   packageService,
   deliveryStoreService,
   supabase,
+  type Product,
 } from "../services/supabase";
 import { theme } from "../config/theme";
 import { analytics } from "../services/AnalyticsService";
 import { STORE_AVATAR_UPDATED, storeAvatarDisplayUri } from "../utils/storeAvatar";
+import { pickHomeSpotlightProducts, spotlightOffer } from "../utils/homeSpotlightProducts";
+import { rewritePublicStorageUrl } from "../services/merchantApi/nativeSupabaseUrl";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
 interface MerchantStats {
   pendingConfirm: number;
+  awaitingPayment: number;
   awaitingPickup: number;
   processing: number;
+  pickedUp: number;
   delivering: number;
   completed: number;
   revenueOneYear: number;
@@ -53,13 +60,16 @@ interface MerchantStats {
 export default function HomeScreen({ navigation }: any) {
   const { language, isDarkMode } = useApp();
   const { showLoading, hideLoading } = useLoading();
+  const insets = useSafeAreaInsets();
 
   const [refreshing, setRefreshing] = useState(false);
   const [merchantInfo, setMerchantInfo] = useState<any>(null);
   const [stats, setStats] = useState<MerchantStats>({
     pendingConfirm: 0,
+    awaitingPayment: 0,
     awaitingPickup: 0,
     processing: 0,
+    pickedUp: 0,
     delivering: 0,
     completed: 0,
     revenueOneYear: 0,
@@ -71,17 +81,20 @@ export default function HomeScreen({ navigation }: any) {
     yesterdayOrderCount: 0,
   });
   const [loading, setLoading] = useState(true);
-  const scrollY = new Animated.Value(0);
+  const [spotlightProducts, setSpotlightProducts] = useState<Product[]>([]);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const t = {
     zh: {
       welcome: "欢迎回来, 合作伙伴",
       businessStatus: "经营概况",
       pendingOrders: "待确认",
+      awaitingPaymentOrders: "待收款",
       pickupPendingOrders: "待取件",
       processingOrders: "打包中",
+      pickedUpOrders: "已取件",
       deliveringOrders: "配送中",
-      completedOrders: "已完成",
+      completedOrders: "已送达",
       revenueOneYear: "总营收",
       revenueOneYearHint: "本年度（1/1 起）· 已送达 · MMK",
       revenueYesterday: "昨日营收",
@@ -102,15 +115,18 @@ export default function HomeScreen({ navigation }: any) {
       yesterday: "昨日",
       placeOrder: "立即下单",
       myProducts: "我的商品",
+      spotlightOff: "已下架",
     },
     en: {
       welcome: "Welcome Back, Partner",
       businessStatus: "Business Overview",
       pendingOrders: "To confirm",
+      awaitingPaymentOrders: "To collect",
       pickupPendingOrders: "Awaiting pickup",
       processingOrders: "Packing",
+      pickedUpOrders: "Picked up",
       deliveringOrders: "In transit",
-      completedOrders: "Completed",
+      completedOrders: "Delivered",
       revenueOneYear: "Total revenue",
       revenueOneYearHint: "YTD (Jan 1) · delivered · MMK",
       revenueYesterday: "Yesterday",
@@ -131,15 +147,18 @@ export default function HomeScreen({ navigation }: any) {
       yesterday: "Yesterday",
       placeOrder: "Place Order",
       myProducts: "Products",
+      spotlightOff: "Off shelf",
     },
     my: {
       welcome: "ပြန်လည်ကြိုဆိုပါတယ် မိတ်ဖက်",
       businessStatus: "စီးပွားရေးအခြေအနေ",
       pendingOrders: "အတည်ပြုရန်",
+      awaitingPaymentOrders: "ငွေကောက်ရန်",
       pickupPendingOrders: "ယူရန်စောင့်ဆိုင်း",
       processingOrders: "ထုပ်ပိုးနေသည်",
+      pickedUpOrders: "ထုပ်ယူပြီး",
       deliveringOrders: "ပို့ဆောင်နေသည်",
-      completedOrders: "ပြီးစီးသည်",
+      completedOrders: "ပို့ဆောင်ပြီး",
       revenueOneYear: "စုစုဝင်ငွေ (၁ နှစ်)",
       revenueOneYearHint: "ယခုနှစ် ၁.၁ မှ · ပို့ဆောင်ပြီး · MMK",
       revenueYesterday: "မနေ့က ဝင်ငွေ",
@@ -160,6 +179,7 @@ export default function HomeScreen({ navigation }: any) {
       yesterday: "မနေ့က",
       placeOrder: "အော်ဒါတင်မည်",
       myProducts: "ကုန်ပစ္စည်းများ",
+      spotlightOff: "ပိတ်ထား",
     },
   };
 
@@ -196,7 +216,7 @@ export default function HomeScreen({ navigation }: any) {
 
       // 获取订单统计 (针对商家)
       const email = await AsyncStorage.getItem("userEmail");
-      const [orderData, revenueData] = await Promise.all([
+      const [orderData, revenueData, productRows] = await Promise.all([
         packageService.getOrderStats(
           userId,
           email || undefined,
@@ -205,12 +225,16 @@ export default function HomeScreen({ navigation }: any) {
           store?.store_name,
         ),
         packageService.getRevenueStats(userId, store?.store_name),
+        merchantService.getStoreProducts(userId),
       ]);
+      setSpotlightProducts(pickHomeSpotlightProducts(productRows, 3));
 
       setStats({
         pendingConfirm: orderData.pendingConfirm ?? 0,
+        awaitingPayment: orderData.awaitingPayment ?? 0,
         awaitingPickup: orderData.awaitingPickup ?? 0,
         processing: orderData.processing || 0,
+        pickedUp: orderData.pickedUp ?? 0,
         delivering: orderData.delivering ?? 0,
         completed: orderData.delivered || 0,
         revenueOneYear: revenueData.revenueOneYear ?? 0,
@@ -270,9 +294,31 @@ export default function HomeScreen({ navigation }: any) {
     merchantInfo?.updated_at,
   );
 
+  const headerMax = insets.top + 108;
+  const headerMin = insets.top + 58;
   const headerHeight = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [220, 180],
+    inputRange: [0, 96],
+    outputRange: [headerMax, headerMin],
+    extrapolate: "clamp",
+  });
+  const avatarSize = scrollY.interpolate({
+    inputRange: [0, 96],
+    outputRange: [56, 32],
+    extrapolate: "clamp",
+  });
+  const avatarRadius = scrollY.interpolate({
+    inputRange: [0, 96],
+    outputRange: [28, 16],
+    extrapolate: "clamp",
+  });
+  const welcomeOpacity = scrollY.interpolate({
+    inputRange: [0, 36, 64],
+    outputRange: [1, 0.4, 0],
+    extrapolate: "clamp",
+  });
+  const notifySize = scrollY.interpolate({
+    inputRange: [0, 96],
+    outputRange: [44, 34],
     extrapolate: "clamp",
   });
 
@@ -280,14 +326,28 @@ export default function HomeScreen({ navigation }: any) {
     <View
       style={[styles.container, isDarkMode && { backgroundColor: "#0f172a" }]}
     >
-      <Animated.View style={[styles.header, { height: headerHeight }]}>
+      <Animated.View
+        style={[
+          styles.header,
+          { height: headerHeight, paddingTop: insets.top + 4 },
+        ]}
+      >
         <LinearGradient
           colors={["#1e293b", "#0f172a"]}
           style={StyleSheet.absoluteFill}
         />
         <View style={styles.headerContent}>
           <View style={styles.profileRow}>
-            <View style={styles.avatarContainer}>
+            <Animated.View
+              style={[
+                styles.avatarContainer,
+                {
+                  width: avatarSize,
+                  height: avatarSize,
+                  borderRadius: avatarRadius,
+                },
+              ]}
+            >
               {homeAvatarUri ? (
                 <Image
                   source={{ uri: homeAvatarUri }}
@@ -298,20 +358,41 @@ export default function HomeScreen({ navigation }: any) {
                   {merchantInfo?.store_name?.charAt(0) || "M"}
                 </Text>
               )}
-            </View>
+            </Animated.View>
             <View style={styles.nameContainer}>
-              <Text style={styles.welcomeText}>{currentT.welcome}</Text>
-              <Text style={styles.storeName}>
+              <Animated.View
+                style={{
+                  opacity: welcomeOpacity,
+                  height: scrollY.interpolate({
+                    inputRange: [0, 64],
+                    outputRange: [18, 0],
+                    extrapolate: "clamp",
+                  }),
+                  overflow: "hidden",
+                }}
+              >
+                <Text style={styles.welcomeText} numberOfLines={1}>
+                  {currentT.welcome}
+                </Text>
+              </Animated.View>
+              <Text style={styles.storeName} numberOfLines={1}>
                 {merchantInfo?.store_name || (loading ? "Loading..." : "—")}
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.notificationBtn}
-              onPress={() => navigation.navigate("NotificationCenter")}
+            <Animated.View
+              style={[
+                styles.notificationBtn,
+                { width: notifySize, height: notifySize, borderRadius: 22 },
+              ]}
             >
-              <Ionicons name="notifications-outline" size={24} color="#fff" />
-              <View style={styles.badge} />
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => navigation.navigate("NotificationCenter")}
+                style={styles.notificationHit}
+              >
+                <Ionicons name="notifications-outline" size={22} color="#fff" />
+                <View style={styles.badge} />
+              </TouchableOpacity>
+            </Animated.View>
           </View>
         </View>
       </Animated.View>
@@ -323,6 +404,7 @@ export default function HomeScreen({ navigation }: any) {
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: false },
         )}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -331,241 +413,6 @@ export default function HomeScreen({ navigation }: any) {
           />
         }
       >
-        <View style={styles.statsContainer}>
-          <Text style={styles.sectionTitle}>{currentT.businessStatus}</Text>
-          <View style={styles.statsGrid}>
-            <TouchableOpacity
-              style={styles.statsCard}
-              onPress={() =>
-                navigation.navigate("MyOrders", { filterStatus: "待确认" })
-              }
-            >
-              <Text style={styles.statsValue}>{stats.pendingConfirm}</Text>
-              <Text style={styles.statsLabel}>{currentT.pendingOrders}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.statsCard}
-              onPress={() =>
-                navigation.navigate("MyOrders", { filterStatus: "待取件" })
-              }
-            >
-              <Text style={styles.statsValue}>{stats.awaitingPickup}</Text>
-              <Text style={styles.statsLabel}>
-                {currentT.pickupPendingOrders}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.statsCard}
-              onPress={() =>
-                navigation.navigate("MyOrders", { filterStatus: "打包中" })
-              }
-            >
-              <Text style={styles.statsValue}>{stats.processing}</Text>
-              <Text style={styles.statsLabel}>{currentT.processingOrders}</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={[styles.statsGrid, { marginTop: 12 }]}>
-            <TouchableOpacity
-              style={styles.statsCard}
-              onPress={() =>
-                navigation.navigate("MyOrders", { filterStatus: "配送中" })
-              }
-            >
-              <Text style={styles.statsValue}>{stats.delivering}</Text>
-              <Text style={styles.statsLabel}>{currentT.deliveringOrders}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.statsCard}
-              onPress={() =>
-                navigation.navigate("MyOrders", { filterStatus: "已送达" })
-              }
-            >
-              <Text style={styles.statsValue}>{stats.completed}</Text>
-              <Text style={styles.statsLabel}>{currentT.completedOrders}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* 🚀 新增：细分统计 (急件 vs 标准) */}
-          <View style={[styles.statsGrid, { marginTop: 12 }]}>
-            <View style={[styles.statsCard, { paddingVertical: 10 }]}>
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <Ionicons
-                  name="flash"
-                  size={14}
-                  color="#ef4444"
-                  style={{ marginRight: 4 }}
-                />
-                <Text
-                  style={[
-                    styles.statsValue,
-                    { fontSize: 18, color: "#ef4444" },
-                  ]}
-                >
-                  {stats.urgent}
-                </Text>
-              </View>
-              <Text style={styles.statsLabel}>{currentT.urgentOrders}</Text>
-            </View>
-            <View style={[styles.statsCard, { paddingVertical: 10 }]}>
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <Ionicons
-                  name="apps"
-                  size={14}
-                  color="#3b82f6"
-                  style={{ marginRight: 4 }}
-                />
-                <Text
-                  style={[
-                    styles.statsValue,
-                    { fontSize: 18, color: "#3b82f6" },
-                  ]}
-                >
-                  {stats.standard}
-                </Text>
-              </View>
-              <Text style={styles.statsLabel}>{currentT.standardOrders}</Text>
-            </View>
-          </View>
-
-          {/* 🚀 新增：营收对比图表 (今日 vs 昨日) */}
-          <View style={styles.revenueContainer}>
-            <Text
-              style={[styles.sectionTitle, { fontSize: 16, marginBottom: 12 }]}
-            >
-              {currentT.revenueChart}
-            </Text>
-            <View style={styles.chartArea}>
-              <View style={styles.chartBarRow}>
-                <Text style={styles.chartDayLabel}>{currentT.yesterday}</Text>
-                <View style={styles.barBackground}>
-                  <View
-                    style={[
-                      styles.barFill,
-                      {
-                        backgroundColor: "#94a3b8",
-                        width:
-                          stats.yesterdayOrderCount > 0 ||
-                          stats.todayOrderCount > 0
-                            ? `${(stats.yesterdayOrderCount / Math.max(stats.todayOrderCount, stats.yesterdayOrderCount, 1)) * 100}%`
-                            : "0%",
-                      },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.chartValueLabel}>
-                  {stats.yesterdayOrderCount.toLocaleString()}
-                  {currentT.orderCountUnit}
-                </Text>
-              </View>
-
-              <View style={styles.chartBarRow}>
-                <Text style={styles.chartDayLabel}>{currentT.today}</Text>
-                <View style={styles.barBackground}>
-                  <LinearGradient
-                    colors={["#f59e0b", "#d97706"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={[
-                      styles.barFill,
-                      {
-                        width:
-                          stats.todayOrderCount > 0 ||
-                          stats.yesterdayOrderCount > 0
-                            ? `${(stats.todayOrderCount / Math.max(stats.todayOrderCount, stats.yesterdayOrderCount, 1)) * 100}%`
-                            : "0%",
-                      },
-                    ]}
-                  />
-                </View>
-                <Text
-                  style={[
-                    styles.chartValueLabel,
-                    { color: "#d97706", fontWeight: "bold" },
-                  ]}
-                >
-                  {stats.todayOrderCount.toLocaleString()}
-                  {currentT.orderCountUnit}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.revenueCardsColumn}>
-            <View style={styles.revenueCard}>
-              <LinearGradient
-                colors={["#1e3a8a", "#1e40af"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.revenueCardGradient}
-              >
-                <View style={styles.revenueCardTextCol}>
-                  <Text style={styles.revenueCardLabel}>
-                    {currentT.revenueOneYear}
-                  </Text>
-                  <Text style={styles.revenueCardHint}>
-                    {currentT.revenueOneYearHint}
-                  </Text>
-                </View>
-                <Text
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  style={styles.revenueCardValue}
-                >
-                  {stats.revenueOneYear.toLocaleString()}
-                </Text>
-              </LinearGradient>
-            </View>
-            <View style={styles.revenueCard}>
-              <LinearGradient
-                colors={["#0f766e", "#0d9488"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.revenueCardGradient}
-              >
-                <View style={styles.revenueCardTextCol}>
-                  <Text style={styles.revenueCardLabel}>
-                    {currentT.revenueYesterday}
-                  </Text>
-                  <Text style={styles.revenueCardHint}>
-                    {currentT.revenueMmkHint}
-                  </Text>
-                </View>
-                <Text
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  style={styles.revenueCardValue}
-                >
-                  {stats.yesterdayRevenue.toLocaleString()}
-                </Text>
-              </LinearGradient>
-            </View>
-            <View style={styles.revenueCard}>
-              <LinearGradient
-                colors={["#b45309", "#d97706"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.revenueCardGradient}
-              >
-                <View style={styles.revenueCardTextCol}>
-                  <Text style={styles.revenueCardLabel}>
-                    {currentT.revenueToday}
-                  </Text>
-                  <Text style={styles.revenueCardHint}>
-                    {currentT.revenueMmkHint}
-                  </Text>
-                </View>
-                <Text
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  style={styles.revenueCardValue}
-                >
-                  {stats.todayRevenue.toLocaleString()}
-                </Text>
-              </LinearGradient>
-            </View>
-          </View>
-        </View>
-
         <View style={styles.quickActions}>
           <TouchableOpacity
             style={styles.actionItem}
@@ -619,11 +466,176 @@ export default function HomeScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.pipelineCard}>
+          <Text style={styles.kicker}>{currentT.businessStatus}</Text>
+          <View style={styles.pipelineRow}>
+            {[
+              { value: stats.pendingConfirm, label: currentT.pendingOrders, filter: "待确认" },
+              { value: stats.processing, label: currentT.processingOrders, filter: "打包中" },
+              { value: stats.awaitingPayment, label: currentT.awaitingPaymentOrders, filter: "待收款" },
+              { value: stats.awaitingPickup, label: currentT.pickupPendingOrders, filter: "待取件" },
+              { value: stats.pickedUp, label: currentT.pickedUpOrders, filter: "已取件" },
+              { value: stats.delivering, label: currentT.deliveringOrders, filter: "配送中" },
+              { value: stats.completed, label: currentT.completedOrders, filter: "已送达" },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.filter}
+                style={styles.pipelineCell}
+                onPress={() => navigation.navigate("MyOrders", { filterStatus: item.filter })}
+              >
+                <Text style={styles.pipelineValue}>{item.value}</Text>
+                <Text style={styles.pipelineLabel} numberOfLines={2}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.pipelineMeta}>
+            <View style={styles.metaChip}>
+              <Ionicons name="flash" size={12} color="#ef4444" />
+              <Text style={styles.metaText}>
+                {currentT.urgentOrders} {stats.urgent}
+              </Text>
+            </View>
+            <View style={styles.metaChip}>
+              <Ionicons name="apps" size={12} color="#2563eb" />
+              <Text style={styles.metaText}>
+                {currentT.standardOrders} {stats.standard}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.revenuePanel}>
+          <Text style={styles.kicker}>{currentT.revenueToday}</Text>
+          <Text style={styles.revenueHero} numberOfLines={1} adjustsFontSizeToFit>
+            {stats.todayRevenue.toLocaleString()}
+          </Text>
+          <Text style={styles.revenueHint}>{currentT.revenueMmkHint}</Text>
+          <View style={styles.chartArea}>
+            <View style={styles.chartBarRow}>
+              <Text style={styles.chartDayLabel}>{currentT.today}</Text>
+              <View style={styles.barBackground}>
+                <View
+                  style={[
+                    styles.barFill,
+                    {
+                      backgroundColor: "#d97706",
+                      width:
+                        stats.todayOrderCount > 0 || stats.yesterdayOrderCount > 0
+                          ? `${(stats.todayOrderCount / Math.max(stats.todayOrderCount, stats.yesterdayOrderCount, 1)) * 100}%`
+                          : "0%",
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.chartValueLabel}>
+                {stats.todayOrderCount.toLocaleString()}
+                {currentT.orderCountUnit}
+              </Text>
+            </View>
+            <View style={styles.chartBarRow}>
+              <Text style={styles.chartDayLabel}>{currentT.yesterday}</Text>
+              <View style={styles.barBackground}>
+                <View
+                  style={[
+                    styles.barFill,
+                    {
+                      backgroundColor: "#94a3b8",
+                      width:
+                        stats.todayOrderCount > 0 || stats.yesterdayOrderCount > 0
+                          ? `${(stats.yesterdayOrderCount / Math.max(stats.todayOrderCount, stats.yesterdayOrderCount, 1)) * 100}%`
+                          : "0%",
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.chartValueLabel}>
+                {stats.yesterdayOrderCount.toLocaleString()}
+                {currentT.orderCountUnit}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.revenueSplit}>
+            <View style={styles.revenueSplitCell}>
+              <Text style={styles.revenueSplitLabel}>{currentT.revenueYesterday}</Text>
+              <Text style={styles.revenueSplitValue} numberOfLines={1} adjustsFontSizeToFit>
+                {stats.yesterdayRevenue.toLocaleString()}
+              </Text>
+            </View>
+            <View style={styles.revenueSplitRule} />
+            <View style={styles.revenueSplitCell}>
+              <Text style={styles.revenueSplitLabel}>{currentT.revenueOneYear}</Text>
+              <Text style={styles.revenueSplitValue} numberOfLines={1} adjustsFontSizeToFit>
+                {stats.revenueOneYear.toLocaleString()}
+              </Text>
+            </View>
+          </View>
+        </View>
+
         <View style={styles.recentActivity}>
           <Text style={styles.sectionTitle}>{currentT.recentActivity}</Text>
-          <View style={styles.emptyActivity}>
-            <Text style={styles.emptyText}>{currentT.noActivity}</Text>
-          </View>
+          {spotlightProducts.length === 0 ? (
+            <View style={styles.emptyActivity}>
+              <Text style={styles.emptyText}>{currentT.noActivity}</Text>
+            </View>
+          ) : (
+            spotlightProducts.map((product) => {
+              const offer = spotlightOffer(product);
+              const imageUri =
+                product.image_url && !product.image_url.startsWith("file://")
+                  ? rewritePublicStorageUrl(product.image_url)
+                  : "";
+              const percentLabel = offer.percent > 0 ? `${Math.round(offer.percent)}%` : "";
+              return (
+                <TouchableOpacity
+                  key={product.id}
+                  style={styles.spotlightCard}
+                  activeOpacity={0.86}
+                  onPress={() => {
+                    const storeId = merchantInfo?.id;
+                    if (!storeId) return;
+                    navigation.navigate("MerchantProducts", {
+                      storeId,
+                      storeName: merchantInfo?.store_name,
+                      editProductId: product.id,
+                    });
+                  }}
+                >
+                  <View style={styles.spotlightImageWrap}>
+                    {imageUri ? (
+                      <Image source={{ uri: imageUri }} style={styles.spotlightImage} />
+                    ) : (
+                      <View style={[styles.spotlightImage, styles.spotlightImageEmpty]}>
+                        <Ionicons name="image-outline" size={22} color="#cbd5e1" />
+                      </View>
+                    )}
+                    {percentLabel ? (
+                      <View style={styles.spotlightBadge}>
+                        <Text style={styles.spotlightBadgeText}>{percentLabel}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <View style={styles.spotlightInfo}>
+                    <Text style={styles.spotlightName} numberOfLines={2}>
+                      {product.name}
+                    </Text>
+                    <Text style={styles.spotlightPrice}>
+                      {offer.price.toLocaleString()} MMK
+                    </Text>
+                    {offer.percent > 0 && offer.original ? (
+                      <Text style={styles.spotlightOriginal}>
+                        {offer.original.toLocaleString()} MMK
+                      </Text>
+                    ) : null}
+                    {!product.is_available ? (
+                      <Text style={styles.spotlightOff}>{currentT.spotlightOff}</Text>
+                    ) : null}
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
         </View>
 
         <View style={{ height: 40 }} />
@@ -638,10 +650,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc",
   },
   header: {
-    paddingTop: Platform.OS === "ios" ? 60 : 40,
     paddingHorizontal: 20,
-    justifyContent: "center",
+    paddingBottom: 10,
+    justifyContent: "flex-end",
     overflow: "hidden",
+    zIndex: 4,
+    elevation: 8,
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
   },
   headerContent: {
     zIndex: 1,
@@ -651,9 +669,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   avatarContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
     backgroundColor: "#3b82f6",
     justifyContent: "center",
     alignItems: "center",
@@ -662,42 +677,47 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   avatarImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: "100%",
+    height: "100%",
   },
   avatarText: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
     color: "#fff",
   },
   nameContainer: {
-    marginLeft: 15,
+    marginLeft: 12,
     flex: 1,
+    minWidth: 0,
   },
   welcomeText: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.6)",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.62)",
     fontWeight: "500",
+    letterSpacing: 0.2,
   },
   storeName: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: "800",
     color: "#fff",
-    marginTop: 2,
+    letterSpacing: -0.3,
   },
   notificationBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
     backgroundColor: "rgba(255,255,255,0.1)",
     justifyContent: "center",
     alignItems: "center",
+    overflow: "hidden",
+  },
+  notificationHit: {
+    flex: 1,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
   },
   badge: {
     position: "absolute",
-    top: 12,
-    right: 12,
+    top: 8,
+    right: 8,
     width: 8,
     height: 8,
     borderRadius: 4,
@@ -800,16 +820,16 @@ const styles = StyleSheet.create({
   },
   quickActions: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: 24,
+    marginTop: 20,
     backgroundColor: "#fff",
     borderRadius: 20,
-    padding: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 3,
   },
   actionItem: {
     width: "25%",
@@ -845,6 +865,72 @@ const styles = StyleSheet.create({
   emptyText: {
     color: "#94a3b8",
     fontSize: 14,
+  },
+  spotlightCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#eef2f6",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  spotlightImageWrap: {
+    width: 84,
+    height: 84,
+  },
+  spotlightImage: {
+    width: 84,
+    height: 84,
+    borderRadius: 12,
+    backgroundColor: "#f1f5f9",
+  },
+  spotlightImageEmpty: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  spotlightBadge: {
+    position: "absolute",
+    left: 6,
+    top: 6,
+    backgroundColor: "#ef4444",
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  spotlightBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  spotlightInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  spotlightName: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0f172a",
+    marginBottom: 6,
+  },
+  spotlightPrice: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0f766e",
+  },
+  spotlightOriginal: {
+    marginTop: 2,
+    fontSize: 12,
+    color: "#94a3b8",
+    textDecorationLine: "line-through",
+  },
+  spotlightOff: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#ef4444",
   },
   // 🚀 新增：营收对比图表样式
   revenueContainer: {
@@ -884,10 +970,128 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   chartValueLabel: {
-    minWidth: 60,
+    minWidth: 52,
     textAlign: "right",
     fontSize: 12,
     color: "#475569",
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontWeight: "700",
+  },
+  pipelineCard: {
+    marginTop: 16,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    paddingTop: 14,
+    paddingBottom: 12,
+    paddingHorizontal: 8,
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  kicker: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#64748b",
+    letterSpacing: 0.4,
+    marginBottom: 10,
+    paddingHorizontal: 8,
+  },
+  pipelineRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  pipelineCell: {
+    width: "25%",
+    alignItems: "center",
+    paddingHorizontal: 2,
+    paddingVertical: 6,
+  },
+  pipelineValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0f172a",
+    letterSpacing: -0.4,
+  },
+  pipelineLabel: {
+    marginTop: 4,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: "700",
+    color: "#64748b",
+    textAlign: "center",
+  },
+  pipelineMeta: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+    paddingHorizontal: 8,
+  },
+  metaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#f8fafc",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  metaText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#334155",
+  },
+  revenuePanel: {
+    marginTop: 16,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  revenueHero: {
+    fontSize: 34,
+    fontWeight: "800",
+    color: "#0f172a",
+    letterSpacing: -1,
+  },
+  revenueHint: {
+    marginTop: 2,
+    marginBottom: 14,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#94a3b8",
+  },
+  revenueSplit: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#e2e8f0",
+  },
+  revenueSplitCell: {
+    flex: 1,
+    minWidth: 0,
+  },
+  revenueSplitRule: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: "stretch",
+    backgroundColor: "#e2e8f0",
+    marginHorizontal: 12,
+  },
+  revenueSplitLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#94a3b8",
+  },
+  revenueSplitValue: {
+    marginTop: 2,
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#334155",
   },
 });

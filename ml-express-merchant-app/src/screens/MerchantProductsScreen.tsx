@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,12 +17,14 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../contexts/AppContext';
 import { merchantService, Product, ProductCategory, productFormSource, hasPendingProductUpdate } from '../services/supabase';
 import { theme } from '../config/theme';
 import { feedbackService } from '../services/FeedbackService';
 import { autoPrepareProductImageUri, autoPrepareProductImageUris } from '../utils/productImageNative';
 import { rewritePublicStorageUrl } from '../services/merchantApi/nativeSupabaseUrl';
+import MerchantPageHeader, { MerchantHeaderIconButton, merchantExitLabel } from '../components/MerchantPageHeader';
 import { pickImageFromLibrary } from '../utils/mediaAccess';
 import ProductVariantsEditor from '../components/ProductVariantsEditor';
 import {
@@ -33,6 +35,8 @@ import {
 } from '../utils/merchantProductForm';
 import { formatProductPriceLabel, productHasVariants } from '../utils/productVariants';
 import { collectStockAlerts } from '../utils/merchantOpsReport';
+import { bulkListPadding, summarizeBulkChangeResults, summarizeBulkSelection, survivingBulkIds, type BulkChangeResult } from '../utils/merchantBulkBar';
+import MerchantBulkBar from '../components/MerchantBulkBar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORE_UUID_RE =
@@ -62,8 +66,9 @@ async function resolveMerchantStoreId(routeStoreId?: string | null): Promise<str
 }
 
 export default function MerchantProductsScreen({ route, navigation }: any) {
-  const { storeId: routeStoreId, storeName } = route.params || {};
+  const { storeId: routeStoreId, storeName, editProductId } = route.params || {};
   const { language } = useApp();
+  const insets = useSafeAreaInsets();
   const [storeId, setStoreId] = useState<string>(isStoreUuid(routeStoreId) ? routeStoreId.trim() : '');
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,6 +83,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   const [showDetailImagesPanel, setShowDetailImagesPanel] = useState(false);
 
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [bulkBarOpen, setBulkBarOpen] = useState(false);
   const [bulkModalType, setBulkModalType] = useState<'price' | 'discount' | null>(null);
   const [bulkValue, setBulkValue] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -88,7 +94,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 
   const t = {
     zh: {
-      title: '商品管理',
+      title: '我的商品',
       addProduct: '添加商品',
       editProduct: '编辑商品',
       name: '商品名称',
@@ -103,13 +109,20 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       noProducts: '暂无商品，点击右上角添加',
       infinite: '无限',
       bulkManage: '批量管理',
-      selectAll: '全选',
-      unselectAll: '取消全选',
-      bulkOn: '批量上架',
-      bulkOff: '批量下架',
-      bulkPrice: '批量改价',
-      bulkDiscount: '批量折扣',
-      bulkCount: '已选',
+          selectAll: '全选',
+          unselectAll: '取消',
+          bulkOn: '上架',
+          bulkOff: '下架',
+          bulkPrice: '改价',
+          bulkDiscount: '折扣',
+          bulkCount: '已选',
+          hideBulk: '收起',
+          bulkItemsUnit: '件',
+          bulkOnSale: '在售',
+          bulkOffSale: '已下架',
+          bulkFailed: '操作失败，所选商品没有改动',
+          bulkPartial: '{ok} 件已提交，{fail} 件失败，失败的仍保持选中',
+          bulkPending: '{count} 件变更已提交审核',
       bulkValuePlaceholder: '输入数值',
       productDetail: '商品详情',
       description: '商品描述',
@@ -119,7 +132,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       addDetailImage: '添加图片',
     },
     en: {
-      title: 'Products',
+      title: 'My Products',
       addProduct: 'Add Product',
       editProduct: 'Edit Product',
       name: 'Name',
@@ -134,13 +147,20 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       noProducts: 'No products yet, tap + to add',
       infinite: 'Infinite',
       bulkManage: 'Bulk',
-      selectAll: 'Select All',
-      unselectAll: 'Unselect All',
-      bulkOn: 'Bulk On',
-      bulkOff: 'Bulk Off',
-      bulkPrice: 'Bulk Price',
-      bulkDiscount: 'Bulk Discount',
-      bulkCount: 'Selected',
+          selectAll: 'All',
+          unselectAll: 'None',
+          bulkOn: 'List',
+          bulkOff: 'Unlist',
+          bulkPrice: 'Price',
+          bulkDiscount: 'Off %',
+          bulkCount: 'Selected',
+          hideBulk: 'Done',
+          bulkItemsUnit: 'items',
+          bulkOnSale: 'On sale',
+          bulkOffSale: 'Hidden',
+          bulkFailed: 'Update failed. Selected products were not changed.',
+          bulkPartial: '{ok} submitted, {fail} failed. Failed items stay selected.',
+          bulkPending: '{count} change(s) submitted for approval',
       bulkValuePlaceholder: 'Enter value',
       productDetail: 'Product Details',
       description: 'Description',
@@ -150,7 +170,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       addDetailImage: 'Add image',
     },
     my: {
-      title: 'ကုန်ပစ္စည်းစီမံခန့်ခွဲမှု',
+      title: 'ကုန်ပစ္စည်းများ',
       addProduct: 'ကုန်ပစ္စည်းအသစ်ထည့်ရန်',
       editProduct: 'ပြင်ဆင်ရန်',
       name: 'အမည်',
@@ -165,13 +185,20 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       noProducts: 'ကုန်ပစ္စည်းမရှိသေးပါ။ အသစ်ထည့်ရန် + ကိုနှိပ်ပါ',
       infinite: 'အကန့်အသတ်မရှိ',
       bulkManage: 'အစုလိုက်',
-      selectAll: 'အားလုံးရွေး',
-      unselectAll: 'အားလုံးဖျက်',
-      bulkOn: 'အစုလိုက်တင်',
-      bulkOff: 'အစုလိုက်ပိတ်',
-      bulkPrice: 'စျေးပြောင်း',
-      bulkDiscount: 'လျှော့စျေးပြောင်း',
-      bulkCount: 'ရွေးထား',
+          selectAll: 'အားလုံး',
+          unselectAll: 'ရှင်း',
+          bulkOn: 'တင်မည်',
+          bulkOff: 'ချမည်',
+          bulkPrice: 'စျေး',
+          bulkDiscount: 'လျှော့',
+          bulkCount: 'ရွေးထား',
+          hideBulk: 'ပြီး',
+          bulkItemsUnit: 'ခု',
+          bulkOnSale: 'ရောင်း',
+          bulkOffSale: 'ပိတ်ထား',
+          bulkFailed: 'မအောင်မြင်ပါ။ ရွေးထားသော ပစ္စည်းများ မပြောင်းပါ။',
+          bulkPartial: '{ok} တင်ပြီး၊ {fail} မအောင်မြင်ပါ။ မအောင်မြင်သည်များ ဆက်ရွေးထားသည်။',
+          bulkPending: '{count} ခု စစ်ဆေးရန် တင်ပြီးပါပြီ',
       bulkValuePlaceholder: 'တန်ဖိုးထည့်ပါ',
       productDetail: 'ကုန်ပစ္စည်းအသေးစိတ်',
       description: 'ကုန်ပစ္စည်းအကြောင်းအရာ',
@@ -290,6 +317,22 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     setShowDetailImagesPanel((src.detail_image_urls?.length ?? 0) > 0);
     setShowProductModal(true);
   };
+
+  const openedSpotlightId = useRef('');
+
+  useEffect(() => {
+    const targetId = String(editProductId || '').trim();
+    if (!targetId) {
+      openedSpotlightId.current = '';
+      return;
+    }
+    if (loading || openedSpotlightId.current === targetId) return;
+    const product = products.find((item) => item.id === targetId);
+    if (!product) return;
+    openedSpotlightId.current = targetId;
+    handleOpenEditProduct(product);
+    navigation.setParams({ editProductId: undefined });
+  }, [editProductId, loading, products]);
 
   const handleSaveProduct = async () => {
     const { draft, error: draftError } = buildMerchantProductDraft(productForm);
@@ -428,6 +471,32 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     }
   };
 
+  const finishBulkChange = (ids: string[], results: BulkChangeResult[], closeEditor: boolean) => {
+    const summary = summarizeBulkChangeResults(results);
+    setSelectedProductIds(new Set(survivingBulkIds(ids, results)));
+    if (summary.kind === 'failed') {
+      showToast(currentT.bulkFailed, 'error');
+      return;
+    }
+    if (summary.kind === 'partial') {
+      showToast(
+        currentT.bulkPartial
+          .replace('{ok}', String(summary.successCount))
+          .replace('{fail}', String(summary.failedCount)),
+        'warning',
+      );
+    } else if (summary.kind === 'pending') {
+      showToast(currentT.bulkPending.replace('{count}', String(summary.pendingCount)), 'info');
+    } else {
+      showToast(currentT.saveSuccess, 'success');
+    }
+    if (closeEditor) {
+      setBulkModalType(null);
+      setBulkValue('');
+    }
+    loadProducts();
+  };
+
   const handleBulkAvailability = async (isAvailable: boolean) => {
     if (selectedProductIds.size === 0) return;
     setBulkLoading(true);
@@ -441,19 +510,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           return merchantService.submitMerchantProductChange(product, { is_available: isAvailable });
         }),
       );
-      const pendingCount = results.filter(r => r && 'pendingReview' in r && r.pendingReview).length;
-      if (pendingCount > 0) {
-        showToast(
-          language === 'zh'
-            ? `${pendingCount} 件商品变更已提交审核`
-            : `${pendingCount} change(s) submitted for approval`,
-          'info',
-        );
-      } else {
-        showToast(currentT.saveSuccess, 'success');
-      }
-      setSelectedProductIds(new Set());
-      loadProducts();
+      finishBulkChange(ids, results, false);
     } catch (error) {
       showToast(language === 'zh' ? '批量操作失败' : 'Bulk operation failed', 'error');
     } finally {
@@ -496,21 +553,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           }),
         );
       }
-      const pendingCount = results.filter(r => r.success && 'pendingReview' in r && r.pendingReview).length;
-      if (pendingCount > 0) {
-        showToast(
-          language === 'zh'
-            ? `${pendingCount} 件商品变更已提交审核`
-            : `${pendingCount} change(s) submitted for approval`,
-          'info',
-        );
-      } else {
-        showToast(currentT.saveSuccess, 'success');
-      }
-      setSelectedProductIds(new Set());
-      setBulkModalType(null);
-      setBulkValue('');
-      loadProducts();
+      finishBulkChange(ids, results, true);
     } catch (error) {
       showToast(language === 'zh' ? '批量操作失败' : 'Bulk operation failed', 'error');
     } finally {
@@ -539,6 +582,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     }
   };
 
+  const bulkSummary = useMemo(
+    () => summarizeBulkSelection(products, selectedProductIds),
+    [products, selectedProductIds],
+  );
   const stockAlerts = useMemo(() => collectStockAlerts(products), [products]);
   const outOfStockIds = useMemo(
     () => new Set(stockAlerts.filter((item) => item.level === 'out').map((item) => item.productId)),
@@ -563,16 +610,22 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           styles.productCard, 
           { width: '100%', flexDirection: 'row', alignItems: 'center' },
           stockTone ? { backgroundColor: stockTone } : null,
+          isSelected && bulkBarOpen ? styles.highlightedCard : null,
         ]}
-        onPress={() => handleOpenEditProduct(item)}
+        onPress={() => {
+          if (bulkBarOpen) {
+            toggleSelectProduct(item.id);
+            return;
+          }
+          handleOpenEditProduct(item);
+        }}
         activeOpacity={0.7}
       >
-        <TouchableOpacity
-          style={[styles.selectCircle, isSelected && styles.selectCircleActive]}
-          onPress={() => toggleSelectProduct(item.id)}
-        >
-          {isSelected && <Ionicons name="checkmark" size={14} color="white" />}
-        </TouchableOpacity>
+        {bulkBarOpen ? (
+          <View style={[styles.selectCircle, isSelected && styles.selectCircleActive]}>
+            {isSelected ? <Ionicons name="checkmark" size={14} color="white" /> : null}
+          </View>
+        ) : null}
         <View style={styles.productImageContainerList}>
           {item.image_url && !item.image_url.startsWith('file://') ? (
             <Image source={{ uri: rewritePublicStorageUrl(item.image_url) }} style={styles.productImage} />
@@ -612,7 +665,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                 {item.is_available ? currentT.available : currentT.unavailable}
               </Text>
             </View>
-            <View style={{ marginLeft: 10 }}>
+            <View style={{ marginLeft: 10 }} pointerEvents={bulkBarOpen ? 'none' : 'auto'}>
               <Switch
                 value={item.is_available}
                 onValueChange={() => toggleProductStatus(item)}
@@ -652,34 +705,31 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           )}
         </View>
 
-        <View style={styles.productActions}>
-          <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
-        </View>
+        {bulkBarOpen ? null : (
+          <View style={styles.productActions}>
+            <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#1e3a8a', '#2563eb']}
-        style={styles.header}
-      >
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="chevron-back" size={28} color="white" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{storeName || currentT.title}</Text>
-          <View style={styles.headerRight}>
-            <TouchableOpacity 
-              onPress={handleOpenAddProduct}
-              style={styles.addBtn}
-            >
-              <Ionicons name="add" size={28} color="white" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </LinearGradient>
+      <MerchantPageHeader
+        title={currentT.title}
+        subtitle={storeName || undefined}
+        topInset={insets.top}
+        exitLabel={merchantExitLabel(language)}
+        onExit={() => navigation.goBack()}
+        trailing={
+          <MerchantHeaderIconButton
+            icon="add"
+            label={currentT.addProduct}
+            onPress={handleOpenAddProduct}
+          />
+        }
+      />
 
       <View style={{ flex: 1 }}>
         {loading ? (
@@ -691,7 +741,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
             data={products}
             keyExtractor={(item) => item.id}
             renderItem={renderProductItem}
-            contentContainerStyle={[styles.listContent, { paddingBottom: 180 }]}
+            contentContainerStyle={[
+              styles.listContent,
+              { paddingBottom: bulkListPadding(bulkBarOpen) },
+            ]}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3b82f6']} />
             }
@@ -727,38 +780,32 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           />
         )}
 
-        <View style={styles.bulkBar}>
-            <View style={styles.bulkHeaderRow}>
-              <TouchableOpacity style={styles.bulkSelectBtn} onPress={handleSelectAll}>
-                <Text style={styles.bulkSelectText}>
-                  {selectedProductIds.size === products.length ? currentT.unselectAll : currentT.selectAll}
-                </Text>
-              </TouchableOpacity>
-              <View style={styles.bulkCountBadge}>
-                <Text style={styles.bulkCountText}>
-                  {currentT.bulkCount}: {selectedProductIds.size}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.bulkActions}>
-              <TouchableOpacity style={styles.bulkActionBtn} onPress={() => handleBulkAvailability(true)} disabled={bulkLoading || selectedProductIds.size === 0}>
-                <Ionicons name="checkmark-circle-outline" size={16} color="#1d4ed8" />
-                <Text style={styles.bulkActionText}>{currentT.bulkOn}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.bulkActionBtn} onPress={() => handleBulkAvailability(false)} disabled={bulkLoading || selectedProductIds.size === 0}>
-                <Ionicons name="close-circle-outline" size={16} color="#1d4ed8" />
-                <Text style={styles.bulkActionText}>{currentT.bulkOff}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.bulkActionBtn} onPress={() => setBulkModalType('price')} disabled={bulkLoading || selectedProductIds.size === 0}>
-                <Ionicons name="pricetag-outline" size={16} color="#1d4ed8" />
-                <Text style={styles.bulkActionText}>{currentT.bulkPrice}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.bulkActionBtn} onPress={() => setBulkModalType('discount')} disabled={bulkLoading || selectedProductIds.size === 0}>
-                <Ionicons name="pricetags-outline" size={16} color="#1d4ed8" />
-                <Text style={styles.bulkActionText}>{currentT.bulkDiscount}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+        <MerchantBulkBar
+          open={bulkBarOpen}
+          summary={bulkSummary}
+          loading={bulkLoading}
+          bottomInset={insets.bottom}
+          labels={{
+            manage: currentT.bulkManage,
+            selectAll: currentT.selectAll,
+            unselectAll: currentT.unselectAll,
+            on: currentT.bulkOn,
+            off: currentT.bulkOff,
+            price: currentT.bulkPrice,
+            discount: currentT.bulkDiscount,
+            hide: currentT.hideBulk,
+            itemsUnit: currentT.bulkItemsUnit,
+            onSale: currentT.bulkOnSale,
+            offSale: currentT.bulkOffSale,
+          }}
+          onOpen={() => setBulkBarOpen(true)}
+          onClose={() => setBulkBarOpen(false)}
+          onSelectAll={handleSelectAll}
+          onList={() => handleBulkAvailability(true)}
+          onUnlist={() => handleBulkAvailability(false)}
+          onPrice={() => setBulkModalType('price')}
+          onDiscount={() => setBulkModalType('discount')}
+        />
       </View>
 
       <Modal
@@ -1013,12 +1060,13 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#eef2f7',
   },
   header: {
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   headerRow: {
     flexDirection: 'row',
@@ -1033,10 +1081,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  headerTitleBlock: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '800',
     color: 'white',
+    textAlign: 'center',
+    letterSpacing: -0.3,
+  },
+  headerPageName: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.78)',
+    textAlign: 'center',
   },
   headerRight: {
     width: 40,
@@ -1079,14 +1141,21 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   listContent: {
-    padding: 16,
+    padding: 14,
+    paddingTop: 16,
   },
   productCard: {
     backgroundColor: 'white',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 12,
-    marginBottom: 12,
-    ...theme.shadows.small,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e8eef6',
+    shadowColor: '#1e3a8a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
   },
   highlightedCard: {
     borderColor: '#3b82f6',
@@ -1118,9 +1187,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   productImageContainerList: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
+    width: 84,
+    height: 84,
+    borderRadius: 14,
     backgroundColor: '#f1f5f9',
     overflow: 'hidden',
     position: 'relative',
@@ -1155,8 +1224,9 @@ const styles = StyleSheet.create({
   },
   productName: {
     fontSize: 15,
-    fontWeight: 'bold',
-    color: '#1e293b',
+    fontWeight: '800',
+    color: '#0f172a',
+    letterSpacing: -0.2,
     marginBottom: 4,
   },
   priceRow: {
@@ -1166,9 +1236,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   productPrice: {
-    fontSize: 14,
-    color: '#10b981',
-    fontWeight: '700',
+    fontSize: 15,
+    color: '#0f766e',
+    fontWeight: '800',
   },
   originalPrice: {
     fontSize: 12,
@@ -1586,79 +1656,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 15,
     fontWeight: 'bold',
-  },
-  bulkBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
-    gap: 12,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 20,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(241, 245, 249, 0.8)',
-  },
-  bulkHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  bulkSelectBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#ffffff',
-    borderWidth: 1.5,
-    borderColor: '#3b82f6',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  bulkSelectText: {
-    fontSize: 13,
-    color: '#3b82f6',
-    fontWeight: '800',
-  },
-  bulkCountBadge: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  bulkCountText: {
-    fontSize: 12,
-    color: '#1d4ed8',
-    fontWeight: '700',
-  },
-  bulkActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  bulkActionBtn: {
-    flexBasis: '48%',
-    height: 42,
-    backgroundColor: '#eff6ff',
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.1)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  bulkActionText: {
-    fontSize: 13,
-    color: '#2563eb',
-    fontWeight: '800',
   },
   // 详情模态框样式
   detailImage: {

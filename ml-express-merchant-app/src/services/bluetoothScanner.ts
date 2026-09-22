@@ -1,6 +1,6 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BleManager, type Device, type State } from 'react-native-ble-plx';
+import type { BleManager, Device, State } from 'react-native-ble-plx';
 import type { ScannedBluetoothDevice } from '../utils/bluetoothDeviceMerge';
 
 export type { ScannedBluetoothDevice } from '../utils/bluetoothDeviceMerge';
@@ -14,7 +14,19 @@ let manager: BleManager | null = null;
 let connectedDevice: Device | null = null;
 
 function getManager(): BleManager {
-  if (!manager) manager = new BleManager();
+  if (!manager) {
+    // Expo Go 没有蓝牙原生模块；延迟 require，避免启动时拖垮整个 App。
+    let BleManagerCtor: typeof import('react-native-ble-plx').BleManager;
+    try {
+      BleManagerCtor = require('react-native-ble-plx').BleManager;
+    } catch {
+      throw new Error('BLUETOOTH_UNSUPPORTED');
+    }
+    if (typeof BleManagerCtor !== 'function') {
+      throw new Error('BLUETOOTH_UNSUPPORTED');
+    }
+    manager = new BleManagerCtor();
+  }
   return manager;
 }
 

@@ -25,8 +25,7 @@ import LoggerService from "../services/LoggerService";
 import QRCode from "react-native-qrcode-svg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
-import { ensureSaveToLibraryPermission } from "../utils/mediaAccess";
-import * as MediaLibrary from "expo-media-library";
+import { ensureSaveToLibraryPermission, saveImageToLibrary } from "../utils/mediaAccess";
 import ViewShot, { captureRef } from "react-native-view-shot";
 import { packageService, merchantService, supabase } from "../services/supabase";
 import { useApp } from "../contexts/AppContext";
@@ -224,7 +223,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
         quality: 1.0,
       });
 
-      await MediaLibrary.saveToLibraryAsync(uri);
+      await saveImageToLibrary(uri);
       hideLoading();
       feedbackService.notify(
         language === "zh" ? "保存成功" : "Saved!",
