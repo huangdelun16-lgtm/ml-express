@@ -10,7 +10,7 @@ import type { CustomerSignReceipt } from '../types/customerSignReceipt';
 import { pickupTypeLabel } from '../types/customerSignReceipt';
 import { getPaymentLabelDisplay, useTranslation } from '../i18n';
 import { formatCnyAmount, formatMmkAmount } from '../utils/crossBorderFx';
-import { resolveInvoiceFeeDisplay } from '../utils/crossBorderFxLock';
+import { hasRecordedFee, parseFeeMmk, resolveInvoiceFeeDisplay } from '../utils/crossBorderFxLock';
 import type { CrossBorderFxLock } from '../utils/crossBorderFxLock';
 
 export type InboundInvoiceData = {
@@ -79,9 +79,11 @@ export function InboundInvoiceContent({
 }) {
   const { t, fmt } = useTranslation();
   const pickupLabels = { self: t.sign.pickupSelf, proxy: t.sign.pickupProxy };
-  const feeMmk = Number(String(data.totalFee ?? '').replace(/[^\d.]/g, ''));
+  const recordedFee = hasRecordedFee(data.totalFee);
+  const feeMmk = parseFeeMmk(data.totalFee);
+  const isFree = recordedFee && feeMmk <= 0;
   const feeDisplay =
-    Number.isFinite(feeMmk) && feeMmk > 0
+    recordedFee && feeMmk > 0
       ? resolveInvoiceFeeDisplay({
           feeMmk,
           signed: Boolean(data.signed || data.signReceipt),
@@ -116,7 +118,22 @@ export function InboundInvoiceContent({
       {data.spec ? <InvoiceRow label={t.invoice.spec} value={data.spec} /> : null}
       {data.weight ? <InvoiceRow label={t.invoice.weight} value={data.weight} /> : null}
       <InvoiceRow label={t.invoice.qty} value={`${data.qty} ${stockUnitLabel()}`} />
-      {feeDisplay ? (
+      {isFree ? (
+        data.showCnyQuote ? (
+          <View style={styles.feeBlock}>
+            <InvoiceRow label={t.invoice.quoteCny} value="¥0" highlight />
+            <Text style={styles.feeBooked}>
+              {fmt(t.invoice.bookedMmk, { amount: formatMmkAmount(0) })}
+            </Text>
+            <Text style={styles.feeHint}>{t.invoice.freePromo}</Text>
+          </View>
+        ) : (
+          <View style={styles.feeBlock}>
+            <InvoiceRow label={t.invoice.totalFee} value={`0 MMK`} highlight />
+            <Text style={styles.feeHint}>{t.invoice.freePromo}</Text>
+          </View>
+        )
+      ) : feeDisplay ? (
         data.showCnyQuote && feeDisplay.cny != null ? (
           <View style={styles.feeBlock}>
             <InvoiceRow

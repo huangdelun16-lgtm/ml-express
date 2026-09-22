@@ -7,7 +7,11 @@ vi.mock('../services/supabase', () => ({
   supabase: {},
 }));
 
-import { formatCrossBorderFeeHint, pickRoutePerKgFromRows } from './crossBorderPricing';
+import {
+  formatCrossBorderFeeHint,
+  pickRoutePerKgFromRows,
+  shouldShowCrossBorderQuote,
+} from './crossBorderPricing';
 
 describe('pickRoutePerKgFromRows', () => {
   const rows = [
@@ -42,6 +46,38 @@ describe('pickRoutePerKgFromRows', () => {
   it('returns null when neither customer nor default rate exists', () => {
     expect(pickRoutePerKgFromRows(rows, 'YGN', 'POL', 'MDY260812005')).toBeNull();
   });
+
+  it('treats an explicit customer rate of 0 as free, not a fallback to the default', () => {
+    const freeRows = [
+      ...rows,
+      {
+        settings_key: 'pricing.cross_border.customer.MDY260802001.route.RUI.MDY.per_kg',
+        settings_value: 0,
+      },
+    ];
+    expect(pickRoutePerKgFromRows(freeRows, 'RUILI', 'MDY', 'MDY260802001')).toEqual({
+      perKg: 0,
+      usedCustomerRate: true,
+    });
+  });
+
+  it('treats an explicit default rate of 0 as free', () => {
+    expect(
+      pickRoutePerKgFromRows(
+        [{ settings_key: 'pricing.cross_border.route.RUI.MDY.per_kg', settings_value: 0 }],
+        'RUILI',
+        'MDY',
+      ),
+    ).toEqual({ perKg: 0, usedCustomerRate: false });
+  });
+});
+
+describe('shouldShowCrossBorderQuote', () => {
+  it('hides an empty fee and shows a recorded zero as free', () => {
+    expect(shouldShowCrossBorderQuote('')).toBe(false);
+    expect(shouldShowCrossBorderQuote('0')).toBe(true);
+    expect(shouldShowCrossBorderQuote('12500')).toBe(true);
+  });
 });
 
 describe('formatCrossBorderFeeHint', () => {
@@ -54,6 +90,12 @@ describe('formatCrossBorderFeeHint', () => {
   it('shows CNY/kg plus booked MMK/kg when a rate is set', () => {
     expect(formatCrossBorderFeeHint('RUI', 'MDY', 23500, 8, false, 'MDY260824001', 5000)).toBe(
       'MDY260824001 · RUI → MDY ¥4.7/kg · 入账 23500 MMK/kg × 8 kg',
+    );
+  });
+
+  it('labels an explicit 0 rate as a free promo', () => {
+    expect(formatCrossBorderFeeHint('RUI', 'MDY', 0, 0.5, false, 'MDY260802001', 5000)).toBe(
+      'MDY260802001 · RUI → MDY 免费优惠 · 入账 0 MMK/kg × 0.5 kg',
     );
   });
 });

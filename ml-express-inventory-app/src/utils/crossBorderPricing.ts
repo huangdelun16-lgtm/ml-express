@@ -112,21 +112,23 @@ export function pickRoutePerKgFromRows(
     const key = String(row.settings_key ?? '');
     if (!key) continue;
     const n = parsePricingValue(row.settings_value);
-    if (Number.isFinite(n)) byKey.set(key, n);
+    if (Number.isFinite(n) && n >= 0) byKey.set(key, n);
   }
-  if (customerKey) {
-    const customerVal = byKey.get(customerKey);
-    if (customerVal != null && customerVal > 0) {
-      return { perKg: customerVal, usedCustomerRate: true };
-    }
+  if (customerKey && byKey.has(customerKey)) {
+    return { perKg: byKey.get(customerKey) as number, usedCustomerRate: true };
   }
-  if (globalKey) {
-    const globalVal = byKey.get(globalKey);
-    if (globalVal != null && globalVal > 0) {
-      return { perKg: globalVal, usedCustomerRate: false };
-    }
+  if (globalKey && byKey.has(globalKey)) {
+    return { perKg: byKey.get(globalKey) as number, usedCustomerRate: false };
   }
   return null;
+}
+
+/** 已算出总费用（含明确的 0 元免费）才展示报价卡；空字符串仍视为未计价 */
+export function shouldShowCrossBorderQuote(totalFeeRaw: string): boolean {
+  const trimmed = String(totalFeeRaw ?? '').trim();
+  if (!trimmed) return false;
+  const n = Number(trimmed);
+  return Number.isFinite(n) && n >= 0;
 }
 
 function resolvePricingRegionFromDestination(destination: string): string {
@@ -274,6 +276,9 @@ export function formatCrossBorderFeeHint(
   const origin = originCode || '—';
   const dest = destinationCode || '—';
   const customerPrefix = customerCode ? `${customerCode} · ` : '';
+  if (perKg <= 0) {
+    return `${customerPrefix}${origin} → ${dest} 免费优惠 · 入账 0 MMK/kg × ${weightKg} kg`;
+  }
   const cnyPerKg = mmkToCny(perKg, mmkPerCny);
   if (cnyPerKg != null) {
     const cnyLabel = `¥${formatCnyInput(cnyPerKg)}/kg`;

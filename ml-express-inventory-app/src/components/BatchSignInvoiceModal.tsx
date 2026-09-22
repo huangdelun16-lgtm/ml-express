@@ -34,8 +34,9 @@ type Props = {
   onClose: () => void;
 };
 
-function feeLabel(mmk: number): string {
-  return mmk > 0 ? `${formatMmkAmount(mmk)} MMK` : '—';
+function feeLabel(mmk: number, freeLabel: string): string {
+  if (!(mmk > 0)) return `0 MMK · ${freeLabel}`;
+  return `${formatMmkAmount(mmk)} MMK`;
 }
 
 function InvoiceLineCard({
@@ -44,12 +45,14 @@ function InvoiceLineCard({
   expressLabel,
   weightLabel,
   feeText,
+  freeLabel,
 }: {
   line: BatchSignInvoiceLine;
   kindLabel: string;
   expressLabel: string;
   weightLabel: string;
   feeText: string;
+  freeLabel: string;
 }) {
   return (
     <View style={styles.card}>
@@ -69,7 +72,7 @@ function InvoiceLineCard({
       <Text style={styles.meta}>
         {feeText}
         {'  '}
-        {feeLabel(line.feeMmk)}
+        {feeLabel(line.feeMmk, freeLabel)}
       </Text>
     </View>
   );
@@ -206,6 +209,7 @@ export default function BatchSignInvoiceModal({
                         : t.invoice.weight
                     }
                     feeText={t.invoice.fee}
+                    freeLabel={t.invoice.freePromo}
                   />
                 ))}
 
@@ -218,7 +222,7 @@ export default function BatchSignInvoiceModal({
                   <Text style={styles.totalLine} myanmarWeight="bold">
                     {t.invoice.batchTotalFee}
                     {'  '}
-                    {feeLabel(model.totalFeeMmk)}
+                    {feeLabel(model.totalFeeMmk, t.invoice.freePromo)}
                   </Text>
                 </View>
               </View>

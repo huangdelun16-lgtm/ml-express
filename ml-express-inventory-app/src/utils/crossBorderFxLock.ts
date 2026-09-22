@@ -24,6 +24,14 @@ export function parseFeeMmk(raw: string | number | null | undefined): number {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
+/** 入库已写下总费用（含明确的 0 元免费）；空字符串视为未登记 */
+export function hasRecordedFee(raw: string | number | null | undefined): boolean {
+  const trimmed = String(raw ?? '').trim();
+  if (!trimmed) return false;
+  const n = Number(trimmed.replace(/[^\d.]/g, ''));
+  return Number.isFinite(n) && n >= 0;
+}
+
 export function isFxLockNotePart(part: string): boolean {
   const trimmed = part.trim();
   if (!trimmed) return false;

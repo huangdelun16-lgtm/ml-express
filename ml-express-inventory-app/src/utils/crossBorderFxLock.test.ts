@@ -13,6 +13,7 @@ import {
   displayRateForCustomerCategory,
   parseFeeMmk,
   parseFxLockFromNote,
+  hasRecordedFee,
   resolveInvoiceFeeDisplay,
   sumSettledCustomerCny,
 } from './crossBorderFxLock';
@@ -62,6 +63,9 @@ describe('crossBorderFxLock', () => {
     expect(displayRateForCustomerCategory('order_collected', null, 5200)).toBeNull();
     expect(displayRateForCustomerCategory('order_income_cod', null, 5200)).toBe(5200);
     expect(parseFeeMmk('188000')).toBe(188000);
+    expect(hasRecordedFee('0')).toBe(true);
+    expect(hasRecordedFee('')).toBe(false);
+    expect(hasRecordedFee('12500')).toBe(true);
   });
 
   it('shows live CNY on unsigned invoices and never rewrites old signed rows', () => {

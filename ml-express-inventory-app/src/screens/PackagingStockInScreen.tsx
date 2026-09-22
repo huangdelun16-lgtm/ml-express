@@ -46,6 +46,7 @@ import {
   calculateCrossBorderTotalFee,
   fetchCrossBorderRoutePerKg,
   formatCrossBorderFeeHint,
+  shouldShowCrossBorderQuote,
 } from '../utils/crossBorderPricing';
 import { loadStockInContactDraft, saveStockInContactDraft } from '../utils/stockInDraft';
 import { normalizePackageOriginPrefix } from '../utils/packageNumber';
@@ -688,6 +689,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
                   totalFeeMmk={grandTotalFee}
                   hint={canAutoTotalFee && !totalFeeManual ? feeFormulaHint : ''}
                   mmkPerCny={mmkPerCny}
+                  showQuote={canAutoTotalFee && shouldShowCrossBorderQuote(totalFee)}
                 />
               )}
               <InboundFormField

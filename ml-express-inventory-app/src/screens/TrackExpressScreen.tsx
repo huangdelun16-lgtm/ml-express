@@ -27,7 +27,7 @@ import type { OrderTrackingRecord, PkgTrackingDetail } from '../types/tracking';
 import { resolvePackagingStockInSignIds } from '../utils/customerBatchSign';
 import { canMarkCustomerSigned, isDestinationHubViewer } from '../utils/customerSign';
 import { formatCnyAmount, formatMmkAmount, fetchCrossBorderFxRate } from '../utils/crossBorderFx';
-import { parseFeeMmk, resolveInvoiceFeeDisplay } from '../utils/crossBorderFxLock';
+import { hasRecordedFee, parseFeeMmk, resolveInvoiceFeeDisplay } from '../utils/crossBorderFxLock';
 import { parseInboundMovementNote, pickNotesFxLock } from '../utils/inboundMovementNote';
 import { stockUnitLabel } from '../utils/itemFieldFormat';
 import { packStatusStyle, type PackDisplayStatus } from '../utils/packDisplayStatus';
@@ -204,6 +204,8 @@ function TrackResultPanel({
   const displayStatus = activePack ? resolveTrackPackDisplayStatus(activePack, cloudPkg) : null;
   const showSign = canSignDelivered && onSignDelivered;
   const feeMmk = parseFeeMmk(detail.total_fee);
+  const recordedFee = hasRecordedFee(detail.total_fee);
+  const isFree = recordedFee && feeMmk <= 0;
   const signed = Boolean(detail.customer_signed_at?.trim() || detail.sign_receipt);
   const fxLock = pickNotesFxLock(detail.note, detail.inbound_movement_note);
   const feeDisplay =
@@ -277,7 +279,19 @@ function TrackResultPanel({
         <DetailRow label={t.trackExpress.phone} value={detail.recipient_phone} />
         <DetailRow label={t.trackExpress.destination} value={regionDisplayLabel(detail.destination ?? '')} />
         <DetailRow label={t.trackExpress.packaging} value={detail.packaging} />
-        {feeDisplay ? (
+        {isFree ? (
+          showCnyQuote ? (
+            <>
+              <DetailRow label={t.invoice.quoteCny} value={`¥0 · ${t.invoice.freePromo}`} />
+              <DetailRow
+                label={t.invoice.totalFee}
+                value={fmt(t.invoice.bookedMmk, { amount: formatMmkAmount(0) })}
+              />
+            </>
+          ) : (
+            <DetailRow label={t.invoice.totalFee} value={`0 MMK · ${t.invoice.freePromo}`} />
+          )
+        ) : feeDisplay ? (
           showCnyQuote && feeDisplay.cny != null ? (
             <>
               <DetailRow

@@ -7,6 +7,7 @@ import type { FormFieldChainProps } from '../../hooks/useFormFieldChain';
 import { sanitizeNumberInput, stockUnitLabel } from '../../utils/itemFieldFormat';
 import { useTranslation } from '../../i18n';
 import { colors, radius, space } from '../../theme';
+import { shouldShowCrossBorderQuote } from '../../utils/crossBorderPricing';
 import ScanRefBanner from './ScanRefBanner';
 import CrossBorderQuotePreview from './CrossBorderQuotePreview';
 
@@ -195,6 +196,7 @@ export default function StockInStepFee({
             totalFeeMmk={Number(totalFee)}
             hint={canAutoTotalFee && !totalFeeManual ? feeFormulaHint : ''}
             mmkPerCny={mmkPerCny}
+            showQuote={canAutoTotalFee && shouldShowCrossBorderQuote(totalFee)}
           />
         )}
         <InboundFormField

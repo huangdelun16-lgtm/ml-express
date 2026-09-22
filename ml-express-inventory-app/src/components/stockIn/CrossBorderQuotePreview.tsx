@@ -8,14 +8,17 @@ export default function CrossBorderQuotePreview({
   totalFeeMmk,
   hint,
   mmkPerCny,
+  showQuote,
 }: {
   totalFeeMmk: number;
   hint: string;
   mmkPerCny: number | null;
+  showQuote: boolean;
 }) {
   const { t, fmt } = useTranslation();
-  if (!Number.isFinite(totalFeeMmk) || totalFeeMmk <= 0) return null;
+  if (!showQuote || !Number.isFinite(totalFeeMmk) || totalFeeMmk < 0) return null;
 
+  const isFree = totalFeeMmk === 0;
   const cny = mmkToCny(totalFeeMmk, mmkPerCny);
   const booked = fmt(t.stockIn.bookedMmk, { amount: formatMmkAmount(totalFeeMmk) });
 
@@ -30,6 +33,7 @@ export default function CrossBorderQuotePreview({
       ) : (
         <Text style={styles.mmk}>{formatMmkAmount(totalFeeMmk)} MMK</Text>
       )}
+      {isFree ? <Text style={styles.promo}>{t.stockIn.freePromo}</Text> : null}
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
   );
@@ -68,6 +72,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     marginTop: 2,
+  },
+  promo: {
+    color: colors.success,
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 6,
   },
   hint: {
     color: colors.muted2,

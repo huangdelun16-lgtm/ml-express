@@ -496,12 +496,14 @@ const CrossBorderPricingModal: React.FC<Props> = ({
                 <>
                   Examples: <strong>RUILI → MDY</strong>, <strong>LSO → MDY</strong>,{' '}
                   <strong>YGN → POL</strong>. Reverse routes can differ. Leave blank if unused.
+                  Enter <strong>0</strong> to make that route free for this customer; blank still uses the default rate.
                   After save, re-open Inventory inbound step 3 to refresh.
                 </>
               ) : (
                 <>
                   例如：<strong>RUILI → MDY</strong>、<strong>LSO → MDY</strong>、
                   <strong>YGN → POL</strong> 可分别定价；往返价格可不同。未使用的路线可留空。
+                  填 <strong>0</strong> 表示该路线免费入库（优惠账号 / 自用账号），留空则仍用默认原价。
                   保存后请在 Inventory 重新进入入库第三步同步。
                 </>
               )}

@@ -32,6 +32,7 @@ import {
 } from '../utils/customerBatchSign';
 import {
   buildSignFxLock,
+  hasRecordedFee,
   parseFeeMmk,
   type CrossBorderPaidCurrency,
 } from '../utils/crossBorderFxLock';
@@ -56,9 +57,16 @@ function feeLineText(
   feeRaw: string | undefined,
   mmkPerCny: number | null,
   missingLabel: string,
+  freeLabel: string,
 ): string {
+  if (!hasRecordedFee(feeRaw)) return missingLabel;
   const feeMmk = parseFeeMmk(feeRaw);
-  if (feeMmk <= 0) return missingLabel;
+  if (feeMmk <= 0) {
+    const cny = mmkToCny(0, mmkPerCny);
+    const mmkText = `${formatMmkAmount(0)} MMK`;
+    const money = cny != null ? `${mmkText} · ¥${formatCnyAmount(cny)}` : mmkText;
+    return `${money} · ${freeLabel}`;
+  }
   const cny = mmkToCny(feeMmk, mmkPerCny);
   const mmkText = `${formatMmkAmount(feeMmk)} MMK`;
   return cny != null ? `${mmkText} · ¥${formatCnyAmount(cny)}` : mmkText;
@@ -134,6 +142,7 @@ export default function CustomerSignFlowModal({
                   String(group.fee),
                   resolvedRate,
                   t.hubReceive.feeNotRegistered,
+                  t.sign.freePromo,
                 );
                 return [
                   fmt(t.sign.packagingBatchFeeLine, { count: group.count, fee: feeLine }),
@@ -149,6 +158,7 @@ export default function CustomerSignFlowModal({
                 String(group.fee),
                 resolvedRate,
                 t.hubReceive.feeNotRegistered,
+                t.sign.freePromo,
               );
               return batchCount > 1
                 ? [
@@ -368,6 +378,12 @@ export default function CustomerSignFlowModal({
                     {payCurrency === 'CNY' && collectCny != null
                       ? fmt(t.sign.collectCny, { amount: formatCnyAmount(collectCny) })
                       : fmt(t.sign.collectMmk, { amount: formatMmkAmount(feeMmk) })}
+                  </Text>
+                ) : details.some((row) => hasRecordedFee(row.total_fee)) ? (
+                  <Text style={styles.payAmount}>
+                    {fmt(t.sign.collectMmk, { amount: formatMmkAmount(0) })}
+                    {' · '}
+                    {t.sign.freePromo}
                   </Text>
                 ) : null}
 
