@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import LoggerService from './../services/LoggerService';
 import { profileTranslations } from './profile/profileTranslations';
 import { profileStyles as styles, meStyles as me } from './profile/profileStyles';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Alert, Modal, TextInput, Switch, Dimensions, Linking, ActivityIndicator, Image, Vibration, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Alert, Modal, TextInput, Switch, Dimensions, Linking, ActivityIndicator, Image, Vibration, Animated, Easing, PanResponder } from 'react-native';
 import { Platform } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,7 +17,15 @@ import { useLoading } from '../contexts/LoadingContext';
 import { customerService, packageService, rechargeService, addressService, supabase, fetchRechargeQrUrlMap, getDefaultRechargeQrUrlMap } from '../services/supabase';
 import { remoteImageUri } from '../services/clientApi/nativeSupabaseUrl';
 import { persistUserAvatarUrl, hydrateUserAvatarFromServer } from '../utils/userAvatar';
+import {
+  overlayOpacityFromDrag,
+  shouldClaimSettingsSheetPan,
+  shouldCloseSettingsSheet,
+} from '../utils/settingsSheetGesture';
+import { languageNativeLabel, type ProfileLanguage } from '../utils/profileLanguage';
+import LanguageSegment from './profile/LanguageSegment';
 import Toast from '../components/Toast';
+import MyanmarAwareText from '../components/MyanmarAwareText';
 import HotlinePickerModal from '../components/HotlinePickerModal';
 import { feedbackService } from '../services/FeedbackService';
 import { common, tt } from '../i18n';
@@ -34,7 +42,6 @@ import {
   ClayGlobe,
   ClayInfo,
   ClayGear,
-  ClayTrash,
 } from '../components/ProfileClayIcons';
 import {
   checkAndroidAppUpdate,
@@ -159,6 +166,58 @@ export default function ProfileScreen({ navigation }: any) {
       afterClose?.();
     });
   }, [settingsOverlayOpacity, settingsSheetY, showSettingsSheet]);
+
+  const settingsSheetPan = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          shouldClaimSettingsSheetPan(gesture.dx, gesture.dy),
+        onMoveShouldSetPanResponderCapture: (_, gesture) =>
+          shouldClaimSettingsSheetPan(gesture.dx, gesture.dy, true),
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderGrant: () => {
+          settingsSheetY.stopAnimation();
+          settingsOverlayOpacity.stopAnimation();
+        },
+        onPanResponderMove: (_, gesture) => {
+          const dy = Math.max(0, gesture.dy);
+          settingsSheetY.setValue(dy);
+          settingsOverlayOpacity.setValue(overlayOpacityFromDrag(dy, SETTINGS_SHEET_SLIDE));
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (shouldCloseSettingsSheet(gesture.dy, gesture.vy)) {
+            closeSettingsSheet();
+            return;
+          }
+          Animated.parallel([
+            Animated.spring(settingsSheetY, {
+              toValue: 0,
+              damping: 26,
+              stiffness: 280,
+              mass: 0.86,
+              useNativeDriver: true,
+            }),
+            Animated.timing(settingsOverlayOpacity, {
+              toValue: 1,
+              duration: 180,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
+          ]).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(settingsSheetY, {
+            toValue: 0,
+            damping: 26,
+            stiffness: 280,
+            mass: 0.86,
+            useNativeDriver: true,
+          }).start();
+          settingsOverlayOpacity.setValue(1);
+        },
+      }),
+    [closeSettingsSheet, settingsOverlayOpacity, settingsSheetY],
+  );
 
   // Toast状态
   const [toastVisible, setToastVisible] = useState(false);
@@ -1021,8 +1080,11 @@ export default function ProfileScreen({ navigation }: any) {
     }
   };
 
-  const handleLanguageChange = (lang: 'zh' | 'en' | 'my') => {
+  const handleLanguageChange = (lang: ProfileLanguage) => {
+    if (lang === language) return;
     setLanguage(lang);
+    Vibration.vibrate(12);
+    showToast(profileTranslations[lang].languageSwitched, 'success');
   };
 
   const requireLoginThen = (next?: () => void) => {
@@ -1237,24 +1299,17 @@ export default function ProfileScreen({ navigation }: any) {
             <Ionicons name="chevron-forward" size={18} color="#D0D7DE" />
           </TouchableOpacity>
           <View style={me.menuDivider} />
-          <View style={me.menuRow}>
-            <View style={me.menuIcon}><ClayGlobe size={26} /></View>
-            <Text style={me.menuLabel}>{t.languageSettings}</Text>
-            <View style={me.langSeg}>
-              {([
-                { code: 'zh' as const, label: '中文' },
-                { code: 'en' as const, label: 'EN' },
-                { code: 'my' as const, label: 'မြန်မာ' },
-              ]).map((lang) => (
-                <TouchableOpacity
-                  key={lang.code}
-                  style={[me.langChip, language === lang.code && me.langChipOn]}
-                  onPress={() => handleLanguageChange(lang.code)}
-                >
-                  <Text style={[me.langChipText, language === lang.code && me.langChipTextOn]}>{lang.label}</Text>
-                </TouchableOpacity>
-              ))}
+          <View style={me.langBlock}>
+            <View style={me.langHead}>
+              <View style={me.menuIcon}><ClayGlobe size={26} /></View>
+              <MyanmarAwareText style={me.menuLabel} myanmarWeight="bold">
+                {t.languageSettings}
+              </MyanmarAwareText>
+              <MyanmarAwareText style={me.langCurrent} myanmarWeight="semibold">
+                {languageNativeLabel(language)}
+              </MyanmarAwareText>
             </View>
+            <LanguageSegment language={language} onChange={handleLanguageChange} />
           </View>
           <View style={me.menuDivider} />
           <TouchableOpacity style={me.menuRow} onPress={openCustomerService}>
@@ -1262,18 +1317,6 @@ export default function ProfileScreen({ navigation }: any) {
             <Text style={me.menuLabel}>{t.customerService}</Text>
             <Ionicons name="chevron-forward" size={18} color="#D0D7DE" />
           </TouchableOpacity>
-          {!isGuest ? (
-            <>
-              <View style={me.menuDivider} />
-              <TouchableOpacity style={me.menuRow} onPress={handleDeleteAccount}>
-                <View style={[me.menuIcon, me.menuIconDanger]}>
-                  <ClayTrash size={26} />
-                </View>
-                <Text style={[me.menuLabel, { color: '#ef4444' }]}>{t.deleteAccount}</Text>
-                <Ionicons name="chevron-forward" size={18} color="#FECACA" />
-              </TouchableOpacity>
-            </>
-          ) : null}
           <View style={me.menuDivider} />
           <TouchableOpacity style={me.menuRow} onPress={() => setShowAboutModal(true)}>
             <View style={me.menuIcon}><ClayInfo size={26} /></View>
@@ -1282,13 +1325,28 @@ export default function ProfileScreen({ navigation }: any) {
           </TouchableOpacity>
           <View style={me.menuDivider} />
           <TouchableOpacity
-            style={[me.menuRow, { paddingBottom: 4 }]}
+            style={[me.menuRow, isGuest && { paddingBottom: 4 }]}
             onPress={openSettingsSheet}
           >
             <View style={me.menuIcon}><ClayGear size={26} /></View>
             <Text style={me.menuLabel}>{t.settings}</Text>
             <Ionicons name="chevron-forward" size={18} color="#D0D7DE" />
           </TouchableOpacity>
+          {!isGuest ? (
+            <>
+              <View style={me.menuDivider} />
+              <TouchableOpacity
+                style={[me.menuRow, { paddingBottom: 4 }]}
+                onPress={handleLogout}
+              >
+                <View style={[me.menuIcon, me.menuIconDanger]}>
+                  <Ionicons name="log-out-outline" size={22} color="#ef4444" />
+                </View>
+                <Text style={[me.menuLabel, { color: '#ef4444' }]}>{t.logout}</Text>
+                <Ionicons name="chevron-forward" size={18} color="#FECACA" />
+              </TouchableOpacity>
+            </>
+          ) : null}
         </View>
       </>
     );
@@ -1334,6 +1392,7 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={() => closeSettingsSheet()}
           />
           <Animated.View
+            {...settingsSheetPan.panHandlers}
             style={[
               me.sheet,
               {
@@ -1342,7 +1401,9 @@ export default function ProfileScreen({ navigation }: any) {
               },
             ]}
           >
-            <View style={me.sheetHandle} pointerEvents="none" />
+            <View style={me.sheetHandleHit} accessibilityElementsHidden>
+              <View style={me.sheetHandle} pointerEvents="none" />
+            </View>
             <Text style={me.sheetTitle}>{t.extraSettings}</Text>
             {!isGuest ? (
               <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(handleEditProfile)}>
@@ -1387,9 +1448,9 @@ export default function ProfileScreen({ navigation }: any) {
               </TouchableOpacity>
             ) : null}
             {!isGuest ? (
-              <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(handleLogout)}>
-                <Ionicons name="log-out-outline" size={22} color="#ef4444" />
-                <Text style={[me.sheetRowText, { color: '#ef4444' }]}>{t.logout}</Text>
+              <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(handleDeleteAccount)}>
+                <Ionicons name="trash-outline" size={22} color="#ef4444" />
+                <Text style={[me.sheetRowText, { color: '#ef4444' }]}>{t.deleteAccount}</Text>
               </TouchableOpacity>
             ) : null}
             <Text style={me.sheetVer}>v{appVersion}</Text>

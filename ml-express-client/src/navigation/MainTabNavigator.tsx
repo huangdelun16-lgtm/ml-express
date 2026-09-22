@@ -10,7 +10,8 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { createSwipeTabNavigator } from './SwipeTabNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,7 +26,7 @@ import MyOrdersScreen from '../screens/MyOrdersScreen';
 import TrackOrderScreen from '../screens/TrackOrderScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
-const Tab = createBottomTabNavigator();
+const Tab = createSwipeTabNavigator();
 const TEAL = '#2C98A6';
 const MUTED = '#94a3b8';
 const TAB_MIN_WIDTH = 72;
@@ -207,6 +208,7 @@ export default function MainTabNavigator() {
   return (
     <Tab.Navigator
       tabBar={(props) => <ScrollableTabBar {...props} />}
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
         tabBarHideOnKeyboard: true,

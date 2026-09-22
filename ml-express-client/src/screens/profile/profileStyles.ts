@@ -1372,28 +1372,21 @@ export const meStyles = StyleSheet.create({
     backgroundColor: '#E8EEF2',
     marginLeft: 50,
   },
-  langSeg: {
+  langBlock: {
+    paddingTop: 8,
+    paddingBottom: 10,
+    gap: 10,
+  },
+  langHead: {
     flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 10,
-    padding: 3,
-    gap: 2,
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 4,
   },
-  langChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  langChipOn: {
-    backgroundColor: '#2C98A6',
-  },
-  langChipText: {
-    fontSize: 11,
+  langCurrent: {
+    fontSize: 13,
     fontWeight: '700',
-    color: '#64748b',
-  },
-  langChipTextOn: {
-    color: '#fff',
+    color: '#2C98A6',
   },
   sheetRoot: {
     flex: 1,
@@ -1422,13 +1415,17 @@ export const meStyles = StyleSheet.create({
     shadowOffset: { width: 0, height: -4 },
     elevation: 16,
   },
+  sheetHandleHit: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 4,
+    paddingBottom: 10,
+  },
   sheetHandle: {
-    alignSelf: 'center',
-    width: 40,
+    width: 42,
     height: 4,
     borderRadius: 2,
     backgroundColor: '#E2E8F0',
-    marginBottom: 12,
   },
   sheetTitle: {
     fontSize: 18,
