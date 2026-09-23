@@ -75,6 +75,47 @@ describe('expressDetailsVisibility', () => {
     expect(isVisibleInExpressDetailsList(row, mdy, 'MDY')).toBe(false);
   });
 
+  it('运达站 MDY 入库后，POL 客户订单在 MDY 可见，POL 站不可见，发站仍可见', () => {
+    const row = listRow({
+      barcode: 'POL260801001',
+      final_destination: 'POL',
+      owner_store_code: 'MUSE001',
+      delivery_hub_code: 'MDY',
+      hub_arrived: true,
+      packed: false,
+      parent_pack_barcode: '',
+    });
+    expect(isVisibleInExpressDetailsList(row, store('MDY001'), 'MDY')).toBe(true);
+    expect(isVisibleInExpressDetailsList(row, store('POL001'), 'POL')).toBe(false);
+    expect(isVisibleInExpressDetailsList(row, store('MUSE001'), 'MUSE')).toBe(true);
+    expect(
+      shouldMergeCloudItemToLocal(
+        {
+          barcode: 'POL260801001',
+          owner_store_code: 'MUSE001',
+          final_destination: 'POL',
+          delivery_hub_code: 'MDY',
+          hub_arrived_at: '2026-09-22T00:00:00.000Z',
+        },
+        store('MDY001'),
+        'MDY',
+      ),
+    ).toBe(true);
+    expect(
+      shouldMergeCloudItemToLocal(
+        {
+          barcode: 'POL260801001',
+          owner_store_code: 'MUSE001',
+          final_destination: 'POL',
+          delivery_hub_code: 'MDY',
+          hub_arrived_at: '2026-09-22T00:00:00.000Z',
+        },
+        store('POL001'),
+        'POL',
+      ),
+    ).toBe(false);
+  });
+
   it('MDY 中转站：释放后的中转订单可见于快递明细', () => {
     const mdy = store('MDY001');
     const row = listRow({

@@ -24,6 +24,7 @@ export type CloudStoreItemRow = {
   owner_store_code: string;
   recipient_name: string;
   final_destination: string;
+  delivery_hub_code: string | null;
   hub_arrived_at: string | null;
   arrival_notified_at: string | null;
   customer_signed_at: string | null;
@@ -93,18 +94,30 @@ export type CloudPackRow = {
 };
 
 const STORE_ITEM_COLUMNS =
-  'id, barcode, input_barcode, name, spec, unit, weight, qty_on_hand, min_qty, note, owner_store_id, owner_store_code, recipient_name, final_destination, hub_arrived_at, arrival_notified_at, customer_signed_at, customer_sign_phone, customer_sign_pickup_type, customer_sign_proxy_name, customer_signature_data, customer_signed_by_operator, packed_at, packed_bundle_barcode, hub_transit_released_at, hub_transit_shipped_at, created_at, updated_at';
-const STORE_ITEM_COLUMNS_WITHOUT_ARRIVAL_NOTIFY = STORE_ITEM_COLUMNS.replace(
-  ', arrival_notified_at',
-  '',
-);
+  'id, barcode, input_barcode, name, spec, unit, weight, qty_on_hand, min_qty, note, owner_store_id, owner_store_code, recipient_name, final_destination, delivery_hub_code, hub_arrived_at, arrival_notified_at, customer_signed_at, customer_sign_phone, customer_sign_pickup_type, customer_sign_proxy_name, customer_signature_data, customer_signed_by_operator, packed_at, packed_bundle_barcode, hub_transit_released_at, hub_transit_shipped_at, created_at, updated_at';
+function cloudErrorMessage(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : String((error as { message?: string } | null)?.message ?? error ?? '');
+}
 
 export function isMissingArrivalNotifiedColumnError(error: unknown): boolean {
-  const message =
-    error instanceof Error
-      ? error.message
-      : String((error as { message?: string } | null)?.message ?? error ?? '');
-  return /arrival_notified_at/i.test(message);
+  return /arrival_notified_at/i.test(cloudErrorMessage(error));
+}
+
+export function isMissingDeliveryHubColumnError(error: unknown): boolean {
+  return /delivery_hub_code/i.test(cloudErrorMessage(error));
+}
+
+function storeItemSelectColumns(error?: unknown): string {
+  let columns = STORE_ITEM_COLUMNS;
+  if (error && isMissingArrivalNotifiedColumnError(error)) {
+    columns = columns.replace(', arrival_notified_at', '');
+  }
+  if (error && isMissingDeliveryHubColumnError(error)) {
+    columns = columns.replace(', delivery_hub_code', '');
+  }
+  return columns;
 }
 
 const PACK_COLUMNS =
@@ -212,6 +225,7 @@ function rowToCloudItem(row: Record<string, unknown>): CloudStoreItemRow {
     owner_store_code: String(row.owner_store_code ?? ''),
     recipient_name: String(row.recipient_name ?? ''),
     final_destination: String(row.final_destination ?? ''),
+    delivery_hub_code: row.delivery_hub_code ? String(row.delivery_hub_code) : null,
     hub_arrived_at: row.hub_arrived_at ? String(row.hub_arrived_at) : null,
     arrival_notified_at: row.arrival_notified_at ? String(row.arrival_notified_at) : null,
     customer_signed_at: row.customer_signed_at ? String(row.customer_signed_at) : null,
@@ -507,23 +521,49 @@ export async function fetchCloudStoreItems(
   const itemMap = new Map<string, CloudStoreItemRow>();
 
   let data: Record<string, unknown>[];
+  let selectError: unknown;
+  let columns = storeItemSelectColumns();
   try {
     data = await fetchAllPages<Record<string, unknown>>((from, to) =>
       supabase
         .from('inventory_store_items')
-        .select(STORE_ITEM_COLUMNS as '*')
+        .select(columns as '*')
         .order('updated_at', { ascending: false })
         .range(from, to),
     );
   } catch (error) {
-    if (!isMissingArrivalNotifiedColumnError(error)) throw error;
-    data = await fetchAllPages<Record<string, unknown>>((from, to) =>
-      supabase
-        .from('inventory_store_items')
-        .select(STORE_ITEM_COLUMNS_WITHOUT_ARRIVAL_NOTIFY as '*')
-        .order('updated_at', { ascending: false })
-        .range(from, to),
-    );
+    selectError = error;
+    if (!isMissingArrivalNotifiedColumnError(error) && !isMissingDeliveryHubColumnError(error)) {
+      throw error;
+    }
+    columns = storeItemSelectColumns(error);
+    try {
+      data = await fetchAllPages<Record<string, unknown>>((from, to) =>
+        supabase
+          .from('inventory_store_items')
+          .select(columns as '*')
+          .order('updated_at', { ascending: false })
+          .range(from, to),
+      );
+    } catch (retryError) {
+      const combined = new Error(
+        `${cloudErrorMessage(selectError)} ${cloudErrorMessage(retryError)}`,
+      );
+      if (
+        !isMissingArrivalNotifiedColumnError(combined) &&
+        !isMissingDeliveryHubColumnError(combined)
+      ) {
+        throw retryError;
+      }
+      columns = storeItemSelectColumns(combined);
+      data = await fetchAllPages<Record<string, unknown>>((from, to) =>
+        supabase
+          .from('inventory_store_items')
+          .select(columns as '*')
+          .order('updated_at', { ascending: false })
+          .range(from, to),
+      );
+    }
   }
   for (const row of data) {
     const item = rowToCloudItem(row);
@@ -712,6 +752,7 @@ export async function upsertCloudStoreItem(
       owner_store_code: ownedByAuthStore ? authStore.storeCode : itemOwnerRaw,
       recipient_name: item.recipient_name?.trim() ?? '',
       final_destination: finalDestination,
+      delivery_hub_code: item.delivery_hub_code?.trim() || null,
       hub_arrived_at: toNullableTs(item.hub_arrived_at),
       arrival_notified_at: toNullableTs(item.arrival_notified_at),
       customer_signed_at: toNullableTs(item.customer_signed_at),
@@ -731,11 +772,26 @@ export async function upsertCloudStoreItem(
       supabase.from('inventory_store_items').upsert(row, { onConflict: 'barcode' }).select('id').single();
 
     let { data, error } = await upsertPayload(payload);
-    if (error && isMissingArrivalNotifiedColumnError(error)) {
-      const { arrival_notified_at: _dropped, ...withoutNotify } = payload;
-      const retried = await upsertPayload(withoutNotify);
+    if (
+      error &&
+      (isMissingArrivalNotifiedColumnError(error) || isMissingDeliveryHubColumnError(error))
+    ) {
+      const retryPayload = { ...payload } as Record<string, unknown>;
+      if (isMissingArrivalNotifiedColumnError(error)) delete retryPayload.arrival_notified_at;
+      if (isMissingDeliveryHubColumnError(error)) delete retryPayload.delivery_hub_code;
+      const retried = await upsertPayload(retryPayload);
       data = retried.data;
       error = retried.error;
+      if (
+        error &&
+        (isMissingArrivalNotifiedColumnError(error) || isMissingDeliveryHubColumnError(error))
+      ) {
+        if (isMissingArrivalNotifiedColumnError(error)) delete retryPayload.arrival_notified_at;
+        if (isMissingDeliveryHubColumnError(error)) delete retryPayload.delivery_hub_code;
+        const retriedAgain = await upsertPayload(retryPayload);
+        data = retriedAgain.data;
+        error = retriedAgain.error;
+      }
     }
     if (error || !data) throw error?.message ? new Error(error.message) : svc('syncItemFailed');
     return String((data as { id: string }).id);

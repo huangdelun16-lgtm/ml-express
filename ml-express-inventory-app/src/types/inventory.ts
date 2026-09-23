@@ -21,10 +21,12 @@ export interface InventoryItem {
   recipient_name?: string;
   /** 列表展示用客户名（查询时由 recipient_name 或入库流水填充） */
   customer_name?: string;
-  /** 最终目的地（入库收发信息登记，如 YGN、MDY） */
+  /** 最终目的地（入库收发信息登记，如 YGN、MDY）；客户地区，不随本段运达站改写 */
   final_destination?: string;
   /** 列表展示用，同 final_destination */
   destination?: string;
+  /** 本段运达站。装车时选定的终点；可与客户地区不同（POL 客户只发到 MDY） */
+  delivery_hub_code?: string;
   /** 中转到站收货时间（本站确认后写入） */
     hub_arrived_at?: string;
   /** 目的站通知客户取件时间 */

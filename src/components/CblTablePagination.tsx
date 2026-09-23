@@ -7,6 +7,8 @@ type Props = {
   page: number;
   pageSize: number;
   totalItems: number;
+  /** totalItems < 0 时没有精确总数，用 hasMore 决定能否下一页。 */
+  hasMore?: boolean;
   onPageChange: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
   isEn?: boolean;
@@ -27,21 +29,28 @@ const CblTablePagination: React.FC<Props> = ({
   page,
   pageSize,
   totalItems,
+  hasMore = false,
   onPageChange,
   onPageSizeChange,
   isEn = false,
 }) => {
-  const totalPages = totalPagesFor(totalItems, pageSize);
-  const safePage = Math.min(Math.max(1, page), totalPages);
+  const unknownTotal = totalItems < 0;
+  const totalPages = unknownTotal ? page + (hasMore ? 1 : 0) : totalPagesFor(totalItems, pageSize);
+  const safePage = unknownTotal ? Math.max(1, page) : Math.min(Math.max(1, page), totalPages);
+  const nextDisabled = unknownTotal ? !hasMore : safePage >= totalPages;
 
-  if (totalItems <= pageSize && !onPageSizeChange) return null;
+  if (!unknownTotal && totalItems <= pageSize && !onPageSizeChange) return null;
 
   return (
     <div className="cbl-pagination">
       <span className="cbl-pagination__info">
-        {isEn
-          ? `${totalItems} row(s) · page ${safePage}/${totalPages}`
-          : `共 ${totalItems} 条 · 第 ${safePage}/${totalPages} 页`}
+        {unknownTotal
+          ? isEn
+            ? `Page ${safePage}`
+            : `第 ${safePage} 页`
+          : isEn
+            ? `${totalItems} row(s) · page ${safePage}/${totalPages}`
+            : `共 ${totalItems} 条 · 第 ${safePage}/${totalPages} 页`}
       </span>
       <div className="cbl-pagination__controls">
         {onPageSizeChange ? (
@@ -68,7 +77,7 @@ const CblTablePagination: React.FC<Props> = ({
         <button
           type="button"
           className="cbl-pagination__btn"
-          disabled={safePage >= totalPages}
+          disabled={nextDisabled}
           onClick={() => onPageChange(safePage + 1)}
         >
           {isEn ? 'Next' : '下一页'}

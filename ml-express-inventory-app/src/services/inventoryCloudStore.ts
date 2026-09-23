@@ -134,6 +134,7 @@ function rowToItem(row: CloudStoreItemRow): InventoryItem {
     min_qty: row.min_qty, note: row.note, owner_store_code: row.owner_store_code,
     recipient_name: row.recipient_name, customer_name: row.recipient_name,
     final_destination: row.final_destination, destination: row.final_destination,
+    delivery_hub_code: row.delivery_hub_code ?? '',
     hub_arrived_at: row.hub_arrived_at ?? '',
     arrival_notified_at: row.arrival_notified_at ?? '',
     customer_signed_at: row.customer_signed_at ?? '',

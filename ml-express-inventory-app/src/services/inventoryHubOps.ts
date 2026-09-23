@@ -10,6 +10,7 @@ import {
   itemHasMovementType,
   upsertItem as cloudUpsertItem,
 } from './inventoryCloudStore';
+import { isTruckLegEndingAtHub } from '../utils/hubReceivePack';
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import { shouldPersistInboundOrderAtHub } from '../utils/expressDetailsVisibility';
@@ -140,7 +141,10 @@ export async function deliverLocalHubOrderToInventory(
 ): Promise<void> {
   const hub = params.hubCode.trim().toUpperCase();
   const orderDest = resolveOrderDestinationCode(params.order);
-  if (orderDest !== hub) throw svc('orderDestNotThisHub', { orderDest: orderDest || '?', hub });
+  const legEndsHere = isTruckLegEndingAtHub(params.pkg, hub);
+  if (orderDest !== hub && !legEndsHere) {
+    throw svc('orderDestNotThisHub', { orderDest: orderDest || '?', hub });
+  }
 
   let item = await ops.getItemByBarcode(params.order.order_barcode);
   if (item?.customer_signed_at?.trim()) return;
@@ -177,6 +181,9 @@ export async function deliverLocalHubOrderToInventory(
     item,
     {
       hub_arrived_at: hubArrivedAt,
+      delivery_hub_code: hub,
+      hub_transit_released_at: '',
+      hub_transit_shipped_at: '',
       ...(params.order.recipient_name?.trim() ? { recipient_name: params.order.recipient_name.trim() } : {}),
       ...(childDest ? { final_destination: childDest, destination: childDest } : {}),
     },
@@ -420,6 +427,7 @@ export async function maybeAutoReleaseTransitAfterAllInbound(
   if (!detail) return { releasedCount: 0 };
 
   const hub = params.hubCode.trim().toUpperCase();
+  if (isTruckLegEndingAtHub(detail, hub)) return { releasedCount: 0 };
   const hasTransit = detail.orders.some((o) => resolveOrderDestinationCode(o) !== hub);
   if (!hasTransit) return { releasedCount: 0 };
   if (!detail.orders.every((o) => o.status === 'hub_received')) return { releasedCount: 0 };
@@ -440,7 +448,8 @@ export async function deliverHubOrderInboundAtStation(
 ): Promise<void> {
   const hub = params.hubCode.trim().toUpperCase();
   const orderDest = resolveOrderDestinationCode(params.order);
-  if (orderDest === hub) {
+  const legEndsHere = isTruckLegEndingAtHub(params.pkg, hub);
+  if (orderDest === hub || legEndsHere) {
     await deliverLocalHubOrderToInventory(ops, params);
     return;
   }
@@ -467,9 +476,11 @@ export async function autoDeliverLocalHubOrdersOnPackReceived(
   if (!pkg) throw svc('packNotFound');
 
   const hub = params.hubCode.trim().toUpperCase();
+  const legEndsHere = isTruckLegEndingAtHub(pkg, hub);
   for (const order of pkg.orders) {
     const orderDest = resolveOrderDestinationCode(order);
-    if (orderDest !== hub || order.status !== 'in_transit') continue;
+    if (order.status !== 'in_transit') continue;
+    if (orderDest !== hub && !legEndsHere) continue;
     const result = await confirmOrderInPackById(order.id, params.store, hub, { pkg, order });
     await deliverHubOrderInboundAtStation(ops, {
       order: result.order,
@@ -612,7 +623,8 @@ async function importInboundPackToLocalOnce(
       continue;
     }
 
-    const isLocal = orderDest === hub;
+    const legEndsHere = isTruckLegEndingAtHub(detail, hub);
+    const isLocal = orderDest === hub || legEndsHere;
     let childItem = await ops.getItemByBarcode(order.order_barcode);
     if (!childItem) {
       childItem = await ops.upsertItem(
@@ -664,7 +676,7 @@ async function importInboundPackToLocalOnce(
       });
     }
 
-    if (order.status === 'hub_received' && isLocal) {
+    if ((order.status === 'hub_received' || (legEndsHere && order.status === 'released_at_hub')) && isLocal) {
       const existing = await ops.getItemByBarcode(order.order_barcode);
       if (!existing?.customer_signed_at?.trim()) {
         await deliverLocalHubOrderToInventory(ops, { order, pkg: detail, store, hubCode: hub, operator });

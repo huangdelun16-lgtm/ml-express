@@ -4,6 +4,7 @@ import {
   areAllPackOrdersProcessed,
   countPendingLocalInboundOrders,
   countPendingPackInboundOrders,
+  hasUnreleasedTransitOrders,
   isDestinationHubPack,
   listPendingPackInboundOrders,
   preferConfirmedHubReceivePack,
@@ -60,12 +61,24 @@ describe('hubReceivePack', () => {
     expect(isDestinationHubPack(detail, 'LSO')).toBe(true);
   });
 
-  it('含中转订单的不是纯目的地包', () => {
+  it('运达站是 MDY 时，POL 等其它地区订单也在 MDY 入库', () => {
+    const detail = pack([
+      { id: '1', order_barcode: 'POL260801001', order_name: 'A', destination_code: 'POL', status: 'in_transit', pack_barcode: 'PKG', qty: 1 },
+      { id: '2', order_barcode: 'YGN260801002', order_name: 'B', destination_code: 'YGN', status: 'in_transit', pack_barcode: 'PKG', qty: 1 },
+    ] as PkgTrackingDetail['orders'], { leg_destination_code: 'MDY', destination_code: 'POL' });
+    expect(isDestinationHubPack(detail, 'MDY')).toBe(true);
+    expect(isDestinationHubPack(detail, 'POL')).toBe(false);
+    expect(hasUnreleasedTransitOrders(detail, 'MDY')).toBe(false);
+    expect(listPendingPackInboundOrders(detail, 'MDY')).toHaveLength(2);
+  });
+
+  it('运达站不是本站时，其它地区订单仍按中转处理', () => {
     const detail = pack([
       { id: '1', order_barcode: 'LSO260801001', order_name: 'A', destination_code: 'LSO', status: 'in_transit', pack_barcode: 'PKG', qty: 1 },
       { id: '2', order_barcode: 'YGN260801002', order_name: 'B', destination_code: 'YGN', status: 'in_transit', pack_barcode: 'PKG', qty: 1 },
-    ] as PkgTrackingDetail['orders'], { leg_destination_code: 'MDY', destination_code: 'YGN' });
+    ] as PkgTrackingDetail['orders'], { leg_destination_code: 'LSO', destination_code: 'YGN' });
     expect(isDestinationHubPack(detail, 'MDY')).toBe(false);
+    expect(hasUnreleasedTransitOrders(detail, 'MDY')).toBe(true);
   });
 
   it('按包状态拆成到站三步', () => {

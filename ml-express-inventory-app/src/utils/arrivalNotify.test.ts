@@ -8,6 +8,7 @@ import {
   collectArrivalNotifyTargets,
   countUnnotifiedSignableItems,
   needsArrivalNotify,
+  resolveArrivalNotifyAction,
   toWhatsAppDigits,
 } from './arrivalNotify';
 
@@ -99,6 +100,36 @@ describe('buildArrivalNotifyMessage', () => {
     });
     expect(text.startsWith('[ML Express]')).toBe(true);
     expect(text).not.toContain('包裹');
+  });
+});
+
+describe('resolveArrivalNotifyAction', () => {
+  it('uses the registered account for WhatsApp, Telegram, and WeChat', () => {
+    expect(
+      resolveArrivalNotifyAction({
+        notifyMethod: 'whatsapp',
+        notifyAccount: '091111111',
+        phone: '092222222',
+      }),
+    ).toEqual({ kind: 'whatsapp', phone: '091111111' });
+    expect(
+      resolveArrivalNotifyAction({ notifyMethod: 'telegram', notifyAccount: '@shop' }),
+    ).toEqual({ kind: 'telegram', url: 'https://t.me/shop' });
+    expect(
+      resolveArrivalNotifyAction({ notifyMethod: 'wechat', notifyAccount: 'ml-shop' }),
+    ).toEqual({ kind: 'wechat', copyText: 'ml-shop' });
+  });
+
+  it('falls back to the recipient phone on WhatsApp when no method is registered', () => {
+    expect(resolveArrivalNotifyAction({ phone: '091234567' })).toEqual({
+      kind: 'whatsapp',
+      phone: '091234567',
+    });
+    expect(resolveArrivalNotifyAction({ notifyMethod: 'message', phone: '091234567' })).toEqual({
+      kind: 'sms',
+      phone: '091234567',
+    });
+    expect(resolveArrivalNotifyAction({})).toBeNull();
   });
 });
 

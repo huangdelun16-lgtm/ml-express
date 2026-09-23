@@ -17,6 +17,7 @@ export type CustomerSignItemRef = {
   customer_signed_at?: string | null;
   final_destination?: string | null;
   destination?: string | null;
+  delivery_hub_code?: string | null;
   owner_store_code?: string | null;
 };
 
@@ -38,12 +39,18 @@ function resolveHubKeyForStore(store: InventoryStoreSession): string {
   return normalizeOwnerKey(resolveStoreHubCode(store));
 }
 
-/** 当前登录站是否为该订单最终目的站（收货站才展示客户报价 / 收款人民币） */
+function assignedDeliveryHub(item: { delivery_hub_code?: string | null }): string {
+  return (item.delivery_hub_code || '').trim();
+}
+
+/** 当前登录站是否为该订单的签收站（本段运达站优先；否则看客户地区） */
 export function isDestinationHubViewer(
   store: InventoryStoreSession,
-  item: Pick<CustomerSignItemRef, 'final_destination' | 'destination'>,
+  item: Pick<CustomerSignItemRef, 'final_destination' | 'destination' | 'delivery_hub_code'>,
 ): boolean {
   if (isAdminStore(store)) return true;
+  const deliveryHub = assignedDeliveryHub(item);
+  if (deliveryHub) return destinationCodesMatch(deliveryHub, resolveStoreHubCode(store));
   const dest = (item.final_destination || item.destination || '').trim();
   if (!dest) return false;
   return destinationCodesMatch(dest, resolveStoreHubCode(store));
@@ -65,6 +72,9 @@ export function canMarkCustomerSigned(
 
   // 木姐 MUSE 账号不可签收本站发出订单，须在目的站签收
   if (currentKey === 'MUSE' && originKey === 'MUSE') return false;
+
+  const deliveryHub = assignedDeliveryHub(item);
+  if (deliveryHub) return destinationCodesMatch(deliveryHub, resolveStoreHubCode(store));
 
   const hubKey = resolveHubKeyForStore(store);
   const destKey = resolveItemDestinationKey(item);
@@ -94,8 +104,17 @@ export function customerSignDeniedError(
   }
 
   const hubKey = resolveHubKeyForStore(store);
+  const deliveryHub = assignedDeliveryHub(item);
+  if (deliveryHub && !destinationCodesMatch(deliveryHub, resolveStoreHubCode(store))) {
+    const deliveryKey = normalizeOwnerKey(deliveryHub) || deliveryHub;
+    return svc('signDeniedWrongHub', {
+      dest: ownershipLabelFromKey(deliveryKey),
+      hub: ownershipLabelFromKey(hubKey),
+    });
+  }
+
   const destKey = resolveItemDestinationKey(item);
-  if (destKey && hubKey && destKey !== hubKey) {
+  if (!deliveryHub && destKey && hubKey && destKey !== hubKey) {
     return svc('signDeniedWrongHub', {
       dest: ownershipLabelFromKey(destKey),
       hub: ownershipLabelFromKey(hubKey),

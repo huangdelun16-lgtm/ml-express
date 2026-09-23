@@ -1,5 +1,6 @@
 import type { InventoryStoreSession } from '../services/authService';
 import type { InventoryItemListRow } from '../types/inventory';
+import { destinationCodesMatch } from './destinationCode';
 import { extractDestinationCode } from './inboundBarcode';
 import { isCustomerSignedItem } from './itemFieldFormat';
 import { resolveItemDestinationCode } from './itemDestination';
@@ -14,12 +15,22 @@ type CloudItemRef = {
   owner_store_code: string;
   final_destination: string;
   destination?: string;
+  delivery_hub_code?: string | null;
   hub_arrived_at?: string | null;
   customer_signed_at?: string | null;
   hub_transit_released_at?: string | null;
   hub_transit_shipped_at?: string | null;
   packed_bundle_barcode?: string | null;
 };
+
+function assignedDeliveryHub(item: { delivery_hub_code?: string | null }): string {
+  return (item.delivery_hub_code || '').trim();
+}
+
+function heldForDeliveryAt(item: { delivery_hub_code?: string | null }, hub: string): boolean {
+  const code = assignedDeliveryHub(item);
+  return Boolean(code) && destinationCodesMatch(code, hub);
+}
 
 export type PackVisibilityRef = {
   bundle_barcode: string;
@@ -96,6 +107,8 @@ export function isVisibleInExpressDetailsList(
   const isTransitElsewhere = Boolean(destKey && destKey !== hub);
 
   if (localInbound) return true;
+  if (heldForDeliveryAt(item, hub)) return true;
+  if (assignedDeliveryHub(item)) return false;
 
   if (isCustomerSignedItem(item)) {
     return isFinalDestHere;
@@ -133,6 +146,8 @@ export function shouldMergeCloudItemToLocal(
   const isTransitElsewhere = Boolean(destKey && destKey !== hub);
 
   if (localInbound) return true;
+  if (heldForDeliveryAt(row, hub)) return true;
+  if (assignedDeliveryHub(row)) return false;
 
   if (row.customer_signed_at?.trim()) {
     return isFinalDestHere;

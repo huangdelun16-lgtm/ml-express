@@ -1445,6 +1445,24 @@ export const systemSettingsService = {
     return { ok: true };
   },
 
+  async deleteSettingsByKeys(keys: string[]): Promise<{ ok: boolean; error?: string }> {
+    const seen = new Set<string>();
+    const unique: string[] = [];
+    for (let i = 0; i < keys.length; i += 1) {
+      const trimmed = keys[i].trim();
+      if (!trimmed || seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      unique.push(trimmed);
+    }
+    if (!unique.length) return { ok: true };
+    const { error } = await supabase.from('system_settings').delete().in('settings_key', unique);
+    if (error) {
+      console.error('删除系统设置失败:', error);
+      return { ok: false, error: formatSystemSettingsError(error) };
+    }
+    return { ok: true };
+  },
+
   // 获取计费规则（合并算法见 /shared/src/pricing.ts；默认值与错误处理保留本地）
   async getPricingSettings(region?: string): Promise<Record<string, any>> {
     const defaults: Record<string, number> = {

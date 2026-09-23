@@ -185,6 +185,7 @@ export type InventoryCustomerExpressItem = {
   productName: string;
   expressBarcode: string;
   inboundBarcode: string;
+  packedBundleBarcode?: string | null;
   packaging: string;
   origin: string;
   destination: string;
@@ -242,6 +243,11 @@ export type InventoryConsoleData = {
   orderStatusFilter?: string;
   packsTruncated?: boolean;
   ordersTruncated?: boolean;
+  /** 服务端分页总数。-1 表示当前筛选无法精确计数，配合 listHasMore 翻页。 */
+  packsListTotal?: number;
+  ordersListTotal?: number;
+  packsListHasMore?: boolean;
+  ordersListHasMore?: boolean;
   transportFeeTotal?: number;
   openExceptionCount?: number;
   openExceptions?: InventoryExceptionConsoleRow[];
@@ -443,6 +449,14 @@ export async function fetchInventoryConsoleData(
 type ConsoleSectionResponse = InventoryConsoleData & {
   section?: string;
   warnings?: string[];
+  listTotal?: number;
+  listHasMore?: boolean;
+};
+
+export type ConsoleListParams = {
+  page?: number;
+  pageSize?: number;
+  q?: string;
 };
 
 async function fetchInventoryConsoleSection(
@@ -451,7 +465,7 @@ async function fetchInventoryConsoleSection(
   financePagination?: { page: number; pageSize: number },
   period?: FinancePeriodParams | null,
   orderStatus?: OrderStatusFilter,
-  extras?: { stationKeys?: string[] },
+  extras?: { stationKeys?: string[]; list?: ConsoleListParams },
 ): Promise<ConsoleSectionResponse> {
   const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
   url.searchParams.set('section', section);
@@ -459,6 +473,15 @@ async function fetchInventoryConsoleSection(
   if (orderStatus) url.searchParams.set('orderStatus', orderStatus);
   if (extras?.stationKeys?.length) {
     url.searchParams.set('stationKeys', extras.stationKeys.join(','));
+  }
+  if (extras?.list) {
+    url.searchParams.set('listPage', String(extras.list.page && extras.list.page > 0 ? extras.list.page : 1));
+    url.searchParams.set(
+      'listPageSize',
+      String(extras.list.pageSize && extras.list.pageSize > 0 ? extras.list.pageSize : 20),
+    );
+    const q = String(extras.list.q || '').trim();
+    if (q) url.searchParams.set('q', q);
   }
   if (financePagination) {
     url.searchParams.set('financePage', String(financePagination.page));
@@ -531,10 +554,13 @@ export async function fetchInventoryConsoleFinance(
 export async function fetchInventoryConsolePacks(
   packStatus: PackStatusFilter = 'active',
   stationKeys: string[] = [],
+  list?: ConsoleListParams,
 ): Promise<{
   recentPacks: InventoryPackRow[];
   packStatusFilter?: string;
   packsTruncated?: boolean;
+  listTotal?: number;
+  listHasMore?: boolean;
   warnings?: string[];
 }> {
   const payload = await fetchInventoryConsoleSection(
@@ -543,12 +569,14 @@ export async function fetchInventoryConsolePacks(
     undefined,
     undefined,
     undefined,
-    { stationKeys },
+    { stationKeys, list },
   );
   return {
     recentPacks: payload.recentPacks ?? [],
     packStatusFilter: payload.packStatusFilter,
     packsTruncated: payload.packsTruncated,
+    listTotal: payload.packsListTotal ?? payload.listTotal,
+    listHasMore: payload.packsListHasMore ?? payload.listHasMore,
     warnings: payload.warnings,
   };
 }
@@ -556,10 +584,13 @@ export async function fetchInventoryConsolePacks(
 export async function fetchInventoryConsoleOrders(
   orderStatus: OrderStatusFilter = 'active',
   stationKeys: string[] = [],
+  list?: ConsoleListParams,
 ): Promise<{
   recentOrders: InventoryOrderRow[];
   orderStatusFilter?: string;
   ordersTruncated?: boolean;
+  listTotal?: number;
+  listHasMore?: boolean;
   warnings?: string[];
 }> {
   const payload = await fetchInventoryConsoleSection(
@@ -568,12 +599,14 @@ export async function fetchInventoryConsoleOrders(
     undefined,
     undefined,
     orderStatus,
-    { stationKeys },
+    { stationKeys, list },
   );
   return {
     recentOrders: payload.recentOrders ?? [],
     orderStatusFilter: payload.orderStatusFilter,
     ordersTruncated: payload.ordersTruncated,
+    listTotal: payload.ordersListTotal ?? payload.listTotal,
+    listHasMore: payload.ordersListHasMore ?? payload.listHasMore,
     warnings: payload.warnings,
   };
 }
@@ -873,6 +906,64 @@ export async function clearInventoryTestData(
     throw new Error(payload.error || `清空失败 (${response.status})`);
   }
   return payload as InventoryTestDataClearResult;
+}
+
+export type InventoryTripClearPreview = {
+  ok: boolean;
+  dryRun: true;
+  tripNumber: string;
+  packCount: number;
+  orderCount: number;
+  packs: Array<{
+    packBarcode: string;
+    name: string;
+    route: string;
+    itemCount: number;
+    loadedAt: string | null;
+  }>;
+  orderSamples: string[];
+  keptOnOtherTrip: number;
+};
+
+export type InventoryTripClearResult = {
+  ok: boolean;
+  tripNumber: string;
+  packCount: number;
+  orderCount: number;
+  keptOnOtherTrip: number;
+  message?: string;
+};
+
+export async function previewInventoryTripClear(tripNumber: string): Promise<InventoryTripClearPreview> {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-clear-trip', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tripNumber, dryRun: true }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `查询车次失败 (${response.status})`);
+  }
+  return payload as InventoryTripClearPreview;
+}
+
+export async function clearInventoryTrip(
+  tripNumber: string,
+  password: string,
+  confirmTripNumber: string,
+): Promise<InventoryTripClearResult> {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-clear-trip', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tripNumber, password, confirmTripNumber }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `清空车次失败 (${response.status})`);
+  }
+  return payload as InventoryTripClearResult;
 }
 
 export type CrossBorderSalesperson = {

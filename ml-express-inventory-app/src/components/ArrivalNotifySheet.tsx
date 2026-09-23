@@ -13,11 +13,18 @@ import { fmt, resolveAppError, useTranslation } from '../i18n';
 import {
   enrichArrivalNotifyTarget,
   markItemArrivalNotified,
-  openArrivalNotifyChannel,
-  type ArrivalNotifyChannel,
+  openArrivalNotifyAction,
 } from '../services/arrivalNotifyService';
-import type { ArrivalNotifyTarget } from '../utils/arrivalNotify';
-import { buildArrivalNotifyMessage } from '../utils/arrivalNotify';
+import type { ArrivalNotifyAction, ArrivalNotifyTarget } from '../utils/arrivalNotify';
+import { buildArrivalNotifyMessage, resolveArrivalNotifyAction } from '../utils/arrivalNotify';
+
+function notifyAction(row: ArrivalNotifyTarget) {
+  return resolveArrivalNotifyAction({
+    notifyMethod: row.notifyMethod,
+    notifyAccount: row.notifyAccount,
+    phone: row.recipientPhone,
+  });
+}
 
 type Props = {
   visible: boolean;
@@ -32,6 +39,7 @@ export default function ArrivalNotifySheet({ visible, targets, onClose, onNotifi
   const [rows, setRows] = useState<ArrivalNotifyTarget[]>([]);
   const [busyKey, setBusyKey] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [marked, setMarked] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -39,13 +47,22 @@ export default function ArrivalNotifySheet({ visible, targets, onClose, onNotifi
       setRows([]);
       setBusyKey('');
       setError('');
+      setNotice('');
       setMarked(new Set());
       return;
     }
+    let cancelled = false;
     setRows(targets);
     setBusyKey('');
     setError('');
+    setNotice('');
     setMarked(new Set());
+    void Promise.all(targets.map((row) => enrichArrivalNotifyTarget(row))).then((enriched) => {
+      if (!cancelled) setRows(enriched);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [visible, targets]);
 
   const hubLabel = store?.storeName?.trim() || store?.hubCode || rows[0]?.hubCode || '';
@@ -63,33 +80,46 @@ export default function ArrivalNotifySheet({ visible, targets, onClose, onNotifi
     });
   }, [rows, language, hubLabel]);
 
-  const runChannel = async (target: ArrivalNotifyTarget, channel: ArrivalNotifyChannel) => {
+  const actionLabel = (action: ArrivalNotifyAction) => {
+    if (action.kind === 'whatsapp') return t.arrivalNotify.whatsapp;
+    if (action.kind === 'sms') return t.arrivalNotify.sms;
+    if (action.kind === 'telegram') return t.arrivalNotify.telegram;
+    if (action.kind === 'wechat') return t.arrivalNotify.wechat;
+    return t.arrivalNotify.call;
+  };
+
+  const actionStyle = (action: ArrivalNotifyAction) => {
+    if (action.kind === 'whatsapp') return styles.waBtn;
+    if (action.kind === 'sms') return styles.smsBtn;
+    if (action.kind === 'telegram') return styles.tgBtn;
+    if (action.kind === 'wechat') return styles.wxBtn;
+    return styles.callBtn;
+  };
+
+  const runAction = async (target: ArrivalNotifyTarget, action: ArrivalNotifyAction) => {
     if (!store) return;
-    const key = `${target.barcode}:${channel}`;
+    const key = `${target.barcode}:${action.kind}`;
     setBusyKey(key);
     setError('');
+    setNotice('');
     try {
-      const enriched = await enrichArrivalNotifyTarget(target);
-      if (!enriched.recipientPhone.trim()) {
-        setError(t.common.noPhone);
-        return;
-      }
       const body = buildArrivalNotifyMessage({
         language,
-        hubLabel: enriched.storeName || hubLabel,
-        barcode: enriched.barcode,
-        expressBarcode: enriched.expressBarcode,
-        recipientName: enriched.recipientName,
+        hubLabel: target.storeName || hubLabel,
+        barcode: target.barcode,
+        expressBarcode: target.expressBarcode,
+        recipientName: target.recipientName,
       });
-      const opened = await openArrivalNotifyChannel(channel, enriched.recipientPhone, body);
-      if (channel === 'call') return;
-      if (!opened) {
+      const result = await openArrivalNotifyAction(action, body);
+      if (result === 'called') return;
+      if (result === 'failed') {
         setError(t.arrivalNotify.openFailed);
         return;
       }
-      await markItemArrivalNotified(enriched.barcode, store);
-      setMarked((prev) => new Set(prev).add(enriched.barcode));
-      onNotified?.(enriched.barcode);
+      await markItemArrivalNotified(target.barcode, store);
+      setMarked((prev) => new Set(prev).add(target.barcode));
+      onNotified?.(target.barcode);
+      if (result === 'copied') setNotice(t.arrivalNotify.copiedWechat);
     } catch (e) {
       setError(resolveAppError(t, e));
     } finally {
@@ -116,7 +146,17 @@ export default function ArrivalNotifySheet({ visible, targets, onClose, onNotifi
               <Text style={styles.previewBody}>{preview}</Text>
               <Text style={styles.phoneLine}>
                 {rows[0].recipientName ? `${rows[0].recipientName} · ` : ''}
-                {rows[0].recipientPhone || t.common.noPhone}
+                {(() => {
+                  const action = notifyAction(rows[0]);
+                  if (!action) return t.arrivalNotify.noContact;
+                  return `${actionLabel(action)} · ${
+                    action.kind === 'telegram'
+                      ? action.url.replace('https://t.me/', '@')
+                      : action.kind === 'wechat'
+                        ? action.copyText
+                        : action.phone
+                  }`;
+                })()}
               </Text>
             </View>
           ) : (
@@ -131,27 +171,28 @@ export default function ArrivalNotifySheet({ visible, targets, onClose, onNotifi
                       </Text>
                       <Text style={styles.rowMeta} numberOfLines={1}>
                         {row.barcode}
-                        {row.recipientPhone ? ` · ${row.recipientPhone}` : ''}
+                        {row.notifyAccount ? ` · ${row.notifyAccount}` : row.recipientPhone ? ` · ${row.recipientPhone}` : ''}
                       </Text>
                     </View>
                     {done ? (
                       <Text style={styles.doneText}>{t.arrivalNotify.alreadyNotified}</Text>
                     ) : (
                       <View style={styles.rowActions}>
-                        <Pressable
-                          style={[styles.miniBtn, styles.waBtn, Boolean(busyKey) && styles.busy]}
-                          onPress={() => void runChannel(row, 'whatsapp')}
-                          disabled={Boolean(busyKey)}
-                        >
-                          <Text style={styles.miniBtnText}>{t.arrivalNotify.whatsapp}</Text>
-                        </Pressable>
-                        <Pressable
-                          style={[styles.miniBtn, styles.smsBtn, Boolean(busyKey) && styles.busy]}
-                          onPress={() => void runChannel(row, 'sms')}
-                          disabled={Boolean(busyKey)}
-                        >
-                          <Text style={styles.miniBtnText}>{t.arrivalNotify.sms}</Text>
-                        </Pressable>
+                        {(() => {
+                          const action = notifyAction(row);
+                          if (!action) {
+                            return <Text style={styles.rowMeta}>{t.arrivalNotify.noContact}</Text>;
+                          }
+                          return (
+                            <Pressable
+                              style={[styles.miniBtn, actionStyle(action), Boolean(busyKey) && styles.busy]}
+                              onPress={() => void runAction(row, action)}
+                              disabled={Boolean(busyKey)}
+                            >
+                              <Text style={styles.miniBtnText}>{actionLabel(action)}</Text>
+                            </Pressable>
+                          );
+                        })()}
                       </View>
                     )}
                   </View>
@@ -162,41 +203,30 @@ export default function ArrivalNotifySheet({ visible, targets, onClose, onNotifi
 
           {!isBatch ? (
             <View style={styles.actions}>
-              <Pressable
-                style={[styles.btn, styles.waBtn, Boolean(busyKey) && styles.busy]}
-                onPress={() => void runChannel(rows[0], 'whatsapp')}
-                disabled={Boolean(busyKey)}
-              >
-                {busyKey.endsWith(':whatsapp') ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.btnText}>{t.arrivalNotify.whatsapp}</Text>
-                )}
-              </Pressable>
-              <Pressable
-                style={[styles.btn, styles.smsBtn, Boolean(busyKey) && styles.busy]}
-                onPress={() => void runChannel(rows[0], 'sms')}
-                disabled={Boolean(busyKey)}
-              >
-                {busyKey.endsWith(':sms') ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.btnText}>{t.arrivalNotify.sms}</Text>
-                )}
-              </Pressable>
-              <Pressable
-                style={[styles.btn, styles.callBtn, Boolean(busyKey) && styles.busy]}
-                onPress={() => void runChannel(rows[0], 'call')}
-                disabled={Boolean(busyKey)}
-              >
-                <Text style={styles.btnText}>{t.arrivalNotify.call}</Text>
-              </Pressable>
+              {(() => {
+                const action = notifyAction(rows[0]);
+                if (!action) return null;
+                return (
+                  <Pressable
+                    style={[styles.btn, actionStyle(action), Boolean(busyKey) && styles.busy]}
+                    onPress={() => void runAction(rows[0], action)}
+                    disabled={Boolean(busyKey)}
+                  >
+                    {busyKey.endsWith(`:${action.kind}`) ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.btnText}>{actionLabel(action)}</Text>
+                    )}
+                  </Pressable>
+                );
+              })()}
             </View>
           ) : null}
 
           {marked.has(rows[0]?.barcode) && !isBatch ? (
             <Text style={styles.markedHint}>{t.arrivalNotify.marked}</Text>
           ) : null}
+          {notice ? <Text style={styles.markedHint}>{notice}</Text> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Pressable style={styles.closeBtn} onPress={onClose}>
@@ -277,6 +307,8 @@ const styles = StyleSheet.create({
   waBtn: { backgroundColor: '#16a34a' },
   smsBtn: { backgroundColor: '#0284c7' },
   callBtn: { backgroundColor: '#0f766e' },
+  tgBtn: { backgroundColor: '#229ED9' },
+  wxBtn: { backgroundColor: '#07c160' },
   busy: { opacity: 0.6 },
   markedHint: { color: '#86efac', fontSize: 12, fontWeight: '800', marginTop: 8, textAlign: 'center' },
   error: { color: '#fca5a5', fontSize: 12, fontWeight: '700', marginTop: 8 },

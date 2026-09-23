@@ -435,7 +435,9 @@ export function buildFinanceLedgerEntries(
     const pkg = packagesByBarcode.get(String(order.pack_barcode || '').trim().toUpperCase());
     if (!pkg) continue;
     const destination = String(order.destination_code || '').trim();
-    if (destination && !destinationCodesMatch(destination, hubCode)) continue;
+    const legDestination = String(pkg.leg_destination_code || pkg.destination_code || '').trim();
+    const deliveredOnThisLeg = destinationCodesMatch(legDestination, hubCode);
+    if (destination && !destinationCodesMatch(destination, hubCode) && !deliveredOnThisLeg) continue;
     const item = itemByBarcode.get(barcode);
     const pseudoMovement: FinanceMovementRow = {
       id: `cloud:${barcode}`,

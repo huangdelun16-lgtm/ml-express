@@ -6,6 +6,7 @@ import { SystemSetting, systemSettingsService } from '../services/supabase';
 import {
   CROSS_BORDER_ROUTE_HUBS,
   DEFAULT_PRICING_CUSTOMER_SCOPE,
+  blankRoutePricingKeys,
   buildRouteMatrixPayload,
   customerHasRoutePricing,
   emptyRouteMatrix,
@@ -260,21 +261,40 @@ const CrossBorderPricingModal: React.FC<Props> = ({
         return;
       }
 
+      const scopeOptions = focusDestCode ? { destinations: [focusDestCode] } : undefined;
       const payload = buildRouteMatrixPayload(
         mmkMatrix,
         selectedCustomer || null,
-        focusDestCode ? { destinations: [focusDestCode] } : undefined,
+        scopeOptions,
       );
+      const existingKeys = new Set(loadedSettings.map((row) => row.settings_key));
+      const deleteKeys = blankRoutePricingKeys(
+        mmkMatrix,
+        selectedCustomer || null,
+        scopeOptions,
+      ).filter((key) => existingKeys.has(key));
       const routeCount = payload.length;
-      const result = await systemSettingsService.upsertSettings(payload);
-
-      if (!result.ok) {
-        setErrorMessage(
-          isEn
-            ? `Save failed.${result.error ? ` ${result.error}` : ' Check network and retry.'}`
-            : `保存失败${result.error ? `：${result.error}` : '，请检查网络或稍后重试。'}`,
-        );
-        return;
+      if (payload.length) {
+        const result = await systemSettingsService.upsertSettings(payload);
+        if (!result.ok) {
+          setErrorMessage(
+            isEn
+              ? `Save failed.${result.error ? ` ${result.error}` : ' Check network and retry.'}`
+              : `保存失败${result.error ? `：${result.error}` : '，请检查网络或稍后重试。'}`,
+          );
+          return;
+        }
+      }
+      if (deleteKeys.length) {
+        const removed = await systemSettingsService.deleteSettingsByKeys(deleteKeys);
+        if (!removed.ok) {
+          setErrorMessage(
+            isEn
+              ? `Saved rates, but clearing empty routes failed.${removed.error ? ` ${removed.error}` : ''}`
+              : `单价已保存，但清空留空路线失败${removed.error ? `：${removed.error}` : ''}`,
+          );
+          return;
+        }
       }
 
       const refreshed = await systemSettingsService.getAllSettings();
@@ -295,10 +315,15 @@ const CrossBorderPricingModal: React.FC<Props> = ({
         : isEn
           ? 'default'
           : '默认';
+      const removedNote = deleteKeys.length
+        ? isEn
+          ? `, removed ${deleteKeys.length}`
+          : `，去掉 ${deleteKeys.length} 条`
+        : '';
       setSuccessMessage(
         isEn
-          ? `Pricing saved for ${scopeLabel} (${routeCount} routes).`
-          : `已保存 ${scopeLabel} 的路线计费（${routeCount} 条路线）。`,
+          ? `Pricing saved for ${scopeLabel} (${routeCount} routes${removedNote}).`
+          : `已保存 ${scopeLabel} 的路线计费（${routeCount} 条路线${removedNote}）。`,
       );
       onSaved?.();
     } catch (err) {
@@ -353,8 +378,8 @@ const CrossBorderPricingModal: React.FC<Props> = ({
                     ? `Inbound quote to ${routeHubDisplay(focusDestCode)} in CNY/kg when a rate is set. Saved as MMK/kg for Inventory booking.`
                     : `进入 ${routeHubDisplay(focusDestCode)} 的报价按人民币/公斤填写（需先设汇率）。保存仍写入缅币/公斤，Inventory 入账公式不变。`
                   : isEn
-                    ? 'Quote in CNY/kg when a headquarters rate is set. Saved as MMK/kg so Inventory booking stays in kyat.'
-                    : '设好总部汇率后按人民币/公斤报价；保存仍写入现有缅币/公斤字段，Inventory 入账不变。'}
+                    ? 'Quote in CNY/kg when a headquarters rate is set. Saved as MMK/kg. Clear a cell and save to remove that rate. 0 stays free.'
+                    : '设好总部汇率后按人民币/公斤报价，保存仍是缅币/公斤。清空格子再保存会去掉这条单价；填 0 仍是免费。'}
               </p>
             </div>
             <button
@@ -492,18 +517,35 @@ const CrossBorderPricingModal: React.FC<Props> = ({
                     该客户尚未单独定价，当前显示<strong>默认路线价</strong>方便修改。保存后即成为该客户专属价格；不保存则入库仍用默认价。
                   </>
                 )
+              ) : selectedCustomer ? (
+                isEn ? (
+                  <>
+                    Examples: <strong>RUILI → MDY</strong>, <strong>LSO → MDY</strong>,{' '}
+                    <strong>YGN → POL</strong>. Reverse routes can differ. Enter <strong>0</strong>{' '}
+                    to make that route free. Clear a saved cell and save to drop this customer’s
+                    rate; the route then uses the default price. Re-open Inventory inbound step 3
+                    to refresh.
+                  </>
+                ) : (
+                  <>
+                    例如：<strong>RUILI → MDY</strong>、<strong>LSO → MDY</strong>、
+                    <strong>YGN → POL</strong> 可分别定价；往返价格可不同。填 <strong>0</strong>{' '}
+                    表示该路线免费。把已保存的格子清空再保存，会去掉这条专属价，之后改用默认价。
+                    保存后请在 Inventory 重新进入入库第三步同步。
+                  </>
+                )
               ) : isEn ? (
                 <>
                   Examples: <strong>RUILI → MDY</strong>, <strong>LSO → MDY</strong>,{' '}
-                  <strong>YGN → POL</strong>. Reverse routes can differ. Leave blank if unused.
-                  Enter <strong>0</strong> to make that route free for this customer; blank still uses the default rate.
-                  After save, re-open Inventory inbound step 3 to refresh.
+                  <strong>YGN → POL</strong>. Reverse routes can differ. Enter <strong>0</strong>{' '}
+                  for a free route. Clear a saved cell and save to delete that default per-kg rate.
+                  Re-open Inventory inbound step 3 to refresh.
                 </>
               ) : (
                 <>
                   例如：<strong>RUILI → MDY</strong>、<strong>LSO → MDY</strong>、
-                  <strong>YGN → POL</strong> 可分别定价；往返价格可不同。未使用的路线可留空。
-                  填 <strong>0</strong> 表示该路线免费入库（优惠账号 / 自用账号），留空则仍用默认原价。
+                  <strong>YGN → POL</strong> 可分别定价；往返价格可不同。填 <strong>0</strong>{' '}
+                  表示该路线免费。把已保存的格子清空再保存，会删除这条默认单价。
                   保存后请在 Inventory 重新进入入库第三步同步。
                 </>
               )}

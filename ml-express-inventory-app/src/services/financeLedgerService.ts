@@ -155,6 +155,31 @@ async function loadAgencyRemittances(
   return (data ?? []) as FinanceRemittanceRow[];
 }
 
+async function loadFinanceItems(scope: string): Promise<FinanceItemRow[]> {
+  const run = (orFilter: string) =>
+    fetchAllFinancePages<FinanceItemRow>((from, to) =>
+      supabase
+        .from('inventory_store_items')
+        .select(
+          'id, barcode, note, final_destination, recipient_name, customer_signed_at, packed_bundle_barcode',
+        )
+        .or(orFilter)
+        .order('updated_at', { ascending: false })
+        .range(from, to),
+    );
+
+  const probe = await supabase.from('inventory_store_items').select('id').or(scope).limit(1);
+  if (probe.error && /delivery_hub_code/i.test(probe.error.message || '')) {
+    const fallback = scope
+      .split(',')
+      .filter((part) => !part.startsWith('delivery_hub_code.'))
+      .join(',');
+    return run(fallback);
+  }
+  throwQueryError(probe.error);
+  return run(scope);
+}
+
 async function loadFinanceDataset(
   store: InventoryStoreSession,
   hubCode: string,
@@ -167,6 +192,7 @@ async function loadFinanceDataset(
     ownerKey ? `owner_store_code.ilike.${ownerKey}%` : '',
     `final_destination.eq.${hubCode}`,
     ownerKey ? `final_destination.ilike.${ownerKey}%` : '',
+    `delivery_hub_code.eq.${hubCode}`,
   ]
     .filter(Boolean)
     .join(',');
@@ -183,17 +209,7 @@ async function loadFinanceDataset(
     .join(',');
 
   const [items, packages, paidRows, manualEntries, remittances] = await Promise.all([
-    fetchAllFinancePages<FinanceItemRow>(
-      (from, to) =>
-        supabase
-          .from('inventory_store_items')
-          .select(
-            'id, barcode, note, final_destination, recipient_name, customer_signed_at, packed_bundle_barcode',
-          )
-          .or(itemScope)
-          .order('updated_at', { ascending: false })
-          .range(from, to),
-    ),
+    loadFinanceItems(itemScope),
     fetchAllFinancePages<FinancePackageRow>(
       (from, to) =>
         supabase

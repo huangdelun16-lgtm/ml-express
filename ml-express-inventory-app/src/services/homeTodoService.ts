@@ -17,7 +17,7 @@ import {
   type HomeTodoFeePack,
 } from '../utils/homeTodoQueue';
 import { countUnnotifiedSignableItems } from '../utils/arrivalNotify';
-import { isMissingArrivalNotifiedColumnError } from './inventoryCloudApi';
+import { isMissingArrivalNotifiedColumnError, isMissingDeliveryHubColumnError } from './inventoryCloudApi';
 
 const INBOUND_PACK_COLUMNS =
   'id, pack_barcode, trip_number, transport_fee, truck_loaded_at, origin_store_code, leg_destination_code, destination_code, status';
@@ -32,6 +32,7 @@ type SignCountRow = {
   barcode?: string | null;
   final_destination?: string | null;
   destination?: string | null;
+  delivery_hub_code?: string | null;
   hub_arrived_at?: string | null;
   arrival_notified_at?: string | null;
   customer_signed_at?: string | null;
@@ -177,6 +178,7 @@ async function countPendingSignsAndNotify(
       barcode: String(row.barcode ?? ''),
       final_destination: String(row.final_destination ?? ''),
       destination: String(row.final_destination ?? ''),
+      delivery_hub_code: String(row.delivery_hub_code ?? ''),
       hub_arrived_at: row.hub_arrived_at ?? '',
       arrival_notified_at: includeNotify ? row.arrival_notified_at ?? '' : '',
       customer_signed_at: row.customer_signed_at ?? '',
@@ -190,19 +192,32 @@ async function countPendingSignsAndNotify(
       supabase
         .from('inventory_store_items')
         .select(
-          'barcode, final_destination, hub_arrived_at, arrival_notified_at, customer_signed_at, owner_store_code' as '*',
+          'barcode, final_destination, delivery_hub_code, hub_arrived_at, arrival_notified_at, customer_signed_at, owner_store_code' as '*',
         )
         .not('hub_arrived_at', 'is', null)
         .is('customer_signed_at', null)
         .range(from, to),
     );
   } catch (error) {
-    if (!isMissingArrivalNotifiedColumnError(error)) throw error;
-    includeNotify = false;
+    const missingNotify = isMissingArrivalNotifiedColumnError(error);
+    const missingDeliveryHub = isMissingDeliveryHubColumnError(error);
+    if (!missingNotify && !missingDeliveryHub) throw error;
+    includeNotify = !missingNotify;
+    const columns = [
+      'barcode',
+      'final_destination',
+      missingDeliveryHub ? '' : 'delivery_hub_code',
+      'hub_arrived_at',
+      missingNotify ? '' : 'arrival_notified_at',
+      'customer_signed_at',
+      'owner_store_code',
+    ]
+      .filter(Boolean)
+      .join(', ');
     rows = await fetchAllPages<SignCountRow>((from, to) =>
       supabase
         .from('inventory_store_items')
-        .select('barcode, final_destination, hub_arrived_at, customer_signed_at, owner_store_code')
+        .select(columns)
         .not('hub_arrived_at', 'is', null)
         .is('customer_signed_at', null)
         .range(from, to),

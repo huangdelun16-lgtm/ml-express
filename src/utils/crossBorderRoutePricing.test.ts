@@ -1,4 +1,5 @@
 import {
+  blankRoutePricingKeys,
   buildRouteMatrixPayload,
   buildRoutePerKgSettingsKey,
   collectPricingCustomerOptions,
@@ -148,6 +149,32 @@ describe('crossBorderRoutePricing', () => {
     expect(destOnly.map((row) => row.settings_key)).toEqual([
       'pricing.cross_border.customer.MDY00000.route.RUI.MDY.per_kg',
     ]);
+  });
+
+  it('lists a cleared cell as a key to delete and keeps a zero rate', () => {
+    const matrix = mergeRouteMatrixFromDb([
+      {
+        category: 'pricing',
+        settings_key: 'pricing.cross_border.route.RUI.MDY.per_kg',
+        settings_value: 18000,
+      },
+      {
+        category: 'pricing',
+        settings_key: 'pricing.cross_border.route.RUI.YGN.per_kg',
+        settings_value: 0,
+      },
+    ]);
+    matrix.RUI.MDY = '';
+    const blanks = blankRoutePricingKeys(matrix);
+    expect(blanks).toContain('pricing.cross_border.route.RUI.MDY.per_kg');
+    expect(blanks).not.toContain('pricing.cross_border.route.RUI.YGN.per_kg');
+    const payload = buildRouteMatrixPayload(matrix);
+    expect(payload.map((row) => row.settings_key)).toContain(
+      'pricing.cross_border.route.RUI.YGN.per_kg',
+    );
+    expect(payload.map((row) => row.settings_key)).not.toContain(
+      'pricing.cross_border.route.RUI.MDY.per_kg',
+    );
   });
 
   it('maps customer code prefixes to the inbound destination hub', () => {

@@ -44,7 +44,6 @@ import {
   orderTrackingStatusBadgeClass,
   orderTrackingStatusLabel,
 } from '../utils/inventoryOrderTracking';
-import { filterOrders, filterPacks } from '../utils/crossBorderConsoleSearch';
 import {
   filterCustomersByKind,
   filterUnifiedCustomers,
@@ -107,10 +106,12 @@ const CrossBorderAccountManagementModal = lazy(
   () => import('../components/CrossBorderAccountManagementModal'),
 );
 const CrossBorderPricingModal = lazy(() => import('../components/CrossBorderPricingModal'));
+const CrossBorderTruckFeeModal = lazy(() => import('../components/CrossBorderTruckFeeModal'));
 const CrossBorderManualEntryModal = lazy(() => import('../components/CrossBorderManualEntryModal'));
 const CrossBorderClearTestDataModal = lazy(
   () => import('../components/CrossBorderClearTestDataModal'),
 );
+const CrossBorderClearTripModal = lazy(() => import('../components/CrossBorderClearTripModal'));
 const CreateCrossBorderCustomerModal = lazy(
   () => import('../components/CreateCrossBorderCustomerModal'),
 );
@@ -125,8 +126,23 @@ function CblLazyModal({ open, children }: { open: boolean; children: ReactNode }
   return <Suspense fallback={null}>{children}</Suspense>;
 }
 
-function transportQueryKey(filter: string, stationKeys: string[]): string {
-  return `${filter}|${stationKeys.slice().sort().join(',')}`;
+function transportListKey(
+  filter: string,
+  stationKeys: string[],
+  page: number,
+  pageSize: number,
+  q: string,
+): string {
+  return `${filter}|${stationKeys.slice().sort().join(',')}|${page}|${pageSize}|${q.trim()}`;
+}
+
+function transportQueryId(
+  filter: string,
+  stationKeys: string[],
+  pageSize: number,
+  q: string,
+): string {
+  return `${filter}|${stationKeys.slice().sort().join(',')}|${pageSize}|${q.trim()}`;
 }
 
 function resolveStationKeys(
@@ -426,8 +442,10 @@ const CrossBorderLogisticsPage: FC = () => {
   const [transportView, setTransportView] = useState<TransportView>('orders');
   const [showAccountMgmtModal, setShowAccountMgmtModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
+  const [showTruckFeeModal, setShowTruckFeeModal] = useState(false);
   const [showManualEntryModal, setShowManualEntryModal] = useState(false);
   const [showClearTestModal, setShowClearTestModal] = useState(false);
+  const [showClearTripModal, setShowClearTripModal] = useState(false);
   const [financeModalStore, setFinanceModalStore] = useState<InventoryTransitStore | null>(null);
   const [financeModalMode, setFinanceModalMode] = useState<StoreFinanceDetailMode>('ledger');
   const [reconcileModalStore, setReconcileModalStore] = useState<InventoryTransitStore | null>(
@@ -445,6 +463,7 @@ const CrossBorderLogisticsPage: FC = () => {
     phone: string;
   } | null>(null);
   const [transportSearch, setTransportSearch] = useState('');
+  const [debouncedTransportSearch, setDebouncedTransportSearch] = useState('');
   const [customerSummaries, setCustomerSummaries] = useState<InventoryCustomerSummary[]>([]);
   const [registeredCustomers, setRegisteredCustomers] = useState<CrossBorderRegisteredCustomer[]>(
     [],
@@ -494,10 +513,19 @@ const CrossBorderLogisticsPage: FC = () => {
     return isEn ? hub.nameEn : hub.nameZh;
   };
 
-  const packsFilterLoadedRef = useRef(transportQueryKey('hub_received', []));
-  const ordersFilterLoadedRef = useRef(transportQueryKey('awaiting_pickup', []));
+  const packsFilterLoadedRef = useRef(
+    transportListKey('hub_received', [], 1, DEFAULT_PAGE_SIZE, ''),
+  );
+  const ordersFilterLoadedRef = useRef(
+    transportListKey('awaiting_pickup', [], 1, DEFAULT_PAGE_SIZE, ''),
+  );
+  const packsQueryRef = useRef(transportQueryId('hub_received', [], DEFAULT_PAGE_SIZE, ''));
+  const ordersQueryRef = useRef(transportQueryId('awaiting_pickup', [], DEFAULT_PAGE_SIZE, ''));
   const packFilterRef = useRef(packFilter);
   const orderFilterRef = useRef(orderFilter);
+  const packsPageRef = useRef(1);
+  const ordersPageRef = useRef(1);
+  const transportSearchRef = useRef('');
   const transportStoreCodeRef = useRef(transportStoreCode);
   const transportStationKeysRef = useRef<string[]>([]);
   const financePageRef = useRef(financePage);
@@ -513,6 +541,9 @@ const CrossBorderLogisticsPage: FC = () => {
 
   packFilterRef.current = packFilter;
   orderFilterRef.current = orderFilter;
+  packsPageRef.current = packsPage;
+  ordersPageRef.current = ordersPage;
+  transportSearchRef.current = debouncedTransportSearch;
   transportStoreCodeRef.current = transportStoreCode;
   financePageRef.current = financePage;
   tablePageSizeRef.current = tablePageSize;
@@ -707,6 +738,10 @@ const CrossBorderLogisticsPage: FC = () => {
     const filter = packFilterRef.current;
     const nextOrderFilter = orderFilterRef.current;
     const stationKeys = transportStationKeysRef.current;
+    const pageSize = tablePageSizeRef.current;
+    const q = transportSearchRef.current;
+    const packList = { page: packsPageRef.current, pageSize, q };
+    const orderList = { page: ordersPageRef.current, pageSize, q };
     const shouldReloadCustomers = customersFetchStartedRef.current;
     setLoading(true);
     setFinanceLoading(true);
@@ -721,8 +756,8 @@ const CrossBorderLogisticsPage: FC = () => {
         date: periodDateRef.current,
         storeCode: financeStoreCodeRef.current || undefined,
       }),
-      fetchInventoryConsolePacks(filter, stationKeys),
-      fetchInventoryConsoleOrders(nextOrderFilter, stationKeys),
+      fetchInventoryConsolePacks(filter, stationKeys, packList),
+      fetchInventoryConsoleOrders(nextOrderFilter, stationKeys, orderList),
     ]);
 
     if (loadId !== loadSeqRef.current) return;
@@ -773,6 +808,14 @@ const CrossBorderLogisticsPage: FC = () => {
         ordersTruncated: ordersResult && ordersFresh
           ? Boolean(ordersResult.ordersTruncated)
           : prev?.ordersTruncated,
+        packsListTotal: packsResult && packsFresh ? packsResult.listTotal : prev?.packsListTotal,
+        ordersListTotal: ordersResult && ordersFresh ? ordersResult.listTotal : prev?.ordersListTotal,
+        packsListHasMore: packsResult && packsFresh
+          ? Boolean(packsResult.listHasMore)
+          : prev?.packsListHasMore,
+        ordersListHasMore: ordersResult && ordersFresh
+          ? Boolean(ordersResult.listHasMore)
+          : prev?.ordersListHasMore,
         crossBorderFinance: financeResult && financeFresh
           ? financeResult.crossBorderFinance
           : prev?.crossBorderFinance,
@@ -780,10 +823,22 @@ const CrossBorderLogisticsPage: FC = () => {
       }));
 
       if (packsFresh) {
-        packsFilterLoadedRef.current = transportQueryKey(filter, stationKeys);
+        packsFilterLoadedRef.current = transportListKey(
+          filter,
+          stationKeys,
+          packList.page,
+          packList.pageSize,
+          packList.q,
+        );
       }
       if (ordersFresh) {
-        ordersFilterLoadedRef.current = transportQueryKey(nextOrderFilter, stationKeys);
+        ordersFilterLoadedRef.current = transportListKey(
+          nextOrderFilter,
+          stationKeys,
+          orderList.page,
+          orderList.pageSize,
+          orderList.q,
+        );
       }
     } else {
       const reason = overviewSettled.reason;
@@ -824,12 +879,32 @@ const CrossBorderLogisticsPage: FC = () => {
   }, [financePage, tablePageSize, loadFinanceEntries, periodKind, periodDate, financeStoreCode]);
 
   useEffect(() => {
-    const nextKey = transportQueryKey(packFilter, transportStationKeysRef.current);
+    const timer = window.setTimeout(() => {
+      setDebouncedTransportSearch(transportSearch.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [transportSearch]);
+
+  useEffect(() => {
+    const stationKeys = transportStationKeysRef.current;
+    const q = debouncedTransportSearch.trim();
+    const queryId = transportQueryId(packFilter, stationKeys, tablePageSize, q);
+    if (packsQueryRef.current !== queryId) {
+      packsQueryRef.current = queryId;
+      if (packsPage !== 1) {
+        setPacksPage(1);
+        return;
+      }
+    }
+    const nextKey = transportListKey(packFilter, stationKeys, packsPage, tablePageSize, q);
     if (packsFilterLoadedRef.current === nextKey) return;
     const reqId = ++packsReqIdRef.current;
-    setPacksPage(1);
     setPacksLoading(true);
-    void fetchInventoryConsolePacks(packFilter, transportStationKeysRef.current)
+    void fetchInventoryConsolePacks(packFilter, stationKeys, {
+      page: packsPage,
+      pageSize: tablePageSize,
+      q,
+    })
       .then((result) => {
         if (reqId !== packsReqIdRef.current) return;
         packsFilterLoadedRef.current = nextKey;
@@ -840,6 +915,8 @@ const CrossBorderLogisticsPage: FC = () => {
                 recentPacks: result.recentPacks,
                 packStatusFilter: packFilter,
                 packsTruncated: Boolean(result.packsTruncated),
+                packsListTotal: result.listTotal,
+                packsListHasMore: Boolean(result.listHasMore),
               }
             : prev,
         );
@@ -852,15 +929,28 @@ const CrossBorderLogisticsPage: FC = () => {
           setPacksLoading(false);
         }
       });
-  }, [packFilter, transportStoreCode]);
+  }, [packFilter, transportStoreCode, packsPage, tablePageSize, debouncedTransportSearch]);
 
   useEffect(() => {
-    const nextKey = transportQueryKey(orderFilter, transportStationKeysRef.current);
+    const stationKeys = transportStationKeysRef.current;
+    const q = debouncedTransportSearch.trim();
+    const queryId = transportQueryId(orderFilter, stationKeys, tablePageSize, q);
+    if (ordersQueryRef.current !== queryId) {
+      ordersQueryRef.current = queryId;
+      if (ordersPage !== 1) {
+        setOrdersPage(1);
+        return;
+      }
+    }
+    const nextKey = transportListKey(orderFilter, stationKeys, ordersPage, tablePageSize, q);
     if (ordersFilterLoadedRef.current === nextKey) return;
     const reqId = ++ordersReqIdRef.current;
-    setOrdersPage(1);
     setOrdersLoading(true);
-    void fetchInventoryConsoleOrders(orderFilter, transportStationKeysRef.current)
+    void fetchInventoryConsoleOrders(orderFilter, stationKeys, {
+      page: ordersPage,
+      pageSize: tablePageSize,
+      q,
+    })
       .then((result) => {
         if (reqId !== ordersReqIdRef.current) return;
         ordersFilterLoadedRef.current = nextKey;
@@ -871,6 +961,8 @@ const CrossBorderLogisticsPage: FC = () => {
                 recentOrders: result.recentOrders,
                 orderStatusFilter: orderFilter,
                 ordersTruncated: Boolean(result.ordersTruncated),
+                ordersListTotal: result.listTotal,
+                ordersListHasMore: Boolean(result.listHasMore),
               }
             : prev,
         );
@@ -883,7 +975,7 @@ const CrossBorderLogisticsPage: FC = () => {
           setOrdersLoading(false);
         }
       });
-  }, [orderFilter, transportStoreCode]);
+  }, [orderFilter, transportStoreCode, ordersPage, tablePageSize, debouncedTransportSearch]);
 
   useEffect(() => {
     setStoresPage(1);
@@ -896,11 +988,6 @@ const CrossBorderLogisticsPage: FC = () => {
   useEffect(() => {
     setCustomersPage(1);
   }, [customerSearch, customerKindFilter]);
-
-  useEffect(() => {
-    setPacksPage(1);
-    setOrdersPage(1);
-  }, [transportSearch]);
 
   const crossBorderFinance = data?.crossBorderFinance;
   const expenseEntries = crossBorderFinance?.entries ?? [];
@@ -1093,14 +1180,8 @@ const CrossBorderLogisticsPage: FC = () => {
     [registeredCustomers, customerSummaries],
   );
 
-  const filteredPacks = useMemo(
-    () => filterPacks(recentPacks, transportSearch),
-    [recentPacks, transportSearch],
-  );
-  const pagedPacks = useMemo(
-    () => paginateSlice(filteredPacks, packsPage, tablePageSize),
-    [filteredPacks, packsPage, tablePageSize],
-  );
+  const packsListTotal = data?.packsListTotal;
+  const ordersListTotal = data?.ordersListTotal;
 
   const recentOrders = useMemo(
     () =>
@@ -1108,14 +1189,6 @@ const CrossBorderLogisticsPage: FC = () => {
         orderTouchesStation(order, transportStationKeys),
       ),
     [data?.recentOrders, transportStationKeys],
-  );
-  const filteredOrders = useMemo(
-    () => filterOrders(recentOrders, transportSearch),
-    [recentOrders, transportSearch],
-  );
-  const pagedOrders = useMemo(
-    () => paginateSlice(filteredOrders, ordersPage, tablePageSize),
-    [filteredOrders, ordersPage, tablePageSize],
   );
 
   const customerSearchOptions = useMemo((): CblSearchOption[] => {
@@ -2311,37 +2384,43 @@ const CrossBorderLogisticsPage: FC = () => {
               }
               isEn={isEn}
             />
-            {(recentPacks.length || recentOrders.length) ? (
-              <CblSearchCombobox
-                value={transportSearch}
-                onChange={setTransportSearch}
-                options={transportSearchOptions}
-                placeholder={
-                  transportView === 'orders'
-                    ? isEn
-                      ? 'Search order, express, pack, name or phone…'
-                      : '搜索订单条码、快递单、包装号、姓名或电话…'
-                    : isEn
-                      ? 'Search pack, trip or route…'
-                      : '搜索包装号、车次或路线…'
-                }
-                emptyText={
-                  transportView === 'orders'
-                    ? isEn
-                      ? 'No matching orders'
-                      : '没有匹配的订单'
-                    : isEn
-                      ? 'No matching packs'
-                      : '没有匹配的包裹'
-                }
-                count={transportView === 'orders' ? filteredOrders.length : filteredPacks.length}
-                isEn={isEn}
-              />
-            ) : null}
+            <CblSearchCombobox
+              value={transportSearch}
+              onChange={setTransportSearch}
+              options={transportSearchOptions}
+              placeholder={
+                transportView === 'orders'
+                  ? isEn
+                    ? 'Search order, express, pack, name or phone…'
+                    : '搜索订单条码、快递单、包装号、姓名或电话…'
+                  : isEn
+                    ? 'Search pack, trip or route…'
+                    : '搜索包装号、车次或路线…'
+              }
+              emptyText={
+                transportView === 'orders'
+                  ? isEn
+                    ? 'No matching orders'
+                    : '没有匹配的订单'
+                  : isEn
+                    ? 'No matching packs'
+                    : '没有匹配的包裹'
+              }
+              count={
+                transportView === 'orders'
+                  ? ordersListTotal != null && ordersListTotal >= 0
+                    ? ordersListTotal
+                    : undefined
+                  : packsListTotal != null && packsListTotal >= 0
+                    ? packsListTotal
+                    : undefined
+              }
+              isEn={isEn}
+            />
             {transportView === 'packs' ? (
               packsLoading && !recentPacks.length ? (
                 <CblTableSkeleton rows={6} cols={isMobile ? 7 : 8} />
-              ) : filteredPacks.length ? (
+              ) : recentPacks.length ? (
                 <>
                   <div className={`cbl-table-wrap${packsLoading ? ' is-loading' : ''}`}>
                     <table className="cbl-table">
@@ -2358,7 +2437,7 @@ const CrossBorderLogisticsPage: FC = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {pagedPacks.map((pack: InventoryPackRow) => (
+                        {recentPacks.map((pack: InventoryPackRow) => (
                           <tr key={pack.id}>
                             <td>
                               <button
@@ -2423,7 +2502,8 @@ const CrossBorderLogisticsPage: FC = () => {
                   <CblTablePagination
                     page={packsPage}
                     pageSize={tablePageSize}
-                    totalItems={filteredPacks.length}
+                    totalItems={packsListTotal ?? recentPacks.length}
+                    hasMore={Boolean(data?.packsListHasMore)}
                     onPageChange={setPacksPage}
                     onPageSizeChange={setTablePageSize}
                     isEn={isEn}
@@ -2442,7 +2522,7 @@ const CrossBorderLogisticsPage: FC = () => {
               )
             ) : ordersLoading && !recentOrders.length ? (
               <CblTableSkeleton rows={6} cols={isMobile ? 8 : 9} />
-            ) : filteredOrders.length ? (
+            ) : recentOrders.length ? (
               <>
                 <div className={`cbl-table-wrap${ordersLoading ? ' is-loading' : ''}`}>
                   <table className="cbl-table">
@@ -2460,7 +2540,7 @@ const CrossBorderLogisticsPage: FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {pagedOrders.map((order) => (
+                      {recentOrders.map((order) => (
                         <tr key={order.id}>
                           <td>
                             <div style={{ fontWeight: 650 }}>{order.order_barcode || '—'}</div>
@@ -2529,7 +2609,8 @@ const CrossBorderLogisticsPage: FC = () => {
                 <CblTablePagination
                   page={ordersPage}
                   pageSize={tablePageSize}
-                  totalItems={filteredOrders.length}
+                  totalItems={ordersListTotal ?? recentOrders.length}
+                  hasMore={Boolean(data?.ordersListHasMore)}
                   onPageChange={setOrdersPage}
                   onPageSizeChange={setTablePageSize}
                   isEn={isEn}
@@ -2660,6 +2741,13 @@ const CrossBorderLogisticsPage: FC = () => {
                   >
                     {isEn ? 'Pricing' : '跨境计费'}
                   </button>
+                  <button
+                    type="button"
+                    className="cbl-btn"
+                    onClick={() => setShowTruckFeeModal(true)}
+                  >
+                    {isEn ? 'Truck fees' : '装车车费'}
+                  </button>
                 </div>
               </div>
             </section>
@@ -2671,16 +2759,25 @@ const CrossBorderLogisticsPage: FC = () => {
               <div className="cbl-card__body">
                 <p className="cbl-card-hint">
                   {isEn
-                    ? 'Clears all cross-border business data in the cloud. Station apps will reconcile on next sync.'
-                    : '清空云端全部跨境业务数据。各中转站 App 下次同步后会清理本机对应订单与包裹。'}
+                    ? 'Clear one trip, or clear every cross-border business record. A trip clear does not touch other trips.'
+                    : '可以只清空某一车次，也可以清空全部跨境业务。清空车次时，其他车次上的订单不会动。'}
                 </p>
-                <button
-                  type="button"
-                  className="cbl-btn cbl-btn--danger-outline"
-                  onClick={() => setShowClearTestModal(true)}
-                >
-                  {isEn ? 'Clear all business data' : '清空全部跨境业务数据'}
-                </button>
+                <div className="cbl-settings-actions">
+                  <button
+                    type="button"
+                    className="cbl-btn cbl-btn--danger-outline"
+                    onClick={() => setShowClearTripModal(true)}
+                  >
+                    {isEn ? 'Clear one trip' : '清空指定车次'}
+                  </button>
+                  <button
+                    type="button"
+                    className="cbl-btn cbl-btn--danger-outline"
+                    onClick={() => setShowClearTestModal(true)}
+                  >
+                    {isEn ? 'Clear all business data' : '清空全部跨境业务数据'}
+                  </button>
+                </div>
               </div>
             </section>
           </div>
@@ -2714,12 +2811,31 @@ const CrossBorderLogisticsPage: FC = () => {
         />
       </CblLazyModal>
 
+      <CblLazyModal open={showTruckFeeModal}>
+        <CrossBorderTruckFeeModal
+          open={showTruckFeeModal}
+          onClose={() => setShowTruckFeeModal(false)}
+        />
+      </CblLazyModal>
+
       <CblLazyModal open={showManualEntryModal}>
         <CrossBorderManualEntryModal
           open={showManualEntryModal}
           onClose={() => setShowManualEntryModal(false)}
           onSaved={() => void load()}
           stores={transitStores}
+        />
+      </CblLazyModal>
+
+      <CblLazyModal open={showClearTripModal}>
+        <CrossBorderClearTripModal
+          open={showClearTripModal}
+          onClose={() => setShowClearTripModal(false)}
+          isEn={isEn}
+          onCleared={(message) => {
+            void load();
+            feedbackService.notify(message);
+          }}
         />
       </CblLazyModal>
 
@@ -2745,6 +2861,7 @@ const CrossBorderLogisticsPage: FC = () => {
           onClose={() => setCustomerModalTarget(null)}
           customer={customerModalTarget}
           fxRate={fxRate}
+          stores={transitStores}
         />
       </CblLazyModal>
 

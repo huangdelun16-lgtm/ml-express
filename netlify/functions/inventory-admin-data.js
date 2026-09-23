@@ -32,6 +32,14 @@ const {
   uniqueCodes,
 } = require('./utils/inventoryOrderPickup');
 const { applyStationKeys, parseStationKeys, rowTouchesStation } = require('./utils/inventoryStationFilter');
+const {
+  ORDER_SEARCH_COLUMNS,
+  PACK_SEARCH_COLUMNS,
+  listRange,
+  packListIsSimple,
+  parseConsoleListQuery,
+  searchOrFilter,
+} = require('./utils/inventoryConsoleList');
 
 const CONSOLE_LIST_LIMIT = 500;
 const PACK_STATION_COLUMNS = [
@@ -664,6 +672,310 @@ async function loadOpenExceptions(supabase, warnings) {
   };
 }
 
+const SCAN_OFFSET_CAP = 4000;
+
+function applyListSearch(query, q, columns) {
+  const filter = searchOrFilter(q, columns);
+  return filter ? query.or(filter) : query;
+}
+
+function appendUniqueRows(matched, seen, rows) {
+  for (const row of rows || []) {
+    const id = String(row?.id || row?.order_barcode || row?.pack_barcode || '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    matched.push(row);
+  }
+}
+
+function applyPackListStatus(query, packStatus) {
+  if (!packStatus || packStatus === 'all') return query.neq('status', 'cancelled');
+  const statuses = packStatusesForQuery(packStatus);
+  if (statuses?.length === 1) return query.eq('status', statuses[0]);
+  if (statuses?.length) return query.in('status', statuses);
+  return query;
+}
+
+function applyOrderListStatus(query, orderStatus) {
+  if (orderStatus === 'in_transit') return query.eq('status', 'in_transit');
+  if (orderStatus === 'hub_received' || orderStatus === 'awaiting_pickup') {
+    return query.eq('status', 'hub_received');
+  }
+  if (orderStatus === 'released_at_hub') return query.eq('status', 'released_at_hub');
+  if (orderStatus === 'active') return query.in('status', ['in_transit', 'hub_received']);
+  return query;
+}
+
+async function mapPackRows(supabase, rows) {
+  const barcodes = (rows || []).map((row) => row.pack_barcode);
+  const qtyByBarcode = await loadPackedQtyByBarcode(supabase, barcodes);
+  return (rows || []).map((row) => {
+    const code = String(row.pack_barcode || '').trim().toUpperCase();
+    return normalizePackRow(row, qtyByBarcode[code]);
+  });
+}
+
+function visiblePacks(packs, packStatus, stationKeys) {
+  return packs
+    .filter((pack) => matchesPackTransportFilter(pack, packStatus))
+    .filter((pack) => rowTouchesStation(pack, stationKeys, PACK_STATION_COLUMNS));
+}
+
+async function loadPackPage(supabase, packStatus, warnings, stationKeys, list) {
+  const base = (withCount) => {
+    let query = supabase
+      .from('inventory_pkg_tracking')
+      .select('*', withCount ? { count: 'exact' } : undefined)
+      .order('updated_at', { ascending: false });
+    query = applyPackListStatus(query, packStatus);
+    query = applyStationKeys(query, stationKeys, PACK_STATION_COLUMNS);
+    return applyListSearch(query, list.q, PACK_SEARCH_COLUMNS);
+  };
+
+  if (packListIsSimple(packStatus)) {
+    const { from, to } = listRange(list.page, list.pageSize);
+    const { data, error, count } = await base(true).range(from, to);
+    if (error) {
+      warnings.push(`包裹追踪表暂不可用：${error.message}`);
+      return { packs: [], total: 0, hasMore: false };
+    }
+    const packs = visiblePacks(await mapPackRows(supabase, data || []), packStatus, stationKeys);
+    const total = count ?? packs.length;
+    return { packs, total, hasMore: from + (data || []).length < total };
+  }
+
+  const want = (list.page - 1) * list.pageSize + list.pageSize + 1;
+  const matched = [];
+  const seen = new Set();
+  let offset = 0;
+  let hitCap = false;
+  const batch = 80;
+  while (matched.length < want) {
+    if (offset >= SCAN_OFFSET_CAP) {
+      hitCap = true;
+      warnings.push('包裹较多，请用搜索或站点缩小范围后再翻页。');
+      break;
+    }
+    const { data, error } = await base(false).range(offset, offset + batch - 1);
+    if (error) {
+      warnings.push(`包裹追踪表暂不可用：${error.message}`);
+      break;
+    }
+    if (!data?.length) break;
+    appendUniqueRows(
+      matched,
+      seen,
+      visiblePacks(await mapPackRows(supabase, data), packStatus, stationKeys),
+    );
+    offset += data.length;
+    if (data.length < batch) break;
+  }
+  const start = (list.page - 1) * list.pageSize;
+  return {
+    packs: matched.slice(start, start + list.pageSize),
+    total: -1,
+    hasMore: hitCap || matched.length > start + list.pageSize,
+  };
+}
+
+async function loadOrderPage(supabase, orderStatus, warnings, stationKeys, list) {
+  if (orderStatus === 'signed') {
+    return scanSignedOrderPage(supabase, warnings, stationKeys, list);
+  }
+  if (orderStatus === 'awaiting_pickup') {
+    return scanAwaitingOrderPage(supabase, warnings, stationKeys, list);
+  }
+
+  const { from, to } = listRange(list.page, list.pageSize);
+  let query = supabase
+    .from('inventory_order_tracking')
+    .select(ORDER_TRACKING_SELECT, { count: 'exact' })
+    .order('updated_at', { ascending: false });
+  query = applyOrderListStatus(query, orderStatus);
+  query = applyStationKeys(query, stationKeys, ORDER_STATION_COLUMNS);
+  query = applyListSearch(query, list.q, ORDER_SEARCH_COLUMNS);
+  const { data, error, count } = await query.range(from, to);
+  if (error) {
+    warnings.push(`订单追踪表暂不可用：${error.message}`);
+    return { orders: [], total: 0, hasMore: false };
+  }
+  const enriched = await enrichOrdersWithPickup(
+    supabase,
+    (data || []).map(normalizeOrderRow),
+    warnings,
+  );
+  const orders = enriched.filter((order) =>
+    rowTouchesStation(order, stationKeys, ORDER_STATION_COLUMNS),
+  );
+  const total = count ?? orders.length;
+  return { orders, total, hasMore: from + (data || []).length < total };
+}
+
+async function scanAwaitingOrderPage(supabase, warnings, stationKeys, list) {
+  const want = (list.page - 1) * list.pageSize + list.pageSize + 1;
+  const matched = [];
+  const seen = new Set();
+  let offset = 0;
+  let hitCap = false;
+  const batch = 80;
+  while (matched.length < want) {
+    if (offset >= SCAN_OFFSET_CAP) {
+      hitCap = true;
+      warnings.push('待签收订单较多，请用搜索或站点缩小范围后再翻页。');
+      break;
+    }
+    let query = supabase
+      .from('inventory_order_tracking')
+      .select(ORDER_TRACKING_SELECT)
+      .eq('status', 'hub_received')
+      .order('updated_at', { ascending: false });
+    query = applyStationKeys(query, stationKeys, ORDER_STATION_COLUMNS);
+    query = applyListSearch(query, list.q, ORDER_SEARCH_COLUMNS);
+    const { data, error } = await query.range(offset, offset + batch - 1);
+    if (error) {
+      warnings.push(`订单追踪表暂不可用：${error.message}`);
+      break;
+    }
+    if (!data?.length) break;
+    const enriched = await enrichOrdersWithPickup(
+      supabase,
+      (data || []).map(normalizeOrderRow),
+      warnings,
+    );
+    appendUniqueRows(
+      matched,
+      seen,
+      filterAwaitingPickupOrders(enriched).filter((order) =>
+        rowTouchesStation(order, stationKeys, ORDER_STATION_COLUMNS),
+      ),
+    );
+    offset += data.length;
+    if (data.length < batch) break;
+  }
+  const start = (list.page - 1) * list.pageSize;
+  return {
+    orders: matched.slice(start, start + list.pageSize),
+    total: -1,
+    hasMore: hitCap || matched.length > start + list.pageSize,
+  };
+}
+
+async function scanOrdersThenKeepSigned(supabase, warnings, stationKeys, list) {
+  const want = (list.page - 1) * list.pageSize + list.pageSize + 1;
+  const matched = [];
+  const seen = new Set();
+  let offset = 0;
+  let hitCap = false;
+  const batch = 80;
+  while (matched.length < want) {
+    if (offset >= SCAN_OFFSET_CAP) {
+      hitCap = true;
+      warnings.push('匹配订单较多，请缩小搜索后再翻页。');
+      break;
+    }
+    let query = supabase
+      .from('inventory_order_tracking')
+      .select(ORDER_TRACKING_SELECT)
+      .order('updated_at', { ascending: false });
+    query = applyStationKeys(query, stationKeys, ORDER_STATION_COLUMNS);
+    query = applyListSearch(query, list.q, ORDER_SEARCH_COLUMNS);
+    const { data, error } = await query.range(offset, offset + batch - 1);
+    if (error) {
+      warnings.push(`订单追踪表暂不可用：${error.message}`);
+      break;
+    }
+    if (!data?.length) break;
+    const enriched = await enrichOrdersWithPickup(
+      supabase,
+      (data || []).map(normalizeOrderRow),
+      warnings,
+    );
+    appendUniqueRows(
+      matched,
+      seen,
+      filterSignedOrders(enriched).filter((order) =>
+        rowTouchesStation(order, stationKeys, ORDER_STATION_COLUMNS),
+      ),
+    );
+    offset += data.length;
+    if (data.length < batch) break;
+  }
+  const start = (list.page - 1) * list.pageSize;
+  return {
+    orders: matched.slice(start, start + list.pageSize),
+    total: -1,
+    hasMore: hitCap || matched.length > start + list.pageSize,
+  };
+}
+
+async function scanSignedOrderPage(supabase, warnings, stationKeys, list) {
+  if (String(list.q || '').trim()) {
+    return scanOrdersThenKeepSigned(supabase, warnings, stationKeys, list);
+  }
+  const want = (list.page - 1) * list.pageSize + list.pageSize + 1;
+  const matched = [];
+  const seen = new Set();
+  let offset = 0;
+  let hitCap = false;
+  const batch = 80;
+  while (matched.length < want) {
+    if (offset >= SCAN_OFFSET_CAP) {
+      hitCap = true;
+      warnings.push('签收记录较多，请用搜索或站点缩小范围后再翻页。');
+      break;
+    }
+    const run = async (selectCols) =>
+      supabase
+        .from('inventory_store_items')
+        .select(selectCols)
+        .not('customer_signed_at', 'is', null)
+        .order('customer_signed_at', { ascending: false })
+        .range(offset, offset + batch - 1);
+    let { data, error } = await run(STORE_ITEM_PICKUP_SELECT);
+    if (error && missingArrivalNotifiedColumn(error.message)) {
+      ({ data, error } = await run(STORE_ITEM_PICKUP_SELECT_FALLBACK));
+    }
+    if (error) {
+      warnings.push(`签收记录暂不可用：${error.message}`);
+      break;
+    }
+    if (!data?.length) break;
+    const { barcodes, expresses } = collectItemLookupCodes(data);
+    const orders = await loadOrdersMatchingCodes(supabase, barcodes, expresses, warnings);
+    const signed = filterSignedOrders(attachPickupToOrders(orders, data)).filter((order) =>
+      rowTouchesStation(order, stationKeys, ORDER_STATION_COLUMNS),
+    );
+    const q = list.q.trim().toLowerCase();
+    appendUniqueRows(
+      matched,
+      seen,
+      signed.filter((order) => {
+        if (!q) return true;
+        const hay = [
+          order.order_barcode,
+          order.express_barcode,
+          order.pack_barcode,
+          order.order_name,
+          order.recipient_name,
+          order.recipient_phone,
+          order.destination_code,
+        ]
+          .join(' ')
+          .toLowerCase();
+        return hay.includes(q);
+      }),
+    );
+    offset += data.length;
+    if (data.length < batch) break;
+  }
+  const start = (list.page - 1) * list.pageSize;
+  return {
+    orders: matched.slice(start, start + list.pageSize),
+    total: -1,
+    hasMore: hitCap || matched.length > start + list.pageSize,
+  };
+}
+
 async function handleOverview(supabase, warnings) {
   const [storesList, snapshot, exceptions] = await Promise.all([
     loadTransitStores(supabase),
@@ -704,7 +1016,27 @@ async function handleFinance(supabase, warnings, financePagination, financeScope
   };
 }
 
-async function handlePacks(supabase, packStatus, warnings, stationKeys) {
+async function handlePacks(supabase, packStatus, warnings, stationKeys, list) {
+  if (list) {
+    const { packs: recentPacks, total, hasMore } = await loadPackPage(
+      supabase,
+      packStatus,
+      warnings,
+      stationKeys,
+      list,
+    );
+    return {
+      ok: true,
+      at: new Date().toISOString(),
+      section: 'packs',
+      recentPacks,
+      packStatusFilter: packStatus,
+      packsTruncated: false,
+      listTotal: total,
+      listHasMore: hasMore,
+      warnings,
+    };
+  }
   const { packs: recentPacks, truncated } = await loadRecentPacks(
     supabase,
     packStatus,
@@ -722,7 +1054,27 @@ async function handlePacks(supabase, packStatus, warnings, stationKeys) {
   };
 }
 
-async function handleOrders(supabase, orderStatus, warnings, packBarcode, stationKeys) {
+async function handleOrders(supabase, orderStatus, warnings, packBarcode, stationKeys, list) {
+  if (list && !String(packBarcode || '').trim()) {
+    const { orders: recentOrders, total, hasMore } = await loadOrderPage(
+      supabase,
+      orderStatus,
+      warnings,
+      stationKeys,
+      list,
+    );
+    return {
+      ok: true,
+      at: new Date().toISOString(),
+      section: 'orders',
+      recentOrders,
+      orderStatusFilter: orderStatus,
+      ordersTruncated: false,
+      listTotal: total,
+      listHasMore: hasMore,
+      warnings,
+    };
+  }
   const { orders: recentOrders, truncated } = await loadRecentOrders(
     supabase,
     orderStatus,
@@ -839,6 +1191,9 @@ exports.handler = async (event) => {
   const section = String(event.queryStringParameters?.section || 'overview').toLowerCase();
   const financePagination = parseFinancePagination(event.queryStringParameters);
   const financeScope = parseFinancePeriodQuery(event.queryStringParameters || {});
+  const list = event.queryStringParameters?.listPage
+    ? parseConsoleListQuery(event.queryStringParameters)
+    : null;
   const warnings = [];
 
   try {
@@ -846,9 +1201,9 @@ exports.handler = async (event) => {
     if (section === 'finance') {
       body = await handleFinance(supabase, warnings, financePagination, financeScope);
     } else if (section === 'packs') {
-      body = await handlePacks(supabase, packStatus, warnings, stationKeys);
+      body = await handlePacks(supabase, packStatus, warnings, stationKeys, list);
     } else if (section === 'orders') {
-      body = await handleOrders(supabase, orderStatus, warnings, packBarcode, stationKeys);
+      body = await handleOrders(supabase, orderStatus, warnings, packBarcode, stationKeys, list);
     } else if (section === 'all') {
       body = await handleAll(supabase, packStatus, warnings, financePagination, financeScope);
     } else {

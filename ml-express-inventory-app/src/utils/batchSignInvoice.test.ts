@@ -94,6 +94,31 @@ describe('buildBatchSignInvoice', () => {
     expect(formatInvoiceWeight(model.totalWeightKg)).toBe('22 Kg');
   });
 
+  it('uses the tracked pack weight when the bundle row is missing', () => {
+    const model = buildBatchSignInvoice([
+      {
+        id: 'p1',
+        barcode: 'POL1(4-1)',
+        input_barcode: '116622',
+        weight: '',
+        total_fee: '264000',
+        tracked_pack_weight: '10 Kg',
+      },
+      {
+        id: 'p2',
+        barcode: 'POL1(4-2)',
+        input_barcode: '432423',
+        weight: '',
+        total_fee: '264000',
+        tracked_pack_weight: '10 Kg',
+      },
+    ]);
+    expect(model.lines[0].weightKg).toBe(10);
+    expect(model.totalWeightKg).toBe(10);
+    expect(model.totalFeeMmk).toBe(264000);
+    expect(formatInvoiceWeight(model.totalWeightKg)).toBe('10 Kg');
+  });
+
   it('does not take a later mixed pack weight or extra express nos', () => {
     const mixedPack = {
       weight: '99 Kg',

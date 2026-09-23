@@ -248,6 +248,9 @@ export function useHubReceiveFlow(openPackBarcode: string) {
             return detail;
           }
           pkg = await ensurePackHubReceived(pkg.pack_barcode, pkg);
+          if (isDestinationHubPack(pkg, hubCode)) {
+            await importInboundPackToLocal(pkg, store, operator);
+          }
         } catch (e: unknown) {
           setError(resolveAppError(t, e));
         }
@@ -260,7 +263,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
       void refreshTransportFeePaid(pkg.pack_barcode);
       return pkg;
     },
-    [store, ensurePackHubReceived, refreshTransportFeePaid, preflightHubReceive, t],
+    [store, hubCode, operator, ensurePackHubReceived, refreshTransportFeePaid, preflightHubReceive, t],
   );
 
   useEffect(() => {

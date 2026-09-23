@@ -1,14 +1,24 @@
 import type { PkgTrackingDetail } from '../types/tracking';
+import { destinationCodesMatch } from './destinationCode';
 import { resolveOrderDestinationCode } from './orderDestination';
 
 export function resolvePackLegDestinationCode(pack: PkgTrackingDetail): string {
   return (pack.leg_destination_code || pack.destination_code || '').trim().toUpperCase();
 }
 
-/** 本站目的地快递包：包内订单最终目的地均为当前 hub（与包装号前缀无关） */
+/** 装车时选的运达站就是本段终点（客户地区可以不同，例如 POL 客户只发到 MDY） */
+export function isTruckLegEndingAtHub(
+  pack: Pick<PkgTrackingDetail, 'leg_destination_code' | 'destination_code'>,
+  hubCode: string,
+): boolean {
+  return destinationCodesMatch(resolvePackLegDestinationCode(pack as PkgTrackingDetail), hubCode);
+}
+
+/** 本站目的地快递包：运达站是本站，或包内订单最终目的地均为当前 hub（与包装号前缀无关） */
 export function isDestinationHubPack(pack: PkgTrackingDetail, hubCode: string): boolean {
   const hub = hubCode.trim().toUpperCase();
   if (!hub || pack.orders.length === 0) return false;
+  if (isTruckLegEndingAtHub(pack, hub)) return true;
   return pack.orders.every((order) => resolveOrderDestinationCode(order) === hub);
 }
 
@@ -43,6 +53,7 @@ export function areAllPackOrdersProcessed(pack: PkgTrackingDetail): boolean {
 }
 
 export function hasUnreleasedTransitOrders(pack: PkgTrackingDetail, hubCode: string): boolean {
+  if (isTruckLegEndingAtHub(pack, hubCode)) return false;
   const hub = hubCode.trim().toUpperCase();
   return pack.orders.some(
     (order) => resolveOrderDestinationCode(order) !== hub && order.status !== 'released_at_hub',

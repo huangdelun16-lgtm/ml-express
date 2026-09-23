@@ -12,6 +12,8 @@ export type BatchSignInvoiceSource = {
   input_barcode?: string | null;
   weight?: string | null;
   total_fee?: string | null;
+  /** 运达站读不到包装商品时，用车次追踪上的整包重量 */
+  tracked_pack_weight?: string | null;
   pack?: {
     weight?: string | null;
     items?: Array<{ item_id?: string; input_barcode?: string | null }>;
@@ -63,6 +65,10 @@ function packagingWeightKg(group: BatchSignInvoiceSource[]): number {
     const packWeight = parseWeightKg(pack.weight ?? '');
     if (packWeight > 0) return packWeight;
   }
+  const tracked = group
+    .map((row) => parseWeightKg(row.tracked_pack_weight ?? ''))
+    .find((kg) => kg > 0);
+  if (tracked) return tracked;
   return group.map((row) => parseWeightKg(row.weight ?? '')).find((kg) => kg > 0) ?? 0;
 }
 

@@ -11,7 +11,72 @@ export type ArrivalNotifyTarget = {
   recipientPhone: string;
   hubCode: string;
   storeName?: string;
+  customerCode?: string;
+  notifyMethod?: string;
+  notifyAccount?: string;
 };
+
+export type ArrivalNotifyAction =
+  | { kind: 'whatsapp'; phone: string }
+  | { kind: 'sms'; phone: string }
+  | { kind: 'call'; phone: string }
+  | { kind: 'telegram'; url: string }
+  | { kind: 'wechat'; copyText: string };
+
+function normalizeNotifyMethod(raw: string | null | undefined): string {
+  const value = String(raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '');
+  if (value === 'whatsapp' || value === 'wa') return 'whatsapp';
+  if (value === 'telegram' || value === 'tg') return 'telegram';
+  if (value === 'message' || value === 'sms' || value === 'text') return 'message';
+  if (value === 'phone' || value === 'phonecall' || value === 'call' || value === 'tel') return 'phone';
+  if (value === 'wechat' || value === 'weixin') return 'wechat';
+  return '';
+}
+
+function telegramUrl(account: string): string {
+  const value = account.trim();
+  if (!value) return '';
+  if (value.startsWith('http://') || value.startsWith('https://')) return value;
+  const username = value.replace(/^@/, '');
+  return username ? `https://t.me/${username}` : '';
+}
+
+/** 按后台登记的通知方式和账号决定打开哪个渠道；没有登记时仍用收件电话走 WhatsApp。 */
+export function resolveArrivalNotifyAction(input: {
+  notifyMethod?: string | null;
+  notifyAccount?: string | null;
+  phone?: string | null;
+}): ArrivalNotifyAction | null {
+  const method = normalizeNotifyMethod(input.notifyMethod) || 'whatsapp';
+  const account = String(input.notifyAccount ?? '').trim();
+  const phone = String(input.phone ?? '').trim();
+  const contact = account || phone;
+
+  if (method === 'wechat') {
+    if (!contact) return null;
+    return { kind: 'wechat', copyText: contact };
+  }
+  if (method === 'telegram') {
+    const looksLikeUser = Boolean(account) && !/^\+?\d[\d\s-]*$/.test(account);
+    if (looksLikeUser) {
+      const url = telegramUrl(account);
+      return url ? { kind: 'telegram', url } : null;
+    }
+    const dial = account || phone;
+    return dial ? { kind: 'call', phone: dial } : null;
+  }
+  if (method === 'message') {
+    return contact ? { kind: 'sms', phone: contact } : null;
+  }
+  if (method === 'phone') {
+    const dial = phone || account;
+    return dial ? { kind: 'call', phone: dial } : null;
+  }
+  return contact ? { kind: 'whatsapp', phone: contact } : null;
+}
 
 export type ArrivalNotifyItemRef = CustomerSignItemRef & {
   arrival_notified_at?: string | null;

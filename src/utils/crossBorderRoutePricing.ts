@@ -272,6 +272,32 @@ export function buildRouteMatrixPayload(
   return payload;
 }
 
+/** 矩阵里留空的路线键。只应删除数据库里已经存在的键，避免把没配过的路线当成删除。 */
+export function blankRoutePricingKeys(
+  matrix: RouteMatrixValues,
+  customerCode?: string | null,
+  options?: { destinations?: string[] },
+): string[] {
+  const customer = normalizeCustomerPricingCode(customerCode ?? '');
+  const destFilter = new Set(
+    (options?.destinations ?? [])
+      .map((code) => normalizeRouteHubCode(code))
+      .filter((code): code is CrossBorderRouteHubCode => Boolean(code)),
+  );
+  const keys: string[] = [];
+  for (const origin of CROSS_BORDER_ROUTE_HUBS) {
+    for (const dest of CROSS_BORDER_ROUTE_HUBS) {
+      if (origin.code === dest.code) continue;
+      if (destFilter.size > 0 && !destFilter.has(dest.code)) continue;
+      const trimmed = String(matrix[origin.code]?.[dest.code] ?? '').trim();
+      if (trimmed) continue;
+      const key = buildRoutePerKgSettingsKey(origin.code, dest.code, customer || null);
+      if (key) keys.push(key);
+    }
+  }
+  return keys;
+}
+
 export function parseRouteMatrixForSave(matrix: RouteMatrixValues): {
   ok: true;
   numeric: Record<string, Record<string, number>>;

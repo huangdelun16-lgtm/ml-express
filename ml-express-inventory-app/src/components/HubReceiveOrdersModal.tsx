@@ -19,6 +19,7 @@ import {
   areAllPackOrdersProcessed,
   countPendingPackInboundOrders,
   isDestinationHubPack,
+  isTruckLegEndingAtHub,
   resolveHubReceiveStep,
   resolvePackLegDestinationCode,
 } from '../utils/hubReceivePack';
@@ -116,6 +117,7 @@ export default function HubReceiveOrdersModal({
   const transitOrders = pack.orders.filter((line) => resolveOrderDestinationCode(line) !== hubCode);
   const canReleaseTransit =
     step === 2 &&
+    !isTruckLegEndingAtHub(pack, hubCode) &&
     canReleaseTransitManually({
       packageStatus: pack.status,
       hasTransitOrders: transitOrders.length > 0,

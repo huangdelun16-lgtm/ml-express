@@ -683,7 +683,7 @@ async function applyOrderHubReceived(
   if (orderDest === dest) {
     // 本站最终目的地：到站交付
   } else if (legDest === dest) {
-    // 经本站中转：在本站扫码「入库」登记到站
+    // 本段运达站就是终点：在本站入库，客户地区保持不变
   } else {
     throw svc('orderDestLegMismatch', {
       orderDest: orderDest || '?',

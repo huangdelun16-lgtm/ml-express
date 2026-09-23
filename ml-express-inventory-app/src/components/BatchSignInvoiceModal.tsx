@@ -5,20 +5,23 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import Text from './AppText';
-import { useTranslation } from '../i18n';
+import { getPaymentLabelDisplay, useTranslation } from '../i18n';
 import { getItemDetails, listItems } from '../services/inventoryService';
+import { getPkgTrackingDetail } from '../services/trackingService';
 import { feedbackService } from '../services/FeedbackService';
 import type { InventoryStoreSession } from '../services/authService';
-import type { InventoryItemListRow } from '../types/inventory';
+import type { InventoryItemDetail, InventoryItemListRow } from '../types/inventory';
 import { resolvePackagingStockInSignIds } from '../utils/customerBatchSign';
 import { formatMmkAmount } from '../utils/crossBorderFx';
+import { parseWeightKg } from '../utils/itemFieldFormat';
+import { yangonTodayYmd } from '../utils/yangonFinancePeriod';
 import {
   buildBatchSignInvoice,
-  formatInvoiceExpressNos,
   formatInvoiceWeight,
   type BatchSignInvoiceLine,
   type BatchSignInvoiceModel,
@@ -34,46 +37,82 @@ type Props = {
   onClose: () => void;
 };
 
+type InvoiceHeading = {
+  customer: string;
+  phone: string;
+  destination: string;
+  station: string;
+  packBarcode: string;
+  payment: string;
+  dateLabel: string;
+};
+
+const WATERMARK_TOPS = [16, 72, 128, 184, 240, 296, 352, 408, 464, 520];
+
 function feeLabel(mmk: number, freeLabel: string): string {
   if (!(mmk > 0)) return `0 MMK · ${freeLabel}`;
   return `${formatMmkAmount(mmk)} MMK`;
 }
 
-function InvoiceLineCard({
+async function attachTrackedPackWeights(details: InventoryItemDetail[]): Promise<InventoryItemDetail[]> {
+  const missing = new Set<string>();
+  for (const row of details) {
+    const code = row.packed_bundle_barcode?.trim().toUpperCase() || '';
+    if (!code) continue;
+    if (parseWeightKg(row.pack?.weight || row.weight || '') > 0) continue;
+    missing.add(code);
+  }
+  const weights = new Map<string, string>();
+  await Promise.all(
+    [...missing].map(async (code) => {
+      const pkg = await getPkgTrackingDetail(code).catch(() => null);
+      const weight = pkg?.total_weight?.trim() || '';
+      if (parseWeightKg(weight) > 0) weights.set(code, weight);
+    }),
+  );
+  if (weights.size === 0) return details;
+  return details.map((row) => {
+    const code = row.packed_bundle_barcode?.trim().toUpperCase() || '';
+    const tracked = code ? weights.get(code) : '';
+    if (!tracked) return row;
+    return { ...row, tracked_pack_weight: tracked };
+  });
+}
+
+function headingFrom(
+  details: InventoryItemDetail[],
+  store: InventoryStoreSession | null,
+  paymentLabel: (raw?: string | null) => string,
+): InvoiceHeading {
+  const first = details[0];
+  return {
+    customer: first?.customer_name?.trim() || first?.recipient_name?.trim() || '',
+    phone: details.map((row) => row.recipient_phone?.trim()).find(Boolean) || '',
+    destination: details.map((row) => row.final_destination?.trim()).find(Boolean) || '',
+    station: store?.storeName?.trim() || store?.storeCode?.trim() || '',
+    packBarcode: details.map((row) => row.packed_bundle_barcode?.trim()).find(Boolean) || '',
+    payment: paymentLabel(details.map((row) => row.payment_label).find(Boolean)),
+    dateLabel: yangonTodayYmd(),
+  };
+}
+
+function OrderTable({
   line,
-  kindLabel,
-  expressLabel,
-  weightLabel,
-  feeText,
-  freeLabel,
+  orderLabel,
 }: {
   line: BatchSignInvoiceLine;
-  kindLabel: string;
-  expressLabel: string;
-  weightLabel: string;
-  feeText: string;
-  freeLabel: string;
+  orderLabel: string;
 }) {
+  const nos = line.expressNos.length ? line.expressNos : ['—'];
   return (
-    <View style={styles.card}>
-      <Text style={styles.kind} myanmarWeight="bold">
-        {kindLabel}
-      </Text>
-      <Text style={styles.meta}>
-        {expressLabel}
-        {'  '}
-        {formatInvoiceExpressNos(line.expressNos)}
-      </Text>
-      <Text style={styles.meta}>
-        {weightLabel}
-        {'  '}
-        {formatInvoiceWeight(line.weightKg) || '—'}
-      </Text>
-      <Text style={styles.meta}>
-        {feeText}
-        {'  '}
-        {feeLabel(line.feeMmk, freeLabel)}
-      </Text>
+    <View style={styles.table}>
+      <Text style={styles.tableHead}>{orderLabel}</Text>
+      {nos.map((no, index) => (
+        <View key={`${no}-${index}`} style={styles.orderRow}>
+          <Text style={styles.orderIndex}>{String(index + 1).padStart(2, '0')}</Text>
+          <Text style={styles.orderNo}>{no}</Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -87,11 +126,15 @@ export default function BatchSignInvoiceModal({
   onClose,
 }: Props) {
   const { t } = useTranslation();
+  const { height: windowHeight } = useWindowDimensions();
   const shotRef = useRef<View>(null);
+  const sheetMaxHeight = Math.round(windowHeight * 0.9);
+  const listMaxHeight = Math.max(240, sheetMaxHeight - 88);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [model, setModel] = useState<BatchSignInvoiceModel | null>(null);
+  const [heading, setHeading] = useState<InvoiceHeading | null>(null);
 
   const customerName = useMemo(() => {
     const first = selectedItems[0];
@@ -101,6 +144,7 @@ export default function BatchSignInvoiceModal({
   useEffect(() => {
     if (!visible || !store || selectedItems.length === 0) {
       setModel(null);
+      setHeading(null);
       setError('');
       setLoading(false);
       setSaving(false);
@@ -120,12 +164,16 @@ export default function BatchSignInvoiceModal({
           store,
           (keyword) => listItems(keyword, scope),
         );
-        const details = await getItemDetails(expanded.map((item) => item.id));
+        const details = await attachTrackedPackWeights(
+          await getItemDetails(expanded.map((item) => item.id)),
+        );
         if (cancelled) return;
         setModel(buildBatchSignInvoice(details));
+        setHeading(headingFrom(details, store, (raw) => getPaymentLabelDisplay(t, raw)));
       } catch {
         if (!cancelled) {
           setModel(null);
+          setHeading(null);
           setError(t.invoice.batchLoadFailed);
         }
       } finally {
@@ -136,7 +184,7 @@ export default function BatchSignInvoiceModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, selectedItems, knownItems, store, hubCode, t.invoice.batchLoadFailed]);
+  }, [visible, selectedItems, knownItems, store, hubCode, t]);
 
   const handleSave = async () => {
     if (!model || saving) return;
@@ -168,62 +216,88 @@ export default function BatchSignInvoiceModal({
     }
   };
 
+  const pieceCount = model?.lines.reduce((sum, line) => sum + Math.max(line.expressNos.length, 1), 0) ?? 0;
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+      <View style={styles.overlay}>
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t.invoice.close} />
+        <View style={[styles.sheet, { maxHeight: sheetMaxHeight }]}>
           {loading ? (
             <View style={styles.loadingBox}>
-              <ActivityIndicator color="#0369a1" size="large" />
+              <ActivityIndicator color="#1c1917" size="large" />
               <Text style={styles.loadingText}>{t.invoice.loadingOrder}</Text>
             </View>
           ) : error ? (
             <Text style={styles.error}>{error}</Text>
-          ) : model ? (
-            <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-              <View ref={shotRef} collapsable={false} style={styles.capture}>
-                <Text style={styles.title} myanmarWeight="bold">
-                  {t.invoice.batchTitle}
-                </Text>
-                {store?.storeName || customerName ? (
-                  <Text style={styles.subtitle}>
-                    {[store?.storeName, customerName].filter(Boolean).join(' · ')}
-                  </Text>
-                ) : null}
+          ) : model && heading ? (
+            <ScrollView
+              style={[styles.list, { maxHeight: listMaxHeight }]}
+              contentContainerStyle={styles.listContent}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
+              keyboardShouldPersistTaps="handled"
+            >
+              <View ref={shotRef} collapsable={false} style={styles.paper}>
+                <View pointerEvents="none" style={styles.watermarkWrap}>
+                  {WATERMARK_TOPS.map((top) => (
+                    <Text key={top} numberOfLines={1} clipMyanmar style={[styles.watermark, { top }]}>
+                      MARKET LINK
+                    </Text>
+                  ))}
+                </View>
 
-                {model.lines.map((line, index) => (
-                  <InvoiceLineCard
-                    key={`${line.kind}-${line.expressNos.join('|')}-${index}`}
-                    line={line}
-                    kindLabel={
-                      line.kind === 'packaging'
-                        ? t.home.tilePackagingStockIn
-                        : t.home.tileStockIn
-                    }
-                    expressLabel={
-                      line.kind === 'packaging' ? t.invoice.orderNos : t.invoice.expressNo
-                    }
-                    weightLabel={
-                      line.kind === 'packaging'
-                        ? t.invoice.batchTotalWeight
-                        : t.invoice.weight
-                    }
-                    feeText={t.invoice.fee}
-                    freeLabel={t.invoice.freePromo}
-                  />
-                ))}
+                <View style={styles.paperBody}>
+                  <View style={styles.brandRow}>
+                    <View>
+                      <Text style={styles.brand} myanmarWeight="bold">
+                        MARKET LINK
+                      </Text>
+                      <Text style={styles.brandSub}>EXPRESS</Text>
+                    </View>
+                    <Text style={styles.invoiceWord}>INVOICE</Text>
+                  </View>
+                  <View style={styles.rule} />
+                  <View style={styles.ruleThin} />
 
-                <View style={styles.totals}>
-                  <Text style={styles.totalLine} myanmarWeight="bold">
-                    {t.invoice.batchTotalWeight}
-                    {'  '}
-                    {formatInvoiceWeight(model.totalWeightKg) || '—'}
-                  </Text>
-                  <Text style={styles.totalLine} myanmarWeight="bold">
-                    {t.invoice.batchTotalFee}
-                    {'  '}
-                    {feeLabel(model.totalFeeMmk, t.invoice.freePromo)}
-                  </Text>
+                  <View style={styles.meta}>
+                    <MetaRow label={t.invoice.customerName} value={heading.customer || customerName || '—'} />
+                    {heading.phone ? <MetaRow label={t.invoice.phone} value={heading.phone} /> : null}
+                    {heading.destination ? (
+                      <MetaRow label={t.invoice.finalDest} value={heading.destination} />
+                    ) : null}
+                    {heading.station ? <MetaRow label={t.invoice.station} value={heading.station} /> : null}
+                    {heading.packBarcode ? (
+                      <MetaRow label={t.invoice.packNo} value={heading.packBarcode} />
+                    ) : null}
+                    <MetaRow label={t.invoice.pieceCount} value={String(pieceCount)} />
+                    {heading.payment ? <MetaRow label={t.invoice.payment} value={heading.payment} /> : null}
+                    <MetaRow label={t.invoice.issuedOn} value={heading.dateLabel} />
+                  </View>
+
+                  {model.lines.map((line, index) => (
+                    <OrderTable
+                      key={`${line.kind}-${index}`}
+                      line={line}
+                      orderLabel={line.kind === 'packaging' ? t.invoice.orderNos : t.invoice.expressNo}
+                    />
+                  ))}
+
+                  <View style={styles.totals}>
+                    <View style={styles.totalRow}>
+                      <Text style={styles.totalLabel}>{t.invoice.batchTotalWeight}</Text>
+                      <Text style={styles.totalValue}>{formatInvoiceWeight(model.totalWeightKg) || '—'}</Text>
+                    </View>
+                    <View style={styles.feeRow}>
+                      <Text style={styles.feeLabel}>{t.invoice.batchTotalFee}</Text>
+                      <Text style={styles.feeValue} myanmarWeight="bold">
+                        {feeLabel(model.totalFeeMmk, t.invoice.freePromo)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.payNote}>{t.invoice.payNote}</Text>
+                  <Text style={styles.footerBrand}>MARKET LINK EXPRESS</Text>
                 </View>
               </View>
             </ScrollView>
@@ -238,7 +312,7 @@ export default function BatchSignInvoiceModal({
               accessibilityLabel={t.invoice.batchSave}
             >
               {saving ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color="#f6f3ec" size="small" />
               ) : (
                 <Text style={styles.saveBtnText} myanmarWeight="bold">
                   {t.invoice.batchSave}
@@ -254,91 +328,256 @@ export default function BatchSignInvoiceModal({
               <Text style={styles.closeText}>{t.invoice.close}</Text>
             </Pressable>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
+  );
+}
+
+function MetaRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.metaRow}>
+      <Text style={styles.metaLabel}>{label}</Text>
+      <Text style={styles.metaValue}>{value}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(2,6,23,0.72)',
+    backgroundColor: 'rgba(18, 16, 14, 0.72)',
     justifyContent: 'center',
-    padding: 20,
-  },
-  sheet: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    maxHeight: '82%',
     padding: 16,
   },
-  capture: {
-    backgroundColor: '#f8fafc',
-    gap: 10,
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
   },
-  title: {
-    color: '#0f172a',
+  sheet: {
+    width: '100%',
+    flexShrink: 1,
+    padding: 12,
+    overflow: 'hidden',
+  },
+  paper: {
+    position: 'relative',
+    backgroundColor: '#f6f3ec',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#1c1917',
+  },
+  watermarkWrap: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 0,
+  },
+  watermark: {
+    position: 'absolute',
+    left: -24,
+    right: -24,
+    color: '#1c1917',
+    opacity: 0.1,
     fontSize: 20,
     fontWeight: '800',
+    letterSpacing: 0.6,
+    textAlign: 'center',
+    transform: [{ rotate: '-18deg' }],
   },
-  subtitle: {
-    color: '#475569',
+  paperBody: {
+    position: 'relative',
+    zIndex: 1,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 16,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  brand: {
+    color: '#1c1917',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  brandSub: {
+    marginTop: 1,
+    color: '#1c1917',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 4,
+  },
+  invoiceWord: {
+    color: '#1c1917',
     fontSize: 13,
-    marginTop: -4,
+    fontWeight: '700',
+    letterSpacing: 3,
+  },
+  rule: {
+    marginTop: 12,
+    height: 2,
+    backgroundColor: '#1c1917',
+  },
+  ruleThin: {
+    marginTop: 3,
+    height: 1,
+    backgroundColor: '#1c1917',
+  },
+  meta: {
+    marginTop: 14,
+    gap: 7,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  metaLabel: {
+    color: '#57534e',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  metaValue: {
+    flex: 1,
+    color: '#1c1917',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  table: {
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#1c1917',
+  },
+  tableHead: {
+    paddingTop: 8,
+    paddingBottom: 6,
+    color: '#57534e',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  orderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 7,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#a8a29e',
+  },
+  orderIndex: {
+    width: 24,
+    color: '#78716c',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  orderNo: {
+    flex: 1,
+    color: '#1c1917',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  totals: {
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#1c1917',
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    paddingTop: 10,
+  },
+  totalLabel: {
+    color: '#44403c',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  totalValue: {
+    color: '#1c1917',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  feeRow: {
+    marginTop: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    backgroundColor: '#1c1917',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  feeLabel: {
+    color: '#f6f3ec',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  feeValue: {
+    color: '#f6f3ec',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  payNote: {
+    marginTop: 14,
+    textAlign: 'center',
+    color: '#44403c',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  footerBrand: {
+    marginTop: 4,
+    textAlign: 'center',
+    color: '#a8a29e',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 2,
   },
   loadingBox: {
     alignItems: 'center',
     paddingVertical: 28,
     gap: 10,
+    backgroundColor: '#f6f3ec',
   },
-  loadingText: { color: '#64748b', fontSize: 13 },
+  loadingText: { color: '#57534e', fontSize: 13 },
   error: { color: '#b91c1c', fontSize: 13, paddingVertical: 16 },
-  list: { maxHeight: 420 },
+  list: {
+    flexGrow: 0,
+    flexShrink: 1,
+    overflow: 'hidden',
+  },
   listContent: { paddingBottom: 4 },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    padding: 12,
-    gap: 6,
-  },
-  kind: { color: '#0369a1', fontSize: 13, fontWeight: '800' },
-  meta: { color: '#334155', fontSize: 14, lineHeight: 22 },
-  totals: {
-    marginTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: '#cbd5e1',
-    paddingTop: 12,
-    gap: 8,
-  },
-  totalLine: { color: '#0f172a', fontSize: 16, fontWeight: '800' },
   actions: {
-    marginTop: 14,
+    marginTop: 12,
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 8,
   },
   saveBtn: {
-    backgroundColor: '#0369a1',
-    borderRadius: 10,
+    backgroundColor: '#1c1917',
     paddingHorizontal: 16,
     paddingVertical: 10,
     minWidth: 88,
     alignItems: 'center',
   },
-  saveBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  saveBtnText: { color: '#f6f3ec', fontWeight: '800', fontSize: 14 },
   btnDisabled: { opacity: 0.5 },
   closeBtn: {
-    borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: '#94a3b8',
+    borderColor: '#d6d3d1',
+    backgroundColor: '#f6f3ec',
   },
-  closeText: { color: '#475569', fontWeight: '700' },
+  closeText: { color: '#1c1917', fontWeight: '700' },
 });
