@@ -3,6 +3,7 @@ import {
   formatUnsignedInvoiceFee,
   formatUnsignedInvoiceWeight,
   isUnsignedExpressItem,
+  packagingBatchSelectionIds,
   type UnsignedInvoiceSource,
 } from './customerUnsignedInvoice';
 
@@ -23,6 +24,19 @@ function row(partial: Partial<UnsignedInvoiceSource> & Pick<UnsignedInvoiceSourc
 }
 
 describe('customerUnsignedInvoice', () => {
+  it('selects every unsigned piece in the same inbound batch', () => {
+    const items = [
+      row({ id: 'a', inboundBarcode: 'POL142622220926(4-1)' }),
+      row({ id: 'b', inboundBarcode: 'POL142622220926(4-2)' }),
+      row({ id: 'c', inboundBarcode: 'POL142622220926(4-3)', customerSigned: true, transportStatus: '已签收' }),
+      row({ id: 'd', inboundBarcode: 'POL142622220926(4-4)' }),
+      row({ id: 'solo', inboundBarcode: 'SOLO-1' }),
+    ];
+    expect(packagingBatchSelectionIds(items, 'a').sort()).toEqual(['a', 'b', 'd']);
+    expect(packagingBatchSelectionIds(items, 'c')).toEqual([]);
+    expect(packagingBatchSelectionIds(items, 'solo')).toEqual(['solo']);
+  });
+
   it('treats signed rows as not selectable', () => {
     expect(isUnsignedExpressItem({ transportStatus: '已入库' })).toBe(true);
     expect(isUnsignedExpressItem({ transportStatus: '已签收' })).toBe(false);

@@ -1,4 +1,7 @@
-import { groupCustomerExpressItems } from './packagingStockInDisplay';
+import {
+  groupCustomerExpressItems,
+  parsePackagingStockInLineBarcode,
+} from './packagingStockInDisplay';
 
 export type UnsignedInvoiceSource = {
   id: string;
@@ -31,6 +34,21 @@ export type UnsignedCustomerInvoice = {
   packNo: string;
   payment: string;
 };
+
+/** 勾选多个入库中的一件时，同一批未签收订单一起选上。已签收的不进选择。 */
+export function packagingBatchSelectionIds<
+  T extends { id: string; inboundBarcode: string; customerSigned?: boolean; transportStatus?: string | null },
+>(items: T[], id: string): string[] {
+  const target = items.find((item) => item.id === id);
+  if (!target || !isUnsignedExpressItem(target)) return [];
+  const parsed = parsePackagingStockInLineBarcode(target.inboundBarcode);
+  if (!parsed || parsed.total <= 1) return [id];
+  const siblings = items.filter((item) => {
+    const row = parsePackagingStockInLineBarcode(item.inboundBarcode);
+    return row?.base === parsed.base && isUnsignedExpressItem(item);
+  });
+  return siblings.length ? siblings.map((item) => item.id) : [id];
+}
 
 export function isUnsignedExpressItem(item: {
   customerSigned?: boolean;

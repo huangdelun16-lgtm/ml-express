@@ -1274,14 +1274,51 @@ button.cbl-io-overview-card--btn:hover {
 }
 
 .cbl-customer-items-modal .cbl-pricing-modal__head {
-  background: #1c1917;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px 18px 16px;
+  background: #171512;
   border-bottom: none;
   color: #f6f3ec;
 }
 
+.cbl-customer-items-modal .cbl-customer-modal__head-main {
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cbl-customer-items-modal .cbl-customer-modal__identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.cbl-customer-items-modal .cbl-customer-modal__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #f6f3ec;
+  color: #171512;
+  font-size: 16px;
+}
+
 .cbl-customer-items-modal .cbl-pricing-modal__title,
 .cbl-customer-items-modal .cbl-customer-modal__title {
-  color: #f6f3ec;
+  margin: 0;
+  color: #fafaf9;
+  font-size: 1.45rem;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.cbl-customer-items-modal .cbl-customer-modal__phone {
+  margin: 5px 0 0;
+  color: #d6d3d1;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .cbl-customer-items-modal .cbl-pricing-modal__close {
@@ -1290,46 +1327,88 @@ button.cbl-io-overview-card--btn:hover {
   border-color: rgba(246, 243, 236, 0.28);
 }
 
+.cbl-customer-items-modal .cbl-customer-modal__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(168px, 1.35fr);
+  gap: 0;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(246, 243, 236, 0.16);
+  border-radius: 12px;
+  background: rgba(246, 243, 236, 0.06);
+}
+
 .cbl-customer-items-modal .cbl-customer-modal__stat {
-  background: #f6f3ec;
-  border-color: #e7e5e4;
-  color: #57534e;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 14px;
+  border: none;
+  border-right: 1px solid rgba(246, 243, 236, 0.12);
+  border-radius: 0;
+  background: transparent;
+  color: #a8a29e;
 }
 
 .cbl-customer-items-modal .cbl-customer-modal__stat-label {
-  color: #78716c;
+  color: #a8a29e;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 .cbl-customer-items-modal .cbl-customer-modal__stat strong {
-  color: #1c1917;
-  font-size: 16px;
+  color: #fafaf9;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.1;
 }
 
 .cbl-customer-items-modal .cbl-customer-modal__stat--fee {
-  background: #1c1917;
-  border-color: #1c1917;
+  background: #f6f3ec;
+  border-right: none;
 }
 
 .cbl-customer-items-modal .cbl-customer-modal__stat--fee .cbl-customer-modal__stat-label {
-  color: #a8a29e;
+  color: #78716c;
 }
 
 .cbl-customer-items-modal .cbl-customer-modal__stat--fee strong,
 .cbl-customer-items-modal .cbl-customer-modal__stat--fee .cbl-money-main {
-  color: #fafaf9;
-  font-size: 18px;
+  color: #171512;
+  font-size: 20px;
   font-weight: 800;
+  line-height: 1.1;
 }
 
 .cbl-customer-items-modal .cbl-customer-modal__stat--fee .cbl-money-ccy {
-  color: #e7e5e4;
-  font-size: 11px;
+  color: #44403c;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .cbl-customer-items-modal .cbl-customer-modal__stat--fee .cbl-money-sub {
-  color: #d6d3d1;
+  margin-top: 1px;
+  color: #57534e;
   font-size: 13px;
   font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .cbl-customer-items-modal .cbl-customer-modal__stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .cbl-customer-items-modal .cbl-customer-modal__stat:nth-child(2) {
+    border-right: none;
+  }
+
+  .cbl-customer-items-modal .cbl-customer-modal__stat--fee {
+    grid-column: 1 / -1;
+  }
 }
 
 .cbl-customer-check-col {

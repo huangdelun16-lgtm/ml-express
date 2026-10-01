@@ -20,6 +20,7 @@ import {
   formatUnsignedInvoiceFee,
   formatUnsignedInvoiceWeight,
   isUnsignedExpressItem,
+  packagingBatchSelectionIds,
   type UnsignedCustomerInvoice,
 } from '../utils/customerUnsignedInvoice';
 import { yangonTodayYmd } from '../utils/yangonFinancePeriod';
@@ -200,9 +201,13 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
   }, [invoice]);
 
   const toggleId = (id: string) => {
-    setSelectedIds((current) =>
-      current.includes(id) ? current.filter((row) => row !== id) : [...current, id],
-    );
+    const bundle = packagingBatchSelectionIds(items, id);
+    const ids = bundle.length ? bundle : [id];
+    setSelectedIds((current) => {
+      const allOn = ids.every((row) => current.includes(row));
+      if (allOn) return current.filter((row) => !ids.includes(row));
+      return [...current, ...ids.filter((row) => !current.includes(row))];
+    });
   };
 
   const toggleAllUnsigned = () => {
@@ -264,15 +269,18 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
       <div className="cbl-pricing-modal cbl-customer-items-modal" role="dialog" aria-modal="true">
         <header className="cbl-pricing-modal__head cbl-customer-modal__head">
           <div className="cbl-customer-modal__head-main">
-            <div className="cbl-customer-modal__avatar" aria-hidden="true">客</div>
-            <div>
-              <h2 className="cbl-pricing-modal__title cbl-customer-modal__title">
-                {customer.customerName}
-              </h2>
-              {customer.customerPhone && customer.customerPhone !== '—' ? (
-                <p className="cbl-customer-modal__phone">{customer.customerPhone}</p>
-              ) : null}
-              <div className="cbl-customer-modal__stats">
+            <div className="cbl-customer-modal__identity">
+              <div className="cbl-customer-modal__avatar" aria-hidden="true">客</div>
+              <div>
+                <h2 className="cbl-pricing-modal__title cbl-customer-modal__title">
+                  {customer.customerName}
+                </h2>
+                {customer.customerPhone && customer.customerPhone !== '—' ? (
+                  <p className="cbl-customer-modal__phone">{customer.customerPhone}</p>
+                ) : null}
+              </div>
+            </div>
+            <div className="cbl-customer-modal__stats">
                 <span className="cbl-customer-modal__stat">
                   <span className="cbl-customer-modal__stat-label">
                     {isEn ? 'Orders' : '订单'}
@@ -305,7 +313,6 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                     />
                   </strong>
                 </span>
-              </div>
             </div>
           </div>
           <button
@@ -466,11 +473,15 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                                   onChange={() => toggleId(item.id)}
                                   aria-label={item.expressBarcode}
                                   title={
-                                    unsigned
-                                      ? undefined
-                                      : isEn
+                                    !unsigned
+                                      ? isEn
                                         ? 'Signed orders cannot be invoiced'
                                         : '已签收，不能开发票'
+                                      : group.type === 'packaging'
+                                        ? isEn
+                                          ? 'Checking one selects the whole inbound batch'
+                                          : '勾选一件，同一批多个入库会一起选上'
+                                        : undefined
                                   }
                                 />
                               </td>
