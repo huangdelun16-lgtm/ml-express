@@ -410,74 +410,43 @@ export const serviceErrorsMy: ServiceErrorTexts = {
 };
 
 export const pkgNotFoundHintZh = {
-  title: '云端未找到该快递包追踪记录。',
-  stepsLead: '请确认发站已完成以下步骤：',
-  step1: '1. 在「装车出库」选中该包裹并提交',
-  step2: '2. 成功提示中含「已同步云端」',
-  step3: '3. 发站与本站使用同一 Supabase 项目（.env 配置一致）',
-  step4: '4. 已执行数据库迁移 inventory_pkg_tracking',
+  title: '发站还没把这包同步到云端。',
+  next: '下一步：让发站在「装车出库」看到「已同步云端」后，再来扫。本站先不要入库。',
   destMismatch:
-    '包装号标注目的地 {packDest}，本站 {hub}。若为本段运达站，请确认发站装车时目的地选 {hub}',
-  destOnly: '包装号目的地：{packDest}',
-  resyncTip: '请恢复网络，并由发站核对该 PKG 是否已完整写入 Supabase；未确认前不要重复装车。',
+    '包装号标注目的地 {packDest}，本站 {hub}。若这车是发到本站的，请让发站装车时运达站选 {hub}。',
 };
 
 export const pkgNotFoundHintEn = {
-  title: 'Package tracking not found in cloud.',
-  stepsLead: 'Confirm the origin hub completed:',
-  step1: '1. Selected the package in Truck Load and submitted',
-  step2: '2. Success message included cloud sync',
-  step3: '3. Same Supabase project on both hubs (.env)',
-  step4: '4. DB migration inventory_pkg_tracking applied',
+  title: 'The origin hub has not synced this pack yet.',
+  next: 'Next: ask them to finish Truck Load and see “synced to cloud”, then scan again. Do not stock it in here yet.',
   destMismatch:
-    'Package shows destination {packDest}; this hub is {hub}. For this leg, origin must select {hub} when loading.',
-  destOnly: 'Package destination: {packDest}',
-  resyncTip: 'Restore the connection and verify that the origin fully wrote this PKG to Supabase before repeating any truck load.',
+    'The barcode shows destination {packDest}; this hub is {hub}. If the truck should end here, the origin must choose {hub} when loading.',
 };
 
 export const pkgNotFoundHintMy = {
-  title: 'ကလောက် PKG ခြေရာခံ မတွေ့',
-  stepsLead: 'မူလစခန်း လုပ်ရမည့်အချက်များ —',
-  step1: '1. 「ကားတင်ပို့」 တွင် PKG ရွေးပြီး တင်ပါ',
-  step2: '2. 「ကလောက်စင့်ခ်ပြီး」 ပါရမည်',
-  step3: '3. Supabase project တူညီရမည်',
-  step4: '4. inventory_pkg_tracking migration',
-  destMismatch: 'PKG {packDest} — ဤစခန်း {hub} — leg အတွက် {hub} ရွေးပါ',
-  destOnly: 'PKG ရောက်ရှိမည့်နေရာ — {packDest}',
-  resyncTip: 'ကွန်ရက်ပြန်ချိတ်ပြီး မူလစခန်းက ဤ PKG ကို Supabase တွင် အပြည့်အစုံရေးထားကြောင်း စစ်ဆေးပါ။',
+  title: 'မူလစခန်းက ဤထုပ်ကို ကလောက်သို့ မတင်ရသေးပါ။',
+  next: 'နောက်တစ်ဆင့် — 「ကားတင်ပို့」 တွင် 「ကလောက်စင့်ခ်ပြီး」 မြင်ပြီးမှ ထပ်စကင်ပါ။ ဤစခန်းတွင် အရင် မသွင်းပါနှင့်။',
+  destMismatch: 'ဘားကုဒ် ရောက်ရှိရာ {packDest}၊ ဤစခန်း {hub}။ ဤစခန်းသို့ လာမည်ဆိုလျှင် မူလစခန်းက ကားတင်ရာတွင် {hub} ရွေးပါ။',
 };
 
 export const orderNotFoundHintZh = {
-  title: '云端未找到该订单追踪记录。',
-  scanHint: '您扫描的可能是入库单或快递单，而非快递包 PKG 号。',
-  stepsLead: '建议操作：',
-  step1: '1. 优先扫描快递包条码（PKG 开头）',
-  step2: '2. 或确认发站已装车出库并「已同步云端」',
-  step3: '3. 发站与本站 Supabase 配置一致',
+  title: '云端还没有这张单。',
+  scanHint: '先扫包装号。包装号也没有的话，就是发站还没装车同步。',
+  next: '下一步：让发站在「装车出库」看到「已同步云端」后，再来扫。本站先不要入库。',
   destMismatch:
-    '条码前缀 {dest} 表示订单最终目的地，本站为 {hub}。若为本站中转，请先扫所属 PKG 确认到站。',
-  manualTip: '也可在弹窗订单列表中手动点「确认入库」或「释放中转」。',
+    '条码前缀 {dest} 是最终目的地，本站是 {hub}。若这车发到本站，请先扫所属包装号。',
 };
 
 export const orderNotFoundHintEn = {
-  title: 'Order tracking not found in cloud.',
-  scanHint: 'You may have scanned an inbound or express label, not a PKG barcode.',
-  stepsLead: 'Try:',
-  step1: '1. Scan the PKG barcode first',
-  step2: '2. Confirm origin truck load with cloud sync',
-  step3: '3. Same Supabase config on both hubs',
-  destMismatch:
-    'Prefix {dest} is final destination; this hub is {hub}. For transit, scan the PKG first.',
-  manualTip: 'Or confirm stock-in / release transfer from the order list.',
+  title: 'This order is not on the cloud yet.',
+  scanHint: 'Scan the pack barcode first. If that is missing too, the origin has not synced the truck load.',
+  next: 'Next: ask the origin to finish Truck Load and see “synced to cloud”, then scan again. Do not stock it in here yet.',
+  destMismatch: 'Prefix {dest} is the final destination; this hub is {hub}. If the truck ends here, scan the pack barcode first.',
 };
 
 export const orderNotFoundHintMy = {
-  title: 'ကလောက် အော်ဒါ ခြေရာခံ မတွေ့',
-  scanHint: 'PKG မဟုတ်သော ဘားကုဒ် ဖြစ်နိုင်သည်',
-  stepsLead: 'လုပ်ရန် —',
-  step1: '1. PKG ဘားကုဒ် ဦးစွာ စကင်ပါ',
-  step2: '2. မူလစခန်း ကားတင်ပို့+စင့်ခ်',
-  step3: '3. Supabase config တူညီရမည်',
-  destMismatch: 'prefix {dest} — ဤစခန်း {hub} — PKG ဦးစွာ',
-  manualTip: 'အော်ဒါစာရင်းမှ 「စာရင်းသွင်း」/「လွှဲထုတ်」',
+  title: 'ဤအော်ဒါ ကလောက်တွင် မရှိသေးပါ။',
+  scanHint: 'ထုပ်ဘားကုဒ်ကို အရင်စကင်ပါ။ မရှိလျှင် မူလစခန်း ကားတင် မစင့်ခ်ရသေးပါ။',
+  next: 'နောက်တစ်ဆင့် — 「ကားတင်ပို့」 တွင် 「ကလောက်စင့်ခ်ပြီး」 မြင်ပြီးမှ ထပ်စကင်ပါ။ ဤစခန်းတွင် အရင် မသွင်းပါနှင့်။',
+  destMismatch: 'prefix {dest} သည် နောက်ဆုံးရောက်ရှိရာ၊ ဤစခန်း {hub}။ ဤစခန်းသို့ လာမည်ဆိုလျှင် ထုပ်ဘားကုဒ်ကို အရင်စကင်ပါ။',
 };

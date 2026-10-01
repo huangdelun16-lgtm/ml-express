@@ -101,13 +101,10 @@ export function formatPkgNotFoundHint(
   const h = t.hubReceiveHints;
   const packDest = packDestinationFromBarcode(packBarcode);
   const hub = hubCode.trim().toUpperCase();
-  const lines = [h.title, '', h.stepsLead, h.step1, h.step2, h.step3, h.step4];
+  const lines = [h.title, '', h.next];
   if (packDest && hub && packDest !== hub) {
     lines.push('', fmt(h.destMismatch, { packDest, hub }));
-  } else if (packDest) {
-    lines.push('', fmt(h.destOnly, { packDest }));
   }
-  lines.push('', h.resyncTip);
   return lines.join('\n');
 }
 
@@ -120,11 +117,10 @@ export function formatOrderNotFoundHint(
   const h = t.orderReceiveHints;
   const dest = extractDestinationCode(scanCode);
   const hub = hubCode.trim().toUpperCase();
-  const lines = [h.title, '', h.scanHint, '', h.stepsLead, h.step1, h.step2, h.step3];
+  const lines = [h.title, '', h.scanHint, '', h.next];
   if (dest && hub && dest !== hub) {
     lines.push('', fmt(h.destMismatch, { dest, hub }));
   }
-  lines.push('', h.manualTip);
   return lines.join('\n');
 }
 

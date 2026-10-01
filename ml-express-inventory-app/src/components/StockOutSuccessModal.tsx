@@ -77,8 +77,8 @@ export default function StockOutSuccessModal({
   const cloudHint =
     data.cloudStatus === 'synced'
       ? fmt(t.stockOut.cloudSynced, { dest: data.destination })
-      : data.cloudStatus === 'failed' && data.cloudError
-        ? fmt(t.stockOut.cloudFailed, { err: data.cloudError })
+      : data.cloudError
+        ? data.cloudError
         : t.stockOut.cloudSkipped;
 
   const failedSteps = fmt(t.stockOut.cloudSyncFailedSteps, { dest: data.destination });
@@ -130,9 +130,11 @@ export default function StockOutSuccessModal({
           {needsCloudAction ? (
             <>
               <View style={styles.warnBanner}>
-                <Text style={styles.warnBannerTitle}>{t.stockOut.cloudSyncFailedLead}</Text>
+                <Text style={styles.warnBannerTitle}>
+                  {data.cloudError ? t.stockOut.cloudSyncWarnTitle : t.stockOut.cloudSyncFailedLead}
+                </Text>
                 <Text style={styles.warnBannerText}>{cloudHint}</Text>
-                <Text style={styles.warnSteps}>{failedSteps}</Text>
+                {data.cloudError ? null : <Text style={styles.warnSteps}>{failedSteps}</Text>}
               </View>
               {data.packBarcodes.length > 0 ? (
                 <View style={styles.packListBox}>

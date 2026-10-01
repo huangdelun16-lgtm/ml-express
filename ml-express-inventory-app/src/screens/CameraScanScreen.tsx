@@ -9,6 +9,7 @@ import { getItemByBarcode, listItems } from '../services/inventoryService';
 import { findTrackingByAnyCode } from '../services/trackingService';
 import type { InventoryItem } from '../types/inventory';
 import { resolvePackagingStockInSignIds } from '../utils/customerBatchSign';
+import { resolveCameraScanRoute } from '../utils/cameraScanRoute';
 import { canMarkCustomerSigned } from '../utils/customerSign';
 import { isPackageBarcode } from '../utils/packageNumber';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
@@ -45,12 +46,38 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
         findTrackingByAnyCode(code),
       ]);
       const pkg = cloud.pkg;
-      setResult({
+      const next: ScanResult = {
         code,
         item,
         cloudStatus: pkg ? getPkgStatusLabel(t, pkg.status) : null,
         cloudRoute: pkg ? `${pkg.origin_store_code} → ${pkg.destination_code}` : null,
+      };
+      setResult(next);
+      const route = resolveCameraScanRoute({
+        code,
+        hubCode: hubCode ?? '',
+        hasLocalItem: item != null,
+        canSign: Boolean(item && store && canMarkCustomerSigned(store, item)),
+        pkg: pkg
+          ? {
+              pack_barcode: pkg.pack_barcode,
+              leg_destination_code: pkg.leg_destination_code,
+              destination_code: pkg.destination_code,
+              status: pkg.status,
+            }
+          : null,
       });
+      if (route.kind === 'hub_receive') {
+        navigation.navigate('HubReceive', { openPackBarcode: route.packBarcode });
+        return;
+      }
+      if (route.kind === 'stock_in') {
+        navigation.navigate('StockIn', { presetBarcode: route.barcode });
+        return;
+      }
+      if (route.kind === 'sign' && item && store) {
+        await openSign(item);
+      }
     } finally {
       setLoading(false);
     }
@@ -77,23 +104,25 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
   const canSign =
     result?.item && store && canMarkCustomerSigned(store, result.item);
 
-  const handleSign = () => {
-    if (!result?.item || !store) return;
-    const item = result.item;
+  const openSign = async (item: InventoryItem) => {
+    if (!store) return;
     const scope = hubCode ? { store, hubCode } : undefined;
-    void (async () => {
-      const expanded = await resolvePackagingStockInSignIds(
-        [item],
-        [item],
-        store,
-        (keyword) => listItems(keyword, scope),
-      );
-      setSignRequest({
-        itemIds: expanded.map((item) => item.id),
-        operator: operatorName ?? t.common.operator,
-        store,
-      });
-    })();
+    const expanded = await resolvePackagingStockInSignIds(
+      [item],
+      [item],
+      store,
+      (keyword) => listItems(keyword, scope),
+    );
+    setSignRequest({
+      itemIds: expanded.map((row) => row.id),
+      operator: operatorName ?? t.common.operator,
+      store,
+    });
+  };
+
+  const handleSign = () => {
+    if (!result?.item) return;
+    void openSign(result.item);
   };
 
   return (

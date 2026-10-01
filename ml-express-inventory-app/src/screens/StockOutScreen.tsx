@@ -19,6 +19,7 @@ import StockOutSuccessModal, { type StockOutSuccessData } from '../components/St
 import { useAuth } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useTranslation, resolveAppError } from '../i18n';
+import { explainCloudOperationFailure } from '../utils/cloudOperationFailure';
 import {
   applyTruckLoadOutbound,
   ensureCloudPackRegistered,
@@ -230,7 +231,10 @@ export default function StockOutScreen({ navigation }: Props) {
       }
       rejectScan(classifyUnresolvedTruckLoadScan({ item, pack }));
     } catch (e: unknown) {
-      feedbackService.notify(t.common.fail, resolveAppError(t, e));
+      feedbackService.notify(
+        t.common.fail,
+        explainCloudOperationFailure(t, e, 'stockOut') ?? resolveAppError(t, e),
+      );
     } finally {
       setScanBusy(false);
     }
@@ -320,7 +324,8 @@ export default function StockOutScreen({ navigation }: Props) {
         transportFee: transportFee.trim(),
         cloudStatus,
         cloudError: result.cloudError
-          ? resolveAppError(t, new Error(result.cloudError))
+          ? explainCloudOperationFailure(t, new Error(result.cloudError), 'stockOut') ??
+            resolveAppError(t, new Error(result.cloudError))
           : undefined,
         packBarcodes: selectedPacks.map((p) => p.bundle_barcode),
       });
@@ -328,7 +333,10 @@ export default function StockOutScreen({ navigation }: Props) {
       await loadPacks();
       await refreshTripPreview();
     } catch (e: unknown) {
-      feedbackService.notify(t.common.fail, resolveAppError(t, e));
+      feedbackService.notify(
+        t.common.fail,
+        explainCloudOperationFailure(t, e, 'stockOut') ?? resolveAppError(t, e),
+      );
     } finally {
       setLoading(false);
     }

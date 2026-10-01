@@ -9,6 +9,7 @@ import {
   resolveAppError,
   useTranslation,
 } from '../i18n';
+import { explainCloudOperationFailure } from '../utils/cloudOperationFailure';
 import {
   deliverHubOrderInboundAtStation,
   ensurePackHubReceivedAtStation,
@@ -135,9 +136,9 @@ export function useHubReceiveFlow(openPackBarcode: string) {
       setError(
         gate.reason === 'notConfigured'
           ? getSupabaseConfigHint() || t.hubReceive.supabaseMissing
-          : gate.reason === 'offline' || gate.reason === 'notAuthenticated'
-            ? t.hubReceive.cloudOfflineBlock
-            : t.hubReceive.cloudOfflineBlock,
+          : gate.reason === 'notAuthenticated'
+            ? t.hubReceive.cloudFailSession
+            : t.hubReceive.cloudFailNetwork,
       );
       setCloudConnected(false);
       return false;
@@ -154,7 +155,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
         try {
           await importInboundPackToLocal(pkg, store, operator);
         } catch (e: unknown) {
-          const syncErr = resolveAppError(t, e);
+          const syncErr = explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e);
           setError(fmt(t.hubReceive.orderConfirmedSyncFailed, { err: syncErr }));
         }
       }
@@ -194,7 +195,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
         try {
           await importInboundPackToLocal(pkg, store, operator);
         } catch (e: unknown) {
-          const syncErr = resolveAppError(t, e);
+          const syncErr = explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e);
           setError(fmt(t.hubReceive.orderConfirmedSyncFailed, { err: syncErr }));
         }
       }
@@ -252,7 +253,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
             await importInboundPackToLocal(pkg, store, operator);
           }
         } catch (e: unknown) {
-          setError(resolveAppError(t, e));
+          setError(explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e));
         }
       } else if (store) {
         void ensureHubReceiveCloudReady({ forWrite: true });
@@ -283,7 +284,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
         const opened = await openPackOrdersModal(detail);
         setMessage(fmt(t.hubReceive.packIdentified, { barcode: opened.pack_barcode, count: opened.item_count }));
       } catch (e: unknown) {
-        setError(resolveAppError(t, e));
+        setError(explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e));
       } finally {
         setLoading(false);
       }
@@ -358,7 +359,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
         setMessage(fmt(t.hubReceive.packIdentified, { barcode: opened.pack_barcode, count: opened.item_count }));
       }
     } catch (e: unknown) {
-      setError(resolveAppError(t, e));
+      setError(explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -401,7 +402,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
       );
       return;
     } catch (e: unknown) {
-      setError(resolveAppError(t, e));
+      setError(explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -435,7 +436,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
       setScan('');
       void addScannedOrderToBasket(order.order_barcode, { quiet: true });
     } catch (e: unknown) {
-      setError(resolveAppError(t, e));
+      setError(explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -577,7 +578,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
         if (!after) {
           setError(
             inboundError
-              ? resolveAppError(t, inboundError)
+              ? explainCloudOperationFailure(t, inboundError, 'hubReceive') ?? resolveAppError(t, inboundError)
               : formatOrderNotFoundHint(t, trimmed, hubCode),
           );
           return;
@@ -586,7 +587,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
       const added = await addScannedOrderToBasket(trimmed);
       if (added) setScan('');
     } catch (e: unknown) {
-      setError(resolveAppError(t, e));
+      setError(explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -645,7 +646,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
         await refreshInventoryCloudSession({ force: true });
         const retried = await ensurePackHubReceived(activePack.pack_barcode, latest ?? activePack);
         if (retried.status === 'in_transit') {
-          setError(resolveAppError(t, e));
+          setError(explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e));
           return;
         }
         setError('');
@@ -658,7 +659,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
         );
         return;
       } catch {
-        setError(resolveAppError(t, e));
+        setError(explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e));
       }
     } finally {
       setConfirmingHubReceive(false);
@@ -682,7 +683,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
       setModalSuccess(successMsg);
       showTaskSuccess(t.hubReceive.inboundSuccess, successMsg);
     } catch (e: unknown) {
-      setError(resolveAppError(t, e));
+      setError(explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e));
     } finally {
       setConfirmingOrderId(null);
     }
@@ -727,7 +728,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
       showTaskSuccess(t.hubReceive.batchInboundSuccess, successMsg);
       queueArrivalNotify(pendingOrders);
     } catch (e: unknown) {
-      setError(resolveAppError(t, e));
+      setError(explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e));
     } finally {
       setBatchInbounding(false);
     }
@@ -773,7 +774,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
                 showTaskSuccess(t.hubReceive.paySuccess, fmt(t.hubReceive.paySuccessMsg, { fee: feeDisplay }));
                 setMessage(paidMsg);
               } catch (e: unknown) {
-                setError(resolveAppError(t, e));
+                setError(explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e));
               } finally {
                 setPayingTransportFee(false);
               }
@@ -801,7 +802,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
       if (updated) setActivePack(preferConfirmedHubReceivePack(activePack, updated));
       setMessage(fmt(t.hubReceive.manualReleaseDone, { count: releasedCount }));
     } catch (e: unknown) {
-      setError(resolveAppError(t, e));
+      setError(explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e));
     } finally {
       setReleasingTransit(false);
     }

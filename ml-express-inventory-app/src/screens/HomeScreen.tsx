@@ -89,25 +89,23 @@ export default function HomeScreen({ navigation }: HomeProps) {
     }, [load]),
   );
 
-  const tiles = [
-    { title: t.home.tileStockIn, icon: '📥', screen: 'StockIn', color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
+  const tiles: ActionTile[] = [
+    { title: t.home.tileStockIn, hint: t.home.tileStockInHint, icon: '📥', screen: 'StockIn' },
     {
       title: t.home.tilePackagingStockIn,
+      hint: t.home.tilePackagingStockInHint,
       icon: '📦',
       screen: 'PackagingStockIn',
-      color: '#f59e0b',
-      bg: 'rgba(245,158,11,0.12)',
     },
-    { title: t.home.tileItems, icon: '📋', screen: 'Items', color: '#3b82f6', bg: 'rgba(59,130,246,0.12)' },
-    { title: t.home.tilePkg, icon: '📦', screen: 'Pkg', color: '#a855f7', bg: 'rgba(168,85,247,0.12)' },
-    { title: t.home.tileStockOut, icon: '🚚', screen: 'StockOut', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
-    { title: t.home.tileHubReceive, icon: '✅', screen: 'HubReceive', color: '#14b8a6', bg: 'rgba(20,184,166,0.12)' },
-    { title: t.home.tileExceptions, icon: '⚠️', screen: 'Exceptions', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
-    { title: t.home.tileShipmentTrack, icon: '🛰️', screen: 'ShipmentTrack', color: '#0ea5e9', bg: 'rgba(14,165,233,0.12)' },
-    { title: t.home.tileMovements, icon: '📜', screen: 'Movements', color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
-    { title: t.home.tileFinance, icon: '🌏', screen: 'CrossBorderFinance', color: '#38bdf8', bg: 'rgba(56,189,248,0.12)' },
-    { title: t.home.tileScan, icon: '📷', screen: 'CameraScan', color: '#06b6d4', bg: 'rgba(6,182,212,0.12)' },
-    { title: t.home.tileSettings, icon: '⚙️', screen: 'Settings', color: '#94a3b8', bg: 'rgba(148,163,184,0.1)' },
+    { title: t.home.tileItems, hint: t.home.tileItemsHint, icon: '📋', screen: 'Items' },
+    { title: t.home.tilePkg, hint: t.home.tilePkgHint, icon: '📦', screen: 'Pkg' },
+    { title: t.home.tileStockOut, hint: t.home.tileStockOutHint, icon: '🚚', screen: 'StockOut' },
+    { title: t.home.tileHubReceive, hint: t.home.tileHubReceiveHint, icon: '✅', screen: 'HubReceive' },
+    { title: t.home.tileExceptions, hint: t.home.tileExceptionsHint, icon: '⚠️', screen: 'Exceptions' },
+    { title: t.home.tileShipmentTrack, hint: t.home.tileShipmentTrackHint, icon: '🛰️', screen: 'ShipmentTrack' },
+    { title: t.home.tileMovements, hint: t.home.tileMovementsHint, icon: '📜', screen: 'Movements' },
+    { title: t.home.tileFinance, hint: t.home.tileFinanceHint, icon: '🌏', screen: 'CrossBorderFinance' },
+    { title: t.home.tileSettings, hint: t.home.tileSettingsHint, icon: '⚙️', screen: 'Settings' },
   ];
   const outboundTiles = tiles.filter((tile) =>
     ['StockIn', 'PackagingStockIn', 'Items', 'Pkg', 'StockOut'].includes(tile.screen),
@@ -116,7 +114,7 @@ export default function HomeScreen({ navigation }: HomeProps) {
     ['HubReceive', 'Exceptions', 'CrossBorderFinance'].includes(tile.screen),
   );
   const moreTiles = tiles.filter((tile) =>
-    ['ShipmentTrack', 'Movements', 'CameraScan', 'Settings'].includes(tile.screen),
+    ['ShipmentTrack', 'Movements', 'Settings'].includes(tile.screen),
   );
 
   const goQueryExpress = () => {
@@ -128,10 +126,11 @@ export default function HomeScreen({ navigation }: HomeProps) {
     navigation.navigate('TrackExpress', { presetCode: q });
   };
 
-  const tabs: { id: HomeTab; label: string; icon: string }[] = [
+  const tabs: { id: HomeTab | 'scan'; label: string; icon: string }[] = [
     { id: 'overview', label: t.home.tabOverview, icon: '🏠' },
     { id: 'outbound', label: t.home.tabOutbound, icon: '📤' },
     { id: 'inbound', label: t.home.tabInbound, icon: '✅' },
+    { id: 'scan', label: t.home.tabScan, icon: '📷' },
     { id: 'more', label: t.home.tabMore, icon: 'grid' },
   ];
 
@@ -331,24 +330,33 @@ export default function HomeScreen({ navigation }: HomeProps) {
         ) : null}
 
         {tab === 'outbound' ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>{t.home.sectionOutbound}</Text>
-            <TileGrid tiles={outboundTiles} navigation={navigation} />
-          </View>
+          <ActionSection
+            title={t.home.sectionOutbound}
+            hint={t.home.sectionOutboundHint}
+            tone="outbound"
+            tiles={outboundTiles}
+            navigation={navigation}
+          />
         ) : null}
 
         {tab === 'inbound' ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>{t.home.sectionInboundHub}</Text>
-            <TileGrid tiles={inboundTiles} navigation={navigation} />
-          </View>
+          <ActionSection
+            title={t.home.sectionInboundHub}
+            hint={t.home.sectionInboundHint}
+            tone="inbound"
+            tiles={inboundTiles}
+            navigation={navigation}
+          />
         ) : null}
 
         {tab === 'more' ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>{t.home.sectionMore}</Text>
-            <TileGrid tiles={moreTiles} navigation={navigation} />
-          </View>
+          <ActionSection
+            title={t.home.sectionMore}
+            hint={t.home.sectionMoreHint}
+            tone="more"
+            tiles={moreTiles}
+            navigation={navigation}
+          />
         ) : null}
       </ScrollView>
 
@@ -359,17 +367,25 @@ export default function HomeScreen({ navigation }: HomeProps) {
             <Pressable
               key={item.id}
               style={styles.tabItem}
-              onPress={() => setTab(item.id)}
+              onPress={() => {
+                if (item.id === 'scan') {
+                  navigation.navigate('CameraScan');
+                  return;
+                }
+                setTab(item.id);
+              }}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
-              accessibilityLabel={item.label}
+              accessibilityLabel={item.id === 'scan' ? t.home.tileScan : item.label}
             >
               {item.icon === 'grid' ? (
                 <MoreGridIcon active={active} />
               ) : (
                 <Text style={[styles.tabIcon, active && styles.tabIconActive]}>{item.icon}</Text>
               )}
-              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{item.label}</Text>
+              <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1}>
+                {item.label}
+              </Text>
             </Pressable>
           );
         })}
@@ -389,27 +405,86 @@ function MoreGridIcon({ active }: { active: boolean }) {
   );
 }
 
-function TileGrid({
+type ActionTone = 'outbound' | 'inbound' | 'more';
+
+type ActionTile = {
+  title: string;
+  hint: string;
+  icon: string;
+  screen: 'StockIn' | 'PackagingStockIn' | 'Items' | 'Pkg' | 'StockOut' | 'HubReceive' | 'Exceptions' | 'ShipmentTrack' | 'Movements' | 'CrossBorderFinance' | 'Settings';
+};
+
+const ACTION_TONE: Record<ActionTone, { title: string; bar: string; wash: string; border: string; chevron: string }> = {
+  outbound: {
+    title: '#fbbf24',
+    bar: '#f59e0b',
+    wash: 'rgba(245, 158, 11, 0.14)',
+    border: 'rgba(245, 158, 11, 0.32)',
+    chevron: '#fbbf24',
+  },
+  inbound: {
+    title: '#5eead4',
+    bar: '#14b8a6',
+    wash: 'rgba(20, 184, 166, 0.14)',
+    border: 'rgba(45, 212, 191, 0.32)',
+    chevron: '#5eead4',
+  },
+  more: {
+    title: '#e2e8f0',
+    bar: '#94a3b8',
+    wash: 'rgba(148, 163, 184, 0.12)',
+    border: 'rgba(148, 163, 184, 0.28)',
+    chevron: '#cbd5e1',
+  },
+};
+
+function ActionSection({
+  title,
+  hint,
+  tone,
   tiles,
   navigation,
 }: {
-  tiles: { title: string; icon: string; screen: string; bg: string }[];
+  title: string;
+  hint: string;
+  tone: ActionTone;
+  tiles: ActionTile[];
   navigation: HomeProps['navigation'];
 }) {
+  const palette = ACTION_TONE[tone];
   return (
-    <View style={styles.grid}>
-      {tiles.map((tile) => (
-        <Pressable
-          key={tile.screen}
-          style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
-          onPress={() => navigation.navigate(tile.screen as keyof RootStackParamList)}
-        >
-          <View style={[styles.tileIconWrap, { backgroundColor: tile.bg }]}>
-            <Text style={styles.tileIcon}>{tile.icon}</Text>
-          </View>
-          <Text style={styles.tileTitle}>{tile.title}</Text>
-        </Pressable>
-      ))}
+    <View style={styles.section}>
+      <View style={styles.sectionHead}>
+        <View style={[styles.sectionBar, { backgroundColor: palette.bar }]} />
+        <View style={styles.sectionHeadText}>
+          <Text style={[styles.sectionLabel, { color: palette.title }]}>{title}</Text>
+          <Text style={styles.sectionHint}>{hint}</Text>
+        </View>
+      </View>
+      <View style={styles.actionList}>
+        {tiles.map((tile) => (
+          <Pressable
+            key={tile.screen}
+            style={({ pressed }) => [
+              styles.actionRow,
+              { borderColor: palette.border },
+              pressed && styles.actionRowPressed,
+            ]}
+            onPress={() => navigation.navigate(tile.screen)}
+            accessibilityRole="button"
+            accessibilityLabel={tile.title}
+          >
+            <View style={[styles.actionIconWrap, { backgroundColor: palette.wash }]}>
+              <Text style={styles.actionIcon}>{tile.icon}</Text>
+            </View>
+            <View style={styles.actionCopy}>
+              <Text style={styles.actionTitle}>{tile.title}</Text>
+              <Text style={styles.actionHint}>{tile.hint}</Text>
+            </View>
+            <Text style={[styles.actionChevron, { color: palette.chevron }]}>›</Text>
+          </Pressable>
+        ))}
+      </View>
     </View>
   );
 }
@@ -539,13 +614,54 @@ const styles = StyleSheet.create({
   retryBtnText: { color: '#fecaca', fontWeight: '800', fontSize: 12 },
   section: { marginBottom: 16 },
   sectionLabel: {
-    color: '#64748b',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginBottom: 10,
-    textTransform: 'uppercase',
+    color: '#e2e8f0',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 0,
+    marginBottom: 4,
+    textTransform: 'none',
   },
+  sectionHint: {
+    color: '#64748b',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 10,
+    marginBottom: 12,
+  },
+  sectionBar: {
+    width: 4,
+    borderRadius: 2,
+  },
+  sectionHeadText: { flex: 1, minWidth: 0 },
+  actionList: { gap: 8 },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+  },
+  actionRowPressed: { opacity: 0.82 },
+  actionIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionIcon: { fontSize: 22 },
+  actionCopy: { flex: 1, minWidth: 0 },
+  actionTitle: { color: '#f8fafc', fontSize: 16, fontWeight: '800' },
+  actionHint: { color: '#94a3b8', fontSize: 12, fontWeight: '600', marginTop: 2, lineHeight: 16 },
+  actionChevron: { fontSize: 28, fontWeight: '300', lineHeight: 28 },
   statsGrid: {
     flexDirection: 'row',
     gap: 8,
@@ -666,33 +782,6 @@ const styles = StyleSheet.create({
   loadBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   loadBadgeText: { fontSize: 10, fontWeight: '900' },
   pkgQty: { color: '#c4b5fd', fontSize: 12, fontWeight: '800' },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  tile: {
-    width: '47.5%',
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  tilePressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
-  },
-  tileIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  tileIcon: { fontSize: 22 },
-  tileTitle: { color: '#f8fafc', fontSize: 15, fontWeight: '800' },
   queryCard: {
     backgroundColor: 'rgba(15, 23, 42, 0.85)',
     borderRadius: 20,
