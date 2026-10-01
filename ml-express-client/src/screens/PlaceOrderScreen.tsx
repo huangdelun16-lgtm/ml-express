@@ -25,6 +25,7 @@ import { packageService, systemSettingsService, supabase, Product } from '../ser
 import { databaseService } from '../services/DatabaseService';
 import { FadeInView } from '../components/Animations';
 import { MoneyIcon } from '../components/Icon';
+import { moneyLineProps } from '../components/MoneyText';
 import { useLanguageStyles } from '../hooks/useLanguageStyles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorService } from '../services/ErrorService';
@@ -1767,7 +1768,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         <Text style={wizardStyles.payableLabel}>
           {(currentT as { payableAmount?: string }).payableAmount || currentT.totalPrice}
         </Text>
-        <Text style={wizardStyles.payableValue}>
+        <Text {...moneyLineProps} style={wizardStyles.payableValue}>
           {isCalculated ? `${Number(calculatedPrice).toLocaleString()} MMK` : '—'}
         </Text>
       </View>

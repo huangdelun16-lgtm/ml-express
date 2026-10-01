@@ -182,7 +182,7 @@ export default function NearbyDealsSection({
                 <Text style={styles.name} numberOfLines={2}>
                   {deal.name}
                 </Text>
-                <Text style={styles.price} numberOfLines={1}>
+                <Text style={styles.price} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
                   {formatProductPriceLabel(deal, lang)}
                 </Text>
                 <Text style={styles.meta} numberOfLines={1}>

@@ -192,7 +192,9 @@ const ProductCard = React.memo(({ item, t, onVisit, onAddToCart, language }: any
         <ProxiedImage uri={item.image_url} style={styles.productImage} iconSize={22} />
         <View style={styles.productInfo}>
           <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-          <Text style={styles.productPrice}>{formatProductPriceLabel(item, langKey)}</Text>
+          <Text style={styles.productPrice} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
+            {formatProductPriceLabel(item, langKey)}
+          </Text>
           {store ? (
             <View style={styles.productStoreInfo}>
               <Ionicons name="storefront-outline" size={13} color="#94a3b8" />

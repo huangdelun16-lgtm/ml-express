@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   resolveTabSwipeIndex,
+  isTabSwipeLocked,
   shouldCaptureTabSwipeOnRoute,
   shouldClaimTabSwipe,
   tabSwipeTranslateX,
@@ -121,11 +122,11 @@ function SwipeTabView({ tabBar, ...rest }: any) {
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gesture) => {
-          if (keyboardRef.current) return false;
+          if (keyboardRef.current || isTabSwipeLocked()) return false;
           return shouldClaimTabSwipe(gesture.dx, gesture.dy);
         },
         onMoveShouldSetPanResponderCapture: (_, gesture) => {
-          if (keyboardRef.current) return false;
+          if (keyboardRef.current || isTabSwipeLocked()) return false;
           const routeName = String(stateRef.current.routes[stateRef.current.index]?.name ?? '');
           return shouldCaptureTabSwipeOnRoute(
             routeName,

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MoneyIcon } from '../Icon';
 import { ScaleInView } from '../Animations';
 import { tt } from '../../i18n';
+import { moneyLineProps } from '../MoneyText';
 
 interface DeliverySpeed {
   value: string;
@@ -124,42 +125,42 @@ const PriceCalculation = memo<PriceCalculationProps>(({
               </View>
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>{currentT.basePrice}:</Text>
-                <Text style={styles.priceValue}>{pricingSettings.base_fee} MMK</Text>
+                <Text {...moneyLineProps} style={styles.priceValue}>{pricingSettings.base_fee} MMK</Text>
               </View>
               {packageType !== '顺路递' && (
                 <>
                   <View style={styles.priceRow}>
                     <Text style={styles.priceLabel}>{currentT.distancePrice}:</Text>
-                    <Text style={styles.priceValue}>{distanceFee} MMK</Text>
+                    <Text {...moneyLineProps} style={styles.priceValue}>{distanceFee} MMK</Text>
                   </View>
                   {overweightFee > 0 && (
                     <View style={styles.priceRow}>
                       <Text style={styles.priceLabel}>超重附加费:</Text>
-                      <Text style={styles.priceValue}>{overweightFee} MMK</Text>
+                      <Text {...moneyLineProps} style={styles.priceValue}>{overweightFee} MMK</Text>
                     </View>
                   )}
                   {deliverySpeed !== '准时达' && speedExtra > 0 && (
                     <View style={styles.priceRow}>
                       <Text style={styles.priceLabel}>{currentT.speedPrice}:</Text>
-                      <Text style={styles.priceValue}>{speedExtra} MMK</Text>
+                      <Text {...moneyLineProps} style={styles.priceValue}>{speedExtra} MMK</Text>
                     </View>
                   )}
                   {oversizeFee > 0 && (
                     <View style={styles.priceRow}>
                       <Text style={styles.priceLabel}>超规附加费:</Text>
-                      <Text style={styles.priceValue}>{oversizeFee} MMK</Text>
+                      <Text {...moneyLineProps} style={styles.priceValue}>{oversizeFee} MMK</Text>
                     </View>
                   )}
                   {fragileFee > 0 && (
                     <View style={styles.priceRow}>
                       <Text style={styles.priceLabel}>易碎品附加费:</Text>
-                      <Text style={styles.priceValue}>{fragileFee} MMK</Text>
+                      <Text {...moneyLineProps} style={styles.priceValue}>{fragileFee} MMK</Text>
                     </View>
                   )}
                   {foodFee > 0 && (
                     <View style={styles.priceRow}>
                       <Text style={styles.priceLabel}>食品附加费:</Text>
-                      <Text style={styles.priceValue}>{foodFee} MMK</Text>
+                      <Text {...moneyLineProps} style={styles.priceValue}>{foodFee} MMK</Text>
                     </View>
                   )}
                 </>
@@ -225,7 +226,7 @@ const PriceCalculation = memo<PriceCalculationProps>(({
 
                 {paymentMethod === 'balance' && accountBalance !== undefined && (
                   <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
-                    <Text style={{ fontSize: 11, color: accountBalance < parseFloat(calculatedPrice) ? '#ef4444' : '#10b981', textAlign: 'center' }}>
+                    <Text {...moneyLineProps} style={{ fontSize: 11, color: accountBalance < parseFloat(calculatedPrice) ? '#ef4444' : '#10b981', textAlign: 'center' }}>
                       {currentT.accountBalance}: {accountBalance.toLocaleString()} MMK
                       {accountBalance < parseFloat(calculatedPrice) ? ` (${currentT.insufficientBalance})` : ''}
                     </Text>
@@ -236,7 +237,7 @@ const PriceCalculation = memo<PriceCalculationProps>(({
               <View style={styles.priceDivider} />
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabelTotal}>{currentT.totalPrice}:</Text>
-                <Text style={styles.priceTotal}>{calculatedPrice} MMK</Text>
+                <Text {...moneyLineProps} style={styles.priceTotal}>{calculatedPrice} MMK</Text>
               </View>
             </>
           )}

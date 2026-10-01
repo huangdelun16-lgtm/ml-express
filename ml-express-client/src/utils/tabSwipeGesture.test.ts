@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   clampIndex,
   isTabSwipeEdgeStart,
+  isTabSwipeLocked,
+  lockTabSwipe,
   resolveTabSwipeIndex,
   rubberbandDx,
   shouldCaptureTabSwipeOnRoute,
@@ -26,6 +28,14 @@ describe('tabSwipeGesture', () => {
     expect(shouldCaptureTabSwipeOnRoute('Home', 180, 360, -60, 8)).toBe(true);
     expect(shouldCaptureTabSwipeOnRoute('PlaceOrder', 180, 360, -60, 8)).toBe(false);
     expect(shouldCaptureTabSwipeOnRoute('PlaceOrder', 10, 360, -16, 3)).toBe(true);
+  });
+
+  it('locks home tab swipes while a map gesture is open', () => {
+    expect(isTabSwipeLocked()).toBe(false);
+    const unlock = lockTabSwipe();
+    expect(isTabSwipeLocked()).toBe(true);
+    unlock();
+    expect(isTabSwipeLocked()).toBe(false);
   });
 
   it('rubber-bands at the first and last page', () => {

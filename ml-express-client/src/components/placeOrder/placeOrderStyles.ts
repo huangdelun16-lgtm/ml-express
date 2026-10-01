@@ -252,6 +252,9 @@ export const baseStyles = StyleSheet.create({
     color: '#64748b',
   },
   priceValue: {
+    flexShrink: 1,
+    marginLeft: 8,
+    textAlign: 'right',
     fontSize: 14,
     color: '#1e293b',
     fontWeight: '500',
@@ -267,6 +270,9 @@ export const baseStyles = StyleSheet.create({
     color: '#1e293b',
   },
   priceTotal: {
+    flexShrink: 1,
+    marginLeft: 8,
+    textAlign: 'right',
     fontSize: 20,
     fontWeight: 'bold',
     color: '#2C98A6',
@@ -416,9 +422,34 @@ export const baseStyles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
+  suggestionsPanel: {
+    marginTop: 10,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    maxHeight: 280,
+    overflow: 'hidden',
+  },
+  suggestionsList: {
+    maxHeight: 280,
+  },
+  mapSearchAccessory: {
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#f3f4f6',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  mapSearchAccessoryText: {
+    color: '#2C98A6',
+    fontSize: 16,
+    fontWeight: '700',
+  },
   suggestionsContainer: {
     position: 'absolute',
-    top: 70, // 输入框下方 (padding 15 + input height ~50 + margin 5)
+    top: 70,
     left: 20,
     right: 20,
     backgroundColor: '#ffffff',
@@ -432,9 +463,6 @@ export const baseStyles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
     zIndex: 1001,
-  },
-  suggestionsList: {
-    maxHeight: 400,
   },
   suggestionItem: {
     paddingHorizontal: 16,
@@ -1392,6 +1420,7 @@ export const wizardStyles = StyleSheet.create({
     marginBottom: 2,
   },
   payableValue: {
+    flexShrink: 1,
     fontSize: 20,
     fontWeight: '800',
     color: '#2C98A6',

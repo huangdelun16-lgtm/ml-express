@@ -16,6 +16,7 @@ import { addDismissedReviewOrderId, getDismissedReviewOrderIds } from '../utils/
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import Toast from '../components/Toast';
+import { moneyLineProps } from '../components/MoneyText';
 import BackToHomeButton from '../components/BackToHomeButton';
 import { type AppLang, getJourneyCopy, getJourneyLabels } from '../utils/orderJourney';
 import { common, tt } from '../i18n';
@@ -897,7 +898,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
                   <Text style={[styles.infoLabel, { fontWeight: 'bold', color: '#10b981' }]}>
                     {c.itemCostBalanceOnly}:
                   </Text>
-                  <Text style={[styles.infoValue, { fontWeight: 'bold', color: '#10b981' }]}>
+                  <Text {...moneyLineProps} style={[styles.infoValue, { fontWeight: 'bold', color: '#10b981', flexShrink: 1, textAlign: 'right' }]}>
                     {payMatch[1]} MMK
                   </Text>
                 </View>
@@ -935,7 +936,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
                         <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>✨ {t.balancePayment}</Text>
                       </View>
                     </View>
-                    <Text style={[styles.priceValue, { color: '#1e293b' }]}>{itemCost.toLocaleString()} MMK</Text>
+                    <Text {...moneyLineProps} style={[styles.priceValue, { color: '#1e293b' }]}>{itemCost.toLocaleString()} MMK</Text>
                   </View>
 
                   {/* 跑腿费项目 */}
@@ -964,7 +965,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
                         </Text>
                       </View>
                     </View>
-                    <Text style={[styles.priceValue, { color: '#1e293b' }]}>{deliveryFee.toLocaleString()} MMK</Text>
+                    <Text {...moneyLineProps} style={[styles.priceValue, { color: '#1e293b' }]}>{deliveryFee.toLocaleString()} MMK</Text>
                   </View>
                   
                   {/* 分隔线 */}
@@ -977,7 +978,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
                   >
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
       <Text style={{ color: '#1F7A84', fontWeight: '900', fontSize: 16 }}>{t.totalAmount}</Text>
-      <Text style={{ color: '#1F7A84', fontWeight: '900', fontSize: 26 }}>{total.toLocaleString()} MMK</Text>
+      <Text {...moneyLineProps} style={{ color: '#1F7A84', fontWeight: '900', fontSize: 26, flexShrink: 1, marginLeft: 8, textAlign: 'right' }}>{total.toLocaleString()} MMK</Text>
     </View>
     <Text style={{ color: 'rgba(30, 64, 175, 0.6)', fontSize: 11, marginTop: 4, textAlign: 'right', fontStyle: 'italic' }}>
       * {c.includesItemAndDelivery}
@@ -989,7 +990,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
 return (
 <View style={[styles.priceRow, { backgroundColor: '#f8fafc', padding: 20, borderRadius: 16, borderLeftWidth: 4, borderLeftColor: '#10b981' }]}>
   <Text style={[styles.priceLabel, { fontSize: 18, fontWeight: '800' }]}>{t.totalPrice}</Text>
-  <Text style={[styles.priceValue, { fontSize: 22, fontWeight: '900', color: '#10b981' }]}>{deliveryFee.toLocaleString()} MMK</Text>
+  <Text {...moneyLineProps} style={[styles.priceValue, { fontSize: 22, fontWeight: '900', color: '#10b981' }]}>{deliveryFee.toLocaleString()} MMK</Text>
 </View>
 );
 }
@@ -1341,7 +1342,7 @@ return (
                   </View>
                   <View style={styles.qrInfoItem}>
                     <Text style={styles.qrInfoLabel}>{t.totalPrice}:</Text>
-                    <Text style={styles.qrInfoValue}>{order?.price} MMK</Text>
+                    <Text {...moneyLineProps} style={styles.qrInfoValue}>{order?.price} MMK</Text>
                   </View>
                 </View>
               </View>
@@ -1701,6 +1702,9 @@ const styles = StyleSheet.create({
     color: '#1e293b',
   },
   priceValue: {
+    flexShrink: 1,
+    marginLeft: 8,
+    textAlign: 'right',
     fontSize: 18,
     fontWeight: 'bold',
     color: '#2C98A6',

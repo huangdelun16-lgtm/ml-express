@@ -23,6 +23,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { useFocusEffect } from '@react-navigation/native';
 import { feedbackService } from '../services/FeedbackService';
+import { moneyLineProps } from '../components/MoneyText';
 import { common } from '../i18n';
 import { getTrackOrderCopy } from './trackOrder/trackOrderCopy';
 import { styles, ui, TEAL, NAVY } from './trackOrder/trackOrderStyles';
@@ -751,7 +752,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
               <Ionicons name="cube-outline" size={22} color={TEAL} />
             </View>
             <Text style={ui.summaryName} numberOfLines={1}>{summaryText}</Text>
-            <Text style={ui.summaryPrice}>{Number(packageData.price || 0).toLocaleString()} MMK</Text>
+            <Text {...moneyLineProps} style={ui.summaryPrice}>{Number(packageData.price || 0).toLocaleString()} MMK</Text>
             <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
           </TouchableOpacity>
         </View>

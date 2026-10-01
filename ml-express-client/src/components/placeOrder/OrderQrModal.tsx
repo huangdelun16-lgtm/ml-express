@@ -14,6 +14,7 @@ import ViewShot, { captureRef } from 'react-native-view-shot';
 import { common } from '../../i18n';
 import LoggerService from '../../services/LoggerService';
 import { ensureSaveToLibraryPermission, saveImageToLibrary } from '../../utils/mediaAccess';
+import { moneyLineProps } from '../MoneyText';
 
 const TEAL = '#2C98A6';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -134,7 +135,7 @@ export default function OrderQrModal({
                   {!mallSummary ? (
                     <View style={styles.qrPaidRow}>
                       <Text style={styles.qrPaidLabel}>{currentT.paidAmount}</Text>
-                      <Text style={styles.qrOrderPrice}>{orderPrice} MMK</Text>
+                      <Text {...moneyLineProps} style={styles.qrOrderPrice}>{orderPrice} MMK</Text>
                     </View>
                   ) : null}
                 </View>
@@ -146,19 +147,20 @@ export default function OrderQrModal({
                 <View style={styles.qrBreakdownCard}>
                   <View style={styles.qrBreakdownRow}>
                     <Text style={styles.qrBreakdownLabel}>{currentT.productAmount}</Text>
-                    <Text style={styles.qrBreakdownValue}>
+                    <Text {...moneyLineProps} style={styles.qrBreakdownValue}>
                       {mallSummary.productAmount.toLocaleString()} MMK
                     </Text>
                   </View>
                   <View style={styles.qrBreakdownRow}>
                     <Text style={styles.qrBreakdownLabel}>{currentT.deliveryFee}</Text>
-                    <Text style={styles.qrBreakdownValue}>
+                    <Text {...moneyLineProps} style={styles.qrBreakdownValue}>
                       {mallSummary.deliveryFee.toLocaleString()} MMK
                     </Text>
                   </View>
                   <View style={styles.qrBreakdownRow}>
                     <Text style={styles.qrBreakdownLabel}>{currentT.coupon}</Text>
                     <Text
+                      {...moneyLineProps}
                       style={[
                         styles.qrBreakdownValue,
                         mallSummary.coupon > 0 ? styles.qrBreakdownCoupon : null,
@@ -172,7 +174,7 @@ export default function OrderQrModal({
                   <View style={styles.qrBreakdownDivider} />
                   <View style={styles.qrBreakdownRow}>
                     <Text style={styles.qrBreakdownTotalLabel}>{currentT.paidAmount}</Text>
-                    <Text style={styles.qrBreakdownTotalValue}>
+                    <Text {...moneyLineProps} style={styles.qrBreakdownTotalValue}>
                       {mallSummary.paidAmount.toLocaleString()} MMK
                     </Text>
                   </View>
@@ -203,7 +205,7 @@ export default function OrderQrModal({
             <View style={styles.qrActionBar}>
               <View style={styles.qrActionBarSide}>
                 <Text style={styles.qrPayableLabel}>{currentT.payableAmount}</Text>
-                <Text style={styles.qrPayableValue}>
+                <Text {...moneyLineProps} style={styles.qrPayableValue}>
                   {mallSummary
                     ? `${mallSummary.paidAmount.toLocaleString()} MMK`
                     : `${orderPrice} MMK`}

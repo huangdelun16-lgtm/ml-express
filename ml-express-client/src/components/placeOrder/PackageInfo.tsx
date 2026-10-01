@@ -3,6 +3,7 @@ import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-nativ
 import { PackageIcon } from '../Icon';
 import { FadeInView } from '../Animations';
 import PackageTypeChip from './PackageTypeChip';
+import { moneyLineProps } from '../MoneyText';
 
 interface PackageInfoProps {
   language: 'zh' | 'en' | 'my';
@@ -119,7 +120,7 @@ const PackageInfo = memo<PackageInfoProps>(({
                 <Text style={{ fontSize: 10, color: '#10b981' }}>[Active]</Text>
               </View>
               <View style={{ backgroundColor: '#10b981', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
-                <Text style={{ fontSize: 12, color: 'white', fontWeight: 'bold' }}>
+                <Text {...moneyLineProps} style={{ fontSize: 12, color: 'white', fontWeight: 'bold' }}>
                   {cartTotal.toLocaleString()} MMK
                 </Text>
               </View>
@@ -127,8 +128,8 @@ const PackageInfo = memo<PackageInfoProps>(({
 
             {accountBalance !== undefined && (
               <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
-                <Text style={{ fontSize: 11, color: accountBalance < cartTotal ? '#ef4444' : '#10b981', textAlign: 'center' }}>
-                  {currentT.accountBalance}: {accountBalance.toLocaleString()} MMK 
+                <Text {...moneyLineProps} style={{ fontSize: 11, color: accountBalance < cartTotal ? '#ef4444' : '#10b981', textAlign: 'center' }}>
+                  {currentT.accountBalance}: {accountBalance.toLocaleString()} MMK
                   {accountBalance < cartTotal ? ` (${currentT.insufficientBalance})` : ''}
                 </Text>
               </View>

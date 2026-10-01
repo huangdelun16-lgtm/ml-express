@@ -965,6 +965,9 @@ export const ui = StyleSheet.create({
     color: NAVY,
   },
   summaryPrice: {
+    flexShrink: 1,
+    marginLeft: 8,
+    textAlign: 'right',
     fontSize: 15,
     fontWeight: '800',
     color: NAVY,

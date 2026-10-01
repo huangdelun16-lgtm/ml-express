@@ -15,6 +15,20 @@ export function clampIndex(n: number, count: number): number {
   return n;
 }
 
+let tabSwipeLockCount = 0;
+
+/** 地图等全屏手势打开时暂停首页左右切页，关闭后恢复。 */
+export function lockTabSwipe(): () => void {
+  tabSwipeLockCount += 1;
+  return () => {
+    tabSwipeLockCount = Math.max(0, tabSwipeLockCount - 1);
+  };
+}
+
+export function isTabSwipeLocked(): boolean {
+  return tabSwipeLockCount > 0;
+}
+
 export function shouldClaimTabSwipe(dx: number, dy: number): boolean {
   const adx = Math.abs(dx);
   const ady = Math.abs(dy);

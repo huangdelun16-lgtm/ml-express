@@ -12,6 +12,7 @@ import {
   Dimensions,
   RefreshControl,
   ScrollView,
+  Pressable,
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -32,6 +33,7 @@ import { theme } from '../config/theme';
 import Toast from '../components/Toast';
 import { common } from '../i18n';
 import MyanmarAwareText from '../components/MyanmarAwareText';
+import { moneyLineProps } from '../components/MoneyText';
 import { adjustStyleForMyanmarText } from '../utils/myanmarText';
 import {
   buildProductForCart,
@@ -81,7 +83,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   } = route.params || {};
   const { language } = useApp();
   const insets = useSafeAreaInsets();
-  const { addToCart, removeFromCart, cartItems, updateCartItemDetails } = useCart();
+  const { addToCart, removeFromCart, updateQuantity, cartItems, updateCartItemDetails } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [store, setStore] = useState<DeliveryStore | null>(null);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
@@ -140,6 +142,8 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       distanceCity: '同城配送',
       freeDelivery: '满额免配',
       checkout: '去结算',
+      collapseCart: '收起',
+      cartSheetTitle: '已选商品',
       itemsUnit: '件',
       selectVariant: '请先选择规格',
       outOfStock: '暂无库存',
@@ -176,6 +180,8 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       distanceCity: 'City delivery',
       freeDelivery: 'Free delivery over min.',
       checkout: 'Checkout',
+      collapseCart: 'Close',
+      cartSheetTitle: 'Selected items',
       itemsUnit: 'items',
       selectVariant: 'Please select a variant',
       outOfStock: 'Out of stock',
@@ -212,6 +218,8 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       distanceCity: 'မြို့တွင်းပို့ဆောင်',
       freeDelivery: 'ပြည့်ရင် ပို့ခအခမဲ့',
       checkout: 'ငွေရှင်းရန်',
+      collapseCart: 'ပိတ်ရန်',
+      cartSheetTitle: 'ရွေးထားသောပစ္စည်း',
       itemsUnit: 'ခု',
       selectVariant: 'အမျိုးအစား အရင်ရွေးပါ',
       outOfStock: 'ကုန်ပစ္စည်း မရှိပါ',
@@ -281,6 +289,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   const [detailQty, setDetailQty] = useState(1);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [detailCartLineKey, setDetailCartLineKey] = useState<string | null>(null);
+  const [cartSheetOpen, setCartSheetOpen] = useState(false);
 
   const categoryTabs = useMemo(
     () => [{ id: HOT_CATEGORY_ID, name: currentT.hot }, ...categories],
@@ -301,6 +310,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   );
   const storeCartCount = storeCartItems.reduce((sum, item) => sum + item.quantity, 0);
   const storeCartTotal = storeCartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  useEffect(() => {
+    if (storeCartCount === 0) setCartSheetOpen(false);
+  }, [storeCartCount]);
   const monthlySales = products.reduce((sum, item) => sum + (item.sales_count || 0), 0);
   const ratingLabel = (reviewStats.average > 0 ? reviewStats.average : 4.9).toFixed(1);
   const coverUri = products.map((p) => remoteImageUri(p.image_url)).find(Boolean);
@@ -532,7 +545,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           <MyanmarAwareText style={styles.productName} numberOfLines={2}>
             {item.name}
           </MyanmarAwareText>
-          <Text style={styles.productPrice} numberOfLines={1}>
+          <Text {...moneyLineProps} style={styles.productPrice}>
             {formatProductPriceLabel(item, langKey)}
           </Text>
         </View>
@@ -672,25 +685,100 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       )}
 
       {storeCartCount > 0 ? (
-        <TouchableOpacity
-          style={[styles.floatingCart, { bottom: Math.max(insets.bottom, 12) + 8 }]}
-          onPress={() => navigation.navigate('Main', { screen: 'Cart' })}
-          activeOpacity={0.9}
-        >
-          <View style={styles.floatingCartIcon}>
-            <Ionicons name="cart" size={20} color="#fff" />
-            <View style={styles.floatingCartBadge}>
-              <Text style={styles.floatingCartBadgeText}>{storeCartCount}</Text>
-            </View>
+        <>
+          {cartSheetOpen ? (
+            <Pressable style={styles.cartSheetBackdrop} onPress={() => setCartSheetOpen(false)} />
+          ) : null}
+          <View
+            style={[styles.floatingCartDock, { bottom: Math.max(insets.bottom, 12) + 8 }]}
+            pointerEvents="box-none"
+          >
+            {cartSheetOpen ? (
+              <View style={styles.cartSheet}>
+                <Text style={styles.cartSheetTitle}>{currentT.cartSheetTitle}</Text>
+                <ScrollView style={styles.cartSheetList} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                  {storeCartItems.map((item) => {
+                    const lineKey = getCartItemLineKey(item);
+                    const lineTotal = item.price * item.quantity;
+                    const maxQty = maxSelectableStock(item, item.variant_id);
+                    return (
+                      <View key={lineKey} style={styles.cartSheetRow}>
+                        <View style={styles.cartSheetInfo}>
+                          <Text style={styles.cartSheetName} numberOfLines={1}>{item.name}</Text>
+                          {item.variant_name ? (
+                            <Text style={styles.cartSheetVariant} numberOfLines={1}>{item.variant_name}</Text>
+                          ) : null}
+                          <Text {...moneyLineProps} style={styles.cartSheetPrice}>
+                            {lineTotal.toLocaleString()} MMK
+                          </Text>
+                        </View>
+                        <View style={styles.cartSheetStepper}>
+                          <TouchableOpacity
+                            style={styles.cartSheetStepBtn}
+                            onPress={() => updateQuantity(lineKey, item.quantity - 1)}
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                          >
+                            <Ionicons name="remove" size={16} color={TEAL} />
+                          </TouchableOpacity>
+                          <Text style={styles.cartSheetQty}>{item.quantity}</Text>
+                          <TouchableOpacity
+                            style={[styles.cartSheetStepBtn, styles.cartSheetStepBtnPlus]}
+                            onPress={() => {
+                              if (item.quantity >= maxQty) {
+                                showToast(currentT.outOfStock, 'info');
+                                return;
+                              }
+                              updateQuantity(lineKey, item.quantity + 1);
+                            }}
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                          >
+                            <Ionicons name="add" size={16} color="#fff" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+                <TouchableOpacity
+                  style={styles.cartSheetCheckout}
+                  onPress={() => navigation.navigate('Main', { screen: 'Cart' })}
+                  activeOpacity={0.88}
+                >
+                  <Text style={styles.cartSheetCheckoutText}>{currentT.checkout}</Text>
+                  <Text {...moneyLineProps} style={styles.cartSheetCheckoutAmount}>
+                    {storeCartTotal.toLocaleString()} MMK
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+            <TouchableOpacity
+              style={styles.floatingCart}
+              onPress={() => setCartSheetOpen((open) => !open)}
+              activeOpacity={0.9}
+            >
+              <View style={styles.floatingCartIcon}>
+                <Ionicons name="cart" size={20} color="#fff" />
+                <View style={styles.floatingCartBadge}>
+                  <Text style={styles.floatingCartBadgeText}>{storeCartCount}</Text>
+                </View>
+              </View>
+              <Text style={styles.floatingCartCount}>
+                {storeCartCount} {currentT.itemsUnit}
+              </Text>
+              <Text {...moneyLineProps} style={styles.floatingCartTotal}>
+                {storeCartTotal.toLocaleString()} MMK
+              </Text>
+              <Text style={styles.floatingCartGo}>
+                {cartSheetOpen ? currentT.collapseCart : currentT.checkout}
+              </Text>
+              <Ionicons
+                name={cartSheetOpen ? 'chevron-down' : 'chevron-up'}
+                size={16}
+                color="#fff"
+              />
+            </TouchableOpacity>
           </View>
-          <Text style={styles.floatingCartCount}>
-            {storeCartCount} {currentT.itemsUnit}
-          </Text>
-          <Text style={styles.floatingCartTotal} numberOfLines={1}>
-            {storeCartTotal.toLocaleString()} MMK
-          </Text>
-          <Text style={styles.floatingCartGo}>{currentT.checkout}</Text>
-        </TouchableOpacity>
+        </>
       ) : null}
 
       {/* 商品详情模态框：单 ScrollView 上滑时白底内容盖住头图 */}
@@ -766,7 +854,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                       </Text>
                     ) : (
                       <>
-                        <Text style={styles.detailPrice}>
+                        <Text {...moneyLineProps} style={styles.detailPrice}>
                           {(detailDisplayProduct ?? selectedProductDetail)?.price.toLocaleString()} MMK
                         </Text>
                         {(() => {
@@ -777,7 +865,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                               ? getProductDisplayOriginalPrice(selectedProductDetail)
                               : undefined);
                           return orig && dp && orig > dp.price ? (
-                            <Text style={styles.detailOriginalPrice}>
+                            <Text {...moneyLineProps} style={styles.detailOriginalPrice}>
                               {orig.toLocaleString()} MMK
                             </Text>
                           ) : null;
@@ -1230,17 +1318,124 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '800',
   },
-  floatingCart: {
+  cartSheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.28)',
+    zIndex: 20,
+  },
+  floatingCartDock: {
     position: 'absolute',
     right: 14,
     left: 14,
+    zIndex: 21,
+  },
+  cartSheet: {
+    marginBottom: 8,
+    maxHeight: 360,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    paddingTop: 12,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  cartSheetTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#64748b',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  cartSheetList: {
+    flexGrow: 0,
+  },
+  cartSheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e2e8f0',
+  },
+  cartSheetInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  cartSheetName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  cartSheetVariant: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  cartSheetPrice: {
+    marginTop: 2,
+    fontSize: 13,
+    fontWeight: '800',
+    color: TEAL,
+  },
+  cartSheetStepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cartSheetStepBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#d7eef1',
+    backgroundColor: '#f3fbfc',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cartSheetStepBtnPlus: {
+    backgroundColor: TEAL,
+    borderColor: TEAL,
+  },
+  cartSheetQty: {
+    minWidth: 16,
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  cartSheetCheckout: {
+    marginTop: 8,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: TEAL,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  cartSheetCheckoutText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  cartSheetCheckoutAmount: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  floatingCart: {
     height: 56,
     borderRadius: 28,
     backgroundColor: '#1A4E56',
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: 8,
-    paddingRight: 16,
+    paddingRight: 14,
     gap: 8,
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 8 },

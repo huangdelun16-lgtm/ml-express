@@ -26,6 +26,7 @@ import { languageNativeLabel, type ProfileLanguage } from '../utils/profileLangu
 import LanguageSegment from './profile/LanguageSegment';
 import Toast from '../components/Toast';
 import MyanmarAwareText from '../components/MyanmarAwareText';
+import MoneyText from '../components/MoneyText';
 import HotlinePickerModal from '../components/HotlinePickerModal';
 import { feedbackService } from '../services/FeedbackService';
 import { common, tt } from '../i18n';
@@ -1255,9 +1256,11 @@ export default function ProfileScreen({ navigation }: any) {
               <View style={me.walletIcon}>
                 <Ionicons name="wallet" size={16} color="#fff" />
               </View>
-              <Text style={me.walletLabel}>{t.walletBalance}</Text>
-              <Text style={me.walletValue}>{formatMoney(accountBalance)} MMK</Text>
-              <Text style={me.walletCta}>{t.goRecharge}</Text>
+              <View style={me.walletMain}>
+                <Text style={me.walletLabel} numberOfLines={1}>{t.walletBalance}</Text>
+                <MoneyText amount={accountBalance} style={me.walletValue} />
+              </View>
+              <Text style={me.walletCta} numberOfLines={1}>{t.goRecharge}</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -1271,7 +1274,7 @@ export default function ProfileScreen({ navigation }: any) {
               onPress={() => handleQuickAction(item.action)}
             >
               <View style={me.statIconWell}>{item.icon}</View>
-              <Text style={me.statValue}>{formatMoney(item.value)}</Text>
+              <Text style={me.statValue} numberOfLines={1}>{formatMoney(item.value)}</Text>
               <Text style={me.statLabel}>{item.label}</Text>
             </TouchableOpacity>
           ))}
@@ -1420,7 +1423,7 @@ export default function ProfileScreen({ navigation }: any) {
               <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(() => setShowRechargeModal(true))}>
                 <Ionicons name="wallet-outline" size={22} color="#2C98A6" />
                 <Text style={me.sheetRowText}>{t.recharge}</Text>
-                <Text style={me.sheetMeta}>{formatMoney(accountBalance)} MMK</Text>
+                <MoneyText amount={accountBalance} style={me.sheetMeta} />
               </TouchableOpacity>
             ) : null}
             <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(() => navigation.navigate('NotificationCenter'))}>
@@ -1846,10 +1849,10 @@ export default function ProfileScreen({ navigation }: any) {
                         marginBottom: 4,
                       }}
                     >
-                      <Text style={{ fontSize: 18, fontWeight: 'bold', color: selectedRechargeAmount === item.amount ? '#2C98A6' : '#1e293b' }}>
-                        {item.label}
-                      </Text>
-                      <Text style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>MMK</Text>
+                      <MoneyText
+                        amount={item.amount}
+                        style={{ fontSize: 18, fontWeight: 'bold', color: selectedRechargeAmount === item.amount ? '#2C98A6' : '#1e293b' }}
+                      />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -1905,9 +1908,10 @@ export default function ProfileScreen({ navigation }: any) {
               style={{ padding: 20, alignItems: 'center' }}
             >
               <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold' }}>{t.paymentQRTitle}</Text>
-              <Text style={{ color: 'rgba(255,255,255,0.8)', marginTop: 4 }}>
-                {selectedRechargeAmount?.toLocaleString()} MMK
-              </Text>
+              <MoneyText
+                amount={selectedRechargeAmount}
+                style={{ color: 'rgba(255,255,255,0.8)', marginTop: 4 }}
+              />
             </LinearGradient>
 
             <View style={{ padding: 20, alignItems: 'center' }}>

@@ -14,6 +14,7 @@ import { useCart, CartItem, getCartItemLineKey } from '../contexts/CartContext';
 import { useApp } from '../contexts/AppContext';
 import { deliveryStoreService } from '../services/supabase';
 import { remoteImageUri } from '../services/clientApi/nativeSupabaseUrl';
+import { moneyLineProps } from '../components/MoneyText';
 
 const TEAL = '#2C98A6';
 const PAGE_BG = '#F3F5F7';
@@ -182,7 +183,7 @@ export default function CartScreen({ navigation }: any) {
                 {item.customer_remark}
               </Text>
             ) : null}
-            <Text style={styles.itemPrice}>{item.price.toLocaleString()} MMK</Text>
+            <Text {...moneyLineProps} style={styles.itemPrice}>{item.price.toLocaleString()} MMK</Text>
           </View>
         </TouchableOpacity>
 
@@ -263,9 +264,8 @@ export default function CartScreen({ navigation }: any) {
         <View style={styles.footer}>
           <View style={styles.totalInfo}>
             <Text style={styles.totalLabel}>{t.total}</Text>
-            <Text style={styles.totalAmount}>
-              {cartTotal.toLocaleString()}
-              <Text style={styles.currency}> MMK</Text>
+            <Text {...moneyLineProps} style={styles.totalAmount}>
+              {cartTotal.toLocaleString()} MMK
             </Text>
           </View>
           <TouchableOpacity style={styles.checkoutBtn} onPress={handleCheckout} activeOpacity={0.88}>

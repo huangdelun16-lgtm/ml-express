@@ -1173,19 +1173,23 @@ export const meStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  walletMain: {
+    flex: 1,
+    minWidth: 0,
+  },
   walletLabel: {
     fontSize: 12,
     fontWeight: '700',
     color: '#64748b',
   },
   walletValue: {
-    flex: 1,
-    textAlign: 'right',
-    fontSize: 14,
+    marginTop: 2,
+    fontSize: 16,
     fontWeight: '800',
     color: '#0f172a',
   },
   walletCta: {
+    flexShrink: 0,
     fontSize: 12,
     fontWeight: '800',
     color: '#2C98A6',
@@ -1448,9 +1452,12 @@ export const meStyles = StyleSheet.create({
     color: '#0f172a',
   },
   sheetMeta: {
+    flexShrink: 1,
+    minWidth: 0,
     fontSize: 12,
     fontWeight: '700',
     color: '#2C98A6',
+    textAlign: 'right',
   },
   sheetVer: {
     textAlign: 'center',

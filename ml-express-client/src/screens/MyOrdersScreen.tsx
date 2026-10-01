@@ -13,6 +13,7 @@ import { errorService } from '../services/ErrorService';
 import { feedbackService } from '../services/FeedbackService';
 import { OrderSkeleton } from '../components/SkeletonLoader';
 import MyanmarAwareText from '../components/MyanmarAwareText';
+import { moneyLineProps } from '../components/MoneyText';
 import { common, ratingCaption } from '../i18n';
 import { type AppLang, getOrderListJourneyHint } from '../utils/orderJourney';
 import { useFocusEffect } from '@react-navigation/native';
@@ -983,7 +984,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         <View style={styles.orderFooter}>
           <View style={styles.orderFooterLeft}>
             <View style={styles.priceRow}>
-              <Text style={styles.orderPrice}>{formatPrice(order.price)}</Text>
+              <Text {...moneyLineProps} style={styles.orderPrice}>{formatPrice(order.price)}</Text>
               {showPendingPay(order) ? (
                 <View style={styles.pendingPayBadge}>
                   <Text style={styles.pendingPayText}>{t.pendingPay}</Text>
@@ -1597,6 +1598,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   orderPrice: {
+    flexShrink: 1,
     fontSize: 20,
     fontWeight: '800',
     color: TEAL,

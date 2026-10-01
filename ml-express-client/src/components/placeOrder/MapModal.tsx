@@ -1,9 +1,10 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import LoggerService from './../../services/LoggerService';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, Platform, ActivityIndicator, Keyboard, InputAccessoryView } from 'react-native';
 import type { MapPlaceSearchStatus } from '../../utils/mapPlaceSearch';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import AutocompleteSuggestionItem from './AutocompleteSuggestionItem';
+import { lockTabSwipe } from '../../utils/tabSwipeGesture';
 
 interface MapModalProps {
   visible: boolean;
@@ -60,28 +61,41 @@ const MapModal = memo<MapModalProps>(({
   onPlaceChange,
   markerTitle,
 }) => {
+  const inputRef = useRef<TextInput>(null);
+  const searchAccessoryId = 'map-place-search-accessory';
+
+  const dismissKeyboard = useCallback(() => {
+    inputRef.current?.blur();
+    Keyboard.dismiss();
+  }, []);
+
   const handleMapPress = useCallback((e: any) => {
+    dismissKeyboard();
+    onSetShowSuggestions(false);
     onLocationChange(e.nativeEvent.coordinate);
     onPlaceChange(null);
-  }, [onLocationChange, onPlaceChange]);
+  }, [dismissKeyboard, onLocationChange, onPlaceChange, onSetShowSuggestions]);
 
   const handlePoiClick = useCallback((e: any) => {
+    dismissKeyboard();
     onLocationChange(e.nativeEvent.coordinate);
     onPlaceChange({
       name: e.nativeEvent.name || '选中位置',
       address: e.nativeEvent.name || '未知地址'
     });
-  }, [onLocationChange, onPlaceChange]);
+  }, [dismissKeyboard, onLocationChange, onPlaceChange]);
 
   const handleMarkerDragEnd = useCallback((e: any) => {
+    dismissKeyboard();
     onLocationChange(e.nativeEvent.coordinate);
     onPlaceChange(null);
-  }, [onLocationChange, onPlaceChange]);
+  }, [dismissKeyboard, onLocationChange, onPlaceChange]);
 
   const handleSuggestionPress = useCallback((suggestion: any) => {
+    dismissKeyboard();
     onSelectSuggestion(suggestion);
     onSetShowSuggestions(false);
-  }, [onSelectSuggestion, onSetShowSuggestions]);
+  }, [dismissKeyboard, onSelectSuggestion, onSetShowSuggestions]);
 
   const handleInputFocus = useCallback(() => {
     if (onRetrySearch) {
@@ -92,15 +106,6 @@ const MapModal = memo<MapModalProps>(({
       onMapAddressInputChange(mapAddressInput);
     }
   }, [mapAddressInput, onMapAddressInputChange, onRetrySearch]);
-
-  const handleInputBlur = useCallback(() => {
-    setTimeout(() => {
-      if (searchStatus === 'loading' || searchStatus === 'empty' || searchStatus === 'error') {
-        return;
-      }
-      onSetShowSuggestions(false);
-    }, 200);
-  }, [onSetShowSuggestions, searchStatus]);
 
   const mapRef = useRef<MapView>(null);
   const lastAnimatedKeyRef = useRef('');
@@ -119,19 +124,30 @@ const MapModal = memo<MapModalProps>(({
   }, [selectedLocation]);
 
   useEffect(() => {
+    if (!visible) return undefined;
+    return lockTabSwipe();
+  }, [visible]);
+
+  useEffect(() => {
     if (!visible) {
       setAttachMap(false);
       setMapReady(false);
       lastAnimatedKeyRef.current = '';
-      return;
+      return undefined;
     }
-    const delay = Platform.OS === 'android' ? 400 : 0;
+    const delay = Platform.OS === 'android' ? 400 : 350;
     const timer = setTimeout(() => setAttachMap(true), delay);
     return () => clearTimeout(timer);
   }, [visible]);
 
   useEffect(() => {
-    if (!attachMap || Platform.OS !== 'android' || !mapReady) return;
+    if (!attachMap || mapReady) return undefined;
+    const timer = setTimeout(() => setMapReady(true), 2000);
+    return () => clearTimeout(timer);
+  }, [attachMap, mapReady]);
+
+  useEffect(() => {
+    if (!attachMap || !mapReady) return;
     const key = `${mapRegion.latitude.toFixed(5)},${mapRegion.longitude.toFixed(5)}`;
     if (key === lastAnimatedKeyRef.current) return;
     lastAnimatedKeyRef.current = key;
@@ -194,6 +210,7 @@ const MapModal = memo<MapModalProps>(({
         <View style={styles.mapAddressInputContainer}>
           <View>
             <TextInput
+              ref={inputRef}
               style={[styles.mapAddressInput, status === 'loading' ? { paddingRight: 40 } : null]}
               value={mapAddressInput}
               onChangeText={(text) => {
@@ -202,8 +219,11 @@ const MapModal = memo<MapModalProps>(({
               }}
               placeholder={placeholderText}
               placeholderTextColor="#9ca3af"
+              returnKeyType="done"
+              blurOnSubmit
+              inputAccessoryViewID={Platform.OS === 'ios' ? searchAccessoryId : undefined}
+              onSubmitEditing={dismissKeyboard}
               onFocus={handleInputFocus}
-              onBlur={handleInputBlur}
             />
             {status === 'loading' ? (
               <ActivityIndicator
@@ -239,7 +259,7 @@ const MapModal = memo<MapModalProps>(({
           </TouchableOpacity>
 
           {showDropdown ? (
-            <View style={styles.suggestionsContainer}>
+            <View style={styles.suggestionsPanel}>
               {status === 'loading' ? (
                 <Text style={{ padding: 16, textAlign: 'center', color: '#6b7280' }}>
                   {searchLabels.loading}
@@ -273,8 +293,9 @@ const MapModal = memo<MapModalProps>(({
               {status === 'success' ? (
                 <ScrollView
                   style={styles.suggestionsList}
-                  keyboardShouldPersistTaps="handled"
-                  nestedScrollEnabled={true}
+                  keyboardShouldPersistTaps="always"
+                  keyboardDismissMode="none"
+                  nestedScrollEnabled
                 >
                   {autocompleteSuggestions.map((suggestion, index) => (
                     <AutocompleteSuggestionItem
@@ -292,6 +313,18 @@ const MapModal = memo<MapModalProps>(({
           ) : null}
         </View>
 
+        {Platform.OS === 'ios' ? (
+          <InputAccessoryView nativeID={searchAccessoryId}>
+            <View style={styles.mapSearchAccessory}>
+              <TouchableOpacity onPress={dismissKeyboard} hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}>
+                <Text style={styles.mapSearchAccessoryText}>
+                  {language === 'zh' ? '完成' : language === 'en' ? 'Done' : 'ပြီးပါပြီ'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </InputAccessoryView>
+        ) : null}
+
         <View style={[styles.map, { overflow: 'hidden' }]} collapsable={false}>
           {attachMap ? (
             <>
@@ -301,23 +334,18 @@ const MapModal = memo<MapModalProps>(({
                 {...(Platform.OS === 'android' ? { googleRenderer: 'LEGACY' as const } : {})}
                 style={{ flex: 1 }}
                 initialRegion={mapRegion}
-                {...(Platform.OS === 'ios' ? { region: mapRegion } : {})}
                 showsUserLocation={true}
                 showsMyLocationButton={false}
                 showsCompass={true}
                 showsScale={true}
-                loadingEnabled={true}
+                loadingEnabled={false}
                 moveOnMarkerPress={false}
                 toolbarEnabled={false}
                 mapType="standard"
                 onPress={handleMapPress}
                 onPoiClick={handlePoiClick}
-                onMapReady={() => {
-                  setMapReady(true);
-                  if (__DEV__) {
-                    LoggerService.debug('地图已准备就绪');
-                  }
-                }}
+                onMapReady={() => setMapReady(true)}
+                onMapLoaded={() => setMapReady(true)}
               >
                 {selectedLocation && (
                   <Marker
