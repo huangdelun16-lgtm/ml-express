@@ -42,7 +42,6 @@ export default function StockInStepFee({
   onTogglePrepaid,
   onTotalFeeChange,
   onNoteChange,
-  mmkPerCny,
 }: {
   scan: string;
   destination: string;
@@ -78,7 +77,6 @@ export default function StockInStepFee({
   onTogglePrepaid: () => void;
   onTotalFeeChange: (v: string) => void;
   onNoteChange: (v: string) => void;
-  mmkPerCny: number | null;
 }) {
   const { t } = useTranslation();
 
@@ -193,9 +191,8 @@ export default function StockInStepFee({
           </>
         ) : (
           <CrossBorderQuotePreview
-            totalFeeMmk={Number(totalFee)}
+            quoteCny={Number(totalFee)}
             hint={canAutoTotalFee && !totalFeeManual ? feeFormulaHint : ''}
-            mmkPerCny={mmkPerCny}
             showQuote={canAutoTotalFee && shouldShowCrossBorderQuote(totalFee)}
           />
         )}

@@ -43,5 +43,8 @@ describe('classifyCloudOperationFailure', () => {
       t.hubReceive.cloudFailOrigin,
     );
     expect(explainCloudOperationFailure(t, svc('destCannotBeOwnStation'), 'stockOut')).toBeNull();
+    expect(explainCloudOperationFailure(t, new Error('Failed to fetch'), 'scan')).toBe(
+      t.cameraScan.cloudFailNetwork,
+    );
   });
 });

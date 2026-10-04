@@ -191,8 +191,11 @@ export type InventoryCustomerExpressItem = {
   destination: string;
   weight: string;
   weightKg: number;
+  packWeightKg?: number;
   qty: number;
   fee: number;
+  quoteCny?: number;
+  inboundNote?: string;
   paymentStatus: string;
   packageStatus: string;
   transportStatus: string;

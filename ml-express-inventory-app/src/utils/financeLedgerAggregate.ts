@@ -113,12 +113,14 @@ export function parseFinanceAmount(raw: unknown): number {
 
 export function parseInboundFinanceNote(note: unknown): {
   totalFee?: string;
+  quoteCny?: string;
   paymentLabel?: '预付' | '到付';
 } {
   const parsed = parseInboundMovementNote(String(note ?? ''));
   const payment = normalizePaymentLabel(parsed.paymentLabel);
   return {
     totalFee: parsed.totalFee,
+    quoteCny: parsed.quoteCny,
     paymentLabel: payment === '预付' || payment === '到付' ? payment : undefined,
   };
 }
@@ -137,7 +139,7 @@ export function enrichInboundNoteWithPackFee(
 ): string {
   const trimmed = String(note || '').trim();
   const parsed = parseInboundFinanceNote(trimmed);
-  if (parsed.totalFee) return trimmed;
+  if (parsed.totalFee || parsed.quoteCny) return trimmed;
 
   const bundle =
     String(packedBundleBarcode || '').trim().toUpperCase() ||
@@ -148,7 +150,7 @@ export function enrichInboundNoteWithPackFee(
   const packNote = packNotesByBarcode[bundle];
   if (!packNote) return trimmed;
   const packParsed = parseInboundFinanceNote(packNote);
-  if (!packParsed.totalFee) return trimmed;
+  if (!packParsed.totalFee && !packParsed.quoteCny) return trimmed;
 
   if (packFeeAssigned?.has(bundle)) {
     // 同包其它行只补付款方式，不重复补金额
@@ -157,7 +159,9 @@ export function enrichInboundNoteWithPackFee(
   }
   packFeeAssigned?.add(bundle);
 
-  const feePart = `总费用 ${packParsed.totalFee} MMK`;
+  const feePart = packParsed.totalFee
+    ? `总费用 ${packParsed.totalFee} MMK`
+    : `报价 ${packParsed.quoteCny} CNY`;
   if (!trimmed) {
     return packParsed.paymentLabel ? `${feePart} · ${packParsed.paymentLabel}` : feePart;
   }
@@ -186,7 +190,13 @@ function orderEntry(
     packFeeAssigned,
   );
   const parsed = parseInboundFinanceNote(enrichedNote);
-  const amount = parseFinanceAmount(parsed.totalFee);
+  const settled = parsed.totalFee != null && parsed.totalFee !== '';
+  const amount = settled ? parseFinanceAmount(parsed.totalFee) : 0;
+  const quote = Number(parsed.quoteCny);
+  const quoteText =
+    parsed.quoteCny != null && parsed.quoteCny !== '' && Number.isFinite(quote)
+      ? `¥${quote.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+      : '';
   const fxLock = pickFxLock(
     parseInboundMovementNote(String(item?.note || '')).fxLock,
     parseInboundMovementNote(enrichedNote).fxLock,
@@ -222,7 +232,11 @@ function orderEntry(
       title: '订单 · 已付款',
       subtitle: `${customer} · ${originLabel} → ${destination} · 预付`,
       amount,
-      amountDisplay: amount > 0 ? `+${formatMmk(amount)}` : '已付款',
+      amountDisplay: settled
+        ? amount > 0
+          ? `+${formatMmk(amount)}`
+          : '已付款'
+        : quoteText || '已付款',
     };
   }
   if (parsed.paymentLabel === '到付') {
@@ -235,7 +249,13 @@ function orderEntry(
       title: collected ? '订单收入 · 已签收收款' : '订单收入 · 到付待收',
       subtitle: `${customer} · ${originLabel} → ${destination} · 到付`,
       amount,
-      amountDisplay: amount > 0 ? `+${formatMmk(amount)}` : collected ? '已收款' : '到付待收',
+      amountDisplay: settled
+        ? amount > 0
+          ? `+${formatMmk(amount)}`
+          : collected
+            ? '已收款'
+            : '到付待收'
+        : quoteText || (collected ? '已收款' : '到付待收'),
     };
   }
   if (amount > 0 && destination) {
@@ -358,6 +378,7 @@ export function collapsePackagingStockInOrderEntries(
         : category === 'order_collected'
           ? '订单收入 · 已签收收款'
           : '订单收入 · 到付待收';
+    const quoteDisplay = list.map((row) => row.amountDisplay).find((text) => text.startsWith('¥'));
     rest.push({
       ...primary,
       id: `order:pack:${base}`,
@@ -372,14 +393,13 @@ export function collapsePackagingStockInOrderEntries(
       amount,
       amountDisplay:
         amount > 0
-          ? category === 'order_prepaid'
-            ? `+${formatMmk(amount)}`
-            : `+${formatMmk(amount)}`
-          : category === 'order_collected'
-            ? '已收款'
-            : category === 'order_prepaid'
-              ? '已付款'
-              : '到付待收',
+          ? `+${formatMmk(amount)}`
+          : quoteDisplay ||
+            (category === 'order_collected'
+              ? '已收款'
+              : category === 'order_prepaid'
+                ? '已付款'
+                : '到付待收'),
       barcode: primary.barcode || `${base}(1-1)`,
     });
   }

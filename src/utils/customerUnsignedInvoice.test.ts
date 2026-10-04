@@ -1,9 +1,12 @@
 import {
   buildUnsignedCustomerInvoice,
   formatUnsignedInvoiceFee,
+  formatUnsignedInvoiceQuote,
+  formatUnsignedInvoiceRate,
   formatUnsignedInvoiceWeight,
   isUnsignedExpressItem,
   packagingBatchSelectionIds,
+  settleUnsignedInvoice,
   type UnsignedInvoiceSource,
 } from './customerUnsignedInvoice';
 
@@ -57,9 +60,11 @@ describe('customerUnsignedInvoice', () => {
       row({ id: 'c', inboundBarcode: 'MDY1(3-3)', expressBarcode: 'E3', weightKg: 0 }),
     ];
     const invoice = buildUnsignedCustomerInvoice(items, ['b', 'c']);
-    expect(invoice.groups).toEqual([{ kind: 'packaging', expressNos: ['E2', 'E3'] }]);
+    expect(invoice.groups).toEqual([
+      { kind: 'packaging', expressNos: ['E2', 'E3'], weightKg: 10, quoteCny: 0 },
+    ]);
     expect(invoice.totalFeeMmk).toBe(125000);
-    expect(invoice.totalWeightKg).toBe(0);
+    expect(invoice.totalWeightKg).toBe(10);
     expect(invoice.pieceCount).toBe(2);
     expect(invoice.packNo).toBe('RUI26POL40001');
     expect(invoice.destination).toBe('POL');
@@ -116,5 +121,103 @@ describe('customerUnsignedInvoice', () => {
     expect(invoice.stationCodes).toEqual(['POL', 'MDY']);
     expect(invoice.packNo).toBe('PACK9');
     expect(invoice.pieceCount).toBe(3);
+  });
+
+  it('shows each single order weight and one package weight for a multiple inbound', () => {
+    const items = [
+      row({ id: 's1', inboundBarcode: 'SOLO-1', expressBarcode: 'S1', weightKg: 2.5, quoteCny: 20 }),
+      row({ id: 's2', inboundBarcode: 'SOLO-2', expressBarcode: 'S2', weightKg: 1, quoteCny: 8 }),
+      row({
+        id: 'a',
+        inboundBarcode: 'MDY1(2-1)',
+        expressBarcode: 'E1',
+        weightKg: 1,
+        packWeightKg: 13,
+        quoteCny: 100,
+      }),
+      row({
+        id: 'b',
+        inboundBarcode: 'MDY1(2-2)',
+        expressBarcode: 'E2',
+        weightKg: 1,
+        packWeightKg: 13,
+        inboundNote: '报价 100 CNY · 到付',
+      }),
+    ];
+    const invoice = buildUnsignedCustomerInvoice(items, ['s1', 's2', 'a', 'b']);
+    expect(invoice.groups.map((group) => ({ kind: group.kind, weightKg: group.weightKg, quoteCny: group.quoteCny }))).toEqual([
+      { kind: 'single', weightKg: 2.5, quoteCny: 20 },
+      { kind: 'single', weightKg: 1, quoteCny: 8 },
+      { kind: 'packaging', weightKg: 13, quoteCny: 100 },
+    ]);
+    expect(invoice.totalWeightKg).toBe(16.5);
+    expect(invoice.totalQuoteCny).toBe(128);
+    expect(formatUnsignedInvoiceQuote(invoice.totalQuoteCny)).toBe('¥128');
+    expect(formatUnsignedInvoiceRate(450)).toBe('1 CNY = 450 MMK');
+    expect(settleUnsignedInvoice(invoice.totalQuoteCny, 450, 99999)).toEqual({
+      feeMmk: 57600,
+      missingRate: false,
+    });
+    expect(settleUnsignedInvoice(invoice.totalQuoteCny, null, 99999)).toEqual({
+      feeMmk: 0,
+      missingRate: true,
+    });
+  });
+
+  it('uses the package barcode row as the multiple-inbound total weight', () => {
+    const items = [
+      row({
+        id: 'shell',
+        inboundBarcode: 'RUI26MDY50001',
+        expressBarcode: '—',
+        weightKg: 13,
+      }),
+      row({
+        id: 'a',
+        inboundBarcode: 'MDY1(2-1)',
+        expressBarcode: 'E1',
+        weightKg: 0,
+        packedBundleBarcode: 'RUI26MDY50001',
+        inboundNote: '报价 100 CNY · 到付',
+      }),
+      row({
+        id: 'b',
+        inboundBarcode: 'MDY1(2-2)',
+        expressBarcode: 'E2',
+        weightKg: 0,
+        packedBundleBarcode: 'RUI26MDY50001',
+        inboundNote: '报价 100 CNY · 到付',
+      }),
+    ];
+    const invoice = buildUnsignedCustomerInvoice(items, ['shell', 'a', 'b']);
+    expect(invoice.groups).toEqual([
+      { kind: 'packaging', expressNos: ['E1', 'E2'], weightKg: 13, quoteCny: 100 },
+    ]);
+    expect(invoice.pieceCount).toBe(2);
+  });
+
+  it('reads a quote from the inbound note and does not bill a signed package again', () => {
+    const items = [
+      row({
+        id: 'a',
+        inboundBarcode: 'MDY1(2-1)',
+        expressBarcode: 'E1',
+        inboundNote: '报价 100 CNY · 到付',
+        customerSigned: true,
+        transportStatus: '已签收',
+      }),
+      row({
+        id: 'b',
+        inboundBarcode: 'MDY1(2-2)',
+        expressBarcode: 'E2',
+        inboundNote: '报价 100 CNY · 到付',
+      }),
+    ];
+    const invoice = buildUnsignedCustomerInvoice(items, ['b']);
+    expect(invoice.totalQuoteCny).toBe(0);
+    expect(settleUnsignedInvoice(0, 450, invoice.totalFeeMmk)).toEqual({
+      feeMmk: 0,
+      missingRate: false,
+    });
   });
 });

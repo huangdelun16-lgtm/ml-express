@@ -12,7 +12,6 @@ type Props = {
   onEnterSign: () => void;
   onCancel: () => void;
   onOpenPack: () => void;
-  onBatchSign: () => void;
   onOpenInvoice: () => void;
 };
 
@@ -23,7 +22,6 @@ export default function ItemsModeBar({
   onEnterSign,
   onCancel,
   onOpenPack,
-  onBatchSign,
   onOpenInvoice,
 }: Props) {
   const { t, fmt } = useTranslation();
@@ -102,17 +100,6 @@ export default function ItemsModeBar({
               {t.items.invoiceBtn}
             </Text>
           </Pressable>
-          <Pressable
-            style={[styles.signActionBtn, selectedCount === 0 && styles.packBtnDisabled]}
-            onPress={onBatchSign}
-            disabled={selectedCount === 0}
-            accessibilityRole="button"
-            accessibilityLabel={fmt(t.items.batchSignConfirm, { count: selectedCount })}
-          >
-            <Text style={styles.signActionBtnText} myanmarWeight="bold">
-              {fmt(t.items.batchSignConfirm, { count: selectedCount })}
-            </Text>
-          </Pressable>
         </>
       )}
     </View>
@@ -152,13 +139,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   invoiceBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  signActionBtn: {
-    backgroundColor: '#059669',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  signActionBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   ghostBtn: {
     borderRadius: 10,
     paddingHorizontal: 12,

@@ -14,10 +14,12 @@ import {
   collectPackagingStockInSiblings,
   collectSameCustomerPeers,
   fxLockFeeMmkForItem,
+  fxLockQuoteCnyForItem,
   packagingStockInSignBatch,
   resolveCustomerKey,
   resolvePackagingStockInSignIds,
   uniqueSignFeeMmk,
+  uniqueQuoteCny,
   validateBatchSignSelection,
 } from './customerBatchSign';
 
@@ -149,8 +151,20 @@ describe('customerBatchSign', () => {
         kind: 'packaging',
         count: 3,
         fee: 125000,
+        quoteCny: null,
         barcodes: ['MDY1(3-1)', 'MDY1(3-2)', 'MDY1(3-3)'],
       },
     ]);
+  });
+
+  it('counts one inbound CNY quote for a packaging batch', () => {
+    const details = [
+      { id: 'a', barcode: 'MDY1(3-1)', quote_cny: '100' },
+      { id: 'b', barcode: 'MDY1(3-2)', quote_cny: '100' },
+      { id: 'c', barcode: 'SOLO', quote_cny: '20' },
+    ];
+    expect(uniqueQuoteCny(details)).toBe(120);
+    expect(fxLockQuoteCnyForItem(details[0], details.slice(0, 2))).toBe(100);
+    expect(fxLockQuoteCnyForItem(details[1], details.slice(0, 2))).toBe(0);
   });
 });

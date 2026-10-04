@@ -73,7 +73,6 @@ export default function PhoneBarcodeScanModal({
           <BarcodeScannerView
             active={visible && !busy && !listVisible}
             onScan={handleScanned}
-            title={t.forms.scanAim}
             subtitle={subtitle ?? t.forms.scanAutoFill}
           />
           {listVisible ? (

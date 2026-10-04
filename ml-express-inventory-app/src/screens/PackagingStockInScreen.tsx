@@ -45,9 +45,10 @@ import { resolveStoreHubCode } from '../utils/storeZone';
 import {
   calculateCrossBorderTotalFee,
   fetchCrossBorderRoutePerKg,
-  formatCrossBorderFeeHint,
+  formatCrossBorderCnyHint,
   shouldShowCrossBorderQuote,
 } from '../utils/crossBorderPricing';
+import { formatCnyInput, mmkToCny } from '../utils/crossBorderFx';
 import { loadStockInContactDraft, saveStockInContactDraft } from '../utils/stockInDraft';
 import { normalizePackageOriginPrefix } from '../utils/packageNumber';
 import { resolveAppError, useTranslation } from '../i18n';
@@ -114,7 +115,6 @@ export default function PackagingStockInScreen({ navigation }: Props) {
   const [payPrepaid, setPayPrepaid] = useState(false);
   const [batchNote, setBatchNote] = useState('');
   const [feeFormulaHint, setFeeFormulaHint] = useState('');
-  const [mmkPerCny, setMmkPerCny] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [scanLoading, setScanLoading] = useState(false);
   const [barcodeModalData, setBarcodeModalData] = useState<OrderBarcodeData | null>(null);
@@ -195,22 +195,22 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     const dest = normalizePackDestination(batchDestination);
     const weightKg = Number(batchWeightN.trim()) || 0;
     void (async () => {
-      const { perKg, originCode, destinationCode, usedLegacyFallback, mmkPerCny: rate } =
+      const { perKg, originCode, destinationCode, mmkPerCny: rate } =
         await fetchCrossBorderRoutePerKg(originHub, dest, customerCode);
       if (cancelled) return;
-      setMmkPerCny(rate);
+      const mmk = calculateCrossBorderTotalFee(perKg, batchWeightStr);
+      const cny = mmkToCny(mmk, rate);
       setFeeFormulaHint(
-        formatCrossBorderFeeHint(
+        formatCrossBorderCnyHint(
           originCode,
           destinationCode,
           perKg,
           weightKg,
-          usedLegacyFallback,
           customerCode.trim().toUpperCase(),
           rate,
         ),
       );
-      setTotalFee(String(calculateCrossBorderTotalFee(perKg, batchWeightStr)));
+      setTotalFee(cny == null ? '' : formatCnyInput(cny));
     })();
     return () => {
       cancelled = true;
@@ -364,7 +364,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
   /** 财务/Admin 只认中文业务标签；多语言 UI 文案勿写入 note */
   const buildLineNote = () => {
     const parts: string[] = [];
-    if (grandTotalFee > 0) parts.push(`总费用 ${grandTotalFee} MMK`);
+    if (totalFee.trim()) parts.push(`报价 ${totalFee.trim()} CNY`);
     if (payCod) parts.push('到付');
     if (payPrepaid) parts.push('预付');
     if (batchNote.trim()) parts.push(batchNote.trim());
@@ -433,10 +433,13 @@ export default function PackagingStockInScreen({ navigation }: Props) {
               spec: specStr,
               unit: `${totalPieceCount} Pcs`,
               weight: batchWeightStr,
-              note: fmt(t.packagingStockIn.packNote, {
-                fee: String(grandTotalFee),
-                phone: recipientPhone.trim(),
-              }),
+              note: [
+                '多个入库',
+                totalFee.trim() ? `报价 ${totalFee.trim()} CNY` : '',
+                recipientPhone.trim(),
+              ]
+                .filter(Boolean)
+                .join(' · '),
             },
             lines: stockInLines,
           });
@@ -679,16 +682,13 @@ export default function PackagingStockInScreen({ navigation }: Props) {
                   ) : null}
                   <View style={styles.grandTotalRow}>
                     <Text style={styles.grandTotalLabel}>{t.packagingStockIn.grandTotal}</Text>
-                    <Text style={styles.grandTotalValue}>
-                      {grandTotalFee.toLocaleString()} MMK
-                    </Text>
+                    <Text style={styles.grandTotalValue}>¥{grandTotalFee.toLocaleString()}</Text>
                   </View>
                 </>
               ) : (
                 <CrossBorderQuotePreview
-                  totalFeeMmk={grandTotalFee}
+                  quoteCny={grandTotalFee}
                   hint={canAutoTotalFee && !totalFeeManual ? feeFormulaHint : ''}
-                  mmkPerCny={mmkPerCny}
                   showQuote={canAutoTotalFee && shouldShowCrossBorderQuote(totalFee)}
                 />
               )}

@@ -23,8 +23,9 @@ import { resolveStoreHubCode } from '../utils/storeZone';
 import {
   calculateCrossBorderTotalFee,
   fetchCrossBorderRoutePerKg,
-  formatCrossBorderFeeHint,
+  formatCrossBorderCnyHint,
 } from '../utils/crossBorderPricing';
+import { formatCnyInput, mmkToCny } from '../utils/crossBorderFx';
 import { loadStockInContactDraft, saveStockInContactDraft } from '../utils/stockInDraft';
 import { resolveAppError, useTranslation } from '../i18n';
 import {
@@ -67,7 +68,6 @@ export default function StockInScreen({ route, navigation }: Props) {
   const [totalFee, setTotalFee] = useState('');
   const [totalFeeManual, setTotalFeeManual] = useState(false);
   const [feeFormulaHint, setFeeFormulaHint] = useState('');
-  const [mmkPerCny, setMmkPerCny] = useState<number | null>(null);
   const [payCod, setPayCod] = useState(false);
   const [payPrepaid, setPayPrepaid] = useState(false);
   const [note, setNote] = useState('');
@@ -141,25 +141,25 @@ export default function StockInScreen({ route, navigation }: Props) {
       setFeeFormulaHint('');
       return;
     }
-    const weightKg = Number(weightN.trim()) || 0;
     const originHub = hubCode ?? (store ? resolveStoreHubCode(store) : '');
     let cancelled = false;
     void fetchCrossBorderRoutePerKg(originHub, destination, customerCode).then(
-      ({ perKg, originCode, destinationCode, usedLegacyFallback, mmkPerCny: rate }) => {
+      ({ perKg, originCode, destinationCode, mmkPerCny: rate }) => {
         if (cancelled) return;
-        setMmkPerCny(rate);
+        const weightKg = Number(weightN.trim()) || 0;
+        const mmk = calculateCrossBorderTotalFee(perKg, weightStr);
+        const cny = mmkToCny(mmk, rate);
         setFeeFormulaHint(
-          formatCrossBorderFeeHint(
+          formatCrossBorderCnyHint(
             originCode,
             destinationCode,
             perKg,
             weightKg,
-            usedLegacyFallback,
             customerCode.trim().toUpperCase(),
             rate,
           ),
         );
-        setTotalFee(String(calculateCrossBorderTotalFee(perKg, weightStr)));
+        setTotalFee(cny == null ? '' : formatCnyInput(cny));
       },
     );
     return () => {
@@ -307,7 +307,7 @@ export default function StockInScreen({ route, navigation }: Props) {
   /** 财务/Admin 只认中文业务标签；多语言 UI 文案勿写入 note */
   const buildNote = () => {
     const parts: string[] = [];
-    if (totalFee.trim()) parts.push(`总费用 ${totalFee.trim()} MMK`);
+    if (totalFee.trim()) parts.push(`报价 ${totalFee.trim()} CNY`);
     if (payCod) parts.push('到付');
     if (payPrepaid) parts.push('预付');
     if (note.trim()) parts.push(note.trim());
@@ -472,7 +472,6 @@ export default function StockInScreen({ route, navigation }: Props) {
             feeFormulaHint={feeFormulaHint}
             canAutoTotalFee={canAutoTotalFee}
             totalFeeManual={totalFeeManual}
-            mmkPerCny={mmkPerCny}
             note={note}
             chain={{
               detail: step3Chain.propsFor('detail', { multiline: true }),

@@ -1,11 +1,15 @@
-/** 相机识别的条码类型（快递单 Code128、QR、EAN 等） */
+/** 相机识别的条码类型。通用扫码要同时认自打标签和商品上的 EAN/UPC。 */
 export const BARCODE_SCAN_TYPES = [
   'code128',
   'qr',
   'code39',
+  'code93',
   'codabar',
   'ean13',
   'ean8',
+  'upc_a',
+  'upc_e',
+  'itf14',
   'pdf417',
   'datamatrix',
 ] as const;
@@ -16,4 +20,4 @@ export const LABEL_BARCODE_SCAN_TYPES = ['code128', 'qr'] as const;
 /** 打印标签：单模块最小宽度（dots），低于此值手机相机很难识别 */
 export const MIN_PRINT_BARCODE_NARROW = 2;
 
-export const DEFAULT_SCAN_COOLDOWN_MS = 600;
+export const DEFAULT_SCAN_COOLDOWN_MS = 420;

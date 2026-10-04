@@ -178,6 +178,8 @@ export interface InventoryItemDetail extends InventoryItem {
   /** 发站入库流水上的登记客户编码 */
   customer_code?: string;
   total_fee?: string;
+  /** 入库时报的人民币。签收前还没有缅币。 */
+  quote_cny?: string;
   payment_label?: string;
   inbound_note?: string;
   /** 入库流水原始 note（含「 · 打包入 」等系统段，用于识别多个入库） */

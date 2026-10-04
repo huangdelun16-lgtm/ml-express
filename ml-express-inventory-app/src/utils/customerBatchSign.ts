@@ -20,6 +20,7 @@ export type SignFeeRow = {
   barcode: string;
   name?: string;
   total_fee?: string;
+  quote_cny?: string | null;
   payment_label?: string;
 };
 
@@ -166,6 +167,62 @@ export function uniqueSignFeeMmk(details: SignFeeRow[]): number {
   return independent + groupedTotal;
 }
 
+function parseQuoteCny(raw?: string | null): number | null {
+  const trimmed = String(raw ?? '').trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed.replace(/[^\d.]/g, ''));
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
+/** 入库锁定的人民币。多个入库同一批只取一次。没有任何报价时返回 null。 */
+export function uniqueQuoteCny(
+  details: Array<{ barcode: string; quote_cny?: string | null }>,
+): number | null {
+  const grouped = new Map<string, number[]>();
+  const independent: number[] = [];
+  let found = false;
+  for (const row of details) {
+    const quote = parseQuoteCny(row.quote_cny);
+    if (quote == null) continue;
+    found = true;
+    const parsed = parsePackagingStockInLineBarcode(row.barcode);
+    if (!parsed) {
+      independent.push(quote);
+      continue;
+    }
+    const list = grouped.get(parsed.base) ?? [];
+    list.push(quote);
+    grouped.set(parsed.base, list);
+  }
+  if (!found) return null;
+  let total = 0;
+  for (const quote of independent) total += quote;
+  for (const quotes of grouped.values()) {
+    total += Math.max(0, ...quotes);
+  }
+  return total;
+}
+
+/** 锁汇时同一多个入库组只在序号最小的那件上带上整批人民币 */
+export function fxLockQuoteCnyForItem(
+  item: { id: string; barcode: string; quote_cny?: string | null },
+  allInBatch: Array<{ id: string; barcode: string; quote_cny?: string | null }>,
+): number {
+  const parsed = parsePackagingStockInLineBarcode(item.barcode);
+  if (!parsed) return parseQuoteCny(item.quote_cny) ?? 0;
+  const group = allInBatch.filter(
+    (row) => parsePackagingStockInLineBarcode(row.barcode)?.base === parsed.base,
+  );
+  const primary = [...group].sort(sortByPackagingIndex)[0];
+  if (primary?.id !== item.id) return 0;
+  const quotes = group
+    .map((row) => parseQuoteCny(row.quote_cny))
+    .filter((quote): quote is number => quote != null);
+  if (!quotes.length) return 0;
+  return Math.max(0, ...quotes);
+}
+
 /** 锁汇时同一多个入库组只在序号最小的那件上写入总费用 */
 export function fxLockFeeMmkForItem(item: SignFeeRow, allInBatch: SignFeeRow[]): number {
   const parsed = parsePackagingStockInLineBarcode(item.barcode);
@@ -194,8 +251,8 @@ export function packagingStockInSignBatch(
 }
 
 export type CodAlertFeeGroup =
-  | { kind: 'packaging'; count: number; fee: number; barcodes: string[] }
-  | { kind: 'single'; name: string; fee: number };
+  | { kind: 'packaging'; count: number; fee: number; quoteCny: number | null; barcodes: string[] }
+  | { kind: 'single'; name: string; fee: number; quoteCny: number | null };
 
 export function buildCodAlertFeeGroups(details: SignFeeRow[]): CodAlertFeeGroup[] {
   const cod = details.filter((row) => row.payment_label === '到付');
@@ -213,6 +270,7 @@ export function buildCodAlertFeeGroups(details: SignFeeRow[]): CodAlertFeeGroup[
         kind: 'packaging',
         count: group.length,
         fee: Math.max(0, ...group.map((item) => parseFeeMmk(item.total_fee))),
+        quoteCny: uniqueQuoteCny(group),
         barcodes: [...group].sort(sortByPackagingIndex).map((item) => item.barcode),
       });
       continue;
@@ -221,6 +279,7 @@ export function buildCodAlertFeeGroups(details: SignFeeRow[]): CodAlertFeeGroup[
       kind: 'single',
       name: row.name ?? '',
       fee: parseFeeMmk(row.total_fee),
+      quoteCny: parseQuoteCny(row.quote_cny),
     });
   }
   return groups;

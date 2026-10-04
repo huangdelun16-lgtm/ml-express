@@ -23,11 +23,14 @@ import type {
 import { validateCustomerSignReceipt } from '../types/customerSignReceipt';
 import { svc } from '../errors/serviceError';
 import { fmt, formatServiceError, useTranslation } from '../i18n';
-import { fetchCrossBorderFxRate, formatCnyAmount, formatMmkAmount, mmkToCny } from '../utils/crossBorderFx';
+import type { TranslationDict } from '../i18n/translations';
+import { cnyToMmk, fetchCrossBorderFxRate, formatCnyAmount, formatMmkAmount, mmkToCny } from '../utils/crossBorderFx';
 import {
   buildCodAlertFeeGroups,
   fxLockFeeMmkForItem,
+  fxLockQuoteCnyForItem,
   packagingStockInSignBatch,
+  uniqueQuoteCny,
   uniqueSignFeeMmk,
 } from '../utils/customerBatchSign';
 import {
@@ -52,6 +55,15 @@ type Props = {
   onError?: (message: string) => void;
   resolveError?: (error: unknown) => string;
 };
+
+function settlementLines(cny: number, rate: number, t: TranslationDict): string {
+  const mmk = cnyToMmk(cny, rate) ?? 0;
+  return [
+    fmt(t.sign.settlementQuote, { amount: formatCnyAmount(cny) }),
+    fmt(t.sign.settlementRate, { rate: formatMmkAmount(rate) }),
+    fmt(t.sign.settlementMmk, { amount: formatMmkAmount(mmk) }),
+  ].join('\n');
+}
 
 function feeLineText(
   feeRaw: string | undefined,
@@ -121,29 +133,39 @@ export default function CustomerSignFlowModal({
       try {
         const [loadedDetails, rate] = await Promise.all([
           getItemDetails(itemIds),
-          fetchCrossBorderFxRate(),
+          fetchCrossBorderFxRate({ force: true }),
         ]);
         if (cancelled) return;
         const loaded = loadedDetails[0];
         if (!loaded) throw svc('orderNotFoundOrDeleted');
-        // 只签收加载成功的行，避免漏载兄弟件时用第一件的费用去锁汇/提交
         setDetail(loaded);
         setDetails(loadedDetails);
         const resolvedRate = rate ?? request.liveRate ?? null;
         setMmkPerCny(resolvedRate);
         setPayCurrency('MMK');
 
+        const quoteCny = uniqueQuoteCny(loadedDetails);
+        if (quoteCny != null && quoteCny > 0 && (resolvedRate == null || resolvedRate <= 0)) {
+          Alert.alert(t.sign.codAlertTitle, t.sign.rateRequiredBlock, [
+            { text: t.common.ok, onPress: onClose },
+          ]);
+          return;
+        }
+
         const codGroups = buildCodAlertFeeGroups(loadedDetails);
         if (codGroups.length > 0) {
           const feeLines = codGroups
             .flatMap((group, index) => {
+              const feeLine =
+                group.quoteCny != null && resolvedRate != null && resolvedRate > 0
+                  ? settlementLines(group.quoteCny, resolvedRate, t)
+                  : feeLineText(
+                      String(group.fee),
+                      resolvedRate,
+                      t.hubReceive.feeNotRegistered,
+                      t.sign.freePromo,
+                    );
               if (group.kind === 'packaging') {
-                const feeLine = feeLineText(
-                  String(group.fee),
-                  resolvedRate,
-                  t.hubReceive.feeNotRegistered,
-                  t.sign.freePromo,
-                );
                 return [
                   fmt(t.sign.packagingBatchFeeLine, { count: group.count, fee: feeLine }),
                   ...group.barcodes.map((barcode, siblingIndex) =>
@@ -154,12 +176,6 @@ export default function CustomerSignFlowModal({
                   ),
                 ];
               }
-              const feeLine = feeLineText(
-                String(group.fee),
-                resolvedRate,
-                t.hubReceive.feeNotRegistered,
-                t.sign.freePromo,
-              );
               return batchCount > 1
                 ? [
                     fmt(t.sign.batchFeeLine, {
@@ -200,8 +216,14 @@ export default function CustomerSignFlowModal({
   const hasCod = details.some((row) => row.payment_label === '到付');
   const hasPrepaid = details.some((row) => row.payment_label === '预付');
   const packagingBatch = useMemo(() => packagingStockInSignBatch(details), [details]);
-  const feeMmk = useMemo(() => uniqueSignFeeMmk(details), [details]);
-  const collectCny = mmkToCny(feeMmk, mmkPerCny);
+  const quoteCny = useMemo(() => uniqueQuoteCny(details), [details]);
+  const feeMmk = useMemo(() => {
+    if (quoteCny != null && mmkPerCny != null && mmkPerCny > 0) {
+      return cnyToMmk(quoteCny, mmkPerCny) ?? 0;
+    }
+    return uniqueSignFeeMmk(details);
+  }, [details, quoteCny, mmkPerCny]);
+  const needsRate = quoteCny != null && quoteCny > 0 && (mmkPerCny == null || mmkPerCny <= 0);
 
   const selectPayCurrency = async (currency: CrossBorderPaidCurrency) => {
     if (currency === 'MMK') {
@@ -231,6 +253,11 @@ export default function CustomerSignFlowModal({
   const submit = async () => {
     if (!request || !detail || submitting || itemIds.length === 0) return;
 
+    if (needsRate) {
+      feedbackService.notify(t.sign.needComplete, t.sign.rateRequiredBlock);
+      return;
+    }
+
     if (payCurrency === 'CNY' && (mmkPerCny == null || mmkPerCny <= 0)) {
       feedbackService.notify(t.sign.needComplete, t.sign.cnyNeedsRate);
       return;
@@ -256,11 +283,19 @@ export default function CustomerSignFlowModal({
       const signIds = details.map((row) => row.id);
       for (const id of signIds) {
         const row = details.find((item) => item.id === id) ?? detail;
+        const quote = fxLockQuoteCnyForItem(row, details);
+        const settledMmk =
+          quote > 0 && mmkPerCny != null && mmkPerCny > 0
+            ? (cnyToMmk(quote, mmkPerCny) ?? 0)
+            : fxLockFeeMmkForItem(row, details);
         const lock = buildSignFxLock({
-          feeMmk: fxLockFeeMmkForItem(row, details),
+          feeMmk: settledMmk,
           currency: payCurrency,
           mmkPerCny,
         });
+        if (lock && payCurrency === 'CNY' && quote > 0) {
+          lock.paidCny = quote;
+        }
         await markCustomerSigned(id, request.operator, request.store, {
           ...payload,
           fxLock: lock ?? undefined,
@@ -373,13 +408,13 @@ export default function CustomerSignFlowModal({
                   </Pressable>
                 </View>
 
-                {feeMmk > 0 ? (
+                {quoteCny != null && mmkPerCny != null && mmkPerCny > 0 ? (
+                  <Text style={styles.payAmount}>{settlementLines(quoteCny, mmkPerCny, t)}</Text>
+                ) : feeMmk > 0 ? (
                   <Text style={styles.payAmount}>
-                    {payCurrency === 'CNY' && collectCny != null
-                      ? fmt(t.sign.collectCny, { amount: formatCnyAmount(collectCny) })
-                      : fmt(t.sign.collectMmk, { amount: formatMmkAmount(feeMmk) })}
+                    {fmt(t.sign.collectMmk, { amount: formatMmkAmount(feeMmk) })}
                   </Text>
-                ) : details.some((row) => hasRecordedFee(row.total_fee)) ? (
+                ) : details.some((row) => hasRecordedFee(row.total_fee) || row.quote_cny?.trim()) ? (
                   <Text style={styles.payAmount}>
                     {fmt(t.sign.collectMmk, { amount: formatMmkAmount(0) })}
                     {' · '}
@@ -472,9 +507,9 @@ export default function CustomerSignFlowModal({
               <Text style={styles.btnCancelText}>{t.common.cancel}</Text>
             </Pressable>
             <Pressable
-              style={[styles.btnConfirm, (!formReady || submitting) && styles.btnDisabled]}
+              style={[styles.btnConfirm, (!formReady || submitting || needsRate) && styles.btnDisabled]}
               onPress={() => void submit()}
-              disabled={!formReady || submitting}
+              disabled={!formReady || submitting || needsRate}
             >
               <Text style={styles.btnConfirmText}>
                 {submitting
@@ -534,7 +569,7 @@ const styles = StyleSheet.create({
   summaryMeta: { color: '#94a3b8', fontSize: 13 },
   siblingLine: { color: '#cbd5e1', fontSize: 12, fontWeight: '700' },
   fieldLabel: { color: '#cbd5e1', fontSize: 13, fontWeight: '700', marginTop: 4 },
-  payAmount: { color: '#f8fafc', fontSize: 18, fontWeight: '800' },
+  payAmount: { color: '#f8fafc', fontSize: 16, fontWeight: '800', lineHeight: 24 },
   payMeta: { color: '#7dd3fc', fontSize: 13, fontWeight: '700' },
   payHint: { color: '#94a3b8', fontSize: 12, lineHeight: 18 },
   input: {

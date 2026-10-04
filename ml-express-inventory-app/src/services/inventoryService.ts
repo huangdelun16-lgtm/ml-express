@@ -55,6 +55,7 @@ import {
   pickPrimaryInboundMovement,
 } from '../utils/inboundMovementNote';
 import { applyFxLockToNote, type CrossBorderFxLock } from '../utils/crossBorderFxLock';
+import { settleQuoteNoteAtRate } from '../utils/inboundMovementNote';
 import { isSupabaseConfigured, supabase } from './supabase';
 import { preferConfirmedHubReceivePack } from '../utils/hubReceivePack';
 import { findParentPackForItem, resolvePackagingStockInItemLabel } from '../utils/packItemSequence';
@@ -732,6 +733,7 @@ function buildItemDetail(
     inbound_note: parsedNote.userNote ?? inbound?.note ?? '',
     inbound_movement_note: inbound?.note ?? '',
     total_fee: feeFields.totalFee,
+    quote_cny: feeFields.quoteCny,
     payment_label: feeFields.paymentLabel,
     sign_receipt: signReceipt,
     pack,
@@ -825,13 +827,17 @@ export async function getItemFirstInboundDate(id: string): Promise<Date | null> 
   return m ? new Date(m.created_at) : null;
 }
 
+function noteWithSignSettlement(note: string, lock: CrossBorderFxLock): string {
+  return applyFxLockToNote(settleQuoteNoteAtRate(note, lock.mmkPerCny), lock);
+}
+
 async function persistFxLockBestEffort(item: InventoryItem, lock: CrossBorderFxLock): Promise<void> {
   if (!isSupabaseConfigured()) return;
   try {
     const moves = await cloudListMovementsForItem(item.id);
     const inbound = pickPrimaryInboundMovement(moves.filter((row) => row.type === 'in'));
     if (inbound?.id) {
-      const nextNote = applyFxLockToNote(inbound.note || '', lock);
+      const nextNote = noteWithSignSettlement(inbound.note || '', lock);
       if (nextNote !== (inbound.note || '')) {
         await supabase.from('inventory_stock_movements').update({ note: nextNote }).eq('id', inbound.id);
       }
@@ -849,7 +855,7 @@ async function persistFxLockBestEffort(item: InventoryItem, lock: CrossBorderFxL
     if (error || !data?.length) return;
     for (const row of data as Array<{ id: string; inbound_note?: string | null }>) {
       const current = String(row.inbound_note || '');
-      const nextNote = applyFxLockToNote(current, lock);
+      const nextNote = noteWithSignSettlement(current, lock);
       if (nextNote === current) continue;
       await supabase.from('inventory_order_tracking').update({ inbound_note: nextNote }).eq('id', row.id);
     }
@@ -873,7 +879,7 @@ export async function markCustomerSigned(
   const fxLock = receipt.fxLock;
   await cloudUpsertItem({
     ...item,
-    note: fxLock ? applyFxLockToNote(item.note || '', fxLock) : item.note,
+    note: fxLock ? noteWithSignSettlement(item.note || '', fxLock) : item.note,
     customer_signed_at: nowIso(),
     qty_on_hand: 0,
     packed_at: '',

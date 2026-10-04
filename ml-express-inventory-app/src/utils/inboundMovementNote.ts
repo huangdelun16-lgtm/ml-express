@@ -1,5 +1,6 @@
 /** 解析入库流水 note（总费用 · 付款方式 · 用户备注）— 支持中/英/缅入库标签 */
 
+import { cnyToMmk } from './crossBorderFx';
 import {
   isFxLockNotePart,
   parseFxLockFromNote,
@@ -8,6 +9,7 @@ import {
 } from './crossBorderFxLock';
 
 const FEE_LABEL_PATTERN = /^(?:总费用|Total fee|ပို့ဆောင်ခ)\s+([\d.]+)\s*MMK$/i;
+const QUOTE_CNY_PATTERN = /^(?:报价|Quote)\s+([\d.]+)\s*CNY$/i;
 
 /** 付款方式归一化为中文业务标签（到付 / 预付） */
 export function normalizePaymentLabel(raw: string | undefined): string | undefined {
@@ -21,6 +23,7 @@ export function normalizePaymentLabel(raw: string | undefined): string | undefin
 
 export function parseInboundMovementNote(note: string): {
   totalFee?: string;
+  quoteCny?: string;
   paymentLabel?: string;
   userNote?: string;
   fxLock?: CrossBorderFxLock;
@@ -30,6 +33,7 @@ export function parseInboundMovementNote(note: string): {
 
   const parts = trimmed.split(' · ').map((p) => p.trim()).filter(Boolean);
   let totalFee: string | undefined;
+  let quoteCny: string | undefined;
   let paymentLabel: string | undefined;
   const userParts: string[] = [];
 
@@ -37,6 +41,11 @@ export function parseInboundMovementNote(note: string): {
     const feeMatch = part.match(FEE_LABEL_PATTERN);
     if (feeMatch) {
       totalFee = feeMatch[1];
+      continue;
+    }
+    const quoteMatch = part.match(QUOTE_CNY_PATTERN);
+    if (quoteMatch) {
+      quoteCny = quoteMatch[1];
       continue;
     }
     if (isFxLockNotePart(part)) {
@@ -53,6 +62,7 @@ export function parseInboundMovementNote(note: string): {
   const fxLock = parseFxLockFromNote(trimmed);
   return {
     totalFee,
+    quoteCny,
     paymentLabel,
     userNote: userParts.length ? userParts.join(' · ') : undefined,
     fxLock: fxLock ?? undefined,
@@ -67,7 +77,26 @@ export function pickNotesFxLock(
 
 export function inboundNoteHasFeeOrPayment(note: string): boolean {
   const parsed = parseInboundMovementNote(note);
-  return Boolean(parsed.totalFee?.trim() || parsed.paymentLabel?.trim());
+  return Boolean(parsed.totalFee?.trim() || parsed.quoteCny?.trim() || parsed.paymentLabel?.trim());
+}
+
+/** 签收时把入库人民币按当天汇率写成缅币。已有总费用 MMK 的不再重算。 */
+export function settleQuoteNoteAtRate(note: string, rate: number | null): string {
+  const parsed = parseInboundMovementNote(note);
+  if (parsed.totalFee != null) return note;
+  if (parsed.quoteCny == null || rate == null || rate <= 0) return note;
+  const cny = Number(parsed.quoteCny);
+  if (!Number.isFinite(cny) || cny < 0) return note;
+  const mmk = cnyToMmk(cny, rate);
+  if (mmk == null) return note;
+  const parts = note
+    .split(' · ')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const feePart = `总费用 ${mmk} MMK`;
+  const quoteIndex = parts.findIndex((part) => QUOTE_CNY_PATTERN.test(part));
+  parts.splice(quoteIndex >= 0 ? quoteIndex + 1 : 0, 0, feePart);
+  return parts.join(' · ');
 }
 
 /** 到站/中转补写的入库流水，不含发站总费用 */
@@ -76,16 +105,18 @@ export const HUB_RECEIVE_INBOUND_NOTE_RE =
 
 export function pickInboundFeeFields(
   ...notes: Array<string | null | undefined>
-): { totalFee?: string; paymentLabel?: string } {
+): { totalFee?: string; quoteCny?: string; paymentLabel?: string } {
   let totalFee: string | undefined;
+  let quoteCny: string | undefined;
   let paymentLabel: string | undefined;
   for (const note of notes) {
     const parsed = parseInboundMovementNote(String(note || ''));
     if (!totalFee && parsed.totalFee?.trim()) totalFee = parsed.totalFee.trim();
+    if (!quoteCny && parsed.quoteCny?.trim()) quoteCny = parsed.quoteCny.trim();
     if (!paymentLabel && parsed.paymentLabel) paymentLabel = parsed.paymentLabel;
-    if (totalFee && paymentLabel) break;
+    if (totalFee && quoteCny && paymentLabel) break;
   }
-  return { totalFee, paymentLabel };
+  return { totalFee, quoteCny, paymentLabel };
 }
 
 /** 发票/详情用发站那条入库（带总费用），不要用后补的「到站交付确认」 */

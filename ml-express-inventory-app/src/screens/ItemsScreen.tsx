@@ -263,21 +263,6 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     });
   };
 
-  const handleBatchSign = () => {
-    if (!store) return;
-    const validationError = validateBatchSignSelection(selectedItems);
-    if (validationError) {
-      feedbackService.notify(
-        t.common.tip,
-        validationError === 'batchSignEmpty'
-          ? t.items.batchSignEmpty
-          : t.items.batchSignMixedCustomer,
-      );
-      return;
-    }
-    void openCustomerSign(selectedItems);
-  };
-
   const handleOpenInvoice = () => {
     if (!store) return;
     const validationError = validateBatchSignSelection(selectedItems);
@@ -426,7 +411,6 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
               }}
               onCancel={exitSelectMode}
               onOpenPack={openPackModal}
-              onBatchSign={handleBatchSign}
               onOpenInvoice={handleOpenInvoice}
             />
 
@@ -621,6 +605,11 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         store={store}
         hubCode={hubCode}
         onClose={() => setInvoiceVisible(false)}
+        continueLabel={t.invoice.signAction}
+        onContinue={() => {
+          setInvoiceVisible(false);
+          void openCustomerSign(selectedItems);
+        }}
       />
 
       <CustomerSignFlowModal

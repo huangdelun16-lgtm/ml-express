@@ -8,7 +8,7 @@ vi.mock('../services/supabase', () => ({
 }));
 
 import {
-  formatCrossBorderFeeHint,
+  formatCrossBorderCnyHint,
   pickRoutePerKgFromRows,
   shouldShowCrossBorderQuote,
 } from './crossBorderPricing';
@@ -80,22 +80,10 @@ describe('shouldShowCrossBorderQuote', () => {
   });
 });
 
-describe('formatCrossBorderFeeHint', () => {
-  it('prefixes the customer code when present', () => {
-    expect(formatCrossBorderFeeHint('RUI', 'MDY', 18000, 2, false, 'MDY260812005')).toBe(
-      'MDY260812005 · RUI → MDY 18000 MMK/kg × 2 kg',
-    );
-  });
-
-  it('shows CNY/kg plus booked MMK/kg when a rate is set', () => {
-    expect(formatCrossBorderFeeHint('RUI', 'MDY', 23500, 8, false, 'MDY260824001', 5000)).toBe(
-      'MDY260824001 · RUI → MDY ¥4.7/kg · 入账 23500 MMK/kg × 8 kg',
-    );
-  });
-
-  it('labels an explicit 0 rate as a free promo', () => {
-    expect(formatCrossBorderFeeHint('RUI', 'MDY', 0, 0.5, false, 'MDY260802001', 5000)).toBe(
-      'MDY260802001 · RUI → MDY 免费优惠 · 入账 0 MMK/kg × 0.5 kg',
-    );
+describe('formatCrossBorderCnyHint', () => {
+  it('keeps the stock-in quote in CNY only', () => {
+    const hint = formatCrossBorderCnyHint('RUI', 'MDY', 23500, 8, 'MDY260824001', 5000);
+    expect(hint).toBe('MDY260824001 · RUI → MDY ¥4.7/kg × 8 kg');
+    expect(hint.includes('MMK')).toBe(false);
   });
 });

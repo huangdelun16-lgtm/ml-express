@@ -31,9 +31,20 @@ type Props = {
   target: ExceptionReportTarget | null;
   onClose: () => void;
   onSubmitted?: () => void;
+  initialType?: InventoryExceptionType | null;
+  initialNote?: string;
+  initialQtyActual?: string;
 };
 
-export default function ExceptionReportModal({ visible, target, onClose, onSubmitted }: Props) {
+export default function ExceptionReportModal({
+  visible,
+  target,
+  onClose,
+  onSubmitted,
+  initialType = null,
+  initialNote = '',
+  initialQtyActual = '',
+}: Props) {
   const { t } = useTranslation();
   const { store, operatorName } = useAuth();
   const [type, setType] = useState<InventoryExceptionType | ''>('');
@@ -46,14 +57,21 @@ export default function ExceptionReportModal({ visible, target, onClose, onSubmi
 
   useEffect(() => {
     if (!visible) return;
-    setType('');
-    setNote('');
+    setType(initialType ?? '');
+    setNote(initialNote);
     setQtyExpected(target?.qtyExpected != null ? String(target.qtyExpected) : '');
-    setQtyActual('');
+    setQtyActual(initialQtyActual);
     setPhotos([]);
     setError('');
     setSubmitting(false);
-  }, [visible, target?.itemBarcode, target?.qtyExpected]);
+  }, [
+    visible,
+    target?.itemBarcode,
+    target?.qtyExpected,
+    initialType,
+    initialNote,
+    initialQtyActual,
+  ]);
 
   const showQty = exceptionNeedsQty(type);
   const canSubmit = useMemo(() => {

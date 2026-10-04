@@ -4,7 +4,7 @@ import { isInventoryCloudAuthError, isInventoryRlsPolicyError } from './cloudAut
 import { isLikelyNetworkError } from './networkError';
 
 export type CloudFailureKind = 'network' | 'session' | 'origin';
-export type CloudFailureScene = 'stockOut' | 'hubReceive';
+export type CloudFailureScene = 'stockOut' | 'hubReceive' | 'scan';
 
 const NETWORK_CODES = new Set<ServiceErrorCode>([
   'syncNetworkFailed',
@@ -72,7 +72,7 @@ export function explainCloudOperationFailure(
 ): string | null {
   const kind = classifyCloudOperationFailure(error);
   if (!kind) return null;
-  const pack = scene === 'stockOut' ? t.stockOut : t.hubReceive;
+  const pack = scene === 'stockOut' ? t.stockOut : scene === 'hubReceive' ? t.hubReceive : t.cameraScan;
   if (kind === 'network') return pack.cloudFailNetwork;
   if (kind === 'session') return pack.cloudFailSession;
   return pack.cloudFailOrigin;

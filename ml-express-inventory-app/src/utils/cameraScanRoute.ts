@@ -1,5 +1,6 @@
+import type { PkgTrackingDetail } from '../types/tracking';
+import { isTruckLegEndingAtHub, resolvePackLegDestinationCode } from './hubReceivePack';
 import { isPackageBarcode } from './packageNumber';
-import { isTruckLegEndingAtHub } from './hubReceivePack';
 
 export type CameraScanRoute =
   | { kind: 'hub_receive'; packBarcode: string }
@@ -46,4 +47,35 @@ export function resolveCameraScanRoute(input: {
   if (!input.hasLocalItem) return { kind: 'stock_in', barcode: code };
 
   return { kind: 'stay' };
+}
+
+/** 结果页按钮与自动跳转同一套：只有该入库才给入库；到站必须带上包装号 */
+export function cameraScanManualActions(input: {
+  route: CameraScanRoute;
+  code: string;
+  packBarcode?: string | null;
+}): { showStockIn: boolean; hubPackBarcode: string } {
+  if (input.route.kind === 'stock_in') {
+    return { showStockIn: true, hubPackBarcode: '' };
+  }
+  if (input.route.kind === 'hub_receive') {
+    return { showStockIn: false, hubPackBarcode: input.route.packBarcode };
+  }
+  const fromCloud = (input.packBarcode ?? '').trim().toUpperCase();
+  if (fromCloud) return { showStockIn: false, hubPackBarcode: fromCloud };
+  const scanned = input.code.trim().toUpperCase();
+  if (isPackageBarcode(scanned)) return { showStockIn: false, hubPackBarcode: scanned };
+  return { showStockIn: false, hubPackBarcode: '' };
+}
+
+/** 云端路线显示本段运达站。包装号上的客户目的地可以不同，例如 POL 客户只发到 MDY。 */
+export function formatScanCloudRoute(pkg: {
+  origin_store_code: string;
+  leg_destination_code: string;
+  destination_code: string;
+}): string {
+  const origin = pkg.origin_store_code.trim().toUpperCase();
+  const leg = resolvePackLegDestinationCode(pkg as PkgTrackingDetail);
+  if (origin && leg) return `${origin} → ${leg}`;
+  return origin || leg;
 }

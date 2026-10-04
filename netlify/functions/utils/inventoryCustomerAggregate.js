@@ -19,6 +19,7 @@ function parseAmount(raw) {
 }
 
 const FEE_LABEL_PATTERN = /^(?:总费用|Total fee|ပို့ဆောင်ခ)\s+([\d.]+)\s*MMK$/i;
+const QUOTE_CNY_PATTERN = /^(?:报价|Quote)\s+([\d.]+)\s*CNY$/i;
 const FX_RATE_PART = /^(?:汇率|Rate|FX)\s+([\d.]+)$/i;
 const FX_PAID_MMK = /^(?:实收|Paid)\s+MMK$/i;
 const FX_PAID_CNY_AMT = /^(?:实收|Paid)\s+([\d.]+)\s*CNY$/i;
@@ -77,12 +78,18 @@ function parseInboundMovementNote(note) {
   if (!trimmed) return {};
   const parts = trimmed.split(' · ').map((p) => p.trim()).filter(Boolean);
   let totalFee;
+  let quoteCny;
   let paymentLabel;
   const userParts = [];
   for (const part of parts) {
     const feeMatch = part.match(FEE_LABEL_PATTERN);
     if (feeMatch) {
       totalFee = feeMatch[1];
+      continue;
+    }
+    const quoteMatch = part.match(QUOTE_CNY_PATTERN);
+    if (quoteMatch) {
+      quoteCny = quoteMatch[1];
       continue;
     }
     if (FX_RATE_PART.test(part) || FX_PAID_MMK.test(part) || FX_PAID_CNY_AMT.test(part) || FX_PAID_CNY.test(part)) {
@@ -95,12 +102,16 @@ function parseInboundMovementNote(note) {
     }
     userParts.push(part);
   }
-  return { totalFee, paymentLabel, userNote: userParts.join(' · ') };
+  return { totalFee, quoteCny, paymentLabel, userNote: userParts.join(' · ') };
 }
 
 function inboundNoteHasFeeOrPayment(note) {
   const parsed = parseInboundMovementNote(note);
-  return Boolean(String(parsed.totalFee || '').trim() || String(parsed.paymentLabel || '').trim());
+  return Boolean(
+    String(parsed.totalFee || '').trim() ||
+      String(parsed.quoteCny || '').trim() ||
+      String(parsed.paymentLabel || '').trim(),
+  );
 }
 
 function parseWeightKg(raw) {
@@ -224,6 +235,7 @@ function mergeInvoiceParsed(movementNote, trackingNote) {
   const fromTracking = parseInboundMovementNote(String(trackingNote || ''));
   return {
     totalFee: fromMovement.totalFee || fromTracking.totalFee,
+    quoteCny: fromMovement.quoteCny || fromTracking.quoteCny,
     paymentLabel: fromMovement.paymentLabel || fromTracking.paymentLabel,
   };
 }
@@ -265,6 +277,7 @@ function applyPackFeeDedup(rows, packNotesByBarcode) {
       .localeCompare(String(b.inboundBarcode || '').toUpperCase()),
   );
   const packFeeAssigned = new Set();
+  const packQuoteAssigned = new Set();
 
   for (const row of sorted) {
     const bundle =
@@ -275,7 +288,18 @@ function applyPackFeeDedup(rows, packNotesByBarcode) {
     const packNote = packNotesByBarcode[bundle] || '';
     const packParsed = parseInboundMovementNote(packNote);
     const packFee = parseAmount(packParsed.totalFee);
-    const isPackaging = isPackagingStockInPackNote(packNote) || Boolean(packFee);
+    const packQuote = parseAmount(packParsed.quoteCny);
+    const isPackaging = isPackagingStockInPackNote(packNote) || Boolean(packFee) || Boolean(packQuote);
+    const rowQuote = Number(row.quoteCny) || 0;
+
+    if (rowQuote <= 0 && packQuote > 0 && !packQuoteAssigned.has(bundle)) {
+      row.quoteCny = packQuote;
+      packQuoteAssigned.add(bundle);
+    } else if (isPackaging && packQuoteAssigned.has(bundle)) {
+      if (rowQuote > 0 && (packQuote <= 0 || rowQuote === packQuote)) row.quoteCny = 0;
+    } else if (isPackaging && rowQuote > 0) {
+      packQuoteAssigned.add(bundle);
+    }
 
     if (row.fee <= 0 && packFee > 0 && !packFeeAssigned.has(bundle)) {
       row.fee = packFee;
@@ -310,6 +334,7 @@ function applyPackFeeDedup(rows, packNotesByBarcode) {
   }
   for (const [, list] of byBase.entries()) {
     const maxFee = Math.max(0, ...list.map((r) => Number(r.fee) || 0));
+    const maxQuote = Math.max(0, ...list.map((r) => Number(r.quoteCny) || 0));
     list.sort(
       (a, b) =>
         (parsePackagingStockInLineBarcode(a.inboundBarcode)?.index || 99) -
@@ -317,6 +342,7 @@ function applyPackFeeDedup(rows, packNotesByBarcode) {
     );
     list.forEach((row, idx) => {
       row.fee = idx === 0 ? maxFee : 0;
+      row.quoteCny = idx === 0 ? maxQuote : 0;
     });
   }
 
@@ -340,6 +366,7 @@ function buildExpressItemRow(item, inbound, trackingNote) {
     '—';
   const qty = inbound ? Number(inbound.qty) || 1 : Number(item.qty_on_hand) || 1;
   const fee = parseAmount(merged.totalFee);
+  const quoteCny = parseAmount(merged.quoteCny);
   const customerSigned = isCustomerSignedItem(item);
   const packedBundleBarcode = String(item.packed_bundle_barcode || '').trim().toUpperCase();
   const fxLock = pickFxLock(
@@ -364,8 +391,10 @@ function buildExpressItemRow(item, inbound, trackingNote) {
     destination: destination || '—',
     weight: String(item.weight || '').trim() || '—',
     weightKg: parseWeightKg(item.weight),
+    packWeightKg: 0,
     qty,
     fee,
+    quoteCny,
     customerSigned,
     paymentStatus: derivePaymentStatus(merged.paymentLabel, customerSigned),
     packageStatus: derivePackageStatus(item),
@@ -479,8 +508,48 @@ async function loadExpressItemsDataset(supabase) {
   }
 
   applyPackFeeDedup(rows, packNotesByBarcode);
+  await attachPackWeights(supabase, rows, warnings);
 
   return { rows, warnings };
+}
+
+/** 多个入库的总重在包裹本体上，明细行重量是空的。按包装号抄一次，不摊到每一件。 */
+async function attachPackWeights(supabase, rows, warnings) {
+  const weightByBarcode = {};
+  for (const row of rows) {
+    const code = String(row.inboundBarcode || '').trim().toUpperCase();
+    if (code && row.weightKg > 0) weightByBarcode[code] = row.weightKg;
+  }
+
+  const wanted = [
+    ...new Set(
+      rows
+        .map((row) => String(row.packedBundleBarcode || '').trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ];
+  const missing = wanted.filter((code) => !(weightByBarcode[code] > 0));
+  for (let i = 0; i < missing.length; i += 100) {
+    const chunk = missing.slice(i, i + 100);
+    const { data, error } = await supabase
+      .from('inventory_store_items')
+      .select('barcode, weight')
+      .in('barcode', chunk);
+    if (error) {
+      warnings.push(`包裹重量读取失败：${error.message}`);
+      break;
+    }
+    for (const item of data || []) {
+      const code = String(item.barcode || '').trim().toUpperCase();
+      const kg = parseWeightKg(item.weight);
+      if (code && kg > 0) weightByBarcode[code] = kg;
+    }
+  }
+
+  for (const row of rows) {
+    const pack = String(row.packedBundleBarcode || '').trim().toUpperCase();
+    row.packWeightKg = pack && weightByBarcode[pack] > 0 ? weightByBarcode[pack] : 0;
+  }
 }
 
 function aggregateCustomerSummaries(rows, registry) {
@@ -557,7 +626,13 @@ async function fetchCustomerItems(supabase, customerName, customerPhone, custome
   const targetPhone = registered ? registered.phone : normalizeCustomerPhone(customerPhone);
   const targetCode = registered ? registered.customer_code : codeUpper;
 
+  const packCodes = new Set(
+    rows
+      .map((row) => String(row.packedBundleBarcode || '').trim().toUpperCase())
+      .filter(Boolean),
+  );
   const items = rows
+    .filter((r) => !packCodes.has(String(r.inboundBarcode || '').trim().toUpperCase()))
     .filter((r) => {
       if (targetCode) {
         const rowRegistered = resolveRegisteredCustomer(r, registry);

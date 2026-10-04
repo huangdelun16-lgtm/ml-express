@@ -247,16 +247,6 @@ export async function fetchCrossBorderRoutePerKg(
   };
 }
 
-/** @deprecated 使用 fetchCrossBorderRoutePerKg(origin, destination) */
-export async function fetchCrossBorderBaseFee(
-  destination: string,
-): Promise<{ baseFee: number; regionId: string; destinationCode: string; fromCloud: boolean }> {
-  const destinationCode = normalizeRouteHubCode(destination);
-  const regionId = resolvePricingRegionFromDestination(destinationCode);
-  const baseFee = await fetchLegacyDestinationBaseFee(destinationCode);
-  return { baseFee, regionId, destinationCode, fromCloud: isSupabaseConfigured() };
-}
-
 /** 总费用 = 路线单价 (MMK/kg) × 重量(kg) */
 export function calculateCrossBorderTotalFee(perKg: number, weightStr: string): number {
   const { n } = parseWeight(weightStr);
@@ -264,31 +254,20 @@ export function calculateCrossBorderTotalFee(perKg: number, weightStr: string): 
   return Math.round(perKg * weightKg);
 }
 
-export function formatCrossBorderFeeHint(
+/** 入库报价只给人民币。路线价仍是 MMK/kg，这里按当天汇率折成人民币，不写出缅币。 */
+export function formatCrossBorderCnyHint(
   originCode: string,
   destinationCode: string,
   perKg: number,
   weightKg: number,
-  usedLegacyFallback = false,
   customerCode = '',
   mmkPerCny: number | null = null,
 ): string {
   const origin = originCode || '—';
   const dest = destinationCode || '—';
   const customerPrefix = customerCode ? `${customerCode} · ` : '';
-  if (perKg <= 0) {
-    return `${customerPrefix}${origin} → ${dest} 免费优惠 · 入账 0 MMK/kg × ${weightKg} kg`;
-  }
+  if (perKg <= 0) return `${customerPrefix}${origin} → ${dest} 免费优惠 · ¥0`;
   const cnyPerKg = mmkToCny(perKg, mmkPerCny);
-  if (cnyPerKg != null) {
-    const cnyLabel = `¥${formatCnyInput(cnyPerKg)}/kg`;
-    if (usedLegacyFallback) {
-      return `${customerPrefix}${dest} 领区兜底 ${cnyLabel} · 入账 ${perKg} MMK/kg × ${weightKg} kg`;
-    }
-    return `${customerPrefix}${origin} → ${dest} ${cnyLabel} · 入账 ${perKg} MMK/kg × ${weightKg} kg`;
-  }
-  if (usedLegacyFallback) {
-    return `${customerPrefix}${dest} 领区兜底起步价 ${perKg} × ${weightKg} kg`;
-  }
-  return `${customerPrefix}${origin} → ${dest} ${perKg} MMK/kg × ${weightKg} kg`;
+  if (cnyPerKg == null) return `${customerPrefix}${origin} → ${dest} 未设置汇率，无法生成人民币报价`;
+  return `${customerPrefix}${origin} → ${dest} ¥${formatCnyInput(cnyPerKg)}/kg × ${weightKg} kg`;
 }

@@ -1,8 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../services/supabase', () => ({
+  isSupabaseConfigured: () => false,
+  getSupabaseUrl: () => '',
+  getSupabaseAnonKey: () => '',
+  supabase: {},
+}));
+
 import {
   buildBatchSignInvoice,
   formatInvoiceExpressNos,
+  formatInvoiceUnitRateLines,
   formatInvoiceWeight,
+  resolveInvoiceUnitRateLabels,
 } from './batchSignInvoice';
 
 describe('buildBatchSignInvoice', () => {
@@ -17,7 +27,7 @@ describe('buildBatchSignInvoice', () => {
       },
     ]);
     expect(model.lines).toEqual([
-      { kind: 'single', expressNos: ['EXP-100'], weightKg: 8, feeMmk: 20000 },
+      { kind: 'single', expressNos: ['EXP-100'], weightKg: 8, feeMmk: 20000, route: null },
     ]);
     expect(model.totalWeightKg).toBe(8);
     expect(model.totalFeeMmk).toBe(20000);
@@ -56,6 +66,7 @@ describe('buildBatchSignInvoice', () => {
       expressNos: ['A-11', 'B-22', 'C-33'],
       weightKg: 36,
       feeMmk: 125000,
+      route: null,
     });
     expect(model.totalFeeMmk).toBe(125000);
     expect(model.totalWeightKg).toBe(36);
@@ -150,6 +161,110 @@ describe('buildBatchSignInvoice', () => {
       expressNos: ['P-1', 'P-2'],
       weightKg: 12,
       feeMmk: 30000,
+      route: null,
     });
+  });
+
+  it('settles locked inbound CNY with the HQ rate and does not invent MMK without a rate', () => {
+    const row = {
+      id: 's1',
+      barcode: 'MDY001',
+      input_barcode: 'EXP-100',
+      weight: '8 Kg',
+      quote_cny: '100',
+      total_fee: '99999',
+    };
+    const settled = buildBatchSignInvoice([row], 450);
+    expect(settled.totalFeeCny).toBe(100);
+    expect(settled.rate).toBe(450);
+    expect(settled.totalFeeMmk).toBe(45000);
+    expect(settled.missingRate).toBe(false);
+
+    const blocked = buildBatchSignInvoice([row], null);
+    expect(blocked.missingRate).toBe(true);
+    expect(blocked.totalFeeMmk).toBe(0);
+  });
+
+  it('keeps one customer-pricing route for a single and one for a whole package', () => {
+    const model = buildBatchSignInvoice([
+      {
+        id: 's1',
+        barcode: 'SOLO',
+        input_barcode: '11',
+        weight: '2 Kg',
+        owner_store_code: 'MUSE001',
+        final_destination: 'MDY',
+        customer_code: 'MDY009',
+        quote_cny: '80',
+      },
+      {
+        id: 'p1',
+        barcode: 'MDY9(2-1)',
+        input_barcode: '33',
+        weight: '',
+        owner_store_code: 'RUI001',
+        final_destination: 'MDY',
+        customer_code: 'MDY009',
+        quote_cny: '120',
+        pack: { weight: '3 Kg' },
+      },
+      {
+        id: 'p2',
+        barcode: 'MDY9(2-2)',
+        input_barcode: '22',
+        weight: '',
+        quote_cny: '120',
+        pack: { weight: '3 Kg' },
+      },
+    ]);
+    expect(model.lines.map((line) => ({ kind: line.kind, weightKg: line.weightKg, route: line.route }))).toEqual([
+      {
+        kind: 'single',
+        weightKg: 2,
+        route: { originCode: 'MSE', destinationCode: 'MDY', customerCode: 'MDY009' },
+      },
+      {
+        kind: 'packaging',
+        weightKg: 3,
+        route: { originCode: 'RUI', destinationCode: 'MDY', customerCode: 'MDY009' },
+      },
+    ]);
+    expect(model.totalWeightKg).toBe(5);
+  });
+});
+
+describe('formatInvoiceUnitRateLines', () => {
+  it('writes each different route price once, as 1KG=40RMB', () => {
+    expect(formatInvoiceUnitRateLines([40, 35, 40])).toEqual(['1KG=40RMB', '1KG=35RMB']);
+    expect(formatInvoiceUnitRateLines([4.7])).toEqual(['1KG=4.7RMB']);
+  });
+
+  it('uses the customer route matrix and skips a legacy fallback', async () => {
+    const labels = await resolveInvoiceUnitRateLabels(
+      [
+        {
+          kind: 'single',
+          expressNos: ['11'],
+          weightKg: 2,
+          feeMmk: 0,
+          route: { originCode: 'RUI', destinationCode: 'MDY', customerCode: 'MDY009' },
+        },
+        {
+          kind: 'packaging',
+          expressNos: ['33', '22'],
+          weightKg: 3,
+          feeMmk: 0,
+          route: { originCode: 'LSO', destinationCode: 'MDY', customerCode: 'MDY009' },
+        },
+      ],
+      666,
+      async (route) => {
+        if (route.originCode === 'RUI') {
+          return { perKgMmk: 40 * 666, mmkPerCny: 666, fromRouteMatrix: true };
+        }
+        return { perKgMmk: 999, mmkPerCny: 666, fromRouteMatrix: false };
+      },
+    );
+    expect(labels).toEqual(['1KG=40RMB']);
   });
 });

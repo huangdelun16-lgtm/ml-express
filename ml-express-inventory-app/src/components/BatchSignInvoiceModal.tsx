@@ -17,12 +17,14 @@ import { feedbackService } from '../services/FeedbackService';
 import type { InventoryStoreSession } from '../services/authService';
 import type { InventoryItemDetail, InventoryItemListRow } from '../types/inventory';
 import { resolvePackagingStockInSignIds } from '../utils/customerBatchSign';
-import { formatMmkAmount } from '../utils/crossBorderFx';
+import { fetchCrossBorderFxRate, formatCnyAmount, formatMmkAmount } from '../utils/crossBorderFx';
+import { fetchCrossBorderRoutePerKg } from '../utils/crossBorderPricing';
 import { parseWeightKg } from '../utils/itemFieldFormat';
 import { yangonTodayYmd } from '../utils/yangonFinancePeriod';
 import {
   buildBatchSignInvoice,
   formatInvoiceWeight,
+  resolveInvoiceUnitRateLabels,
   type BatchSignInvoiceLine,
   type BatchSignInvoiceModel,
 } from '../utils/batchSignInvoice';
@@ -35,6 +37,8 @@ type Props = {
   store: InventoryStoreSession | null;
   hubCode?: string | null;
   onClose: () => void;
+  onContinue?: () => void;
+  continueLabel?: string;
 };
 
 type InvoiceHeading = {
@@ -103,7 +107,12 @@ function OrderTable({
   line: BatchSignInvoiceLine;
   orderLabel: string;
 }) {
+  const { t, fmt } = useTranslation();
   const nos = line.expressNos.length ? line.expressNos : ['—'];
+  const weightText = formatInvoiceWeight(line.weightKg);
+  const weightLabel = weightText
+    ? fmt(line.kind === 'packaging' ? t.invoice.packWeight : t.invoice.lineWeight, { weight: weightText })
+    : '';
   return (
     <View style={styles.table}>
       <Text style={styles.tableHead}>{orderLabel}</Text>
@@ -111,8 +120,16 @@ function OrderTable({
         <View key={`${no}-${index}`} style={styles.orderRow}>
           <Text style={styles.orderIndex}>{String(index + 1).padStart(2, '0')}</Text>
           <Text style={styles.orderNo}>{no}</Text>
+          {line.kind === 'single' && index === 0 && weightLabel ? (
+            <Text style={styles.lineWeight}>{weightLabel}</Text>
+          ) : null}
         </View>
       ))}
+      {line.kind === 'packaging' && weightLabel ? (
+        <View style={styles.packWeightRow}>
+          <Text style={styles.packWeight}>{weightLabel}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -124,8 +141,10 @@ export default function BatchSignInvoiceModal({
   store,
   hubCode,
   onClose,
+  onContinue,
+  continueLabel,
 }: Props) {
-  const { t } = useTranslation();
+  const { t, fmt } = useTranslation();
   const { height: windowHeight } = useWindowDimensions();
   const shotRef = useRef<View>(null);
   const sheetMaxHeight = Math.round(windowHeight * 0.9);
@@ -134,6 +153,7 @@ export default function BatchSignInvoiceModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [model, setModel] = useState<BatchSignInvoiceModel | null>(null);
+  const [unitRates, setUnitRates] = useState<string[]>([]);
   const [heading, setHeading] = useState<InvoiceHeading | null>(null);
 
   const customerName = useMemo(() => {
@@ -144,6 +164,7 @@ export default function BatchSignInvoiceModal({
   useEffect(() => {
     if (!visible || !store || selectedItems.length === 0) {
       setModel(null);
+      setUnitRates([]);
       setHeading(null);
       setError('');
       setLoading(false);
@@ -167,8 +188,31 @@ export default function BatchSignInvoiceModal({
         const details = await attachTrackedPackWeights(
           await getItemDetails(expanded.map((item) => item.id)),
         );
+        const rate = await fetchCrossBorderFxRate({ force: true });
         if (cancelled) return;
-        setModel(buildBatchSignInvoice(details));
+        const built = buildBatchSignInvoice(details, rate);
+        if (built.missingRate) {
+          setModel(null);
+          setUnitRates([]);
+          setHeading(null);
+          setError(t.invoice.rateRequired);
+          return;
+        }
+        const labels = await resolveInvoiceUnitRateLabels(built.lines, built.rate, async (route) => {
+          const found = await fetchCrossBorderRoutePerKg(
+            route.originCode,
+            route.destinationCode,
+            route.customerCode,
+          );
+          return {
+            perKgMmk: found.perKg,
+            mmkPerCny: found.mmkPerCny,
+            fromRouteMatrix: found.fromCloud && !found.usedLegacyFallback,
+          };
+        }).catch(() => [] as string[]);
+        if (cancelled) return;
+        setUnitRates(labels);
+        setModel(built);
         setHeading(headingFrom(details, store, (raw) => getPaymentLabelDisplay(t, raw)));
       } catch {
         if (!cancelled) {
@@ -290,9 +334,28 @@ export default function BatchSignInvoiceModal({
                     </View>
                     <View style={styles.feeRow}>
                       <Text style={styles.feeLabel}>{t.invoice.batchTotalFee}</Text>
-                      <Text style={styles.feeValue} myanmarWeight="bold">
-                        {feeLabel(model.totalFeeMmk, t.invoice.freePromo)}
-                      </Text>
+                      <View style={styles.feeStack}>
+                        {model.totalFeeCny != null ? (
+                          <Text style={styles.feeQuote}>
+                            {fmt(t.invoice.settlementQuote, { amount: formatCnyAmount(model.totalFeeCny) })}
+                          </Text>
+                        ) : null}
+                        {model.totalFeeCny != null
+                          ? unitRates.map((label) => (
+                              <Text key={label} style={styles.feeUnit}>
+                                {label}
+                              </Text>
+                            ))
+                          : null}
+                        {model.totalFeeCny != null && model.rate != null ? (
+                          <Text style={styles.feeRate}>
+                            {fmt(t.invoice.settlementRate, { rate: formatMmkAmount(model.rate) })}
+                          </Text>
+                        ) : null}
+                        <Text style={styles.feeValue} myanmarWeight="bold">
+                          {feeLabel(model.totalFeeMmk, t.invoice.freePromo)}
+                        </Text>
+                      </View>
                     </View>
                   </View>
 
@@ -304,6 +367,19 @@ export default function BatchSignInvoiceModal({
           ) : null}
 
           <View style={styles.actions}>
+            {onContinue ? (
+              <Pressable
+                style={[styles.continueBtn, (!model || saving) && styles.btnDisabled]}
+                onPress={onContinue}
+                disabled={!model || saving}
+                accessibilityRole="button"
+                accessibilityLabel={continueLabel || t.invoice.continueSign}
+              >
+                <Text style={styles.continueBtnText} myanmarWeight="bold">
+                  {continueLabel || t.invoice.continueSign}
+                </Text>
+              </Pressable>
+            ) : null}
             <Pressable
               style={[styles.saveBtn, (!model || saving) && styles.btnDisabled]}
               onPress={() => void handleSave()}
@@ -487,6 +563,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.4,
   },
+  lineWeight: {
+    color: '#44403c',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  packWeightRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingTop: 6,
+    paddingBottom: 2,
+  },
+  packWeight: {
+    color: '#44403c',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   totals: {
     marginTop: 16,
     borderTopWidth: 1,
@@ -521,6 +613,28 @@ const styles = StyleSheet.create({
     color: '#f6f3ec',
     fontSize: 13,
     fontWeight: '600',
+  },
+  feeStack: { alignItems: 'flex-end', flexShrink: 1, maxWidth: '72%' },
+  feeQuote: {
+    color: '#f6f3ec',
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+  feeUnit: {
+    color: '#f6f3ec',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 2,
+    textAlign: 'right',
+  },
+  feeRate: {
+    color: '#d6d3d1',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
+    marginBottom: 4,
+    textAlign: 'right',
   },
   feeValue: {
     color: '#f6f3ec',
@@ -559,10 +673,19 @@ const styles = StyleSheet.create({
   actions: {
     marginTop: 12,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 8,
   },
+  continueBtn: {
+    backgroundColor: '#059669',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    minWidth: 88,
+    alignItems: 'center',
+  },
+  continueBtnText: { color: '#f6f3ec', fontWeight: '800', fontSize: 14 },
   saveBtn: {
     backgroundColor: '#1c1917',
     paddingHorizontal: 16,

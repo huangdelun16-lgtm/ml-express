@@ -2,37 +2,26 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from '../../i18n';
 import { colors, radius } from '../../theme';
-import { formatCnyAmount, formatMmkAmount, mmkToCny } from '../../utils/crossBorderFx';
+import { formatCnyAmount } from '../../utils/crossBorderFx';
 
 export default function CrossBorderQuotePreview({
-  totalFeeMmk,
+  quoteCny,
   hint,
-  mmkPerCny,
   showQuote,
 }: {
-  totalFeeMmk: number;
+  quoteCny: number;
   hint: string;
-  mmkPerCny: number | null;
   showQuote: boolean;
 }) {
-  const { t, fmt } = useTranslation();
-  if (!showQuote || !Number.isFinite(totalFeeMmk) || totalFeeMmk < 0) return null;
+  const { t } = useTranslation();
+  if (!showQuote || !Number.isFinite(quoteCny) || quoteCny < 0) return null;
 
-  const isFree = totalFeeMmk === 0;
-  const cny = mmkToCny(totalFeeMmk, mmkPerCny);
-  const booked = fmt(t.stockIn.bookedMmk, { amount: formatMmkAmount(totalFeeMmk) });
+  const isFree = quoteCny === 0;
 
   return (
     <View style={styles.box}>
-      <Text style={styles.label}>{cny != null ? t.stockIn.quoteCny : t.stockIn.totalFee}</Text>
-      {cny != null ? (
-        <>
-          <Text style={styles.cny}>¥{formatCnyAmount(cny)}</Text>
-          <Text style={styles.booked}>{booked}</Text>
-        </>
-      ) : (
-        <Text style={styles.mmk}>{formatMmkAmount(totalFeeMmk)} MMK</Text>
-      )}
+      <Text style={styles.label}>{t.stockIn.quoteCny}</Text>
+      <Text style={styles.cny}>¥{formatCnyAmount(quoteCny)}</Text>
       {isFree ? <Text style={styles.promo}>{t.stockIn.freePromo}</Text> : null}
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>

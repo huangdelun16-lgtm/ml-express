@@ -18,10 +18,14 @@ import { groupCustomerExpressItems } from '../utils/packagingStockInDisplay';
 import {
   buildUnsignedCustomerInvoice,
   formatUnsignedInvoiceFee,
+  formatUnsignedInvoiceQuote,
+  formatUnsignedInvoiceRate,
   formatUnsignedInvoiceWeight,
   isUnsignedExpressItem,
   packagingBatchSelectionIds,
+  settleUnsignedInvoice,
   type UnsignedCustomerInvoice,
+  type UnsignedInvoiceOrderGroup,
 } from '../utils/customerUnsignedInvoice';
 import { yangonTodayYmd } from '../utils/yangonFinancePeriod';
 import '../styles/crossBorderLogistics.css';
@@ -256,7 +260,7 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
 
   if (!open || !customer) return null;
 
-  const watermarkTops = [16, 72, 128, 184, 240, 296, 352, 408, 464, 520];
+  const watermarkTops = Array.from({ length: 8 }, (_, index) => 48 + index * 180);
 
   return createPortal(
     <div
@@ -568,6 +572,7 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
               station={invoice.stationCodes.map((code) => stationName(code, stores)).join(' · ')}
               issuedOn={yangonTodayYmd()}
               isEn={isEn}
+              fxRate={fxRate}
               watermarkTops={watermarkTops}
               onClose={() => setInvoice(null)}
             />,
@@ -579,6 +584,18 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
   );
 };
 
+function orderMeasure(group: UnsignedInvoiceOrderGroup, isEn: boolean): string {
+  const weight = formatUnsignedInvoiceWeight(group.weightKg) || '—';
+  const quote = formatUnsignedInvoiceQuote(group.quoteCny);
+  const priceLabel = isEn ? 'Price' : '定价';
+  if (group.kind === 'packaging') {
+    const weightLabel = isEn ? 'Package weight' : '包裹总重';
+    return quote ? `${weightLabel} ${weight} · ${priceLabel} ${quote}` : `${weightLabel} ${weight}`;
+  }
+  const weightLabel = isEn ? 'Weight' : '重量';
+  return quote ? `${weightLabel} ${weight} · ${priceLabel} ${quote}` : `${weightLabel} ${weight}`;
+}
+
 function UnsignedInvoicePreview({
   invoice,
   customerName,
@@ -586,6 +603,7 @@ function UnsignedInvoicePreview({
   station,
   issuedOn,
   isEn,
+  fxRate,
   watermarkTops,
   onClose,
 }: {
@@ -595,11 +613,15 @@ function UnsignedInvoicePreview({
   station: string;
   issuedOn: string;
   isEn: boolean;
+  fxRate: number | null;
   watermarkTops: number[];
   onClose: () => void;
 }) {
   const weight = formatUnsignedInvoiceWeight(invoice.totalWeightKg) || '—';
-  const fee = formatUnsignedInvoiceFee(invoice.totalFeeMmk, isEn ? 'Free rate' : '免费优惠');
+  const quote = formatUnsignedInvoiceQuote(invoice.totalQuoteCny);
+  const rate = formatUnsignedInvoiceRate(fxRate);
+  const settlement = settleUnsignedInvoice(invoice.totalQuoteCny, fxRate, invoice.totalFeeMmk);
+  const fee = formatUnsignedInvoiceFee(settlement.feeMmk, isEn ? 'Free rate' : '免费优惠');
   const meta: Array<{ label: string; value: string }> = [
     { label: isEn ? 'Customer' : '客户姓名', value: customerName || '—' },
   ];
@@ -652,12 +674,18 @@ function UnsignedInvoicePreview({
               {invoice.groups.map((group, groupIndex) => (
                 <section key={`${group.kind}-${groupIndex}`} className="cbl-invoice-orders">
                   <h3>{group.kind === 'packaging' ? (isEn ? 'Order nos' : '订单号') : isEn ? 'Waybill' : '单号'}</h3>
-                  {group.expressNos.map((no, index) => (
+                  {(group.expressNos.length ? group.expressNos : ['—']).map((no, index) => (
                     <div key={`${no}-${index}`} className="cbl-invoice-order">
                       <span>{String(index + 1).padStart(2, '0')}</span>
-                      <strong>{no || '—'}</strong>
+                      <div className="cbl-invoice-order__main">
+                        <strong>{no || '—'}</strong>
+                        {group.kind === 'single' ? <em>{orderMeasure(group, isEn)}</em> : null}
+                      </div>
                     </div>
                   ))}
+                  {group.kind === 'packaging' ? (
+                    <p className="cbl-invoice-pack-measure">{orderMeasure(group, isEn)}</p>
+                  ) : null}
                 </section>
               ))}
               <div className="cbl-invoice-totals">
@@ -665,10 +693,30 @@ function UnsignedInvoicePreview({
                   <span>{isEn ? 'Total weight' : '总重量'}</span>
                   <strong>{weight}</strong>
                 </div>
-                <div className="cbl-invoice-fee">
-                  <span>{isEn ? 'Total fee' : '总费用'}</span>
-                  <strong>{fee}</strong>
-                </div>
+                {quote ? (
+                  <div>
+                    <span>{isEn ? 'Inbound quote' : '入库报价'}</span>
+                    <strong>{quote}</strong>
+                  </div>
+                ) : null}
+                {rate ? (
+                  <div>
+                    <span>{isEn ? 'Exchange rate' : '汇率'}</span>
+                    <strong>{rate}</strong>
+                  </div>
+                ) : null}
+                {settlement.missingRate ? (
+                  <p className="cbl-invoice-rate-missing">
+                    {isEn
+                      ? 'The head-office rate is missing. Save it in Settings, then print.'
+                      : '还没有总部汇率。请先在设置里保存汇率，再打印。'}
+                  </p>
+                ) : (
+                  <div className="cbl-invoice-fee">
+                    <span>{isEn ? 'Total fee' : '总费用'}</span>
+                    <strong>{fee}</strong>
+                  </div>
+                )}
               </div>
               <p className="cbl-invoice-note">
                 {isEn ? 'Please pay against this invoice' : '请凭此单据付款'}
@@ -678,7 +726,12 @@ function UnsignedInvoicePreview({
           </article>
         </div>
         <div className="cbl-unsigned-invoice-actions">
-          <button type="button" className="cbl-invoice-save" onClick={() => window.print()}>
+          <button
+            type="button"
+            className="cbl-invoice-save"
+            onClick={() => window.print()}
+            disabled={settlement.missingRate}
+          >
             {isEn ? 'Print / Save PDF' : '打印 / 存 PDF'}
           </button>
           <button type="button" className="cbl-invoice-close" onClick={onClose}>
