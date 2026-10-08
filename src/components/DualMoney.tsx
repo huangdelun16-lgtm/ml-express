@@ -16,13 +16,14 @@ export default function DualMoney({
   cny?: number | null;
   prefix?: string;
 }) {
-  const value = mmk ?? 0;
-  const converted = cny !== undefined ? cny : mmkToCny(value, rate);
+  const hasMmk = mmk != null && Number.isFinite(mmk);
+  const converted = cny !== undefined && cny !== null ? cny : hasMmk ? mmkToCny(mmk, rate) : null;
   if (converted == null) {
+    if (!hasMmk) return <span className="cbl-money">—</span>;
     return (
       <span className="cbl-money">
         {prefix}
-        {formatMmK(value)} <span className="cbl-money-ccy">MMK</span>
+        {formatMmK(mmk)} <span className="cbl-money-ccy">MMK</span>
       </span>
     );
   }
@@ -32,7 +33,7 @@ export default function DualMoney({
         {prefix}
         {formatCnyAmount(converted)} <span className="cbl-money-ccy">CNY</span>
       </span>
-      <span className="cbl-money-sub">{formatMmK(value)} MMK</span>
+      {hasMmk ? <span className="cbl-money-sub">{formatMmK(mmk)} MMK</span> : null}
     </span>
   );
 }

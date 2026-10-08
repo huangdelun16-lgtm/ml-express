@@ -186,6 +186,7 @@ export type InventoryCustomerExpressItem = {
   expressBarcode: string;
   inboundBarcode: string;
   packedBundleBarcode?: string | null;
+  tripNumber?: string | null;
   packaging: string;
   origin: string;
   destination: string;
@@ -265,7 +266,8 @@ export type CrossBorderExpenseCategory =
   | 'collected'
   | 'agency_remit'
   | 'manual_income'
-  | 'manual_expense';
+  | 'manual_expense'
+  | 'export_cost';
 
 export type CrossBorderExpenseRow = {
   id: string;
@@ -301,6 +303,8 @@ export type CrossBorderFinanceSummary = {
   agencyRemittedTotal?: number;
   manualIncomeTotal: number;
   manualExpenseTotal: number;
+  /** 出口成本合计，人民币 */
+  exportCostCnyTotal?: number;
 };
 
 export type CrossBorderFinancePagination = {
@@ -1348,5 +1352,88 @@ export async function recordHqAgencyRemittance(params: {
     note: params.note,
     toStoreCode: params.toStoreCode,
   });
+}
+
+export type SignedInvoiceListRow = {
+  id: string;
+  invoice_no: string;
+  issued_on: string;
+  customer_name: string;
+  phone: string;
+  trip_label: string;
+  piece_count: number;
+  total_fee_cny: number | null;
+  total_fee_mmk: number;
+  document: {
+    invoiceNo?: string;
+    meta?: Array<{ label: string; value: string }>;
+    lines?: Array<{ title: string; expressNos: string[]; measure: string }>;
+    totals?: string[];
+    payNote?: string;
+    contactLabel?: string;
+    contactPhoneLabel?: string;
+    contactPhones?: string;
+    contactKpay?: string;
+    contactSite?: string;
+  };
+  signed_at: string;
+  store_code: string;
+};
+
+export type ExportCostRecord = {
+  id: string;
+  subject_kind: 'single' | 'package' | string;
+  display_barcode: string;
+  customer_name: string;
+  final_destination: string;
+  leg_origin: string;
+  leg_destination: string;
+  weight_kg: number | string;
+  unit_price_cny: number | string;
+  total_cny: number | string;
+  trip_number: string;
+  store_code: string;
+  created_by: string;
+  created_at: string;
+};
+
+export async function fetchExportCostRecords(
+  period?: FinancePeriodParams | null,
+): Promise<{ rows: ExportCostRecord[]; totalCny: number }> {
+  const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
+  url.searchParams.set('section', 'export-costs');
+  applyFinancePeriodParams(url, period);
+  const response = await adminAuthenticatedFetch(url.toString(), {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `加载失败 (${response.status})`);
+  }
+  if (!Array.isArray(payload.exportCosts)) {
+    throw new Error('MISSING_EXPORT_COST_API');
+  }
+  return {
+    rows: payload.exportCosts as ExportCostRecord[],
+    totalCny: Number(payload.totalCny) || 0,
+  };
+}
+
+export async function fetchSignedInvoices(): Promise<SignedInvoiceListRow[]> {
+  const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
+  url.searchParams.set('section', 'invoices');
+  const response = await adminAuthenticatedFetch(url.toString(), {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `加载失败 (${response.status})`);
+  }
+  if (!Array.isArray(payload.invoices)) {
+    throw new Error('MISSING_INVOICE_API');
+  }
+  return payload.invoices as SignedInvoiceListRow[];
 }
 

@@ -1,7 +1,9 @@
 import {
   buildUnsignedCustomerInvoice,
+  formatInvoiceDocumentNo,
   formatUnsignedInvoiceFee,
   formatUnsignedInvoiceQuote,
+  formatUnsignedInvoiceUnitPrice,
   formatUnsignedInvoiceRate,
   formatUnsignedInvoiceWeight,
   isUnsignedExpressItem,
@@ -121,6 +123,31 @@ describe('customerUnsignedInvoice', () => {
     expect(invoice.stationCodes).toEqual(['POL', 'MDY']);
     expect(invoice.packNo).toBe('PACK9');
     expect(invoice.pieceCount).toBe(3);
+    expect(invoice.tripNo).toBe('');
+    expect(invoice.tripIncomplete).toBe(true);
+  });
+
+  it('keeps unique trip numbers and builds a stable invoice number', () => {
+    const items = [
+      row({ id: 'a', inboundBarcode: 'SOLO-1', expressBarcode: 'E1', tripNumber: 'rui0026', destination: 'MDY' }),
+      row({ id: 'b', inboundBarcode: 'SOLO-2', expressBarcode: 'E2', tripNumber: 'RUI0026', destination: 'MDY' }),
+      row({ id: 'c', inboundBarcode: 'SOLO-3', expressBarcode: 'E3', tripNumber: 'MSE0001', destination: 'MDY' }),
+    ];
+    const invoice = buildUnsignedCustomerInvoice(items, ['a', 'b', 'c']);
+    expect(invoice.tripNo).toBe('RUI0026 · MSE0001');
+    expect(invoice.tripIncomplete).toBe(false);
+    expect(formatInvoiceDocumentNo({
+      issuedOn: '2026-10-08',
+      trips: invoice.tripNo.split(' · '),
+      destination: invoice.destination,
+      pieceCount: invoice.pieceCount,
+    })).toBe('20261008-RUI0026-MSE0001');
+    expect(formatInvoiceDocumentNo({
+      issuedOn: '2026-10-08',
+      trips: [],
+      destination: 'MDY',
+      pieceCount: 18,
+    })).toBe('20261008-MDY-18');
   });
 
   it('shows each single order weight and one package weight for a multiple inbound', () => {
@@ -153,6 +180,8 @@ describe('customerUnsignedInvoice', () => {
     expect(invoice.totalWeightKg).toBe(16.5);
     expect(invoice.totalQuoteCny).toBe(128);
     expect(formatUnsignedInvoiceQuote(invoice.totalQuoteCny)).toBe('¥128');
+    expect(formatUnsignedInvoiceUnitPrice(200, 5)).toBe('¥40/Kg');
+    expect(formatUnsignedInvoiceUnitPrice(2418.318, 60)).toBe('¥40.3053/Kg');
     expect(formatUnsignedInvoiceRate(450)).toBe('1 CNY = 450 MMK');
     expect(settleUnsignedInvoice(invoice.totalQuoteCny, 450, 99999)).toEqual({
       feeMmk: 57600,
@@ -194,6 +223,67 @@ describe('customerUnsignedInvoice', () => {
       { kind: 'packaging', expressNos: ['E1', 'E2'], weightKg: 13, quoteCny: 100 },
     ]);
     expect(invoice.pieceCount).toBe(2);
+  });
+
+  it('keeps the per-kg price on a package whose pieces have no weight', () => {
+    const items = [1, 2, 3, 4].map((index) =>
+      row({
+        id: `p${index}`,
+        inboundBarcode: `MDY564620260926(4-${index})`,
+        expressBarcode: `YT${index}`,
+        weightKg: 0,
+        packWeightKg: 6.5,
+        packedBundleBarcode: 'RUI26MDY40001',
+        fee: index === 1 ? 162500 : 0,
+        unitCnyPerKg: 40,
+      }),
+    );
+    const invoice = buildUnsignedCustomerInvoice(
+      items,
+      items.map((item) => item.id),
+    );
+    expect(invoice.groups).toEqual([
+      {
+        kind: 'packaging',
+        expressNos: ['YT1', 'YT2', 'YT3', 'YT4'],
+        weightKg: 6.5,
+        quoteCny: 260,
+        unitCnyPerKg: 40,
+      },
+    ]);
+    expect(formatUnsignedInvoiceUnitPrice(40, 1)).toBe('¥40/Kg');
+    expect(invoice.totalQuoteCny).toBe(260);
+    expect(settleUnsignedInvoice(invoice.totalQuoteCny, 669, 162500)).toEqual({
+      feeMmk: Math.round(260 * 669),
+      missingRate: false,
+    });
+  });
+
+  it('bills every kilogram at its per-kg price, including package weight', () => {
+    const loose = row({
+      id: 'solo',
+      inboundBarcode: 'SOLO',
+      expressBarcode: 'S1',
+      weightKg: 236.5,
+      unitCnyPerKg: 40,
+      fee: 1,
+    });
+    const packed = [1, 2].map((index) =>
+      row({
+        id: `p${index}`,
+        inboundBarcode: `PACK(2-${index})`,
+        expressBarcode: `P${index}`,
+        weightKg: 0,
+        packWeightKg: 75,
+        packedBundleBarcode: 'RUI26MDY90001',
+        fee: index === 1 ? 1 : 0,
+        unitCnyPerKg: 40,
+      }),
+    );
+    const invoice = buildUnsignedCustomerInvoice([loose, ...packed], ['solo', 'p1', 'p2']);
+    expect(invoice.totalWeightKg).toBe(311.5);
+    expect(invoice.totalQuoteCny).toBe(12460);
+    expect(settleUnsignedInvoice(invoice.totalQuoteCny, 669, 0).feeMmk).toBe(8_335_740);
   });
 
   it('reads a quote from the inbound note and does not bill a signed package again', () => {

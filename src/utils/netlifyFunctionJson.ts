@@ -20,3 +20,28 @@ export function parseNetlifyFunctionJson<T>(text: string, response: Pick<Respons
 export async function readNetlifyFunctionJson<T>(response: Response): Promise<T> {
   return parseNetlifyFunctionJson<T>(await response.text(), response);
 }
+
+const RETRY_STATUSES = new Set([502, 503, 504]);
+
+/** 线上函数偶发连接重置时再试，避免登录一次 504 就失败。401 等业务错误不重试。 */
+export async function fetchNetlifyWithRetry(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  attempts = 3,
+): Promise<Response> {
+  let lastResponse: Response | null = null;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(input, init);
+      if (!RETRY_STATUSES.has(response.status) || attempt === attempts - 1) return response;
+      lastResponse = response;
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts - 1) throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 700 * (attempt + 1)));
+  }
+  if (lastResponse) return lastResponse;
+  throw lastError instanceof Error ? lastError : new Error('登录服务无响应');
+}

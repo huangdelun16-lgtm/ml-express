@@ -26,7 +26,7 @@ import {
   rewritePublicStorageUrl,
 } from '../utils/supabaseBrowserUrl';
 import { packageBelongsToStore } from '../utils/storePackages';
-import { readNetlifyFunctionJson } from '../utils/netlifyFunctionJson';
+import { fetchNetlifyWithRetry, readNetlifyFunctionJson } from '../utils/netlifyFunctionJson';
 export type { Banner, Tutorial, WelcomeScreen };
 export type { ProxyPurchaseRow as ProxyPurchaseWorkspaceRow };
 
@@ -2038,7 +2038,7 @@ export const adminAccountService = {
   async login(username: string, password: string): Promise<{ account: AdminAccount | null; authToken?: string; error?: string }> {
     try {
       // 使用 Netlify Function 验证登录（包含密码加密验证）
-      const response = await fetch('/.netlify/functions/admin-password', {
+      const response = await fetchNetlifyWithRetry('/.netlify/functions/admin-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

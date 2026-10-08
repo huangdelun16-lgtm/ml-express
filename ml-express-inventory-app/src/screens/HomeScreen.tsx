@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
+  Alert,
   Image,
   Pressable,
   RefreshControl,
@@ -11,10 +12,11 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Text from '../components/AppText';
 import HomeTodoQueue from '../components/HomeTodoQueue';
+import ExportCostCard from '../components/ExportCostCard';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
-import { getHomeOverview } from '../services/inventoryService';
+import { getHomeOverview, listItems, listPackedShipments } from '../services/inventoryService';
 import { fetchHomeTodoCounts } from '../services/homeTodoService';
 import type { PackedShipmentListRow } from '../types/inventory';
 import { packStatusStyle } from '../utils/packDisplayStatus';
@@ -24,6 +26,17 @@ import {
   type HomeTodoItem,
 } from '../utils/homeTodoQueue';
 import { LOGIN_LOGO } from '../constants/branding';
+import {
+  buildExportCostBoard,
+  exportCostOptionsFromPacks,
+  type ExportCostBoard,
+} from '../utils/exportCostBoard';
+import {
+  addExportCost,
+  listExportCosts,
+  listLoadedPackTrips,
+  type SavedExportCost,
+} from '../services/exportCostService';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { getPackStatusLabel, resolveAppError, useTranslation } from '../i18n';
 import { feedbackService } from '../services/FeedbackService';
@@ -58,6 +71,10 @@ export default function HomeScreen({ navigation }: HomeProps) {
   const [loadError, setLoadError] = useState('');
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<HomeTab>('overview');
+  const [exportBoard, setExportBoard] = useState<ExportCostBoard>({ singles: [], packages: [] });
+  const [exportSaved, setExportSaved] = useState<SavedExportCost[]>([]);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   const load = useCallback(async () => {
     const scope = store && hubCode ? { store, hubCode } : undefined;
@@ -82,6 +99,35 @@ export default function HomeScreen({ navigation }: HomeProps) {
       setTodoItems([]);
     }
   }, [store, hubCode, t]);
+
+  const loadExportBoard = useCallback(
+    async (force = false) => {
+      if (!store || !hubCode) {
+        setExportBoard({ singles: [], packages: [] });
+        setExportSaved([]);
+        setExportError('');
+        return;
+      }
+      setExportLoading(true);
+      try {
+        const scope = { store, hubCode };
+        const [items, packs, trips, saved] = await Promise.all([
+          listItems(undefined, scope, { force }),
+          listPackedShipments(undefined, scope),
+          listLoadedPackTrips().catch(() => []),
+          listExportCosts().catch(() => [] as SavedExportCost[]),
+        ]);
+        setExportBoard(buildExportCostBoard(items, exportCostOptionsFromPacks(packs, trips)));
+        setExportSaved(saved);
+        setExportError('');
+      } catch (error) {
+        setExportError(resolveAppError(t, error) || t.home.exportCostLoadFailed);
+      } finally {
+        setExportLoading(false);
+      }
+    },
+    [store, hubCode, t],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -180,7 +226,12 @@ export default function HomeScreen({ navigation }: HomeProps) {
           </View>
           <Pressable
             style={({ pressed }) => [styles.logoutBtn, pressed && styles.logoutBtnPressed]}
-            onPress={() => logout()}
+            onPress={() => {
+              Alert.alert(t.settings.logoutTitle, t.settings.logoutConfirm, [
+                { text: t.common.cancel, style: 'cancel' },
+                { text: t.common.logout, style: 'destructive', onPress: () => void logout() },
+              ]);
+            }}
             hitSlop={8}
           >
             <Text style={styles.logout}>{t.common.logout}</Text>
@@ -336,6 +387,38 @@ export default function HomeScreen({ navigation }: HomeProps) {
             tone="outbound"
             tiles={outboundTiles}
             navigation={navigation}
+            insertBeforeScreen="StockOut"
+            insertBefore={
+              <ExportCostCard
+                board={exportBoard}
+                loading={exportLoading}
+                error={exportError}
+                saved={exportSaved}
+                onOpen={() => {
+                  void loadExportBoard(true);
+                }}
+                onAdd={async (draft) => {
+                  const saved = await addExportCost({
+                    subjectKind: draft.kind,
+                    subjectKey: draft.subjectKey,
+                    displayBarcode: draft.displayBarcode,
+                    customerName: draft.customer,
+                    finalDestination: draft.destination,
+                    legDestination: draft.legDestination,
+                    weightKg: draft.weightKg,
+                    unitPriceCny: draft.unitPriceCny,
+                    tripNumber: draft.tripNumber,
+                    createdBy: operatorName || '',
+                  });
+                  setExportSaved((current) => [
+                    saved,
+                    ...current.filter(
+                      (row) => !(row.subjectKind === saved.subjectKind && row.subjectKey === saved.subjectKey),
+                    ),
+                  ]);
+                }}
+              />
+            }
           />
         ) : null}
 
@@ -444,12 +527,16 @@ function ActionSection({
   tone,
   tiles,
   navigation,
+  insertBeforeScreen,
+  insertBefore,
 }: {
   title: string;
   hint: string;
   tone: ActionTone;
   tiles: ActionTile[];
   navigation: HomeProps['navigation'];
+  insertBeforeScreen?: string;
+  insertBefore?: React.ReactNode;
 }) {
   const palette = ACTION_TONE[tone];
   return (
@@ -463,26 +550,28 @@ function ActionSection({
       </View>
       <View style={styles.actionList}>
         {tiles.map((tile) => (
-          <Pressable
-            key={tile.screen}
-            style={({ pressed }) => [
-              styles.actionRow,
-              { borderColor: palette.border },
-              pressed && styles.actionRowPressed,
-            ]}
-            onPress={() => navigation.navigate(tile.screen)}
-            accessibilityRole="button"
-            accessibilityLabel={tile.title}
-          >
-            <View style={[styles.actionIconWrap, { backgroundColor: palette.wash }]}>
-              <Text style={styles.actionIcon}>{tile.icon}</Text>
-            </View>
-            <View style={styles.actionCopy}>
-              <Text style={styles.actionTitle}>{tile.title}</Text>
-              <Text style={styles.actionHint}>{tile.hint}</Text>
-            </View>
-            <Text style={[styles.actionChevron, { color: palette.chevron }]}>›</Text>
-          </Pressable>
+          <React.Fragment key={tile.screen}>
+            {insertBefore && tile.screen === insertBeforeScreen ? insertBefore : null}
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionRow,
+                { borderColor: palette.border },
+                pressed && styles.actionRowPressed,
+              ]}
+              onPress={() => navigation.navigate(tile.screen)}
+              accessibilityRole="button"
+              accessibilityLabel={tile.title}
+            >
+              <View style={[styles.actionIconWrap, { backgroundColor: palette.wash }]}>
+                <Text style={styles.actionIcon}>{tile.icon}</Text>
+              </View>
+              <View style={styles.actionCopy}>
+                <Text style={styles.actionTitle}>{tile.title}</Text>
+                <Text style={styles.actionHint}>{tile.hint}</Text>
+              </View>
+              <Text style={[styles.actionChevron, { color: palette.chevron }]}>›</Text>
+            </Pressable>
+          </React.Fragment>
         ))}
       </View>
     </View>

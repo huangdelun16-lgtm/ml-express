@@ -400,6 +400,7 @@ function buildExpressItemRow(item, inbound, trackingNote) {
     packageStatus: derivePackageStatus(item),
     transportStatus: deriveTransportStatus(item, inbound, destination),
     paymentLabel: merged.paymentLabel || '',
+    tripNumber: '',
     fxMmkPerCny: fxLock?.mmkPerCny ?? null,
     paidCurrency: fxLock?.paidCurrency,
     paidCny: fxLock?.paidCny,
@@ -480,12 +481,13 @@ async function loadExpressItemsDataset(supabase) {
     ),
   ];
   const packNotesByBarcode = {};
+  const tripByPack = {};
   if (packBarcodes.length > 0) {
     for (let i = 0; i < packBarcodes.length; i += 100) {
       const chunk = packBarcodes.slice(i, i + 100);
       const { data: packRows, error: packErr } = await supabase
         .from('inventory_packed_shipments')
-        .select('bundle_barcode, note')
+        .select('bundle_barcode, note, trip_number')
         .in('bundle_barcode', chunk);
       if (packErr) {
         warnings.push(`快递包备注读取失败：${packErr.message}`);
@@ -494,7 +496,25 @@ async function loadExpressItemsDataset(supabase) {
       for (const row of packRows || []) {
         const code = String(row.bundle_barcode || '').trim().toUpperCase();
         const note = String(row.note || '').trim();
+        const trip = String(row.trip_number || '').trim().toUpperCase();
         if (code && note) packNotesByBarcode[code] = note;
+        if (code && trip) tripByPack[code] = trip;
+      }
+    }
+    for (let i = 0; i < packBarcodes.length; i += 100) {
+      const chunk = packBarcodes.slice(i, i + 100);
+      const { data: trackingRows, error: trackingErr } = await supabase
+        .from('inventory_pkg_tracking')
+        .select('pack_barcode, trip_number')
+        .in('pack_barcode', chunk);
+      if (trackingErr) {
+        warnings.push(`车次读取失败：${trackingErr.message}`);
+        break;
+      }
+      for (const row of trackingRows || []) {
+        const code = String(row.pack_barcode || '').trim().toUpperCase();
+        const trip = String(row.trip_number || '').trim().toUpperCase();
+        if (code && trip) tripByPack[code] = trip;
       }
     }
   }
@@ -508,9 +528,19 @@ async function loadExpressItemsDataset(supabase) {
   }
 
   applyPackFeeDedup(rows, packNotesByBarcode);
+  attachTripNumbers(rows, tripByPack);
   await attachPackWeights(supabase, rows, warnings);
 
   return { rows, warnings };
+}
+
+function attachTripNumbers(rows, tripByPack) {
+  const map = tripByPack || {};
+  for (const row of rows) {
+    const code = String(row.packedBundleBarcode || '').trim().toUpperCase();
+    row.tripNumber = code ? String(map[code] || '').trim().toUpperCase() : '';
+  }
+  return rows;
 }
 
 /** 多个入库的总重在包裹本体上，明细行重量是空的。按包装号抄一次，不摊到每一件。 */
@@ -553,8 +583,21 @@ async function attachPackWeights(supabase, rows, warnings) {
 }
 
 function aggregateCustomerSummaries(rows, registry) {
-  const map = {};
+  const packCodes = new Set();
   for (const row of rows) {
+    const pack = String(row.packedBundleBarcode || '').trim().toUpperCase();
+    if (pack) packCodes.add(pack);
+  }
+  const orders = [];
+  const shells = [];
+  for (const row of rows) {
+    const barcode = String(row.inboundBarcode || '').trim().toUpperCase();
+    if (barcode && packCodes.has(barcode)) shells.push(row);
+    else orders.push(row);
+  }
+
+  const map = {};
+  const ensure = (row) => {
     const registered = resolveRegisteredCustomer(row, registry);
     let key;
     let customerName;
@@ -585,11 +628,24 @@ function aggregateCustomerSummaries(rows, registry) {
         orderCount: 0,
       };
     }
-    const g = map[key];
+    return map[key];
+  };
+
+  const packHasPieceWeight = new Set();
+  for (const row of orders) {
+    const g = ensure(row);
     g.totalPieces += row.qty;
     g.totalWeightKg += row.weightKg;
     g.totalFee += row.fee;
     g.orderCount += 1;
+    const pack = String(row.packedBundleBarcode || '').trim().toUpperCase();
+    if (pack && row.weightKg > 0) packHasPieceWeight.add(pack);
+  }
+  for (const shell of shells) {
+    const code = String(shell.inboundBarcode || '').trim().toUpperCase();
+    if (!code || packHasPieceWeight.has(code) || !(shell.weightKg > 0)) continue;
+    const g = ensure(shell);
+    g.totalWeightKg += shell.weightKg;
   }
 
   return Object.values(map)
@@ -662,4 +718,5 @@ module.exports = {
   customerKey,
   aggregateCustomerSummaries,
   applyPackFeeDedup,
+  attachTripNumbers,
 };

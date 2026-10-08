@@ -12,6 +12,7 @@ const {
   filterEntriesForFinancePeriod,
   yangonNoonIsoFromYmd,
 } = require('./yangonFinancePeriod');
+const { appendExportCosts, loadExportCostRows } = require('./exportCostFinance');
 
 const HUB_BY_REGION = {
   muse: 'MSE',
@@ -1895,6 +1896,12 @@ async function aggregateFinanceForTransitStores(supabase, transitStores, opts = 
         : { ...crossBorderFinance.summary, entryCount: filtered.length },
     };
   }
+
+  const exportRows = await loadExportCostRows(supabase, warnings);
+  crossBorderFinance = appendExportCosts(crossBorderFinance, exportRows, transitStores, {
+    range,
+    storeCode,
+  });
 
   return { financeByStoreCode, crossBorderFinance, warnings, period: range };
 }

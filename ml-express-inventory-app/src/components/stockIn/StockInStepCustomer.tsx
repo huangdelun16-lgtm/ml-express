@@ -16,14 +16,12 @@ export default function StockInStepCustomer({
   customerLookupHint,
   recipientName,
   recipientPhone,
-  productName,
   packaging,
   chain,
   onCustomerCodeChange,
   onCustomerCodeSubmit,
   onRecipientNameChange,
   onRecipientPhoneChange,
-  onProductNameChange,
   onPackagingChange,
 }: {
   scan: string;
@@ -31,19 +29,16 @@ export default function StockInStepCustomer({
   customerLookupHint: string;
   recipientName: string;
   recipientPhone: string;
-  productName: string;
   packaging: string;
   chain: {
     code: FormFieldChainProps;
     name: FormFieldChainProps;
     phone: FormFieldChainProps;
-    product: FormFieldChainProps;
   };
   onCustomerCodeChange: (v: string) => void;
   onCustomerCodeSubmit: () => void;
   onRecipientNameChange: (v: string) => void;
   onRecipientPhoneChange: (v: string) => void;
-  onProductNameChange: (v: string) => void;
   onPackagingChange: (v: string) => void;
 }) {
   const { t } = useTranslation();
@@ -91,16 +86,6 @@ export default function StockInStepCustomer({
           returnKeyType={chain.phone.returnKeyType}
           onSubmitEditing={chain.phone.onSubmitEditing}
           blurOnSubmit={chain.phone.blurOnSubmit}
-        />
-        <InboundFormField
-          label={t.stockIn.itemNameRequired}
-          value={productName}
-          onChange={onProductNameChange}
-          placeholder={t.stockIn.itemNameRequired.replace(' *', '')}
-          inputRef={chain.product.inputRef}
-          returnKeyType={chain.product.returnKeyType}
-          onSubmitEditing={chain.product.onSubmitEditing}
-          blurOnSubmit={chain.product.blurOnSubmit}
         />
         {SHOW_PACKAGING_FIELD ? (
           <PackagingPickerField value={packaging} onChange={onPackagingChange} />

@@ -1,5 +1,13 @@
 import type { SystemSetting } from '../services/supabase';
 import { parsePricingSettingValue } from '../services/_shared/pricing';
+import {
+  cnyToMmk,
+  formatCnyInput,
+  mmkToCny,
+  rateInEffectAt,
+  repairFxHistory,
+  type CrossBorderFxHistoryEntry,
+} from './crossBorderFx';
 
 /** 跨境路线计费站点（与 Inventory App 目的地码一致，RUI=MUSE 等用 hubCode） */
 export const CROSS_BORDER_ROUTE_HUBS = [
@@ -152,6 +160,17 @@ export function buildRoutePerKgSettingsKey(
   return `pricing.cross_border.route.${from}.${to}.per_kg`;
 }
 
+/** 与 per_kg 平行的人民币单价。解析器只认最后一段是 per_kg，不会把它当成缅币。 */
+export function buildRouteCnyPerKgSettingsKey(
+  origin: string,
+  destination: string,
+  customerCode?: string | null,
+): string | null {
+  const mmkKey = buildRoutePerKgSettingsKey(origin, destination, customerCode);
+  if (!mmkKey) return null;
+  return mmkKey.replace(/\.per_kg$/, '.cny_per_kg');
+}
+
 export function emptyRouteMatrix(): RouteMatrixValues {
   const matrix: RouteMatrixValues = {};
   for (const origin of CROSS_BORDER_ROUTE_HUBS) {
@@ -180,6 +199,271 @@ export function mergeRouteMatrixFromDb(
     matrix[parsed.origin][parsed.dest] = String(numeric);
   });
   return matrix;
+}
+
+type PricingDisplaySetting = {
+  settings_key?: string | null;
+  settings_value?: unknown;
+  updated_at?: string | null;
+};
+
+function readNonNegativeSetting(row: PricingDisplaySetting | undefined): number | null {
+  if (!row) return null;
+  const n = parsePricingSettingValue(row.settings_value);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/**
+ * 计价窗口里的格子。有人民币键就原样显示，改汇率不会改它。
+ * 只有缅币的旧数据，按这条单价保存当时的汇率还原人民币，不用今天的汇率倒除。
+ * 没设汇率时格子仍是缅币。
+ */
+export function buildPricingDisplayMatrix(input: {
+  settings: PricingDisplaySetting[];
+  customerCode?: string | null;
+  /** false：客户还没有专属价，预览默认矩阵 */
+  useCustomerRates: boolean;
+  liveRate: number | null;
+  history: CrossBorderFxHistoryEntry[];
+}): RouteMatrixValues {
+  const history = repairFxHistory(input.history);
+  const matrix = emptyRouteMatrix();
+  const scope = input.useCustomerRates
+    ? normalizeCustomerPricingCode(input.customerCode ?? '')
+    : '';
+  const byKey = new Map<string, PricingDisplaySetting>();
+  for (const row of input.settings) {
+    const key = String(row.settings_key || '').trim();
+    if (key) byKey.set(key, row);
+  }
+
+  for (const origin of CROSS_BORDER_ROUTE_HUBS) {
+    for (const dest of CROSS_BORDER_ROUTE_HUBS) {
+      if (origin.code === dest.code) continue;
+      const mmkKey = buildRoutePerKgSettingsKey(origin.code, dest.code, scope || null);
+      if (!mmkKey) continue;
+      const cnyKey = mmkKey.replace(/\.per_kg$/, '.cny_per_kg');
+      const cnyRow = byKey.get(cnyKey);
+      const storedCny = readNonNegativeSetting(cnyRow);
+      if (cnyRow && storedCny != null) {
+        matrix[origin.code][dest.code] = input.liveRate
+          ? formatCnyInput(storedCny)
+          : String(storedCny);
+        continue;
+      }
+      const mmkRow = byKey.get(mmkKey);
+      const mmk = readNonNegativeSetting(mmkRow);
+      if (mmk == null) continue;
+      if (!input.liveRate) {
+        matrix[origin.code][dest.code] = String(mmk);
+        continue;
+      }
+      const savedRate = rateInEffectAt(history, null, mmkRow?.updated_at);
+      const cny = mmkToCny(mmk, savedRate);
+      matrix[origin.code][dest.code] = cny == null ? '' : formatCnyInput(cny);
+    }
+  }
+  return matrix;
+}
+
+/** 汇率变更后，只重算已经有人民币键的路线缅币。没有人民币键的旧数据不动，避免把被汇率改过的数字锁死。 */
+export function buildFxMmkRepricePayload(
+  settings: PricingDisplaySetting[],
+  nextRate: number,
+  updatedBy = 'admin-dashboard',
+): Array<Omit<SystemSetting, 'id'>> {
+  if (!Number.isFinite(nextRate) || nextRate <= 0) return [];
+  const payload: Array<Omit<SystemSetting, 'id'>> = [];
+  for (const row of settings) {
+    const cnyKey = String(row.settings_key || '').trim();
+    if (!cnyKey.endsWith('.cny_per_kg')) continue;
+    const mmkKey = cnyKey.replace(/\.cny_per_kg$/, '.per_kg');
+    const parsed = parseRoutePerKgSettingsKey(mmkKey);
+    if (!parsed) continue;
+    const cny = readNonNegativeSetting(row);
+    if (cny == null) continue;
+    const mmk = cnyToMmk(cny, nextRate);
+    if (mmk == null) continue;
+    const origin = CROSS_BORDER_ROUTE_HUBS.find((hub) => hub.code === parsed.origin);
+    const dest = CROSS_BORDER_ROUTE_HUBS.find((hub) => hub.code === parsed.dest);
+    const customerPrefix = parsed.customerCode ? `${parsed.customerCode} · ` : '';
+    payload.push({
+      category: 'pricing',
+      settings_key: mmkKey,
+      settings_value: mmk,
+      description: `${customerPrefix}${origin?.display ?? parsed.origin} → ${dest?.display ?? parsed.dest} cross-border per kg (MMK)`,
+      updated_by: updatedBy || 'admin-dashboard',
+    });
+  }
+  return payload;
+}
+
+export type RouteRateSetting = {
+  settings_key?: string | null;
+  settings_value?: unknown;
+  updated_at?: string | null;
+};
+
+function routeSettingAmount(
+  row: RouteRateSetting | undefined,
+): { value: number; updatedAt: string | null } | null {
+  if (!row) return null;
+  const n = parsePricingSettingValue(row.settings_value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return { value: n, updatedAt: row.updated_at ?? null };
+}
+
+/**
+ * 跟客户定价窗口同一个人民币单价。
+ * 有人民币键就用它；旧数据按这条单价保存时的汇率还原，不用今天的汇率倒除。
+ * 下面的缅币按当前汇率折算，和定价窗口格子下的数字一致。
+ */
+export function resolveRouteUnitQuote(input: {
+  settings: RouteRateSetting[];
+  origin: string;
+  destination: string;
+  customerCode?: string | null;
+  history?: CrossBorderFxHistoryEntry[];
+  liveRate: number | null;
+}): { cnyPerKg: number | null; mmkPerKg: number | null } {
+  const history = repairFxHistory(input.history ?? []);
+  const byKey = new Map<string, RouteRateSetting>();
+  for (const row of input.settings) {
+    const key = String(row.settings_key || '').trim();
+    if (key) byKey.set(key, row);
+  }
+  const customerMmkKey = buildRoutePerKgSettingsKey(
+    input.origin,
+    input.destination,
+    input.customerCode,
+  );
+  const customerCnyKey = customerMmkKey
+    ? customerMmkKey.replace(/\.per_kg$/, '.cny_per_kg')
+    : null;
+  const hasCustomer =
+    Boolean(customerMmkKey && byKey.has(customerMmkKey)) ||
+    Boolean(customerCnyKey && byKey.has(customerCnyKey));
+  const mmkKey = hasCustomer
+    ? customerMmkKey
+    : buildRoutePerKgSettingsKey(input.origin, input.destination);
+  if (!mmkKey) return { cnyPerKg: null, mmkPerKg: null };
+  const cnyKey = mmkKey.replace(/\.per_kg$/, '.cny_per_kg');
+  const storedCny = routeSettingAmount(byKey.get(cnyKey));
+  const storedMmk = routeSettingAmount(byKey.get(mmkKey));
+  let cny = storedCny ? storedCny.value : null;
+  if (cny == null && storedMmk) {
+    cny = mmkToCny(storedMmk.value, rateInEffectAt(history, null, storedMmk.updatedAt));
+  }
+  if (cny == null) {
+    return { cnyPerKg: null, mmkPerKg: storedMmk ? storedMmk.value : null };
+  }
+  const locked = Number(formatCnyInput(cny));
+  if (Number.isFinite(locked)) cny = locked;
+  const mmkPerKg =
+    input.liveRate != null ? cnyToMmk(cny, input.liveRate) : storedMmk ? storedMmk.value : null;
+  return { cnyPerKg: cny, mmkPerKg };
+}
+
+/** 还没有人民币键的旧路线，按保存时的汇率写成定死的人民币。已有的人民币键不动。 */
+export function buildMissingRouteCnyPayload(
+  settings: RouteRateSetting[],
+  history: CrossBorderFxHistoryEntry[] = [],
+): Array<Omit<SystemSetting, 'id'>> {
+  const keys = new Set(settings.map((row) => String(row.settings_key || '').trim()));
+  const payload: Array<Omit<SystemSetting, 'id'>> = [];
+  for (const row of settings) {
+    const key = String(row.settings_key || '').trim();
+    const parsed = parseRoutePerKgSettingsKey(key);
+    if (!parsed) continue;
+    const cnyKey = key.replace(/\.per_kg$/, '.cny_per_kg');
+    if (keys.has(cnyKey)) continue;
+    const quote = resolveRouteUnitQuote({
+      settings,
+      origin: parsed.origin,
+      destination: parsed.dest,
+      customerCode: parsed.customerCode || null,
+      history,
+      liveRate: null,
+    });
+    if (quote.cnyPerKg == null) continue;
+    const origin = CROSS_BORDER_ROUTE_HUBS.find((hub) => hub.code === parsed.origin);
+    const dest = CROSS_BORDER_ROUTE_HUBS.find((hub) => hub.code === parsed.dest);
+    const customerPrefix = parsed.customerCode ? `${parsed.customerCode} · ` : '';
+    payload.push({
+      category: 'pricing',
+      settings_key: cnyKey,
+      settings_value: quote.cnyPerKg,
+      description: `${customerPrefix}${origin?.display ?? parsed.origin} → ${dest?.display ?? parsed.dest} cross-border per kg (CNY)`,
+      updated_by: 'admin-dashboard',
+    });
+  }
+  return payload;
+}
+
+/** 未签收、没有入库报价时，费用人民币 = 定价 × 重量。 */
+export function feeFromRouteUnit(
+  cnyPerKg: number,
+  weightKg: number,
+  liveRate: number | null,
+): { cny: number; mmk: number | null } {
+  const cny = cnyPerKg * weightKg;
+  return { cny, mmk: cnyToMmk(cny, liveRate) };
+}
+
+/** 客户专属路线价优先；没有专属价时用默认路线。显式 0 是免费，不再回退默认价。 */
+export function resolveRoutePerKgMmk(
+  settings: RouteRateSetting[],
+  origin: string,
+  destination: string,
+  customerCode?: string | null,
+): number | null {
+  const byKey = new Map<string, unknown>();
+  for (const row of settings) {
+    const key = String(row.settings_key || '').trim();
+    if (key) byKey.set(key, row.settings_value);
+  }
+  const read = (key: string | null): number | null => {
+    if (!key || !byKey.has(key)) return null;
+    const n = parsePricingSettingValue(byKey.get(key));
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  const customerKey = buildRoutePerKgSettingsKey(origin, destination, customerCode);
+  if (customerKey && byKey.has(customerKey)) return read(customerKey);
+  return read(buildRoutePerKgSettingsKey(origin, destination));
+}
+
+/**
+ * 明细里的定价。未签收跟客户定价窗口同一个人民币，缅币按当天汇率。
+ * 已签收只按该单自己的费用和重量，人民币只用签收当天锁定的汇率。
+ */
+export function resolveExpressItemUnitPrice(input: {
+  origin: string;
+  destination: string;
+  customerCode?: string | null;
+  settings: RouteRateSetting[];
+  signed: boolean;
+  weightKg: number;
+  feeMmk: number;
+  lockedRate: number | null;
+  liveRate: number | null;
+  history?: CrossBorderFxHistoryEntry[];
+}): { mmkPerKg: number | null; cnyPerKg: number | null } {
+  if (input.signed) {
+    const mmkPerKg =
+      input.weightKg > 0 && input.feeMmk > 0 ? input.feeMmk / input.weightKg : null;
+    return {
+      mmkPerKg,
+      cnyPerKg: mmkPerKg == null ? null : mmkToCny(mmkPerKg, input.lockedRate),
+    };
+  }
+  return resolveRouteUnitQuote({
+    settings: input.settings,
+    origin: input.origin,
+    destination: input.destination,
+    customerCode: input.customerCode,
+    history: input.history,
+    liveRate: input.liveRate,
+  });
 }
 
 export function customerHasRoutePricing(
@@ -239,7 +523,7 @@ export function summarizeRoutePricing(
 export function buildRouteMatrixPayload(
   matrix: RouteMatrixValues,
   customerCode?: string | null,
-  options?: { destinations?: string[] },
+  options?: { destinations?: string[]; unit?: 'mmk' | 'cny' },
 ): Array<Omit<SystemSetting, 'id'>> {
   const payload: Array<Omit<SystemSetting, 'id'>> = [];
   const customer = normalizeCustomerPricingCode(customerCode ?? '');
@@ -258,13 +542,14 @@ export function buildRouteMatrixPayload(
       if (!trimmed) continue;
       const numeric = Number(trimmed);
       if (!Number.isFinite(numeric) || numeric < 0) continue;
-      const key = buildRoutePerKgSettingsKey(origin.code, dest.code, customer || null);
-      if (!key) continue;
+      const mmkKey = buildRoutePerKgSettingsKey(origin.code, dest.code, customer || null);
+      if (!mmkKey) continue;
+      const storeCny = options?.unit === 'cny';
       payload.push({
         category: 'pricing',
-        settings_key: key,
+        settings_key: storeCny ? mmkKey.replace(/\.per_kg$/, '.cny_per_kg') : mmkKey,
         settings_value: numeric,
-        description: `${customerPrefix}${origin.display} → ${dest.display} cross-border per kg (MMK)`,
+        description: `${customerPrefix}${origin.display} → ${dest.display} cross-border per kg (${storeCny ? 'CNY' : 'MMK'})`,
         updated_by: 'admin-dashboard',
       });
     }
@@ -292,7 +577,10 @@ export function blankRoutePricingKeys(
       const trimmed = String(matrix[origin.code]?.[dest.code] ?? '').trim();
       if (trimmed) continue;
       const key = buildRoutePerKgSettingsKey(origin.code, dest.code, customer || null);
-      if (key) keys.push(key);
+      if (key) {
+        keys.push(key);
+        keys.push(key.replace(/\.per_kg$/, '.cny_per_kg'));
+      }
     }
   }
   return keys;

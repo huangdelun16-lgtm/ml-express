@@ -22,6 +22,10 @@ export type UnsignedInvoiceSource = {
   customerSigned?: boolean;
   transportStatus: string;
   packedBundleBarcode?: string | null;
+  /** 装车车次。发票抬头用来找这一张单。 */
+  tripNumber?: string | null;
+  /** 客户定价窗口里的人民币/公斤。发票「定价」用这个，不把整包总价当成单价。 */
+  unitCnyPerKg?: number | null;
 };
 
 export type UnsignedInvoiceOrderGroup = {
@@ -31,6 +35,8 @@ export type UnsignedInvoiceOrderGroup = {
   weightKg: number;
   /** 这一单或这一包的入库人民币，多个入库只记一次。 */
   quoteCny: number;
+  /** 每公斤人民币。多个入库的重量在包裹上，单价仍要单独写出来。 */
+  unitCnyPerKg?: number;
 };
 
 export type UnsignedCustomerInvoice = {
@@ -43,6 +49,10 @@ export type UnsignedCustomerInvoice = {
   destination: string;
   stationCodes: string[];
   packNo: string;
+  /** 勾选订单上的车次，多个车次用「 · 」连起来。没装车则为空。 */
+  tripNo: string;
+  /** 勾选里还有没装车的订单。抬头要同时写出车次和未装车。 */
+  tripIncomplete: boolean;
   payment: string;
 };
 
@@ -90,6 +100,19 @@ function groupWeightKg(items: UnsignedInvoiceSource[]): number {
   return positive.reduce((sum, kg) => sum + kg, 0);
 }
 
+function chargeQuoteCny(unitCnyPerKg: number, weightKg: number, storedQuote: number): number {
+  if (unitCnyPerKg > 0 && weightKg > 0) return unitCnyPerKg * weightKg;
+  return storedQuote > 0 ? storedQuote : 0;
+}
+
+function groupUnitCny(items: UnsignedInvoiceSource[]): number {
+  for (const item of items) {
+    const n = Number(item.unitCnyPerKg);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
+}
+
 function readPackWeightKg(items: UnsignedInvoiceSource[]): number {
   for (const item of items) {
     const kg = Number(item.packWeightKg);
@@ -124,7 +147,7 @@ function packagingWeightKg(items: UnsignedInvoiceSource[], allItems: UnsignedInv
   return groupWeightKg(items);
 }
 
-export function readUnsignedQuoteCny(item: UnsignedInvoiceSource): number {
+export function readUnsignedQuoteCny(item: { quoteCny?: number; inboundNote?: string }): number {
   const direct = Number(item.quoteCny);
   if (Number.isFinite(direct) && direct > 0) return direct;
   const match = String(item.inboundNote || '').match(QUOTE_CNY_PATTERN);
@@ -171,13 +194,15 @@ export function buildUnsignedCustomerInvoice(
       if (!selected.has(item.id) || !isUnsignedExpressItem(item) || isPackShell(item, shells)) continue;
       pickedItems.push(item);
       packCodes.push(item.packedBundleBarcode);
-      const quoteCny = readUnsignedQuoteCny(item);
+      const unitCnyPerKg = groupUnitCny([item]);
       const weightKg = item.weightKg > 0 ? item.weightKg : 0;
+      const quoteCny = chargeQuoteCny(unitCnyPerKg, weightKg, readUnsignedQuoteCny(item));
       orderGroups.push({
         kind: 'single',
         expressNos: uniqueLabels([item.expressBarcode]),
         weightKg,
         quoteCny,
+        ...(unitCnyPerKg > 0 ? { unitCnyPerKg } : {}),
       });
       weightParts.push(weightKg);
       totalQuoteCny += quoteCny;
@@ -189,13 +214,15 @@ export function buildUnsignedCustomerInvoice(
     if (!picked.length) continue;
     pickedItems.push(...picked);
     packCodes.push(...group.items.map((item) => item.packedBundleBarcode));
-    const quoteCny = packagingQuoteCny(group.items, picked);
     const weightKg = packagingWeightKg(group.items, items);
+    const unitCnyPerKg = groupUnitCny(group.items);
+    const quoteCny = chargeQuoteCny(unitCnyPerKg, weightKg, packagingQuoteCny(group.items, picked));
     orderGroups.push({
       kind: 'packaging',
       expressNos: uniqueLabels(picked.map((item) => item.expressBarcode)),
       weightKg,
       quoteCny,
+      ...(unitCnyPerKg > 0 ? { unitCnyPerKg } : {}),
     });
     weightParts.push(weightKg);
     totalQuoteCny += quoteCny;
@@ -221,8 +248,27 @@ export function buildUnsignedCustomerInvoice(
     destination: uniqueLabels(pickedItems.map((item) => item.destination)).join(' · '),
     stationCodes: uniqueLabels(pickedItems.map((item) => item.destination)),
     packNo: uniqueLabels(packCodes).join(' · '),
+    tripNo: uniqueLabels(pickedItems.map((item) => item.tripNumber?.trim().toUpperCase())).join(' · '),
+    tripIncomplete: pickedItems.some((item) => !String(item.tripNumber || '').trim()),
     payment: uniqueLabels(pickedItems.map((item) => item.paymentLabel || item.paymentStatus)).join(' · '),
   };
+}
+
+/** 同一张开票内容得到同一个发票号：有车次用日期-车次，没装车用日期-目的地-件数。 */
+export function formatInvoiceDocumentNo(input: {
+  issuedOn: string;
+  trips: string[];
+  destination: string;
+  pieceCount: number;
+}): string {
+  const day = input.issuedOn.replace(/\D/g, '').slice(0, 8);
+  const trips = uniqueLabels(input.trips.map((trip) => trip.trim().toUpperCase())).map((trip) =>
+    trip.replace(/[^A-Z0-9]/g, ''),
+  ).filter(Boolean);
+  if (trips.length) return [day, ...trips].filter(Boolean).join('-');
+  const dest = (input.destination.split('·')[0] || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase() || 'ML';
+  const pieces = input.pieceCount > 0 ? String(input.pieceCount) : '0';
+  return [day, dest, pieces].filter(Boolean).join('-');
 }
 
 export function formatUnsignedInvoiceWeight(kg: number): string {
@@ -240,6 +286,19 @@ export function formatUnsignedInvoiceQuote(cny: number): string {
   if (!(cny > 0) || !Number.isFinite(cny)) return '';
   const text = cny.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   return `¥${text}`;
+}
+
+/** 发票行上的定价是每公斤单价，不是这一单的总价。 */
+export function formatUnsignedInvoiceUnitPrice(quoteCny: number, weightKg: number): string {
+  if (!(quoteCny > 0) || !(weightKg > 0) || !Number.isFinite(quoteCny) || !Number.isFinite(weightKg)) {
+    return '';
+  }
+  const unit = quoteCny / weightKg;
+  const text =
+    Math.abs(unit - Math.round(unit)) < 1e-6
+      ? String(Math.round(unit))
+      : String(Number(unit.toFixed(4)));
+  return `¥${text}/Kg`;
 }
 
 export function formatUnsignedInvoiceRate(rate: number | null): string {

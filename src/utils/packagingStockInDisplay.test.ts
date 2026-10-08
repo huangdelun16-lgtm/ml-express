@@ -1,4 +1,8 @@
-import { groupCustomerExpressItems, parsePackagingStockInLineBarcode } from './packagingStockInDisplay';
+import {
+  groupCustomerExpressItems,
+  packagingFeeRowWeight,
+  parsePackagingStockInLineBarcode,
+} from './packagingStockInDisplay';
 
 describe('packagingStockInDisplay', () => {
   it('parses (n-i) inbound barcodes', () => {
@@ -31,5 +35,18 @@ describe('packagingStockInDisplay', () => {
       'c',
     ]);
     expect(groups[1]).toEqual({ type: 'single', item: items[3] });
+  });
+
+  it('writes the pack total weight only on the fee row', () => {
+    const rows = [
+      { weight: '—', weightKg: 0, fee: 0, quoteCny: 2760, packWeightKg: 69 },
+      { weight: '—', weightKg: 0, fee: 0, quoteCny: 0, packWeightKg: 69 },
+      { weight: '—', weightKg: 0, fee: 1980000, quoteCny: 0, packWeightKg: 75 },
+      { weight: '4 Kg', weightKg: 4, fee: 100, quoteCny: 0, packWeightKg: 69 },
+    ];
+    expect(packagingFeeRowWeight(rows[0], rows.slice(0, 2))).toBe('69 Kg');
+    expect(packagingFeeRowWeight(rows[1], rows.slice(0, 2))).toBe('—');
+    expect(packagingFeeRowWeight(rows[2], [rows[2]])).toBe('75 Kg');
+    expect(packagingFeeRowWeight(rows[3], [rows[3]])).toBe('4 Kg');
   });
 });

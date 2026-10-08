@@ -5,6 +5,7 @@ describe('parseCblPageTab', () => {
     expect(parseCblPageTab('finance')).toBe('finance');
     expect(parseCblPageTab('customers')).toBe('customers');
     expect(parseCblPageTab('transport')).toBe('transport');
+    expect(parseCblPageTab('invoices')).toBe('invoices');
     expect(parseCblPageTab('settings')).toBe('settings');
   });
 

@@ -15,6 +15,7 @@ const { verifyAdminToken } = require('./verify-admin');
 const { getAdminTokenFromEvent } = require('./utils/adminToken');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 const { aggregateFinanceForTransitStores } = require('./utils/inventoryFinanceAggregate');
+const { selectExportCostRows } = require('./utils/exportCostFinance');
 const { parseFinancePeriodQuery } = require('./utils/yangonFinancePeriod');
 const { buildTripFeeGroupMap } = require('./utils/tripTransportFee');
 const {
@@ -1132,6 +1133,44 @@ async function handleAll(supabase, packStatus, warnings, financePagination, fina
   };
 }
 
+async function handleSignedInvoices(supabase, warnings) {
+  const { data, error } = await supabase
+    .from('inventory_signed_invoices')
+    .select(
+      'id, invoice_no, issued_on, customer_name, phone, trip_label, piece_count, total_fee_cny, total_fee_mmk, document, signed_at, store_code',
+    )
+    .order('signed_at', { ascending: false })
+    .limit(200);
+  if (error) {
+    const missing = /does not exist|schema cache/i.test(error.message || '');
+    if (missing) {
+      warnings.push(error.message);
+      return { invoices: [], warnings };
+    }
+    throw error;
+  }
+  return { invoices: data || [], warnings };
+}
+
+async function handleExportCosts(supabase, warnings, financeScope) {
+  const { data, error } = await supabase
+    .from('inventory_export_costs')
+    .select(
+      'id, subject_kind, display_barcode, customer_name, final_destination, leg_origin, leg_destination, weight_kg, unit_price_cny, total_cny, trip_number, store_code, created_by, created_at',
+    )
+    .order('created_at', { ascending: false })
+    .limit(500);
+  if (error) {
+    const missing = /does not exist|schema cache/i.test(error.message || '');
+    if (missing) {
+      warnings.push(error.message);
+      return { exportCosts: [], totalCny: 0, warnings };
+    }
+    throw error;
+  }
+  return { ...selectExportCostRows(data || [], financeScope), warnings };
+}
+
 exports.handler = async (event) => {
   const preflightResponse = handleCorsPreflight(event, {
     allowedMethods: ['GET', 'OPTIONS'],
@@ -1198,7 +1237,17 @@ exports.handler = async (event) => {
 
   try {
     let body;
-    if (section === 'finance') {
+    if (section === 'invoices') {
+      body = await handleSignedInvoices(supabase, warnings);
+    } else if (section === 'export-costs') {
+      const listed = await handleExportCosts(supabase, warnings, financeScope);
+      body = {
+        ok: true,
+        at: new Date().toISOString(),
+        section: 'export-costs',
+        ...listed,
+      };
+    } else if (section === 'finance') {
       body = await handleFinance(supabase, warnings, financePagination, financeScope);
     } else if (section === 'packs') {
       body = await handlePacks(supabase, packStatus, warnings, stationKeys, list);

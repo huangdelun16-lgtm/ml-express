@@ -9,11 +9,31 @@ vi.mock('../services/supabase', () => ({
 
 import {
   buildBatchSignInvoice,
+  formatInvoiceDocumentNo,
   formatInvoiceExpressNos,
+  formatInvoiceUnitPrice,
   formatInvoiceUnitRateLines,
   formatInvoiceWeight,
+  resolveInvoiceLineUnitCny,
   resolveInvoiceUnitRateLabels,
 } from './batchSignInvoice';
+
+describe('formatInvoiceDocumentNo', () => {
+  it('uses the date and trip, and falls back to destination plus pieces', () => {
+    expect(formatInvoiceDocumentNo({
+      issuedOn: '2026-10-08',
+      trips: ['rui0026'],
+      destination: 'MDY',
+      pieceCount: 18,
+    })).toBe('20261008-RUI0026');
+    expect(formatInvoiceDocumentNo({
+      issuedOn: '2026-10-08',
+      trips: [],
+      destination: 'MDY',
+      pieceCount: 18,
+    })).toBe('20261008-MDY-18');
+  });
+});
 
 describe('buildBatchSignInvoice', () => {
   it('lists single inbound by express no, own weight and fee', () => {
@@ -237,6 +257,8 @@ describe('formatInvoiceUnitRateLines', () => {
   it('writes each different route price once, as 1KG=40RMB', () => {
     expect(formatInvoiceUnitRateLines([40, 35, 40])).toEqual(['1KG=40RMB', '1KG=35RMB']);
     expect(formatInvoiceUnitRateLines([4.7])).toEqual(['1KG=4.7RMB']);
+    expect(formatInvoiceUnitPrice(40)).toBe('¥40/Kg');
+    expect(formatInvoiceUnitPrice(40.3053)).toBe('¥40.3053/Kg');
   });
 
   it('uses the customer route matrix and skips a legacy fallback', async () => {
@@ -266,5 +288,27 @@ describe('formatInvoiceUnitRateLines', () => {
       },
     );
     expect(labels).toEqual(['1KG=40RMB']);
+  });
+
+  it('uses the locked CNY from the customer pricing window', async () => {
+    const prices = await resolveInvoiceLineUnitCny(
+      [
+        {
+          kind: 'packaging',
+          expressNos: ['YT1'],
+          weightKg: 6.5,
+          feeMmk: 162500,
+          route: { originCode: 'RUI', destinationCode: 'MDY', customerCode: 'RUILI2609211001' },
+        },
+      ],
+      669,
+      async () => ({
+        perKgMmk: 26400,
+        mmkPerCny: 669,
+        fromRouteMatrix: true,
+        cnyPerKg: 40,
+      }),
+    );
+    expect(prices).toEqual([40]);
   });
 });

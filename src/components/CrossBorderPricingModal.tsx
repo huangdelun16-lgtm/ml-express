@@ -7,10 +7,10 @@ import {
   CROSS_BORDER_ROUTE_HUBS,
   DEFAULT_PRICING_CUSTOMER_SCOPE,
   blankRoutePricingKeys,
+  buildPricingDisplayMatrix,
   buildRouteMatrixPayload,
   customerHasRoutePricing,
   emptyRouteMatrix,
-  mergeRouteMatrixFromDb,
   normalizeCustomerPricingCode,
   normalizeRouteHubCode,
   parseRouteMatrixForSave,
@@ -20,9 +20,11 @@ import {
   type RouteMatrixValues,
 } from '../utils/crossBorderRoutePricing';
 import {
+  CROSS_BORDER_FX_HISTORY_SETTINGS_KEY,
   cnyToMmk,
   formatCnyInput,
   mmkToCny,
+  parseCrossBorderFxHistory,
   parseMmkPerCnyRate,
   pickMmkPerCnyRate,
 } from '../utils/crossBorderFx';
@@ -76,6 +78,24 @@ function convertMatrixUnits(
     }
   }
   return next;
+}
+
+function displayMatrixFromSettings(
+  settings: SystemSetting[],
+  customerCode: string | null,
+  hasOwn: boolean,
+  rate: number | null,
+): RouteMatrixValues {
+  const historyRow = settings.find(
+    (row) => row.settings_key === CROSS_BORDER_FX_HISTORY_SETTINGS_KEY,
+  );
+  return buildPricingDisplayMatrix({
+    settings,
+    customerCode,
+    useCustomerRates: !(customerCode && !hasOwn),
+    liveRate: rate,
+    history: parseCrossBorderFxHistory(historyRow?.settings_value),
+  });
 }
 
 function cellBookedMmk(raw: string, rate: number | null): number | null {
@@ -208,12 +228,8 @@ const CrossBorderPricingModal: React.FC<Props> = ({
     const rate = pickMmkPerCnyRate(loadedSettings);
     setFxDraft(rate == null ? '' : String(rate));
     displayRateRef.current = rate;
-    const mmkMatrix =
-      customer && !hasOwn
-        ? mergeRouteMatrixFromDb(loadedSettings)
-        : mergeRouteMatrixFromDb(loadedSettings, customer);
     setUsingDefaultPreview(Boolean(customer && !hasOwn));
-    setMatrix(convertMatrixUnits(mmkMatrix, null, rate));
+    setMatrix(displayMatrixFromSettings(loadedSettings, customer, hasOwn, rate));
     setHasChanges(false);
   }, [open, loadedSettings, selectedCustomer]);
 
@@ -254,26 +270,32 @@ const CrossBorderPricingModal: React.FC<Props> = ({
 
     try {
       const unitRate = displayRateRef.current;
-      const mmkMatrix = convertMatrixUnits(matrix, unitRate, null);
-      const parsed = parseRouteMatrixForSave(mmkMatrix);
+      const parsed = parseRouteMatrixForSave(matrix);
       if (!parsed.ok) {
         setErrorMessage(isEn ? parsed.messageEn : parsed.message);
         return;
       }
 
       const scopeOptions = focusDestCode ? { destinations: [focusDestCode] } : undefined;
-      const payload = buildRouteMatrixPayload(
-        mmkMatrix,
-        selectedCustomer || null,
-        scopeOptions,
-      );
+      const mmkMatrix = unitRate ? convertMatrixUnits(matrix, unitRate, null) : matrix;
+      const mmkPayload = buildRouteMatrixPayload(mmkMatrix, selectedCustomer || null, scopeOptions);
+      const payload = unitRate
+        ? [
+            ...mmkPayload,
+            ...buildRouteMatrixPayload(matrix, selectedCustomer || null, {
+              ...scopeOptions,
+              unit: 'cny',
+            }),
+          ]
+        : mmkPayload;
       const existingKeys = new Set(loadedSettings.map((row) => row.settings_key));
       const deleteKeys = blankRoutePricingKeys(
-        mmkMatrix,
+        matrix,
         selectedCustomer || null,
         scopeOptions,
       ).filter((key) => existingKeys.has(key));
-      const routeCount = payload.length;
+      const routeCount = mmkPayload.length;
+      const removedRouteCount = deleteKeys.filter((key) => !key.endsWith('.cny_per_kg')).length;
       if (payload.length) {
         const result = await systemSettingsService.upsertSettings(payload);
         if (!result.ok) {
@@ -302,11 +324,9 @@ const CrossBorderPricingModal: React.FC<Props> = ({
       const customer = selectedCustomer || null;
       const hasOwn = customer ? customerHasRoutePricing(refreshed, customer) : true;
       setUsingDefaultPreview(Boolean(customer && !hasOwn));
-      const savedMmk =
-        customer && !hasOwn
-          ? mergeRouteMatrixFromDb(refreshed)
-          : mergeRouteMatrixFromDb(refreshed, customer);
-      setMatrix(convertMatrixUnits(savedMmk, null, displayRateRef.current));
+      setMatrix(
+        displayMatrixFromSettings(refreshed, customer, hasOwn, displayRateRef.current),
+      );
       setHasChanges(false);
       const scopeLabel = selectedCustomer
         ? selectedCustomerMeta
@@ -315,10 +335,10 @@ const CrossBorderPricingModal: React.FC<Props> = ({
         : isEn
           ? 'default'
           : '默认';
-      const removedNote = deleteKeys.length
+      const removedNote = removedRouteCount
         ? isEn
-          ? `, removed ${deleteKeys.length}`
-          : `，去掉 ${deleteKeys.length} 条`
+          ? `, removed ${removedRouteCount}`
+          : `，去掉 ${removedRouteCount} 条`
         : '';
       setSuccessMessage(
         isEn
@@ -375,11 +395,11 @@ const CrossBorderPricingModal: React.FC<Props> = ({
               <p className="cbl-pricing-modal__sub">
                 {lockCustomer && focusDestCode
                   ? isEn
-                    ? `Inbound quote to ${routeHubDisplay(focusDestCode)} in CNY/kg when a rate is set. Saved as MMK/kg for Inventory booking.`
-                    : `进入 ${routeHubDisplay(focusDestCode)} 的报价按人民币/公斤填写（需先设汇率）。保存仍写入缅币/公斤，Inventory 入账公式不变。`
+                    ? `Prices into ${routeHubDisplay(focusDestCode)} stay in CNY/kg when the exchange rate changes. The MMK line follows the current rate and is what Inventory books after you save.`
+                    : `进入 ${routeHubDisplay(focusDestCode)} 的单价按人民币/公斤保存，改汇率不会改这些数字。格子下的缅币跟着当前汇率走，保存后 Inventory 按这个缅币入账。`
                   : isEn
-                    ? 'Quote in CNY/kg when a headquarters rate is set. Saved as MMK/kg. Clear a cell and save to remove that rate. 0 stays free.'
-                    : '设好总部汇率后按人民币/公斤报价，保存仍是缅币/公斤。清空格子再保存会去掉这条单价；填 0 仍是免费。'}
+                    ? 'Prices stay in CNY/kg when the exchange rate changes. The MMK line follows the current rate and is what Inventory books after you save. Clear a cell and save to remove that rate. 0 stays free.'
+                    : '单价按人民币/公斤保存，改汇率不会改这些数字。格子下的缅币跟着当前汇率走，保存后 Inventory 按这个缅币入账。清空格子再保存会去掉这条单价；填 0 仍是免费。'}
               </p>
             </div>
             <button

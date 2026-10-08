@@ -75,3 +75,34 @@ export function groupCustomerExpressItems<T extends PackagingDisplayItem>(
 
   return groups;
 }
+
+type PackagingWeightRow = {
+  weight: string;
+  weightKg: number;
+  fee: number;
+  quoteCny?: number;
+  packWeightKg?: number;
+};
+
+function formatPackKg(kg: number): string {
+  const n = Math.round(kg * 100) / 100;
+  return `${n} Kg`;
+}
+
+/**
+ * 多个入库的整包重量在包裹本体上，明细行自己的重量是空的。
+ * 只写在记下费用的那一单上，同批其余件仍保持空，避免每件都看起来有一份总重。
+ */
+export function packagingFeeRowWeight<T extends PackagingWeightRow>(item: T, siblings: T[]): string {
+  const own = String(item.weight || '').trim();
+  if (item.weightKg > 0 && own && own !== '—') return own;
+  const carriesFee = (Number(item.fee) || 0) > 0 || (Number(item.quoteCny) || 0) > 0;
+  if (!carriesFee) return own || '—';
+  let pack = Number(item.packWeightKg) || 0;
+  for (const row of siblings) {
+    const kg = Number(row.packWeightKg) || 0;
+    if (kg > pack) pack = kg;
+  }
+  if (pack > 0) return formatPackKg(pack);
+  return own || '—';
+}

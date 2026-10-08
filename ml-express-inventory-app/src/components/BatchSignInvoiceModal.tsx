@@ -23,11 +23,18 @@ import { parseWeightKg } from '../utils/itemFieldFormat';
 import { yangonTodayYmd } from '../utils/yangonFinancePeriod';
 import {
   buildBatchSignInvoice,
+  applyLockedUnitTotals,
+  formatInvoiceUnitRateLines,
   formatInvoiceWeight,
-  resolveInvoiceUnitRateLabels,
+  resolveInvoiceLineUnitCny,
   type BatchSignInvoiceLine,
   type BatchSignInvoiceModel,
 } from '../utils/batchSignInvoice';
+import {
+  buildFrozenSignedInvoiceDocument,
+  invoiceLineMeasure,
+  type FrozenInvoiceHandoff,
+} from '../utils/frozenSignedInvoice';
 import { persistInvoicePng, shareInvoicePng } from '../utils/saveInvoiceImage';
 
 type Props = {
@@ -37,7 +44,7 @@ type Props = {
   store: InventoryStoreSession | null;
   hubCode?: string | null;
   onClose: () => void;
-  onContinue?: () => void;
+  onContinue?: (handoff: FrozenInvoiceHandoff) => void;
   continueLabel?: string;
 };
 
@@ -47,6 +54,7 @@ type InvoiceHeading = {
   destination: string;
   station: string;
   packBarcode: string;
+  trip: string;
   payment: string;
   dateLabel: string;
 };
@@ -83,20 +91,63 @@ async function attachTrackedPackWeights(details: InventoryItemDetail[]): Promise
   });
 }
 
+async function loadPackTrips(
+  details: InventoryItemDetail[],
+): Promise<{ trips: string[]; incomplete: boolean }> {
+  const codes = Array.from(
+    new Set(
+      details
+        .map((row) => row.packed_bundle_barcode?.trim().toUpperCase() || '')
+        .filter((code) => code.length > 0),
+    ),
+  );
+  const byPack = new Map<string, string>();
+  await Promise.all(
+    codes.map(async (code) => {
+      const pkg = await getPkgTrackingDetail(code).catch(() => null);
+      const trip = pkg?.trip_number?.trim().toUpperCase() || '';
+      if (trip) byPack.set(code, trip);
+    }),
+  );
+  const seen = new Set<string>();
+  const trips: string[] = [];
+  for (const trip of Array.from(byPack.values())) {
+    if (!trip || seen.has(trip)) continue;
+    seen.add(trip);
+    trips.push(trip);
+  }
+  const incomplete = details.some((row) => {
+    const code = row.packed_bundle_barcode?.trim().toUpperCase() || '';
+    return !code || !byPack.get(code);
+  });
+  return { trips, incomplete };
+}
+
 function headingFrom(
   details: InventoryItemDetail[],
   store: InventoryStoreSession | null,
   paymentLabel: (raw?: string | null) => string,
+  trips: string[],
+  tripIncomplete: boolean,
+  notLoadedLabel: string,
 ): InvoiceHeading {
   const first = details[0];
+  const destination = details.map((row) => row.final_destination?.trim()).find(Boolean) || '';
+  const dateLabel = yangonTodayYmd();
+  const trip = trips.length
+    ? tripIncomplete
+      ? `${trips.join(' · ')} · ${notLoadedLabel}`
+      : trips.join(' · ')
+    : '';
   return {
     customer: first?.customer_name?.trim() || first?.recipient_name?.trim() || '',
     phone: details.map((row) => row.recipient_phone?.trim()).find(Boolean) || '',
-    destination: details.map((row) => row.final_destination?.trim()).find(Boolean) || '',
+    destination,
     station: store?.storeName?.trim() || store?.storeCode?.trim() || '',
     packBarcode: details.map((row) => row.packed_bundle_barcode?.trim()).find(Boolean) || '',
+    trip,
     payment: paymentLabel(details.map((row) => row.payment_label).find(Boolean)),
-    dateLabel: yangonTodayYmd(),
+    dateLabel,
   };
 }
 
@@ -107,12 +158,14 @@ function OrderTable({
   line: BatchSignInvoiceLine;
   orderLabel: string;
 }) {
-  const { t, fmt } = useTranslation();
+  const { t } = useTranslation();
   const nos = line.expressNos.length ? line.expressNos : ['—'];
-  const weightText = formatInvoiceWeight(line.weightKg);
-  const weightLabel = weightText
-    ? fmt(line.kind === 'packaging' ? t.invoice.packWeight : t.invoice.lineWeight, { weight: weightText })
-    : '';
+  const weightLabel = invoiceLineMeasure(line, {
+    lineMeasure: t.invoice.lineMeasure,
+    lineWeight: t.invoice.lineWeight,
+    packMeasure: t.invoice.packMeasure,
+    packWeight: t.invoice.packWeight,
+  });
   return (
     <View style={styles.table}>
       <Text style={styles.tableHead}>{orderLabel}</Text>
@@ -120,16 +173,9 @@ function OrderTable({
         <View key={`${no}-${index}`} style={styles.orderRow}>
           <Text style={styles.orderIndex}>{String(index + 1).padStart(2, '0')}</Text>
           <Text style={styles.orderNo}>{no}</Text>
-          {line.kind === 'single' && index === 0 && weightLabel ? (
-            <Text style={styles.lineWeight}>{weightLabel}</Text>
-          ) : null}
         </View>
       ))}
-      {line.kind === 'packaging' && weightLabel ? (
-        <View style={styles.packWeightRow}>
-          <Text style={styles.packWeight}>{weightLabel}</Text>
-        </View>
-      ) : null}
+      {weightLabel ? <Text style={styles.packWeight}>{weightLabel}</Text> : null}
     </View>
   );
 }
@@ -155,6 +201,7 @@ export default function BatchSignInvoiceModal({
   const [model, setModel] = useState<BatchSignInvoiceModel | null>(null);
   const [unitRates, setUnitRates] = useState<string[]>([]);
   const [heading, setHeading] = useState<InvoiceHeading | null>(null);
+  const [signedItemIds, setSignedItemIds] = useState<string[]>([]);
 
   const customerName = useMemo(() => {
     const first = selectedItems[0];
@@ -166,6 +213,7 @@ export default function BatchSignInvoiceModal({
       setModel(null);
       setUnitRates([]);
       setHeading(null);
+      setSignedItemIds([]);
       setError('');
       setLoading(false);
       setSaving(false);
@@ -188,6 +236,7 @@ export default function BatchSignInvoiceModal({
         const details = await attachTrackedPackWeights(
           await getItemDetails(expanded.map((item) => item.id)),
         );
+        const packTrips = await loadPackTrips(details);
         const rate = await fetchCrossBorderFxRate({ force: true });
         if (cancelled) return;
         const built = buildBatchSignInvoice(details, rate);
@@ -195,10 +244,11 @@ export default function BatchSignInvoiceModal({
           setModel(null);
           setUnitRates([]);
           setHeading(null);
+          setSignedItemIds([]);
           setError(t.invoice.rateRequired);
           return;
         }
-        const labels = await resolveInvoiceUnitRateLabels(built.lines, built.rate, async (route) => {
+        const lineCny = await resolveInvoiceLineUnitCny(built.lines, built.rate, async (route) => {
           const found = await fetchCrossBorderRoutePerKg(
             route.originCode,
             route.destinationCode,
@@ -208,16 +258,34 @@ export default function BatchSignInvoiceModal({
             perKgMmk: found.perKg,
             mmkPerCny: found.mmkPerCny,
             fromRouteMatrix: found.fromCloud && !found.usedLegacyFallback,
+            cnyPerKg: found.cnyPerKg,
           };
-        }).catch(() => [] as string[]);
+        }).catch(() => built.lines.map(() => null));
         if (cancelled) return;
-        setUnitRates(labels);
-        setModel(built);
-        setHeading(headingFrom(details, store, (raw) => getPaymentLabelDisplay(t, raw)));
+        const priced = applyLockedUnitTotals(built, lineCny);
+        setUnitRates(
+          formatInvoiceUnitRateLines(lineCny.filter((cny): cny is number => cny != null && cny >= 0)),
+        );
+        setModel({
+          ...priced,
+          lines: priced.lines.map((line, index) => ({ ...line, cnyPerKg: lineCny[index] ?? null })),
+        });
+        setSignedItemIds(details.map((row) => row.id));
+        setHeading(
+          headingFrom(
+            details,
+            store,
+            (raw) => getPaymentLabelDisplay(t, raw),
+            packTrips.trips,
+            packTrips.incomplete,
+            t.invoice.notLoaded,
+          ),
+        );
       } catch {
         if (!cancelled) {
           setModel(null);
           setHeading(null);
+          setSignedItemIds([]);
           setError(t.invoice.batchLoadFailed);
         }
       } finally {
@@ -262,6 +330,73 @@ export default function BatchSignInvoiceModal({
 
   const pieceCount = model?.lines.reduce((sum, line) => sum + Math.max(line.expressNos.length, 1), 0) ?? 0;
 
+  const continueSign = () => {
+    if (!model || !heading || !onContinue || signedItemIds.length === 0) return;
+    const measureTemplates = {
+      lineMeasure: t.invoice.lineMeasure,
+      lineWeight: t.invoice.lineWeight,
+      packMeasure: t.invoice.packMeasure,
+      packWeight: t.invoice.packWeight,
+    };
+    onContinue({
+      itemIds: signedItemIds,
+      document: buildFrozenSignedInvoiceDocument({
+        customerName: heading.customer || customerName,
+        phone: heading.phone,
+        destination: heading.destination,
+        station: heading.station,
+        trip: heading.trip,
+        notLoadedLabel: t.invoice.notLoaded,
+        packNo: heading.packBarcode,
+        pieceCount,
+        payment: heading.payment,
+        issuedOn: heading.dateLabel,
+        labels: {
+          customer: t.invoice.customerName,
+          phone: t.invoice.phone,
+          destination: t.invoice.finalDest,
+          station: t.invoice.station,
+          trip: t.invoice.trip,
+          packNo: t.invoice.packNo,
+          pieces: t.invoice.pieceCount,
+          payment: t.invoice.payment,
+          date: t.invoice.issuedOn,
+          totalWeight: t.invoice.batchTotalWeight,
+          totalFee: t.invoice.batchTotalFee,
+          waybill: t.invoice.expressNo,
+          orderNos: t.invoice.orderNos,
+        },
+        lines: model.lines.map((line) => ({
+          kind: line.kind,
+          expressNos: line.expressNos,
+          weightKg: line.weightKg,
+          cnyPerKg: line.cnyPerKg,
+          title: line.kind === 'packaging' ? t.invoice.orderNos : t.invoice.expressNo,
+        })),
+        measureTemplates,
+        totalWeight: formatInvoiceWeight(model.totalWeightKg),
+        totalQuote:
+          model.totalFeeCny != null
+            ? fmt(t.invoice.settlementQuote, { amount: formatCnyAmount(model.totalFeeCny) })
+            : '',
+        totalRate:
+          model.totalFeeCny != null && model.rate != null
+            ? fmt(t.invoice.settlementRate, { rate: formatMmkAmount(model.rate) })
+            : '',
+        unitRates,
+        totalFee: feeLabel(model.totalFeeMmk, t.invoice.freePromo),
+        totalFeeCny: model.totalFeeCny,
+        totalFeeMmk: model.totalFeeMmk,
+        payNote: t.invoice.payNote,
+        contactLabel: t.invoice.contact,
+        contactPhoneLabel: t.invoice.contactPhoneLabel,
+        contactPhones: t.invoice.contactPhones,
+        contactKpay: t.invoice.contactKpay,
+        contactSite: t.invoice.contactSite,
+      }),
+    });
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -299,7 +434,12 @@ export default function BatchSignInvoiceModal({
                       </Text>
                       <Text style={styles.brandSub}>EXPRESS</Text>
                     </View>
-                    <Text style={styles.invoiceWord}>INVOICE</Text>
+                    <View style={styles.docPlain}>
+                      <Text style={styles.docWord}>INVOICE</Text>
+                      <Text style={styles.docMeta}>
+                        {t.invoice.invoiceNo} —
+                      </Text>
+                    </View>
                   </View>
                   <View style={styles.rule} />
                   <View style={styles.ruleThin} />
@@ -311,6 +451,7 @@ export default function BatchSignInvoiceModal({
                       <MetaRow label={t.invoice.finalDest} value={heading.destination} />
                     ) : null}
                     {heading.station ? <MetaRow label={t.invoice.station} value={heading.station} /> : null}
+                    <MetaRow label={t.invoice.trip} value={heading.trip || t.invoice.notLoaded} />
                     {heading.packBarcode ? (
                       <MetaRow label={t.invoice.packNo} value={heading.packBarcode} />
                     ) : null}
@@ -360,6 +501,18 @@ export default function BatchSignInvoiceModal({
                   </View>
 
                   <Text style={styles.payNote}>{t.invoice.payNote}</Text>
+                  <View style={styles.contact}>
+                    <Text style={styles.contactLabel}>{t.invoice.contact}</Text>
+                    <Text style={styles.contactLine}>
+                      <Text style={styles.contactLineLabel}>{t.invoice.contactPhoneLabel}</Text>
+                      {t.invoice.contactPhones}
+                    </Text>
+                    <Text style={styles.contactLine}>
+                      <Text style={styles.contactLineLabel}>Kpay：</Text>
+                      {t.invoice.contactKpay}
+                    </Text>
+                    <Text style={styles.contactSite}>{t.invoice.contactSite}</Text>
+                  </View>
                   <Text style={styles.footerBrand}>MARKET LINK EXPRESS</Text>
                 </View>
               </View>
@@ -370,8 +523,8 @@ export default function BatchSignInvoiceModal({
             {onContinue ? (
               <Pressable
                 style={[styles.continueBtn, (!model || saving) && styles.btnDisabled]}
-                onPress={onContinue}
-                disabled={!model || saving}
+                onPress={continueSign}
+                disabled={!model || !heading || signedItemIds.length === 0 || saving}
                 accessibilityRole="button"
                 accessibilityLabel={continueLabel || t.invoice.continueSign}
               >
@@ -460,56 +613,68 @@ const styles = StyleSheet.create({
     right: -24,
     color: '#1c1917',
     opacity: 0.1,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
     textAlign: 'center',
     transform: [{ rotate: '-18deg' }],
   },
   paperBody: {
     position: 'relative',
     zIndex: 1,
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 16,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
   brandRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
+    gap: 8,
   },
   brand: {
     color: '#1c1917',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
-    letterSpacing: 1.2,
+    letterSpacing: 0.6,
   },
   brandSub: {
     marginTop: 1,
     color: '#1c1917',
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 4,
+    letterSpacing: 2,
   },
-  invoiceWord: {
+  docPlain: {
+    flexShrink: 1,
+    alignItems: 'flex-end',
+  },
+  docWord: {
     color: '#1c1917',
-    fontSize: 13,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  docMeta: {
+    marginTop: 2,
+    color: '#57534e',
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 3,
+    textAlign: 'right',
   },
   rule: {
-    marginTop: 12,
+    marginTop: 8,
     height: 2,
     backgroundColor: '#1c1917',
   },
   ruleThin: {
-    marginTop: 3,
+    marginTop: 2,
     height: 1,
     backgroundColor: '#1c1917',
   },
   meta: {
-    marginTop: 14,
-    gap: 7,
+    marginTop: 8,
+    gap: 4,
   },
   metaRow: {
     flexDirection: 'row',
@@ -519,68 +684,68 @@ const styles = StyleSheet.create({
   },
   metaLabel: {
     color: '#57534e',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
   },
   metaValue: {
     flex: 1,
+    flexShrink: 1,
     color: '#1c1917',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
     textAlign: 'right',
   },
   table: {
-    marginTop: 16,
+    marginTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#1c1917',
   },
   tableHead: {
-    paddingTop: 8,
-    paddingBottom: 6,
+    paddingTop: 6,
+    paddingBottom: 4,
     color: '#57534e',
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.6,
   },
   orderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 7,
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingVertical: 4,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#a8a29e',
   },
   orderIndex: {
-    width: 24,
-    color: '#78716c',
-    fontSize: 12,
+    width: 22,
+    color: '#a8a29e',
+    fontSize: 10,
     fontWeight: '700',
+    lineHeight: 16,
   },
   orderNo: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     color: '#1c1917',
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-  },
-  lineWeight: {
-    color: '#44403c',
     fontSize: 12,
     fontWeight: '700',
-  },
-  packWeightRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingTop: 6,
-    paddingBottom: 2,
+    lineHeight: 16,
   },
   packWeight: {
-    color: '#44403c',
-    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 2,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(28, 25, 23, 0.05)',
+    color: '#1c1917',
+    fontSize: 11,
     fontWeight: '700',
+    lineHeight: 16,
+    textAlign: 'right',
   },
   totals: {
-    marginTop: 16,
+    marginTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#1c1917',
   },
@@ -592,18 +757,18 @@ const styles = StyleSheet.create({
   },
   totalLabel: {
     color: '#44403c',
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
   },
   totalValue: {
     color: '#1c1917',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
   },
   feeRow: {
-    marginTop: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
+    marginTop: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
     backgroundColor: '#1c1917',
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -611,50 +776,86 @@ const styles = StyleSheet.create({
   },
   feeLabel: {
     color: '#f6f3ec',
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
   },
-  feeStack: { alignItems: 'flex-end', flexShrink: 1, maxWidth: '72%' },
+  feeStack: { alignItems: 'flex-end', flexShrink: 1, maxWidth: '74%' },
   feeQuote: {
     color: '#f6f3ec',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '800',
     textAlign: 'right',
   },
   feeUnit: {
     color: '#f6f3ec',
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '700',
-    marginTop: 2,
+    marginTop: 1,
     textAlign: 'right',
   },
   feeRate: {
     color: '#d6d3d1',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '700',
-    marginTop: 2,
-    marginBottom: 4,
+    marginTop: 1,
+    marginBottom: 2,
     textAlign: 'right',
   },
   feeValue: {
     color: '#f6f3ec',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
+    textAlign: 'right',
   },
   payNote: {
-    marginTop: 14,
+    marginTop: 8,
     textAlign: 'center',
-    color: '#44403c',
-    fontSize: 12,
-    fontWeight: '600',
+    color: '#1c1917',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
-  footerBrand: {
-    marginTop: 4,
+  contact: {
+    marginTop: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(28, 25, 23, 0.28)',
+    backgroundColor: 'rgba(28, 25, 23, 0.035)',
+    alignItems: 'center',
+  },
+  contactLabel: {
+    color: '#57534e',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  contactLine: {
+    marginTop: 3,
+    color: '#1c1917',
+    fontSize: 11,
+    fontWeight: '800',
     textAlign: 'center',
-    color: '#a8a29e',
+  },
+  contactLineLabel: {
+    color: '#57534e',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  contactSite: {
+    marginTop: 3,
+    color: '#1c1917',
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 2,
+    textAlign: 'center',
+  },
+  footerBrand: {
+    marginTop: 6,
+    textAlign: 'center',
+    color: '#78716c',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.4,
   },
   loadingBox: {
     alignItems: 'center',

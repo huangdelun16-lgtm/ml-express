@@ -71,6 +71,7 @@ const CAT_FILL: Record<CrossBorderExpenseCategory, string> = {
   agency_remit: 'FFECFEFF',
   manual_income: 'FFF0FDF4',
   manual_expense: 'FFFFF1F2',
+  export_cost: 'FFFFF7ED',
 };
 
 function exportLabels(isEn: boolean): ExportLabels {

@@ -5,7 +5,7 @@
  */
 
 import { logger } from '../utils/logger';
-import { readNetlifyFunctionJson } from '../utils/netlifyFunctionJson';
+import { fetchNetlifyWithRetry, readNetlifyFunctionJson } from '../utils/netlifyFunctionJson';
 
 const TOKEN_STORAGE_KEY = 'admin_auth_token';
 
@@ -108,14 +108,30 @@ export function getToken(): string | null {
   return readStorage(TOKEN_STORAGE_KEY);
 }
 
-/** Admin Netlify Functions：带 Cookie + Bearer 回退 */
+const inflightAdminGets = new Map<string, Promise<Response>>();
+
+/** Admin Netlify Functions：带 Cookie + Bearer 回退。相同的 GET 在进行中只打一次。 */
 export function adminAuthenticatedFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   const token = getToken();
   if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-  return fetch(input, { ...init, credentials: 'include', headers });
+  const request = { ...init, credentials: 'include' as const, headers };
+  const method = String(request.method || 'GET').toUpperCase();
+  const key = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+  if (method !== 'GET') {
+    return fetchNetlifyWithRetry(input, request);
+  }
+  const existing = inflightAdminGets.get(key);
+  if (existing) {
+    return existing.then((response) => response.clone());
+  }
+  const pending = fetchNetlifyWithRetry(input, request).finally(() => {
+    inflightAdminGets.delete(key);
+  });
+  inflightAdminGets.set(key, pending);
+  return pending.then((response) => response.clone());
 }
 
 /** 清除本地会话并让服务端清 httpOnly Cookie */

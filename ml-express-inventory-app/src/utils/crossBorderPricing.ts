@@ -97,6 +97,16 @@ function buildRoutePerKgSettingsKey(
   return `pricing.cross_border.route.${from}.${to}.per_kg`;
 }
 
+function buildRouteCnyPerKgSettingsKey(
+  origin: string,
+  destination: string,
+  customerCode?: string,
+): string | null {
+  const mmkKey = buildRoutePerKgSettingsKey(origin, destination, customerCode);
+  if (!mmkKey) return null;
+  return mmkKey.replace(/\.per_kg$/, '.cny_per_kg');
+}
+
 export function pickRoutePerKgFromRows(
   rows: Array<{ settings_key?: string; settings_value?: unknown }>,
   origin: string,
@@ -120,6 +130,33 @@ export function pickRoutePerKgFromRows(
   if (globalKey && byKey.has(globalKey)) {
     return { perKg: byKey.get(globalKey) as number, usedCustomerRate: false };
   }
+  return null;
+}
+
+/** 客户定价窗口里定死的人民币/公斤。有客户专属键就用它，含 0；没有才用默认路线。 */
+export function pickRouteCnyPerKgFromRows(
+  rows: Array<{ settings_key?: string; settings_value?: unknown }>,
+  origin: string,
+  destination: string,
+  customerCode?: string,
+): number | null {
+  const customerKey = customerCode
+    ? buildRouteCnyPerKgSettingsKey(origin, destination, customerCode)
+    : null;
+  const globalKey = buildRouteCnyPerKgSettingsKey(origin, destination);
+  const customerMmkKey = customerCode
+    ? buildRoutePerKgSettingsKey(origin, destination, customerCode)
+    : null;
+  const byKey = new Map<string, number>();
+  for (const row of rows) {
+    const key = String(row.settings_key ?? '');
+    if (!key) continue;
+    const n = parsePricingValue(row.settings_value);
+    if (Number.isFinite(n) && n >= 0) byKey.set(key, n);
+  }
+  if (customerKey && byKey.has(customerKey)) return byKey.get(customerKey) as number;
+  if (customerMmkKey && byKey.has(customerMmkKey)) return null;
+  if (globalKey && byKey.has(globalKey)) return byKey.get(globalKey) as number;
   return null;
 }
 
@@ -185,6 +222,8 @@ export async function fetchCrossBorderRoutePerKg(
   usedLegacyFallback: boolean;
   usedCustomerRate: boolean;
   mmkPerCny: number | null;
+  /** 客户定价窗口里定死的人民币/公斤。没有这条键时为 null。 */
+  cnyPerKg: number | null;
 }> {
   const originCode = normalizeRouteHubCode(originHub);
   const destinationCode = normalizeRouteHubCode(destination);
@@ -196,9 +235,13 @@ export async function fetchCrossBorderRoutePerKg(
     ? buildRoutePerKgSettingsKey(originCode, destinationCode, normalizedCustomer)
     : null;
   const globalKey = buildRoutePerKgSettingsKey(originCode, destinationCode);
-  const keys = [customerKey, globalKey, CROSS_BORDER_FX_SETTINGS_KEY].filter(
-    (key): key is string => Boolean(key),
-  );
+  const keys = [
+    customerKey,
+    globalKey,
+    customerKey ? customerKey.replace(/\.per_kg$/, '.cny_per_kg') : null,
+    globalKey ? globalKey.replace(/\.per_kg$/, '.cny_per_kg') : null,
+    CROSS_BORDER_FX_SETTINGS_KEY,
+  ].filter((key): key is string => Boolean(key));
 
   if (!isSupabaseConfigured()) {
     const legacy = await fetchLegacyDestinationBaseFee(destinationCode);
@@ -210,6 +253,7 @@ export async function fetchCrossBorderRoutePerKg(
       usedLegacyFallback: true,
       usedCustomerRate: false,
       mmkPerCny: null,
+      cnyPerKg: null,
     };
   }
 
@@ -219,6 +263,10 @@ export async function fetchCrossBorderRoutePerKg(
     .in('settings_key', keys);
 
   const mmkPerCny = !error && data?.length ? pickMmkPerCnyRate(data) : null;
+  const cnyPerKg =
+    !error && data?.length
+      ? pickRouteCnyPerKgFromRows(data, originCode, destinationCode, normalizedCustomer)
+      : null;
 
   if (!error && data?.length) {
     const picked = pickRoutePerKgFromRows(data, originCode, destinationCode, normalizedCustomer);
@@ -231,6 +279,7 @@ export async function fetchCrossBorderRoutePerKg(
         usedLegacyFallback: false,
         usedCustomerRate: picked.usedCustomerRate,
         mmkPerCny,
+        cnyPerKg,
       };
     }
   }
@@ -244,6 +293,7 @@ export async function fetchCrossBorderRoutePerKg(
     usedLegacyFallback: true,
     usedCustomerRate: false,
     mmkPerCny,
+    cnyPerKg,
   };
 }
 

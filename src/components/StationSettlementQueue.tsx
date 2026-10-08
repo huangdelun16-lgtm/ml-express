@@ -100,7 +100,6 @@ const StationSettlementQueue: React.FC<Props> = ({ isEn, stores, year, storeCode
   const overdueCount = monthCards.filter((item) => item.tone === 'missing').length;
   const upcomingCount = monthCards.filter((item) => item.tone === 'upcoming').length;
   const confirmedCount = monthCards.filter((item) => item.tone === 'confirmed').length;
-  const openMonthCard = monthCards.find((item) => item.month === openMonth) ?? null;
 
   const load = async () => {
     setLoading(true);
@@ -439,80 +438,66 @@ const StationSettlementQueue: React.FC<Props> = ({ isEn, stores, year, storeCode
                   </div>
                 </div>
 
-                <div className="cbl-settle-months">
-                  {monthCards.map((month) => (
-                    <button
-                      key={month.month}
-                      type="button"
-                      className={`cbl-settle-month is-${month.tone}${
-                        openMonth === month.month ? ' is-open' : ''
-                      }`}
-                      onClick={() =>
-                        setOpenMonth((prev) => (prev === month.month ? null : month.month))
-                      }
-                    >
-                      <b>{monthTitle(month.month, isEn)}</b>
-                      <small>{toneLabel(month.tone, isEn)}</small>
-                    </button>
-                  ))}
-                </div>
-
-                {openMonthCard ? (
-                  <div className="cbl-settle-month-detail">
-                    <div className="cbl-settle-month-detail__head">
-                      <strong>
-                        {year}
-                        {isEn ? ' ' : '年'}
-                        {monthTitle(openMonthCard.month, isEn)}
-                      </strong>
-                      <span className={`cbl-badge ${
-                        openMonthCard.tone === 'confirmed'
-                          ? 'cbl-badge--green'
-                          : openMonthCard.tone === 'missing'
-                            ? 'cbl-badge--red'
-                            : openMonthCard.tone === 'current'
-                              ? 'cbl-badge--amber'
-                              : 'cbl-badge--gray'
-                      }`}>
-                        {toneLabel(openMonthCard.tone, isEn)}
-                      </span>
-                    </div>
-                    {openMonthCard.tone === 'confirmed' && openMonthCard.snapshot ? (
-                      <dl className="cbl-settle-month-detail__grid">
-                        {SNAPSHOT_FIELDS.slice(0, 4).map((field) => (
-                          <div key={field.key}>
-                            <dt>{isEn ? field.en : field.zh}</dt>
-                            <dd>{formatMmK(openMonthCard.snapshot?.[field.key] as number)}</dd>
+                <div className={`cbl-settle-months${openMonth ? ' has-open' : ''}`}>
+                  {monthCards.map((month) => {
+                    const opened = openMonth === month.month;
+                    return (
+                      <div
+                        key={month.month}
+                        className={`cbl-settle-month is-${month.tone}${opened ? ' is-open' : ''}`}
+                      >
+                        <button
+                          type="button"
+                          className="cbl-settle-month__hit"
+                          aria-expanded={opened}
+                          onClick={() =>
+                            setOpenMonth((prev) => (prev === month.month ? null : month.month))
+                          }
+                        >
+                          <b>{monthTitle(month.month, isEn)}</b>
+                          <small>{toneLabel(month.tone, isEn)}</small>
+                        </button>
+                        {opened ? (
+                          <div className="cbl-settle-month__body">
+                            {month.tone === 'confirmed' && month.snapshot ? (
+                              <dl className="cbl-settle-month-detail__grid">
+                                {SNAPSHOT_FIELDS.slice(0, 4).map((field) => (
+                                  <div key={field.key}>
+                                    <dt>{isEn ? field.en : field.zh}</dt>
+                                    <dd>{formatMmK(month.snapshot?.[field.key] as number)}</dd>
+                                  </div>
+                                ))}
+                                <div>
+                                  <dt>{isEn ? 'Stations' : '站点数'}</dt>
+                                  <dd>{month.storeCount || 0}</dd>
+                                </div>
+                              </dl>
+                            ) : (
+                              <p>
+                                {month.tone === 'upcoming'
+                                  ? isEn
+                                    ? 'This month is not due yet, so it is not counted as missing.'
+                                    : '这个月还没到，不计入过期缺月。'
+                                  : month.tone === 'current'
+                                    ? isEn
+                                      ? 'This month has no confirmed close yet.'
+                                      : '本月还没有已确认的月结。'
+                                    : isEn
+                                      ? 'No confirmed monthly close for this month.'
+                                      : '该月尚无已确认月结。'}
+                              </p>
+                            )}
                           </div>
-                        ))}
-                        <div>
-                          <dt>{isEn ? 'Stations' : '站点数'}</dt>
-                          <dd>{openMonthCard.storeCount || 0}</dd>
-                        </div>
-                      </dl>
-                    ) : (
-                      <p>
-                        {openMonthCard.tone === 'upcoming'
-                          ? isEn
-                            ? 'This month is not due yet, so it is not counted as missing.'
-                            : '这个月还没到，不计入过期缺月。'
-                          : openMonthCard.tone === 'current'
-                            ? isEn
-                              ? 'This month has no confirmed close yet.'
-                              : '本月还没有已确认的月结。'
-                            : isEn
-                              ? 'No confirmed monthly close for this month.'
-                              : '该月尚无已确认月结。'}
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="cbl-settle-panel__hint">
-                    {isEn
-                      ? 'Tap a month for its confirmed snapshot. Red = overdue, amber = this month, muted = not due.'
-                      : '点月份看已确认快照。红=过期未结，黄=本月，灰=未到。'}
-                  </p>
-                )}
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="cbl-settle-panel__hint">
+                  {isEn
+                    ? 'Months stay small until you open one. Tap again to shrink it. Red = overdue, amber = this month, muted = not due.'
+                    : '没点开时月份都是小卡。再点一次就收回。红=过期未结，黄=本月，灰=未到。'}
+                </p>
               </>
             ) : (
               <div className="cbl-settle-empty">

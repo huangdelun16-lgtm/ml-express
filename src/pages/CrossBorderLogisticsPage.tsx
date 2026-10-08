@@ -60,18 +60,19 @@ import DualMoney from '../components/DualMoney';
 import {
   CROSS_BORDER_FX_HISTORY_SETTINGS_KEY,
   CROSS_BORDER_FX_SETTINGS_KEY,
-  appendCrossBorderFxHistory,
   buildCrossBorderFxHistorySetting,
   buildCrossBorderFxSetting,
   displayRateForCustomerCategory,
   isCustomerLedgerCategory,
   mmkToCny,
+  mergeFxHistoryForSave,
   parseCrossBorderFxHistory,
   parseMmkPerCnyRate,
   pickMmkPerCnyRate,
   type CrossBorderFxHistoryEntry,
 } from '../utils/crossBorderFx';
 import {
+  buildFxMmkRepricePayload,
   collectPricingCustomerOptions,
   summarizeRoutePricing,
   type RoutePricingSummary,
@@ -101,6 +102,8 @@ import {
 } from '../utils/yangonFinancePeriod';
 import { parseCblPageTab, withCblPageTab, type CblPageTab } from '../utils/cblPageTabs';
 import { CblRowMenu, CblTableSkeleton } from '../components/CblOpsUi';
+import SignedInvoicesPanel from '../components/SignedInvoicesPanel';
+import ExportCostRecordsCard from '../components/ExportCostRecordsCard';
 
 const CrossBorderAccountManagementModal = lazy(
   () => import('../components/CrossBorderAccountManagementModal'),
@@ -222,6 +225,15 @@ function formatMmK(n?: number | null): string {
   return Math.round(n).toLocaleString('en-US');
 }
 
+function formatExportCny(n?: number | null): string {
+  if (n == null || !Number.isFinite(n)) return '0';
+  const rounded = Math.round(n * 100) / 100;
+  return rounded % 1 === 0 ? rounded.toLocaleString('en-US') : rounded.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 function formatCblPeriodHeading(kind: FinancePeriodKind, date: string, isEn: boolean): string {
   const range = resolveFinancePeriod(kind, date);
   if (kind === 'year') return isEn ? range.label : `${range.label}年`;
@@ -328,6 +340,7 @@ function expenseCategoryLabel(cat: CrossBorderExpenseCategory, isEn: boolean): s
   if (cat === 'collected') return isEn ? 'Collected' : '已收';
   if (cat === 'manual_income') return isEn ? 'Other income' : '其它收入';
   if (cat === 'manual_expense') return isEn ? 'Other expense' : '其它支出';
+  if (cat === 'export_cost') return isEn ? 'Export cost' : '出口成本';
   return isEn ? 'Agency remit' : '代转应结';
 }
 
@@ -342,7 +355,7 @@ function expenseStatusClass(cat: CrossBorderExpenseCategory, statusLabel: string
   if (cat === 'transport_paid' || statusLabel === '已支付') return 'cbl-badge cbl-badge--green';
   if (cat === 'pending_inflow' || statusLabel === '待入账') return 'cbl-badge cbl-badge--amber';
   if (cat === 'agency_remit') return 'cbl-badge cbl-badge--amber';
-  if (cat === 'manual_expense') return 'cbl-badge cbl-badge--red';
+  if (cat === 'manual_expense' || cat === 'export_cost') return 'cbl-badge cbl-badge--red';
   return 'cbl-badge cbl-badge--red';
 }
 
@@ -383,6 +396,7 @@ const CBL_TAB_ITEMS: { id: CblPageTab; zh: string; en: string }[] = [
   { id: 'finance', zh: '财务', en: 'Finance' },
   { id: 'customers', zh: '客户', en: 'Customers' },
   { id: 'transport', zh: '运输', en: 'Transport' },
+  { id: 'invoices', zh: 'Invoice', en: 'Invoice' },
   { id: 'settings', zh: '设置', en: 'Settings' },
 ];
 
@@ -488,6 +502,7 @@ const CrossBorderLogisticsPage: FC = () => {
   const [periodKind, setPeriodKind] = useState<FinancePeriodKind>('month');
   const [periodDate, setPeriodDate] = useState(() => yangonTodayYmd());
   const [financeStoreCode, setFinanceStoreCode] = useState('');
+  const [exportCostCny, setExportCostCny] = useState<number | null>(null);
   const [exportingCsv, setExportingCsv] = useState(false);
   const [fxRate, setFxRate] = useState<number | null>(null);
   const [fxDraft, setFxDraft] = useState('');
@@ -513,12 +528,10 @@ const CrossBorderLogisticsPage: FC = () => {
     return isEn ? hub.nameEn : hub.nameZh;
   };
 
-  const packsFilterLoadedRef = useRef(
-    transportListKey('hub_received', [], 1, DEFAULT_PAGE_SIZE, ''),
-  );
-  const ordersFilterLoadedRef = useRef(
-    transportListKey('awaiting_pickup', [], 1, DEFAULT_PAGE_SIZE, ''),
-  );
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  const packsFilterLoadedRef = useRef('');
+  const ordersFilterLoadedRef = useRef('');
   const packsQueryRef = useRef(transportQueryId('hub_received', [], DEFAULT_PAGE_SIZE, ''));
   const ordersQueryRef = useRef(transportQueryId('awaiting_pickup', [], DEFAULT_PAGE_SIZE, ''));
   const packFilterRef = useRef(packFilter);
@@ -617,17 +630,51 @@ const CrossBorderLogisticsPage: FC = () => {
     }
     const actor = readCblAdminActor();
     const at = new Date().toISOString();
-    const nextHistory = appendCrossBorderFxHistory(fxHistory, {
-      at,
-      by: actor.name,
-      from: fxRate,
-      to: parsed,
-    });
     setFxSaving(true);
     try {
+      const [fxRows, pricingRows] = await Promise.all([
+        systemSettingsService.getSettingsByKeys([
+          CROSS_BORDER_FX_SETTINGS_KEY,
+          CROSS_BORDER_FX_HISTORY_SETTINGS_KEY,
+        ]),
+        systemSettingsService.getSettingsByKeyPrefix('pricing.cross_border.'),
+      ]);
+      const sawServer = fxRows.some(
+        (row) =>
+          row.settings_key === CROSS_BORDER_FX_SETTINGS_KEY ||
+          row.settings_key === CROSS_BORDER_FX_HISTORY_SETTINGS_KEY,
+      );
+      if (!sawServer && fxHistory.length === 0 && fxRate == null) {
+        feedbackService.notify(
+          isEn
+            ? 'Exchange-rate history did not load. Refresh and try again.'
+            : '汇率记录没加载到，请刷新后再保存，避免把旧记录盖掉。',
+        );
+        return;
+      }
+      const serverHistory = parseCrossBorderFxHistory(
+        fxRows.find((row) => row.settings_key === CROSS_BORDER_FX_HISTORY_SETTINGS_KEY)
+          ?.settings_value,
+      );
+      const fromRate = fxRate ?? pickMmkPerCnyRate(fxRows);
+      const merged = mergeFxHistoryForSave({
+        serverHistory,
+        clientHistory: fxHistory,
+        fromRate,
+        toRate: parsed,
+        at,
+        by: actor.name,
+      });
+      if (merged.unchanged) {
+        applyFxRate(parsed);
+        if (merged.history.length) setFxHistory(merged.history);
+        feedbackService.success(isEn ? 'Rate unchanged' : '汇率未变化');
+        return;
+      }
       const result = await systemSettingsService.upsertSettings([
         buildCrossBorderFxSetting(parsed, actor.name),
-        buildCrossBorderFxHistorySetting(nextHistory, actor.name),
+        buildCrossBorderFxHistorySetting(merged.history, actor.name),
+        ...buildFxMmkRepricePayload(pricingRows, parsed, actor.name),
       ]);
       if (!result.ok) {
         feedbackService.notify(
@@ -638,7 +685,7 @@ const CrossBorderLogisticsPage: FC = () => {
         return;
       }
       applyFxRate(parsed);
-      setFxHistory(nextHistory);
+      setFxHistory(merged.history);
       setFxUpdatedAt(at);
       void auditLogService.log({
         user_id: actor.id,
@@ -749,6 +796,7 @@ const CrossBorderLogisticsPage: FC = () => {
     setOrdersLoading(true);
     setError(null);
 
+    const includeTransport = activeTabRef.current === 'transport';
     const [overviewSettled, financeSettled, packsSettled, ordersSettled] = await Promise.allSettled([
       fetchInventoryConsoleOverview(),
       fetchInventoryConsoleFinance(financePageRef.current, tablePageSizeRef.current, {
@@ -756,8 +804,12 @@ const CrossBorderLogisticsPage: FC = () => {
         date: periodDateRef.current,
         storeCode: financeStoreCodeRef.current || undefined,
       }),
-      fetchInventoryConsolePacks(filter, stationKeys, packList),
-      fetchInventoryConsoleOrders(nextOrderFilter, stationKeys, orderList),
+      includeTransport
+        ? fetchInventoryConsolePacks(filter, stationKeys, packList)
+        : Promise.resolve(null),
+      includeTransport
+        ? fetchInventoryConsoleOrders(nextOrderFilter, stationKeys, orderList)
+        : Promise.resolve(null),
     ]);
 
     if (loadId !== loadSeqRef.current) return;
@@ -886,6 +938,7 @@ const CrossBorderLogisticsPage: FC = () => {
   }, [transportSearch]);
 
   useEffect(() => {
+    if (activeTab !== 'transport') return;
     const stationKeys = transportStationKeysRef.current;
     const q = debouncedTransportSearch.trim();
     const queryId = transportQueryId(packFilter, stationKeys, tablePageSize, q);
@@ -929,9 +982,10 @@ const CrossBorderLogisticsPage: FC = () => {
           setPacksLoading(false);
         }
       });
-  }, [packFilter, transportStoreCode, packsPage, tablePageSize, debouncedTransportSearch]);
+  }, [activeTab, packFilter, transportStoreCode, packsPage, tablePageSize, debouncedTransportSearch]);
 
   useEffect(() => {
+    if (activeTab !== 'transport') return;
     const stationKeys = transportStationKeysRef.current;
     const q = debouncedTransportSearch.trim();
     const queryId = transportQueryId(orderFilter, stationKeys, tablePageSize, q);
@@ -975,7 +1029,7 @@ const CrossBorderLogisticsPage: FC = () => {
           setOrdersLoading(false);
         }
       });
-  }, [orderFilter, transportStoreCode, ordersPage, tablePageSize, debouncedTransportSearch]);
+  }, [activeTab, orderFilter, transportStoreCode, ordersPage, tablePageSize, debouncedTransportSearch]);
 
   useEffect(() => {
     setStoresPage(1);
@@ -1762,6 +1816,12 @@ const CrossBorderLogisticsPage: FC = () => {
               </div>
               <div className="cbl-expense-summary__item">
                 <span className="cbl-expense-summary__label">
+                  {isEn ? 'Export cost' : '出口成本'}
+                </span>
+                <strong>¥{formatExportCny(exportCostCny ?? expenseSummary?.exportCostCnyTotal ?? 0)}</strong>
+              </div>
+              <div className="cbl-expense-summary__item">
+                <span className="cbl-expense-summary__label">
                   {isEn ? 'Remitted' : '已汇发站'}
                 </span>
                 <strong>{formatMmK(expenseSummary?.agencyRemittedTotal ?? 0)} MMK</strong>
@@ -1815,7 +1875,9 @@ const CrossBorderLogisticsPage: FC = () => {
                                 : 'cbl-finance-cell cbl-finance-cell--out'
                             }
                           >
-                            {isCustomerLedgerCategory(row.category) ? (
+                            {row.category === 'export_cost' ? (
+                              <>−¥{formatExportCny(row.paidCny ?? row.amount)}</>
+                            ) : isCustomerLedgerCategory(row.category) ? (
                               <DualMoney
                                 mmk={row.amount}
                                 rate={displayRateForCustomerCategory(
@@ -2011,6 +2073,12 @@ const CrossBorderLogisticsPage: FC = () => {
             </div>
           </section>
         </div>
+        <ExportCostRecordsCard
+          isEn={isEn}
+          period={financePeriodParams}
+          stores={transitStores}
+          onTotal={setExportCostCny}
+        />
         </div>
         )}
 
@@ -2630,6 +2698,12 @@ const CrossBorderLogisticsPage: FC = () => {
           </div>
         </section>
         </div>
+        )}
+
+        {activeTab === 'invoices' && (
+          <div id="cbl-panel-invoices" role="tabpanel" aria-labelledby="cbl-tab-invoices">
+            <SignedInvoicesPanel isEn={isEn} />
+          </div>
         )}
 
         {activeTab === 'settings' && (

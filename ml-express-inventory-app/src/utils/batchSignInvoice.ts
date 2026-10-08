@@ -41,12 +41,16 @@ export type BatchSignInvoiceLine = {
   feeMmk: number;
   /** 客户定价里这条路线。发站和终点对不上时为 null。 */
   route: BatchSignInvoiceRoute | null;
+  /** 客户定价窗口里定死的人民币/公斤。还没查到时为空。 */
+  cnyPerKg?: number | null;
 };
 
 export type InvoiceRateLookup = {
   perKgMmk: number;
   mmkPerCny: number | null;
   fromRouteMatrix: boolean;
+  /** 已经定死的人民币/公斤。有这个数就不再用缅币除以今天的汇率。 */
+  cnyPerKg?: number | null;
 };
 
 export type BatchSignInvoiceModel = {
@@ -162,26 +166,48 @@ export function formatInvoiceUnitRateLines(cnyPerKg: number[]): string[] {
   return out;
 }
 
+/** 发票行上的定价，和后台跨境物流发票同一写法：¥40/Kg。 */
+export function formatInvoiceUnitPrice(cnyPerKg: number): string {
+  if (!Number.isFinite(cnyPerKg) || cnyPerKg < 0) return '';
+  return `¥${formatCnyInput(cnyPerKg)}/Kg`;
+}
+
+export async function resolveInvoiceLineUnitCny(
+  lines: BatchSignInvoiceLine[],
+  fallbackRate: number | null,
+  lookup: (route: BatchSignInvoiceRoute) => Promise<InvoiceRateLookup | null>,
+): Promise<Array<number | null>> {
+  const cache = new Map<string, number | null>();
+  const out: Array<number | null> = [];
+  for (const line of lines) {
+    const route = line.route;
+    if (!route) {
+      out.push(null);
+      continue;
+    }
+    const key = `${route.originCode}|${route.destinationCode}|${route.customerCode}`;
+    if (!cache.has(key)) {
+      const found = await lookup(route);
+      if (!found?.fromRouteMatrix) {
+        cache.set(key, null);
+      } else if (found.cnyPerKg != null && found.cnyPerKg >= 0) {
+        cache.set(key, found.cnyPerKg);
+      } else {
+        cache.set(key, mmkToCny(found.perKgMmk, found.mmkPerCny ?? fallbackRate));
+      }
+    }
+    out.push(cache.get(key) ?? null);
+  }
+  return out;
+}
+
 export async function resolveInvoiceUnitRateLabels(
   lines: BatchSignInvoiceLine[],
   fallbackRate: number | null,
   lookup: (route: BatchSignInvoiceRoute) => Promise<InvoiceRateLookup | null>,
 ): Promise<string[]> {
-  const prices: number[] = [];
-  const seen = new Set<string>();
-  for (const line of lines) {
-    const route = line.route;
-    if (!route) continue;
-    const key = `${route.originCode}|${route.destinationCode}|${route.customerCode}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const found = await lookup(route);
-    if (!found?.fromRouteMatrix) continue;
-    const cny = mmkToCny(found.perKgMmk, found.mmkPerCny ?? fallbackRate);
-    if (cny == null || cny < 0) continue;
-    prices.push(cny);
-  }
-  return formatInvoiceUnitRateLines(prices);
+  const prices = await resolveInvoiceLineUnitCny(lines, fallbackRate, lookup);
+  return formatInvoiceUnitRateLines(prices.filter((cny): cny is number => cny != null && cny >= 0));
 }
 
 function parseQuoteCny(raw?: string | null): number | null {
@@ -267,4 +293,57 @@ export function buildBatchSignInvoice(
     rate: rate != null && rate > 0 ? rate : null,
     missingRate,
   };
+}
+
+/** 有每公斤定价时，总报价 = 各行单价 × 该行重量。包裹重量也要乘进去。 */
+export function applyLockedUnitTotals(
+  model: BatchSignInvoiceModel,
+  cnyPerKg: Array<number | null>,
+): BatchSignInvoiceModel {
+  let total = 0;
+  let saw = false;
+  for (let index = 0; index < model.lines.length; index += 1) {
+    const unit = cnyPerKg[index];
+    const weightKg = model.lines[index].weightKg;
+    if (unit != null && unit > 0 && weightKg > 0) {
+      total += unit * weightKg;
+      saw = true;
+    }
+  }
+  if (!saw) return model;
+  if (model.rate == null || model.rate <= 0) {
+    return { ...model, totalFeeCny: total, totalFeeMmk: 0, missingRate: true };
+  }
+  return {
+    ...model,
+    totalFeeCny: total,
+    totalFeeMmk: Math.round(total * model.rate),
+    missingRate: false,
+  };
+}
+
+function invoiceToken(value: string): string {
+  return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+/** 同一张开票内容得到同一个发票号：有车次用日期-车次，没装车用日期-目的地-件数。 */
+export function formatInvoiceDocumentNo(input: {
+  issuedOn: string;
+  trips: string[];
+  destination: string;
+  pieceCount: number;
+}): string {
+  const day = input.issuedOn.replace(/\D/g, '').slice(0, 8);
+  const seen = new Set<string>();
+  const trips: string[] = [];
+  for (const raw of input.trips) {
+    const token = invoiceToken(raw);
+    if (!token || seen.has(token)) continue;
+    seen.add(token);
+    trips.push(token);
+  }
+  if (trips.length) return [day, ...trips].filter(Boolean).join('-');
+  const dest = invoiceToken(input.destination.split('·')[0] || '') || 'ML';
+  const pieces = input.pieceCount > 0 ? String(input.pieceCount) : '0';
+  return [day, dest, pieces].filter(Boolean).join('-');
 }

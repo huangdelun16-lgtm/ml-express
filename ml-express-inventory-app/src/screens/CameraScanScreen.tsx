@@ -14,6 +14,7 @@ import { findTrackingByAnyCode } from '../services/trackingService';
 import type { InventoryItem, InventoryItemListRow } from '../types/inventory';
 import type { ExceptionReportTarget } from '../types/inventoryException';
 import { resolvePackagingStockInSignIds } from '../utils/customerBatchSign';
+import type { FrozenInvoiceHandoff } from '../utils/frozenSignedInvoice';
 import {
   cameraScanManualActions,
   formatScanCloudRoute,
@@ -358,13 +359,14 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
     setBasket([]);
   };
 
-  const continueToSign = () => {
-    if (!invoiceItems?.length || !store) return;
+  const continueToSign = (handoff: FrozenInvoiceHandoff) => {
+    if (!store || handoff.itemIds.length === 0) return;
     pauseScanRef.current = true;
     setSignRequest({
-      itemIds: invoiceItems.map((row) => row.id),
+      itemIds: handoff.itemIds,
       operator: operatorName ?? t.common.operator,
       store,
+      frozenInvoice: handoff.document,
     });
     setInvoiceItems(null);
   };

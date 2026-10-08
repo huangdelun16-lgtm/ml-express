@@ -107,7 +107,7 @@ export default function StockInScreen({ route, navigation }: Props) {
   const { lookup: lookupCustomerCode, lookupNow: lookupCustomerCodeNow } =
     useCrossBorderCustomerLookup(applyCustomerRegistry);
 
-  const step2Chain = useFormFieldChain(['code', 'name', 'phone', 'product']);
+  const step2Chain = useFormFieldChain(['code', 'name', 'phone']);
   const step3Chain = useFormFieldChain([
     'detail',
     'specL',
@@ -279,7 +279,7 @@ export default function StockInScreen({ route, navigation }: Props) {
         feedbackService.notify(t.common.tip, t.stockIn.alertPhone);
         return;
       }
-      if (!productName.trim()) {
+      if (!productName.trim() && !scan.trim()) {
         feedbackService.notify(t.common.tip, t.stockIn.alertItemName);
         return;
       }
@@ -351,6 +351,7 @@ export default function StockInScreen({ route, navigation }: Props) {
       });
 
       const inputBarcode = scan.trim();
+      const storedName = productName.trim() || inputBarcode;
       await applyStockMovement({
         barcode,
         type: 'in',
@@ -370,16 +371,15 @@ export default function StockInScreen({ route, navigation }: Props) {
           : undefined,
         actingStore: store ?? undefined,
         createIfMissing: {
-          name: productName.trim(),
+          name: storedName,
           spec: specStr,
           unit: `${n} Pcs`,
           weight: weightStr,
         },
       });
 
-      const trimmedProduct = productName.trim();
       setBarcodeModalData({
-        productName: trimmedProduct,
+        productName: storedName,
         barcode,
         inputBarcode: inputBarcode || undefined,
         destination: dest,
@@ -435,13 +435,11 @@ export default function StockInScreen({ route, navigation }: Props) {
             customerLookupHint={customerLookupHint}
             recipientName={recipientName}
             recipientPhone={recipientPhone}
-            productName={productName}
             packaging={packaging}
             chain={{
               code: step2Chain.propsFor('code'),
               name: step2Chain.propsFor('name'),
               phone: step2Chain.propsFor('phone'),
-              product: step2Chain.propsFor('product'),
             }}
             onCustomerCodeChange={(v) => {
               setCustomerCode(v.toUpperCase());
@@ -451,7 +449,6 @@ export default function StockInScreen({ route, navigation }: Props) {
             onCustomerCodeSubmit={() => void lookupCustomerCodeNow(customerCode)}
             onRecipientNameChange={setRecipientName}
             onRecipientPhoneChange={setRecipientPhone}
-            onProductNameChange={setProductName}
             onPackagingChange={setPackaging}
           />
         ) : null}

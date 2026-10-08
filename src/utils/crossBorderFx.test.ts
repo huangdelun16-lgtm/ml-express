@@ -11,11 +11,15 @@ import {
   formatCnyInput,
   isCustomerLedgerCategory,
   isSettledCustomerCategory,
+  mergeFxHistoryForSave,
   mmkToCny,
   parseCrossBorderFxHistory,
   parseMmkPerCnyRate,
+  rateInEffectAt,
   pickMmkPerCnyRate,
   resolveCustomerFeeCny,
+  resolveCustomerOrderMoney,
+  sumCustomerOrderMoney,
 } from './crossBorderFx';
 
 describe('crossBorderFx', () => {
@@ -103,6 +107,69 @@ describe('crossBorderFx', () => {
     expect(customerExpressLedgerCategory({ paymentStatus: '到付待收' })).toBe('order_income_cod');
   });
 
+  it('prices an unsigned order from the locked RMB quote, not from stored MMK', () => {
+    expect(resolveCustomerOrderMoney({
+      quoteCny: 2378.38,
+      mmk: 1_000_000,
+      customerSigned: false,
+      liveRate: 666,
+    })).toEqual({ cny: 2378.38, mmk: 1_584_001, frozen: false });
+    expect(resolveCustomerOrderMoney({
+      quoteCny: 2378.38,
+      customerSigned: false,
+      liveRate: null,
+    })).toEqual({ cny: 2378.38, mmk: null, frozen: false });
+  });
+
+  it('does not invent RMB for an old unsigned order that only has MMK', () => {
+    expect(resolveCustomerOrderMoney({
+      mmk: 1_584_000,
+      customerSigned: false,
+      liveRate: 666,
+    })).toEqual({ cny: null, mmk: 1_584_000, frozen: false });
+  });
+
+  it('keeps a signed order on the sign-day rate when the live rate changes', () => {
+    expect(resolveCustomerOrderMoney({
+      quoteCny: 2378.38,
+      mmk: 1_584_000,
+      customerSigned: true,
+      lockedRate: 666,
+      liveRate: 700,
+    })).toEqual({ cny: 2378.38, mmk: 1_584_000, frozen: true });
+    expect(resolveCustomerOrderMoney({
+      quoteCny: 37.6,
+      customerSigned: true,
+      lockedRate: 5000,
+      liveRate: 4000,
+    })).toEqual({ cny: 37.6, mmk: 188_000, frozen: true });
+    expect(resolveCustomerOrderMoney({
+      mmk: 188_000,
+      customerSigned: true,
+      lockedRate: 5000,
+      liveRate: 4000,
+    })).toEqual({ cny: 37.6, mmk: 188_000, frozen: true });
+    expect(resolveCustomerOrderMoney({
+      mmk: 188_000,
+      customerSigned: true,
+      liveRate: 4000,
+    })).toEqual({ cny: null, mmk: 188_000, frozen: true });
+  });
+
+  it('sums RMB only when every charged row has a quote', () => {
+    expect(sumCustomerOrderMoney([
+      { cny: 20, mmk: 13_320, frozen: false },
+      { cny: 8, mmk: 5_328, frozen: false },
+    ])).toEqual({ cny: 28, mmk: 18_648 });
+    expect(sumCustomerOrderMoney([
+      { cny: 20, mmk: 13_320, frozen: false },
+      { cny: null, mmk: 50_000, frozen: true },
+    ])).toEqual({ cny: null, mmk: 63_320 });
+    expect(sumCustomerOrderMoney([
+      { cny: 20, mmk: null, frozen: false },
+    ])).toEqual({ cny: 20, mmk: null });
+  });
+
   it('builds the system_settings payload', () => {
     expect(buildCrossBorderFxSetting(5000, '张三')).toMatchObject({
       category: 'pricing',
@@ -134,5 +201,51 @@ describe('crossBorderFx', () => {
       settings_key: CROSS_BORDER_FX_HISTORY_SETTINGS_KEY,
       updated_by: '王五',
     });
+  });
+
+  it('uses the exchange rate that was in effect when a route price was saved', () => {
+    const history = parseCrossBorderFxHistory([
+      { at: '2026-10-06T10:14:30.442Z', by: 'admin', from: 666, to: 669 },
+      { at: '2026-10-03T03:44:37.571Z', by: 'admin', from: 672, to: 666 },
+      { at: '2026-09-29T14:14:32.938Z', by: 'admin', from: 664, to: 672 },
+    ]);
+    expect(rateInEffectAt(history, 669, '2026-10-06T03:20:57.243Z')).toBe(666);
+    expect(rateInEffectAt(history, 669, '2026-10-06T12:00:00.000Z')).toBe(669);
+    expect(rateInEffectAt(history, 669, '2026-09-28T00:00:00.000Z')).toBe(664);
+    expect(rateInEffectAt(history, 669, null)).toBe(669);
+    const wiped = parseCrossBorderFxHistory([
+      { at: '2026-10-06T11:23:48.430Z', by: 'admin', from: null, to: 669 },
+    ]);
+    expect(rateInEffectAt(wiped, 669, '2026-10-06T03:20:57.243Z')).toBeNull();
+  });
+
+  it('keeps older FX history when the settings page has not loaded it yet', () => {
+    const server = parseCrossBorderFxHistory([
+      { at: '2026-10-06T10:14:31.214Z', by: 'admin', from: 666, to: 669 },
+      { at: '2026-10-03T03:44:33.007Z', by: 'admin', from: 672, to: 666 },
+    ]);
+    const same = mergeFxHistoryForSave({
+      serverHistory: server,
+      clientHistory: [],
+      fromRate: 669,
+      toRate: 669,
+      at: '2026-10-06T11:23:48.430Z',
+      by: 'admin',
+    });
+    expect(same.unchanged).toBe(true);
+    expect(same.history.some((row) => row.from === 666 && row.to === 669)).toBe(true);
+    expect(same.history.some((row) => row.from === 672 && row.to === 666)).toBe(true);
+
+    const next = mergeFxHistoryForSave({
+      serverHistory: server,
+      clientHistory: [],
+      fromRate: 669,
+      toRate: 670,
+      at: '2026-10-07T01:00:00.000Z',
+      by: 'admin',
+    });
+    expect(next.unchanged).toBe(false);
+    expect(next.history[0]).toMatchObject({ from: 669, to: 670 });
+    expect(next.history.some((row) => row.from === 666 && row.to === 669)).toBe(true);
   });
 });

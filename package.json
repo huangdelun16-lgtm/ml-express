@@ -17,6 +17,7 @@
     "@types/react-window": "^1.8.8",
     "bcryptjs": "^3.0.3",
     "exceljs": "^4.4.0",
+    "html-to-image": "^1.11.11",
     "nodemailer": "^6.9.7",
     "pdfjs-dist": "3.11.174",
     "qrcode": "^1.5.4",

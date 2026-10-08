@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { applyPackFeeDedup } = require('./inventoryCustomerAggregate');
+const { applyPackFeeDedup, attachTripNumbers, aggregateCustomerSummaries } = require('./inventoryCustomerAggregate');
 
 function row(overrides = {}) {
   return {
@@ -20,6 +20,42 @@ function row(overrides = {}) {
     ...overrides,
   };
 }
+
+test('a packed bundle shell is not an extra order, but its weight still counts', () => {
+  const pieces = [1, 2, 3, 4].map((index) =>
+    row({
+      inboundBarcode: `MDY564620260926(4-${index})`,
+      packedBundleBarcode: 'RUI26MDY40001',
+      weightKg: 0,
+      fee: index === 1 ? 162500 : 0,
+      qty: 1,
+      customerName: '裕梅',
+    }),
+  );
+  const shell = row({
+    inboundBarcode: 'RUI26MDY40001',
+    packedBundleBarcode: '',
+    weightKg: 6.5,
+    fee: 0,
+    qty: 1,
+    customerName: '裕梅',
+  });
+  const [summary] = aggregateCustomerSummaries(pieces.concat(shell), null);
+  assert.equal(summary.orderCount, 4);
+  assert.equal(summary.totalPieces, 4);
+  assert.equal(summary.totalWeightKg, 6.5);
+  assert.equal(summary.totalFee, 162500);
+});
+
+test('trip number follows the pack, and an unpacked row stays blank', () => {
+  const rows = [
+    row({ inboundBarcode: 'A', packedBundleBarcode: 'RUI26MDY50001' }),
+    row({ inboundBarcode: 'B', packedBundleBarcode: '' }),
+  ];
+  attachTripNumbers(rows, { RUI26MDY50001: 'rui0007' });
+  assert.equal(rows[0].tripNumber, 'RUI0007');
+  assert.equal(rows[1].tripNumber, '');
+});
 
 test('pack note fee applied once per pack', () => {
   const rows = [

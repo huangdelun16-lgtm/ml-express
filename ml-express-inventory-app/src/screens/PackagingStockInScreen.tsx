@@ -570,11 +570,6 @@ export default function PackagingStockInScreen({ navigation }: Props) {
                         <Text style={styles.scanCount}> ×{line.count}</Text>
                       ) : null}
                     </Text>
-                    {line.productName !== line.code ? (
-                      <Text style={styles.scanMeta} numberOfLines={1}>
-                        {line.productName}
-                      </Text>
-                    ) : null}
                   </View>
                   <View style={styles.scanActions}>
                     <Pressable style={styles.scanBtn} onPress={() => openEditLine(line)}>
@@ -770,7 +765,6 @@ const styles = StyleSheet.create({
   scanRowMain: { flex: 1, minWidth: 0 },
   scanCode: { color: '#e2e8f0', fontSize: 14, fontWeight: '800', fontFamily: 'monospace' },
   scanCount: { color: '#fbbf24', fontWeight: '900' },
-  scanMeta: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
   scanActions: { flexDirection: 'row', gap: 6 },
   scanBtn: {
     paddingHorizontal: 10,

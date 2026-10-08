@@ -2,31 +2,45 @@ import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
+  fetchInventoryConsolePacks,
   fetchInventoryCustomerItems,
   type InventoryCustomerExpressItem,
   type InventoryCustomerSummary,
   type InventoryTransitStore,
 } from '../services/inventoryConsoleService';
-import DualMoney from './DualMoney';
+import DualMoney, { formatMmK } from './DualMoney';
 import {
-  customerExpressLedgerCategory,
-  displayRateForCustomerCategory,
-  isSettledCustomerCategory,
-  resolveCustomerFeeCny,
+  formatCnyInput,
+  parseCrossBorderFxHistory,
+  resolveCustomerOrderMoney,
+  sumCustomerOrderMoney,
+  CROSS_BORDER_FX_HISTORY_SETTINGS_KEY,
+  type CustomerOrderMoney,
 } from '../utils/crossBorderFx';
-import { groupCustomerExpressItems } from '../utils/packagingStockInDisplay';
+import {
+  buildMissingRouteCnyPayload,
+  feeFromRouteUnit,
+  resolveExpressItemUnitPrice,
+  resolveRouteUnitQuote,
+  type RouteRateSetting,
+} from '../utils/crossBorderRoutePricing';
+import { systemSettingsService } from '../services/supabase';
+import { groupCustomerExpressItems, packagingFeeRowWeight } from '../utils/packagingStockInDisplay';
 import {
   buildUnsignedCustomerInvoice,
   formatUnsignedInvoiceFee,
   formatUnsignedInvoiceQuote,
+  formatUnsignedInvoiceUnitPrice,
   formatUnsignedInvoiceRate,
   formatUnsignedInvoiceWeight,
   isUnsignedExpressItem,
+  readUnsignedQuoteCny,
   packagingBatchSelectionIds,
   settleUnsignedInvoice,
   type UnsignedCustomerInvoice,
   type UnsignedInvoiceOrderGroup,
 } from '../utils/customerUnsignedInvoice';
+import { saveElementAsPng } from '../utils/saveElementAsPng';
 import { yangonTodayYmd } from '../utils/yangonFinancePeriod';
 import '../styles/crossBorderLogistics.css';
 
@@ -56,47 +70,184 @@ function transportStatusClass(status: string): string {
   return 'cbl-status-pill cbl-status-pill--gray';
 }
 
+/** 同一批多个入库只在第一件上留报价，其余件是 0，不能再从备注里把总价读回来。 */
+function quoteForDisplay(item: InventoryCustomerExpressItem): number | null {
+  if (item.quoteCny != null && Number.isFinite(Number(item.quoteCny))) {
+    return Number(item.quoteCny) > 0 ? Number(item.quoteCny) : null;
+  }
+  const fromNote = readUnsignedQuoteCny({ inboundNote: item.inboundNote });
+  return fromNote > 0 ? fromNote : null;
+}
+
+function orderMoney(item: InventoryCustomerExpressItem, fxRate: number | null) {
+  return resolveCustomerOrderMoney({
+    quoteCny: quoteForDisplay(item),
+    mmk: item.fee,
+    customerSigned: !isUnsignedExpressItem(item),
+    lockedRate: item.fxMmkPerCny,
+    paidCny: item.paidCny,
+    liveRate: fxRate,
+  });
+}
+
+function lineMoney(
+  item: InventoryCustomerExpressItem,
+  customerCode: string | undefined,
+  settings: RouteRateSetting[],
+  history: ReturnType<typeof parseCrossBorderFxHistory>,
+  fxRate: number | null,
+): CustomerOrderMoney {
+  if (!isUnsignedExpressItem(item)) return orderMoney(item, fxRate);
+  const explicit = quoteForDisplay(item);
+  if (explicit != null) {
+    return resolveCustomerOrderMoney({
+      quoteCny: explicit,
+      mmk: item.fee,
+      customerSigned: false,
+      liveRate: fxRate,
+    });
+  }
+  const unit = resolveRouteUnitQuote({
+    settings,
+    origin: item.origin,
+    destination: item.destination,
+    customerCode,
+    history,
+    liveRate: fxRate,
+  });
+  if (unit.cnyPerKg != null && item.weightKg > 0 && (item.fee > 0 || unit.cnyPerKg === 0)) {
+    const fee = feeFromRouteUnit(unit.cnyPerKg, item.weightKg, fxRate);
+    return { cny: fee.cny, mmk: fee.mmk, frozen: false };
+  }
+  return orderMoney(item, fxRate);
+}
+
+function PricingCell({
+  item,
+  customerCode,
+  settings,
+  history,
+  fxRate,
+  isEn,
+}: {
+  item: InventoryCustomerExpressItem;
+  customerCode?: string;
+  settings: RouteRateSetting[];
+  history: ReturnType<typeof parseCrossBorderFxHistory>;
+  fxRate: number | null;
+  isEn: boolean;
+}) {
+  const price = resolveExpressItemUnitPrice({
+    origin: item.origin,
+    destination: item.destination,
+    customerCode,
+    settings,
+    history,
+    signed: !isUnsignedExpressItem(item),
+    weightKg: item.weightKg,
+    feeMmk: item.fee,
+    lockedRate: item.fxMmkPerCny ?? null,
+    liveRate: fxRate,
+  });
+  if (price.mmkPerKg == null) return <>{'—'}</>;
+  if (price.mmkPerKg === 0) return <span className="cbl-fee-shared">{isEn ? 'Free' : '免费'}</span>;
+  const unit = '/kg';
+  if (price.cnyPerKg == null) {
+    return (
+      <span className="cbl-money">
+        {formatMmK(price.mmkPerKg)} <span className="cbl-money-ccy">MMK{unit}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="cbl-money cbl-money--dual">
+      <span className="cbl-money-main">
+        {formatCnyInput(price.cnyPerKg)} <span className="cbl-money-ccy">CNY{unit}</span>
+      </span>
+      <span className="cbl-money-sub">{formatMmK(price.mmkPerKg)} MMK{unit}</span>
+    </span>
+  );
+}
+
 function FeeCell({
   item,
+  customerCode,
+  settings,
+  history,
   sharedLabel,
   isEn,
   fxRate,
 }: {
   item: InventoryCustomerExpressItem;
+  customerCode?: string;
+  settings: RouteRateSetting[];
+  history: ReturnType<typeof parseCrossBorderFxHistory>;
   sharedLabel?: string;
   isEn: boolean;
   fxRate: number | null;
 }) {
-  if (item.fee > 0) {
-    return (
-      <>
-        <DualMoney
-          mmk={item.fee}
-          rate={displayRateForCustomerCategory(
-            customerExpressLedgerCategory(item),
-            item.fxMmkPerCny,
-            fxRate,
-          )}
-          cny={item.paidCny != null && item.paidCny > 0 ? item.paidCny : undefined}
-        />
-        {isSettledCustomerCategory(customerExpressLedgerCategory(item)) ? (
-          <span className="cbl-fx-lock-hint">
-            {item.fxMmkPerCny || (item.paidCny != null && item.paidCny > 0)
-              ? isEn
-                ? 'Locked FX'
-                : '锁定汇率'
-              : isEn
-                ? 'MMK only'
-                : '旧单无锁'}
-          </span>
-        ) : null}
-      </>
-    );
+  const money = lineMoney(item, customerCode, settings, history, fxRate);
+  if ((money.cny == null || money.cny === 0) && (money.mmk == null || money.mmk === 0)) {
+    if (money.cny === 0 || money.mmk === 0) {
+      return <span className="cbl-fee-shared">{isEn ? 'Free' : '免费'}</span>;
+    }
+    if (sharedLabel) return <span className="cbl-fee-shared">{sharedLabel}</span>;
+    return <>{'—'}</>;
   }
-  if (sharedLabel) {
-    return <span className="cbl-fee-shared">{sharedLabel}</span>;
+  return (
+    <>
+      <DualMoney mmk={money.mmk} rate={null} cny={money.cny ?? undefined} />
+      {money.frozen ? (
+        <span className="cbl-fx-lock-hint">
+          {item.fxMmkPerCny
+            ? isEn
+              ? 'Signed rate'
+              : '签收汇率'
+            : isEn
+              ? 'Signed'
+              : '已签收'}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+function customerItemTrip(
+  item: InventoryCustomerExpressItem,
+  tripByPack: Record<string, string>,
+): string {
+  const fromItem = String(item.tripNumber || '').trim().toUpperCase();
+  if (fromItem) return fromItem;
+  const pack = String(item.packedBundleBarcode || '').trim().toUpperCase();
+  return pack ? String(tripByPack[pack] || '').trim().toUpperCase() : '';
+}
+
+function customerItemsHeadline(items: InventoryCustomerExpressItem[]) {
+  let pieces = 0;
+  let weightKg = 0;
+  const seenPacks = new Set<string>();
+  const packsWithPieceWeight = new Set<string>();
+  for (const item of items) {
+    pieces += item.qty > 0 ? item.qty : 1;
+    const pack = String(item.packedBundleBarcode || '').trim().toUpperCase();
+    if (pack && item.weightKg > 0) packsWithPieceWeight.add(pack);
   }
-  return <>{'—'}</>;
+  for (const item of items) {
+    const pack = String(item.packedBundleBarcode || '').trim().toUpperCase();
+    if (pack && (item.packWeightKg || 0) > 0 && !packsWithPieceWeight.has(pack)) {
+      if (!seenPacks.has(pack)) {
+        seenPacks.add(pack);
+        weightKg += item.packWeightKg || 0;
+      }
+      continue;
+    }
+    if (item.weightKg > 0) weightKg += item.weightKg;
+  }
+  return {
+    orders: items.length,
+    pieces,
+    weightKg: Math.round(weightKg * 100) / 100,
+  };
 }
 
 function formatInboundDate(isEn: boolean, value?: string | null): string {
@@ -139,10 +290,20 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
   const [items, setItems] = useState<InventoryCustomerExpressItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [invoice, setInvoice] = useState<UnsignedCustomerInvoice | null>(null);
+  const [routeRates, setRouteRates] = useState<RouteRateSetting[]>([]);
+  const [tripByPack, setTripByPack] = useState<Record<string, string>>({});
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const [tableScroll, setTableScroll] = useState({ left: false, right: false });
 
   const itemGroups = useMemo(() => groupCustomerExpressItems(items), [items]);
+  const packCodesKey = useMemo(() => {
+    const codes = new Set<string>();
+    for (const item of items) {
+      const code = String(item.packedBundleBarcode || '').trim().toUpperCase();
+      if (code && !String(item.tripNumber || '').trim()) codes.add(code);
+    }
+    return Array.from(codes).sort().join('|');
+  }, [items]);
   const unsignedIds = useMemo(
     () => items.filter((item) => isUnsignedExpressItem(item)).map((item) => item.id),
     [items],
@@ -152,25 +313,86 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
     [selectedIds, unsignedIds],
   );
   const allUnsignedChecked = unsignedIds.length > 0 && selectedUnsignedIds.length === unsignedIds.length;
+  const headline = useMemo(() => customerItemsHeadline(items), [items]);
+  const headerOrders = !loading && items.length > 0 ? headline.orders : customer?.orderCount ?? 0;
+  const headerPieces = !loading && items.length > 0 ? headline.pieces : customer?.totalPieces ?? 0;
+  const headerWeightKg =
+    !loading && headline.weightKg > 0 ? headline.weightKg : customer?.totalWeightKg ?? 0;
 
-  const headerCny = useMemo(() => {
-    if (!items.length) return undefined;
-    let total = 0;
-    for (const item of items) {
-      if (item.fee <= 0) continue;
-      const category = customerExpressLedgerCategory(item);
-      const cny = resolveCustomerFeeCny({
-        category,
-        mmk: item.fee,
-        lockedRate: item.fxMmkPerCny,
-        paidCny: item.paidCny,
-        liveRate: fxRate,
+  const fxHistory = useMemo(
+    () =>
+      parseCrossBorderFxHistory(
+        routeRates.find((row) => row.settings_key === CROSS_BORDER_FX_HISTORY_SETTINGS_KEY)
+          ?.settings_value,
+      ),
+    [routeRates],
+  );
+  const headerMoney = useMemo(
+    () =>
+      sumCustomerOrderMoney(
+        items.map((item) => lineMoney(item, customer?.customerCode, routeRates, fxHistory, fxRate)),
+      ),
+    [items, customer?.customerCode, routeRates, fxHistory, fxRate],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void systemSettingsService.getSettingsByKeyPrefix('pricing.cross_border.').then((rows) => {
+      if (!cancelled) setRouteRates(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !routeRates.length) return;
+    const payload = buildMissingRouteCnyPayload(routeRates, fxHistory);
+    if (!payload.length) return;
+    let cancelled = false;
+    void systemSettingsService.upsertSettings(payload).then((result) => {
+      if (cancelled || !result.ok) return;
+      setRouteRates((current) => {
+        const have = new Set(current.map((row) => String(row.settings_key || '')));
+        const extra = payload.filter((row) => !have.has(row.settings_key));
+        return extra.length ? current.concat(extra) : current;
       });
-      if (cny == null) return null;
-      total += cny;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, routeRates, fxHistory]);
+
+  useEffect(() => {
+    if (!packCodesKey) {
+      setTripByPack({});
+      return;
     }
-    return total;
-  }, [items, fxRate]);
+    const codes = packCodesKey.split('|');
+    let cancelled = false;
+    void Promise.all(
+      codes.map((code) =>
+        fetchInventoryConsolePacks('all', [], { q: code, page: 1, pageSize: 10 }).catch(() => ({
+          recentPacks: [],
+        })),
+      ),
+    ).then((pages) => {
+      if (cancelled) return;
+      const next: Record<string, string> = {};
+      for (const page of pages) {
+        for (const pack of page.recentPacks || []) {
+          const barcode = String(pack.pack_barcode || '').trim().toUpperCase();
+          const trip = String(pack.trip_number || '').trim().toUpperCase();
+          if (barcode && trip) next[barcode] = trip;
+        }
+      }
+      setTripByPack(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [packCodesKey]);
 
   useEffect(() => {
     if (!open || !customer) return;
@@ -220,7 +442,25 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
 
   const openInvoice = () => {
     if (!selectedUnsignedIds.length) return;
-    setInvoice(buildUnsignedCustomerInvoice(items, selectedUnsignedIds));
+    const priced = items.map((item) => {
+      const unit = resolveRouteUnitQuote({
+        settings: routeRates,
+        origin: item.origin,
+        destination: item.destination,
+        customerCode: customer?.customerCode,
+        history: fxHistory,
+        liveRate: fxRate,
+      });
+      const withUnit =
+        unit.cnyPerKg != null && unit.cnyPerKg > 0 ? { ...item, unitCnyPerKg: unit.cnyPerKg } : item;
+      const tripNumber = customerItemTrip(item, tripByPack);
+      const withTrip = tripNumber ? { ...withUnit, tripNumber } : withUnit;
+      if (quoteForDisplay(item) != null || !(item.fee > 0)) return withTrip;
+      const money = lineMoney(item, customer?.customerCode, routeRates, fxHistory, fxRate);
+      if (money.cny == null || !(money.cny > 0)) return withTrip;
+      return { ...withTrip, quoteCny: money.cny };
+    });
+    setInvoice(buildUnsignedCustomerInvoice(priced, selectedUnsignedIds));
   };
 
   const syncTableScroll = () => {
@@ -289,20 +529,20 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                   <span className="cbl-customer-modal__stat-label">
                     {isEn ? 'Orders' : '订单'}
                   </span>
-                  <strong>{customer.orderCount}</strong>
+                  <strong>{headerOrders}</strong>
                 </span>
                 <span className="cbl-customer-modal__stat">
                   <span className="cbl-customer-modal__stat-label">
                     {isEn ? 'Pieces' : '总件数'}
                   </span>
-                  <strong>{customer.totalPieces}</strong>
+                  <strong>{headerPieces}</strong>
                 </span>
                 <span className="cbl-customer-modal__stat">
                   <span className="cbl-customer-modal__stat-label">
                     {isEn ? 'Weight' : '总重量'}
                   </span>
                   <strong>
-                    {customer.totalWeightKg > 0 ? `${customer.totalWeightKg} Kg` : '—'}
+                    {headerWeightKg > 0 ? `${headerWeightKg} Kg` : '—'}
                   </strong>
                 </span>
                 <span className="cbl-customer-modal__stat cbl-customer-modal__stat--fee">
@@ -311,9 +551,9 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                   </span>
                   <strong>
                     <DualMoney
-                      mmk={customer.totalFee}
+                      mmk={items.length ? headerMoney.mmk : customer.totalFee}
                       rate={items.length ? null : fxRate}
-                      cny={items.length ? headerCny : undefined}
+                      cny={items.length ? headerMoney.cny ?? undefined : undefined}
                     />
                   </strong>
                 </span>
@@ -342,18 +582,6 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
           ) : items.length ? (
             <div className="cbl-customer-items-panel">
               <div className="cbl-customer-items-panel__bar">
-                <div className="cbl-customer-items-panel__summary">
-                  <span className="cbl-customer-items-panel__count">
-                    {isEn
-                      ? `${items.length} express record(s)`
-                      : `共 ${items.length} 条快递记录`}
-                  </span>
-                  <span className="cbl-customer-items-panel__unsigned">
-                    {isEn
-                      ? `${unsignedIds.length} unsigned can be invoiced`
-                      : `${unsignedIds.length} 条未签收可开发票`}
-                  </span>
-                </div>
                 <div className="cbl-customer-items-panel__tools">
                   <button
                     type="button"
@@ -380,8 +608,6 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                       : `打 Invoice（${selectedUnsignedIds.length}）`}
                   </button>
                 </div>
-              </div>
-              <div className="cbl-customer-items-scroll">
                 <div className="cbl-customer-items-scroll__bar">
                   <button
                     type="button"
@@ -391,11 +617,7 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                     aria-label={isEn ? 'Scroll left' : '向左滑'}
                   >
                     <span aria-hidden="true">‹</span>
-                    {isEn ? 'Left' : '向左'}
                   </button>
-                  <span className="cbl-customer-items-scroll__hint">
-                    {isEn ? 'Scroll sideways to see the rest of the columns' : '左右滑动查看后面的列'}
-                  </span>
                   <button
                     type="button"
                     className="cbl-customer-items-scroll__btn"
@@ -403,10 +625,11 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                     disabled={!tableScroll.right}
                     aria-label={isEn ? 'Scroll right' : '向右滑'}
                   >
-                    {isEn ? 'Right' : '向右'}
                     <span aria-hidden="true">›</span>
                   </button>
                 </div>
+              </div>
+              <div className="cbl-customer-items-scroll">
               <div ref={tableScrollRef} className="cbl-table-wrap cbl-customer-items-table-wrap">
                 <table className="cbl-table cbl-table--customer-items">
                   <thead>
@@ -421,10 +644,9 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                         />
                       </th>
                       <th>{isEn ? 'Inbound date' : '入库日期'}</th>
-                      <th>{isEn ? 'Product' : '商品名称'}</th>
                       <th>{isEn ? 'Express' : '快递单'}</th>
                       <th>{isEn ? 'Inbound' : '入库单'}</th>
-                      <th>{isEn ? 'Packaging' : '商品包装'}</th>
+                      <th className="cbl-col-num">{isEn ? 'Price' : '定价'}</th>
                       <th>{isEn ? 'Origin' : '始发地'}</th>
                       <th>{isEn ? 'Destination' : '目的地'}</th>
                       <th>{isEn ? 'Weight' : '重量'}</th>
@@ -432,6 +654,7 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                       <th className="cbl-col-num">{isEn ? 'Fee' : '费用'}</th>
                       <th>{isEn ? 'Payment' : '付款状态'}</th>
                       <th>{isEn ? 'Package' : '包裹状态'}</th>
+                      <th>{isEn ? 'Trip' : '车次'}</th>
                       <th>{isEn ? 'Transport' : '运输状态'}</th>
                     </tr>
                   </thead>
@@ -439,7 +662,8 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                     {itemGroups.map((group) => {
                       const rows = group.type === 'single' ? [group.item] : group.items;
                       const sharedLabel =
-                        group.type === 'packaging' && group.sharedFee > 0
+                        group.type === 'packaging' &&
+                        group.items.some((row) => Number(row.quoteCny) > 0 || row.fee > 0)
                           ? isEn
                             ? 'Shared total'
                             : '同批总价'
@@ -458,6 +682,10 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                           {rows.map((item) => {
                             const unsigned = isUnsignedExpressItem(item);
                             const checked = unsigned && selectedUnsignedIds.includes(item.id);
+                            const trip = customerItemTrip(item, tripByPack);
+                            const packed =
+                              Boolean(String(item.packedBundleBarcode || '').trim()) ||
+                              item.packageStatus === '已打包';
                             return (
                             <tr
                               key={item.id}
@@ -490,20 +718,33 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                                 />
                               </td>
                               <td className="cbl-dim">{formatInboundDate(isEn, item.inboundAt)}</td>
-                              <td className="cbl-customer-col-product">
-                                <span className="cbl-customer-product-name">{item.productName}</span>
-                              </td>
                               <td><span className="cbl-code">{item.expressBarcode}</span></td>
                               <td><span className="cbl-code">{item.inboundBarcode}</span></td>
-                              <td>{item.packaging}</td>
+                              <td className="cbl-col-num cbl-col-price">
+                                <PricingCell
+                                  item={item}
+                                  customerCode={customer.customerCode}
+                                  settings={routeRates}
+                                  history={fxHistory}
+                                  fxRate={fxRate}
+                                  isEn={isEn}
+                                />
+                              </td>
                               <td><span className="cbl-code cbl-code--origin">{item.origin}</span></td>
                               <td><span className="cbl-dest-chip">{item.destination}</span></td>
-                              <td>{item.weight}</td>
+                              <td>
+                                {group.type === 'packaging'
+                                  ? packagingFeeRowWeight(item, group.items)
+                                  : item.weight}
+                              </td>
                               <td className="cbl-col-num">{item.qty}</td>
                               <td className="cbl-col-num cbl-col-fee">
                                 <FeeCell
                                   item={item}
-                                  sharedLabel={item.fee > 0 ? undefined : sharedLabel}
+                                  customerCode={customer.customerCode}
+                                  settings={routeRates}
+                                  history={fxHistory}
+                                  sharedLabel={sharedLabel}
                                   isEn={isEn}
                                   fxRate={fxRate}
                                 />
@@ -517,6 +758,15 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                                 <span className={packageStatusClass(item.packageStatus)}>
                                   {item.packageStatus}
                                 </span>
+                              </td>
+                              <td>
+                                {trip ? (
+                                  <span className="cbl-code">{trip}</span>
+                                ) : packed ? (
+                                  <span className="cbl-dim">{isEn ? 'Not loaded' : '未装车'}</span>
+                                ) : (
+                                  '—'
+                                )}
                               </td>
                               <td>
                                 <span className={transportStatusClass(item.transportStatus)}>
@@ -541,27 +791,6 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
             </div>
           )}
         </div>
-
-        <footer className="cbl-pricing-modal__foot cbl-customer-modal__foot">
-          <span className="cbl-customer-modal__foot-hint">
-            {isEn
-              ? 'Check unsigned orders and print one invoice. A multiple-inbound batch is charged once. Signed orders stay off the invoice.'
-              : '勾选未签收订单，打成一张发票发给客户。多个入库总费用只计一次。已签收的不进发票。'}
-          </span>
-          <div className="cbl-customer-modal__foot-actions">
-            <button
-              type="button"
-              className="cbl-btn cbl-btn--primary"
-              onClick={openInvoice}
-              disabled={!selectedUnsignedIds.length}
-            >
-              {isEn ? 'Print invoice' : '打 Invoice'}
-            </button>
-            <button type="button" className="cbl-btn cbl-btn--ghost" onClick={onClose}>
-              {isEn ? 'Close' : '关闭'}
-            </button>
-          </div>
-        </footer>
       </div>
       {invoice
         ? createPortal(
@@ -586,14 +815,18 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
 
 function orderMeasure(group: UnsignedInvoiceOrderGroup, isEn: boolean): string {
   const weight = formatUnsignedInvoiceWeight(group.weightKg) || '—';
-  const quote = formatUnsignedInvoiceQuote(group.quoteCny);
+  const unitPrice =
+    group.unitCnyPerKg && group.unitCnyPerKg > 0
+      ? formatUnsignedInvoiceUnitPrice(group.unitCnyPerKg, 1)
+      : formatUnsignedInvoiceUnitPrice(group.quoteCny, group.weightKg);
   const priceLabel = isEn ? 'Price' : '定价';
+  const price = unitPrice ? `${priceLabel} ${unitPrice}` : '';
   if (group.kind === 'packaging') {
     const weightLabel = isEn ? 'Package weight' : '包裹总重';
-    return quote ? `${weightLabel} ${weight} · ${priceLabel} ${quote}` : `${weightLabel} ${weight}`;
+    return price ? `${weightLabel} ${weight} · ${price}` : `${weightLabel} ${weight}`;
   }
   const weightLabel = isEn ? 'Weight' : '重量';
-  return quote ? `${weightLabel} ${weight} · ${priceLabel} ${quote}` : `${weightLabel} ${weight}`;
+  return price ? `${weightLabel} ${weight} · ${price}` : `${weightLabel} ${weight}`;
 }
 
 function UnsignedInvoicePreview({
@@ -622,6 +855,9 @@ function UnsignedInvoicePreview({
   const rate = formatUnsignedInvoiceRate(fxRate);
   const settlement = settleUnsignedInvoice(invoice.totalQuoteCny, fxRate, invoice.totalFeeMmk);
   const fee = formatUnsignedInvoiceFee(settlement.feeMmk, isEn ? 'Free rate' : '免费优惠');
+  const paperRef = useRef<HTMLElement>(null);
+  const [savingPhoto, setSavingPhoto] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const meta: Array<{ label: string; value: string }> = [
     { label: isEn ? 'Customer' : '客户姓名', value: customerName || '—' },
   ];
@@ -630,6 +866,15 @@ function UnsignedInvoicePreview({
     meta.push({ label: isEn ? 'Final destination' : '最终目的地', value: invoice.destination });
   }
   if (station) meta.push({ label: isEn ? 'Receiving station' : '收货站', value: station });
+  const notLoaded = isEn ? 'Not loaded' : '未装车';
+  meta.push({
+    label: isEn ? 'Trip' : '车次',
+    value: invoice.tripNo
+      ? invoice.tripIncomplete
+        ? `${invoice.tripNo} · ${notLoaded}`
+        : invoice.tripNo
+      : notLoaded,
+  });
   if (invoice.packNo) meta.push({ label: isEn ? 'Pack no.' : '包装号', value: invoice.packNo });
   meta.push({ label: isEn ? 'Pieces' : '件数', value: String(invoice.pieceCount) });
   if (invoice.payment) meta.push({ label: isEn ? 'Payment' : '付款方式', value: invoice.payment });
@@ -645,7 +890,7 @@ function UnsignedInvoicePreview({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="cbl-unsigned-invoice-scroll">
-          <article className="cbl-invoice-paper">
+          <article ref={paperRef} className="cbl-invoice-paper">
             <div className="cbl-invoice-watermark" aria-hidden="true">
               {watermarkTops.map((top) => (
                 <span key={top} style={{ top }}>
@@ -654,13 +899,17 @@ function UnsignedInvoicePreview({
               ))}
             </div>
             <div className="cbl-invoice-body">
-              <div className="cbl-invoice-brand">
-                <div>
-                  <strong>MARKET LINK</strong>
-                  <span>EXPRESS</span>
+                <div className="cbl-invoice-brand">
+                  <div className="cbl-invoice-wordmark">
+                    <strong>MARKET LINK</strong>
+                    <span>EXPRESS</span>
+                  </div>
+                  <div className="cbl-invoice-doc">
+                    <span className="cbl-invoice-doc__word">INVOICE</span>
+                    <span className="cbl-invoice-doc__label">{isEn ? 'Invoice no.' : '发票号'}</span>
+                    <strong className="cbl-invoice-doc__no">—</strong>
+                  </div>
                 </div>
-                <em>INVOICE</em>
-              </div>
               <div className="cbl-invoice-rule" />
               <div className="cbl-invoice-rule cbl-invoice-rule--thin" />
               <dl className="cbl-invoice-meta">
@@ -718,21 +967,58 @@ function UnsignedInvoicePreview({
                   </div>
                 )}
               </div>
-              <p className="cbl-invoice-note">
-                {isEn ? 'Please pay against this invoice' : '请凭此单据付款'}
-              </p>
-              <p className="cbl-invoice-footer">MARKET LINK EXPRESS</p>
+              <div className="cbl-invoice-closeout">
+                <p className="cbl-invoice-note">
+                  {isEn ? 'Please pay against this invoice' : '请凭此单据付款'}
+                </p>
+                <div className="cbl-invoice-contact">
+                  <span>{isEn ? 'Contact' : '联系方式'}</span>
+                  <p>
+                    <em>{isEn ? 'Phone: ' : '联系电话：'}</em>
+                    <strong>09788868928，09259369349，09971118588</strong>
+                  </p>
+                  <p>
+                    <em>Kpay：</em>
+                    <strong>09259369349</strong>
+                  </p>
+                  <em className="cbl-invoice-site">www.market-link-express.com</em>
+                </div>
+                <p className="cbl-invoice-footer">MARKET LINK EXPRESS</p>
+              </div>
             </div>
           </article>
         </div>
         <div className="cbl-unsigned-invoice-actions">
+          {saveError ? <p className="cbl-invoice-save-error">{saveError}</p> : null}
           <button
             type="button"
             className="cbl-invoice-save"
             onClick={() => window.print()}
-            disabled={settlement.missingRate}
+            disabled={settlement.missingRate || savingPhoto}
           >
-            {isEn ? 'Print / Save PDF' : '打印 / 存 PDF'}
+            {isEn ? 'Print' : '打印'}
+          </button>
+          <button
+            type="button"
+            className="cbl-invoice-save"
+            onClick={() => {
+              const node = paperRef.current;
+              if (!node || savingPhoto) return;
+              setSavingPhoto(true);
+              setSaveError(null);
+              const safeName = (customerName || 'invoice')
+                .replace(/[^\w\u4e00-\u9fff-]+/g, '-')
+                .replace(/^-|-$/g, '')
+                .slice(0, 40);
+              void saveElementAsPng(node, `MARKET-LINK-${safeName || 'invoice'}-${issuedOn}.png`)
+                .catch(() => {
+                  setSaveError(isEn ? 'Could not save the photo. Try again.' : '照片没存下来，请再试一次。');
+                })
+                .finally(() => setSavingPhoto(false));
+            }}
+            disabled={settlement.missingRate || savingPhoto}
+          >
+            {savingPhoto ? (isEn ? 'Saving…' : '保存中…') : isEn ? 'Save' : '保存'}
           </button>
           <button type="button" className="cbl-invoice-close" onClick={onClose}>
             {isEn ? 'Close' : '关闭'}

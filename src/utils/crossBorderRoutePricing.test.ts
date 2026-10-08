@@ -1,5 +1,8 @@
 import {
   blankRoutePricingKeys,
+  buildFxMmkRepricePayload,
+  buildPricingDisplayMatrix,
+  buildRouteCnyPerKgSettingsKey,
   buildRouteMatrixPayload,
   buildRoutePerKgSettingsKey,
   collectPricingCustomerOptions,
@@ -10,6 +13,11 @@ import {
   normalizeRouteHubCode,
   parseRouteMatrixForSave,
   parseRoutePerKgSettingsKey,
+  buildMissingRouteCnyPayload,
+  feeFromRouteUnit,
+  resolveExpressItemUnitPrice,
+  resolveRoutePerKgMmk,
+  resolveRouteUnitQuote,
   summarizeRoutePricing,
 } from './crossBorderRoutePricing';
 
@@ -50,6 +58,9 @@ describe('crossBorderRoutePricing', () => {
       origin: 'LSO',
       dest: 'MDY',
     });
+    expect(
+      parseRoutePerKgSettingsKey('pricing.cross_border.route.RUI.MDY.cny_per_kg'),
+    ).toBeNull();
   });
 
   it('merges route matrix from db settings', () => {
@@ -167,6 +178,7 @@ describe('crossBorderRoutePricing', () => {
     matrix.RUI.MDY = '';
     const blanks = blankRoutePricingKeys(matrix);
     expect(blanks).toContain('pricing.cross_border.route.RUI.MDY.per_kg');
+    expect(blanks).toContain('pricing.cross_border.route.RUI.MDY.cny_per_kg');
     expect(blanks).not.toContain('pricing.cross_border.route.RUI.YGN.per_kg');
     const payload = buildRouteMatrixPayload(matrix);
     expect(payload.map((row) => row.settings_key)).toContain(
@@ -240,11 +252,212 @@ describe('crossBorderRoutePricing', () => {
     });
   });
 
+  it('prefers the customer route price and keeps an explicit free rate', () => {
+    const settings = [
+      { settings_key: 'pricing.cross_border.route.RUI.MDY.per_kg', settings_value: 26640 },
+      {
+        settings_key: 'pricing.cross_border.customer.MDY2609101001.route.RUI.MDY.per_kg',
+        settings_value: 26400,
+      },
+      {
+        settings_key: 'pricing.cross_border.customer.MDY260802001.route.RUI.MDY.per_kg',
+        settings_value: 0,
+      },
+    ];
+    expect(resolveRoutePerKgMmk(settings, 'RUILI001', 'MDY', 'MDY2609101001')).toBe(26400);
+    expect(resolveRoutePerKgMmk(settings, 'RUILI001', 'MDY', 'MDY260802001')).toBe(0);
+    expect(resolveRoutePerKgMmk(settings, 'RUILI001', 'MDY', 'NO-SUCH')).toBe(26640);
+    expect(resolveRoutePerKgMmk(settings, 'RUILI001', 'YGN')).toBeNull();
+  });
+
+  it('uses the customer pricing window CNY, and price times weight for the fee', () => {
+    const settings = [
+      {
+        settings_key: 'pricing.cross_border.customer.POL2609171001.route.RUI.POL.per_kg',
+        settings_value: 26400,
+        updated_at: '2026-09-17T04:29:36.061Z',
+      },
+    ];
+    const unsigned = resolveExpressItemUnitPrice({
+      origin: 'RUILI001',
+      destination: 'POL',
+      customerCode: 'POL2609171001',
+      settings,
+      signed: false,
+      weightKg: 4,
+      feeMmk: 105_600,
+      lockedRate: null,
+      liveRate: 669,
+    });
+    expect(unsigned.cnyPerKg).toBe(40);
+    expect(unsigned.mmkPerKg).toBe(26_760);
+    expect(feeFromRouteUnit(unsigned.cnyPerKg ?? 0, 4, 669)).toEqual({
+      cny: 160,
+      mmk: 107_040,
+    });
+
+    const restored = resolveRouteUnitQuote({
+      settings: [
+        {
+          settings_key: 'pricing.cross_border.customer.MDY2609101001.route.RUI.MDY.per_kg',
+          settings_value: 26400,
+          updated_at: '2026-09-10T09:57:15.807Z',
+        },
+      ],
+      origin: 'RUILI001',
+      destination: 'MDY',
+      customerCode: 'MDY2609101001',
+      liveRate: 669,
+    });
+    expect(restored.cnyPerKg).toBe(40.3053);
+    expect(feeFromRouteUnit(restored.cnyPerKg ?? 0, 60, 669).cny).toBeCloseTo(2418.318, 3);
+    const locked = buildMissingRouteCnyPayload([
+      {
+        settings_key: 'pricing.cross_border.customer.MDY2609101001.route.RUI.MDY.per_kg',
+        settings_value: 26400,
+        updated_at: '2026-09-10T09:57:15.807Z',
+      },
+      {
+        settings_key: 'pricing.cross_border.customer.MDY2609101001.route.RUI.MDY.cny_per_kg',
+        settings_value: 40,
+      },
+    ]);
+    expect(locked).toEqual([]);
+
+    const signed = resolveExpressItemUnitPrice({
+      origin: 'RUILI001',
+      destination: 'MDY',
+      customerCode: 'MDY2609101001',
+      settings: [
+        {
+          settings_key: 'pricing.cross_border.customer.MDY2609101001.route.RUI.MDY.per_kg',
+          settings_value: 30000,
+          updated_at: '2026-10-06T03:20:57.243Z',
+        },
+      ],
+      signed: true,
+      weightKg: 60,
+      feeMmk: 1_584_000,
+      lockedRate: 666,
+      liveRate: 669,
+    });
+    expect(signed.mmkPerKg).toBe(26400);
+    expect(signed.cnyPerKg).toBeCloseTo(26400 / 666, 6);
+  });
+
   it('validates numeric matrix on save', () => {
     const matrix = mergeRouteMatrixFromDb([]);
     matrix.RUI.MDY = '22000';
     matrix.LSO.MDY = 'abc';
     const parsed = parseRouteMatrixForSave(matrix);
     expect(parsed.ok).toBe(false);
+  });
+
+  it('keeps the saved RMB when the live exchange rate changes', () => {
+    const history = [
+      { at: '2026-10-06T10:14:30.442Z', by: 'admin', from: 666, to: 669 },
+      { at: '2026-10-03T03:44:37.571Z', by: 'admin', from: 672, to: 666 },
+    ];
+    const legacy = buildPricingDisplayMatrix({
+      settings: [
+        {
+          settings_key: 'pricing.cross_border.route.RUI.MDY.per_kg',
+          settings_value: 26640,
+          updated_at: '2026-10-06T03:20:57.243Z',
+        },
+        {
+          settings_key: 'pricing.cross_border.route.RUI.MSE.per_kg',
+          settings_value: 7992,
+          updated_at: '2026-10-06T03:20:57.243Z',
+        },
+      ],
+      useCustomerRates: true,
+      liveRate: 669,
+      history,
+    });
+    expect(legacy.RUI.MDY).toBe('40');
+    expect(legacy.RUI.MSE).toBe('12');
+
+    const wipedHistory = [
+      { at: '2026-10-06T11:23:48.430Z', by: 'admin', from: null, to: 669 },
+    ];
+    const drifted = buildPricingDisplayMatrix({
+      settings: [
+        {
+          settings_key: 'pricing.cross_border.route.RUI.MDY.per_kg',
+          settings_value: 26640,
+          updated_at: '2026-10-06T03:20:57.243Z',
+        },
+      ],
+      useCustomerRates: true,
+      liveRate: 669,
+      history: wipedHistory,
+    });
+    expect(drifted.RUI.MDY).toBe('40');
+
+    const locked = buildPricingDisplayMatrix({
+      settings: [
+        {
+          settings_key: 'pricing.cross_border.route.RUI.MDY.cny_per_kg',
+          settings_value: 40,
+        },
+        {
+          settings_key: 'pricing.cross_border.route.RUI.MDY.per_kg',
+          settings_value: 26640,
+          updated_at: '2026-10-06T12:00:00.000Z',
+        },
+      ],
+      useCustomerRates: true,
+      liveRate: 700,
+      history,
+    });
+    expect(locked.RUI.MDY).toBe('40');
+    expect(buildRouteCnyPerKgSettingsKey('RUILI', 'MDY')).toBe(
+      'pricing.cross_border.route.RUI.MDY.cny_per_kg',
+    );
+  });
+
+  it('rewrites booked MMK from a stored RMB when the headquarters rate changes', () => {
+    const payload = buildFxMmkRepricePayload(
+      [
+        {
+          settings_key: 'pricing.cross_border.route.RUI.MDY.cny_per_kg',
+          settings_value: 40,
+        },
+        {
+          settings_key: 'pricing.cross_border.route.RUI.MDY.per_kg',
+          settings_value: 26640,
+        },
+        {
+          settings_key: 'pricing.cross_border.customer.MDY260802001.route.RUI.MDY.cny_per_kg',
+          settings_value: 0,
+        },
+      ],
+      669,
+      'admin',
+    );
+    expect(payload).toEqual([
+      expect.objectContaining({
+        settings_key: 'pricing.cross_border.route.RUI.MDY.per_kg',
+        settings_value: 26760,
+        updated_by: 'admin',
+      }),
+      expect.objectContaining({
+        settings_key: 'pricing.cross_border.customer.MDY260802001.route.RUI.MDY.per_kg',
+        settings_value: 0,
+      }),
+    ]);
+
+    const cnyPayload = buildRouteMatrixPayload(
+      { ...mergeRouteMatrixFromDb([]), RUI: { ...mergeRouteMatrixFromDb([]).RUI, MDY: '40' } },
+      null,
+      { unit: 'cny' },
+    );
+    expect(cnyPayload).toEqual([
+      expect.objectContaining({
+        settings_key: 'pricing.cross_border.route.RUI.MDY.cny_per_kg',
+        settings_value: 40,
+      }),
+    ]);
   });
 });

@@ -14,6 +14,8 @@ import SignaturePad from './SignaturePad';
 import type { InventoryStoreSession } from '../services/authService';
 import { feedbackService } from '../services/FeedbackService';
 import { getItemDetail, getItemDetails, markCustomerSigned } from '../services/inventoryService';
+import { freezeSignedInvoice } from '../services/signedInvoiceArchive';
+import type { FrozenSignedInvoiceDocument } from '../utils/frozenSignedInvoice';
 import type { InventoryItemDetail } from '../types/inventory';
 import type {
   CustomerSignPickupType,
@@ -46,6 +48,8 @@ export type CustomerSignFlowRequest = {
   store: InventoryStoreSession;
   /** 调用方已拉到的活汇率，拉取失败时作兜底 */
   liveRate?: number | null;
+  /** 从 Invoice 窗口带过来的纸面。签收成功后才编号定档。 */
+  frozenInvoice?: FrozenSignedInvoiceDocument;
 };
 
 type Props = {
@@ -300,6 +304,20 @@ export default function CustomerSignFlowModal({
           ...payload,
           fxLock: lock ?? undefined,
         });
+      }
+      if (request.frozenInvoice) {
+        try {
+          await freezeSignedInvoice({
+            document: request.frozenInvoice,
+            itemIds: signIds,
+            signedBy: request.operator,
+          });
+        } catch (archiveError: unknown) {
+          feedbackService.notify(
+            t.invoice.archiveFailed,
+            archiveError instanceof Error ? archiveError.message : undefined,
+          );
+        }
       }
       const refreshed = await getItemDetail(signIds[0]);
       if (refreshed) onSuccess?.(refreshed, signIds.length);
