@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -36,6 +37,7 @@ import {
   type FrozenInvoiceHandoff,
 } from '../utils/frozenSignedInvoice';
 import { persistInvoicePng, shareInvoicePng } from '../utils/saveInvoiceImage';
+import { freezeSignedInvoice } from '../services/signedInvoiceArchive';
 
 type Props = {
   visible: boolean;
@@ -46,6 +48,7 @@ type Props = {
   onClose: () => void;
   onContinue?: (handoff: FrozenInvoiceHandoff) => void;
   continueLabel?: string;
+  signedBy?: string;
 };
 
 type InvoiceHeading = {
@@ -59,7 +62,10 @@ type InvoiceHeading = {
   dateLabel: string;
 };
 
-const WATERMARK_TOPS = [16, 72, 128, 184, 240, 296, 352, 408, 464, 520];
+const PAPER_WIDTH = 640;
+const WATERMARK_TOPS = [48, 228, 408, 588, 768];
+const SERIF = Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' });
+const MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
 
 function feeLabel(mmk: number, freeLabel: string): string {
   if (!(mmk > 0)) return `0 MMK · ${freeLabel}`;
@@ -189,12 +195,17 @@ export default function BatchSignInvoiceModal({
   onClose,
   onContinue,
   continueLabel,
+  signedBy,
 }: Props) {
   const { t, fmt } = useTranslation();
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const shotRef = useRef<View>(null);
+  const paperHeightRef = useRef(0);
+  const [paperHeight, setPaperHeight] = useState(1100);
   const sheetMaxHeight = Math.round(windowHeight * 0.9);
   const listMaxHeight = Math.max(240, sheetMaxHeight - 88);
+  const frameWidth = Math.max(280, windowWidth - 48);
+  const paperScale = frameWidth / PAPER_WIDTH;
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -202,6 +213,8 @@ export default function BatchSignInvoiceModal({
   const [unitRates, setUnitRates] = useState<string[]>([]);
   const [heading, setHeading] = useState<InvoiceHeading | null>(null);
   const [signedItemIds, setSignedItemIds] = useState<string[]>([]);
+  const [invoiceNo, setInvoiceNo] = useState('');
+  const [issuing, setIssuing] = useState(false);
 
   const customerName = useMemo(() => {
     const first = selectedItems[0];
@@ -214,6 +227,8 @@ export default function BatchSignInvoiceModal({
       setUnitRates([]);
       setHeading(null);
       setSignedItemIds([]);
+      setInvoiceNo('');
+      setIssuing(false);
       setError('');
       setLoading(false);
       setSaving(false);
@@ -245,6 +260,7 @@ export default function BatchSignInvoiceModal({
           setUnitRates([]);
           setHeading(null);
           setSignedItemIds([]);
+          setInvoiceNo('');
           setError(t.invoice.rateRequired);
           return;
         }
@@ -286,6 +302,7 @@ export default function BatchSignInvoiceModal({
           setModel(null);
           setHeading(null);
           setSignedItemIds([]);
+          setInvoiceNo('');
           setError(t.invoice.batchLoadFailed);
         }
       } finally {
@@ -306,6 +323,7 @@ export default function BatchSignInvoiceModal({
         format: 'png',
         quality: 1,
         result: 'tmpfile',
+        useRenderInContext: true,
       });
       const result = await persistInvoicePng(uri);
       if (result === 'saved') {
@@ -330,15 +348,15 @@ export default function BatchSignInvoiceModal({
 
   const pieceCount = model?.lines.reduce((sum, line) => sum + Math.max(line.expressNos.length, 1), 0) ?? 0;
 
-  const continueSign = () => {
-    if (!model || !heading || !onContinue || signedItemIds.length === 0) return;
+  const issuedDocument = () => {
+    if (!model || !heading) return null;
     const measureTemplates = {
       lineMeasure: t.invoice.lineMeasure,
       lineWeight: t.invoice.lineWeight,
       packMeasure: t.invoice.packMeasure,
       packWeight: t.invoice.packWeight,
     };
-    onContinue({
+    return {
       itemIds: signedItemIds,
       document: buildFrozenSignedInvoiceDocument({
         customerName: heading.customer || customerName,
@@ -394,7 +412,143 @@ export default function BatchSignInvoiceModal({
         contactKpay: t.invoice.contactKpay,
         contactSite: t.invoice.contactSite,
       }),
+    };
+  };
+
+  const issueInvoice = async () => {
+    if (!onContinue || issuing || invoiceNo) return;
+    const handoff = issuedDocument();
+    if (!handoff) return;
+    setIssuing(true);
+    try {
+      const no = await freezeSignedInvoice({
+        document: handoff.document,
+        itemIds: handoff.itemIds,
+        signedBy: signedBy || '',
+      });
+      setInvoiceNo(no);
+    } catch (err) {
+      feedbackService.notify(t.invoice.issueFailed, err instanceof Error ? err.message : undefined);
+    } finally {
+      setIssuing(false);
+    }
+  };
+
+  const finishIssued = () => {
+    if (!onContinue || !invoiceNo) return;
+    const handoff = issuedDocument();
+    if (!handoff) return;
+    onContinue({
+      ...handoff,
+      document: { ...handoff.document, invoiceNo },
     });
+  };
+
+  const quoteLabel = (amount: string) => {
+    const parts = t.invoice.settlementQuote.split('{amount}');
+    return { prefix: (parts[0] || '').replace(/¥\s*$/, '').trim() || t.invoice.batchQuote, amount: `¥${amount}` };
+  };
+  const rateLabel = (rate: string) => {
+    const raw = fmt(t.invoice.settlementRate, { rate });
+    const idx = raw.search(/1 CNY/i);
+    if (idx < 0) return { prefix: t.invoice.batchRate, value: raw };
+    return { prefix: raw.slice(0, idx).trim() || t.invoice.batchRate, value: raw.slice(idx).trim() };
+  };
+  const renderPaper = () => {
+    if (!model || !heading) return null;
+    const quote = model.totalFeeCny != null ? quoteLabel(formatCnyAmount(model.totalFeeCny)) : null;
+    const rate = model.totalFeeCny != null && model.rate != null ? rateLabel(formatMmkAmount(model.rate)) : null;
+    return (
+      <View style={styles.paper}>
+        <View pointerEvents="none" style={styles.watermarkWrap}>
+          {WATERMARK_TOPS.map((top) => (
+            <Text key={top} numberOfLines={1} clipMyanmar style={[styles.watermark, { top }]}>
+              MARKET LINK
+            </Text>
+          ))}
+        </View>
+        <View style={styles.frame}>
+          <View style={styles.paperBody}>
+            <View style={styles.brandRow}>
+              <View style={styles.wordmark}>
+                <Text style={styles.brand} myanmarWeight="bold">
+                  MARKET LINK
+                </Text>
+                <Text style={styles.brandSub}>EXPRESS</Text>
+              </View>
+              <View style={styles.docPlain}>
+                <Text style={styles.docWord} numberOfLines={1}>
+                  invoice no
+                </Text>
+                <Text style={styles.docNo} numberOfLines={1}>
+                  {invoiceNo || '—'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.rule} />
+            <View style={styles.ruleThin} />
+            <View style={styles.meta}>
+              <MetaRow label={t.invoice.customerName} value={heading.customer || customerName || '—'} />
+              {heading.phone ? <MetaRow label={t.invoice.phone} value={heading.phone} /> : null}
+              {heading.destination ? <MetaRow label={t.invoice.finalDest} value={heading.destination} /> : null}
+              {heading.station ? <MetaRow label={t.invoice.station} value={heading.station} /> : null}
+              <MetaRow label={t.invoice.trip} value={heading.trip || t.invoice.notLoaded} />
+              {heading.packBarcode ? <MetaRow label={t.invoice.packNo} value={heading.packBarcode} /> : null}
+              <MetaRow label={t.invoice.pieceCount} value={String(pieceCount)} />
+              {heading.payment ? <MetaRow label={t.invoice.payment} value={heading.payment} /> : null}
+              <MetaRow label={t.invoice.issuedOn} value={heading.dateLabel} />
+            </View>
+            {model.lines.map((line, index) => (
+              <OrderTable
+                key={`${line.kind}-${index}`}
+                line={line}
+                orderLabel={line.kind === 'packaging' ? t.invoice.orderNos : t.invoice.expressNo}
+              />
+            ))}
+            <View style={styles.totals}>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>{t.invoice.batchTotalWeight}</Text>
+                <Text style={styles.totalValue}>{formatInvoiceWeight(model.totalWeightKg) || '—'}</Text>
+              </View>
+              {quote ? (
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>{quote.prefix}</Text>
+                  <Text style={styles.totalValue}>{quote.amount}</Text>
+                </View>
+              ) : null}
+              {rate ? (
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>{rate.prefix}</Text>
+                  <Text style={styles.totalValue}>{rate.value}</Text>
+                </View>
+              ) : null}
+              <View style={styles.feeRow}>
+                <Text style={styles.feeLabel}>{t.invoice.batchTotalFee}</Text>
+                <Text style={styles.feeValue} myanmarWeight="bold">
+                  {feeLabel(model.totalFeeMmk, t.invoice.freePromo)}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.closeout}>
+              <Text style={styles.payNote}>{t.invoice.payNote}</Text>
+              <View style={styles.contact}>
+                <Text style={styles.contactLabel}>{t.invoice.contact}</Text>
+                <Text style={styles.contactLine}>
+                  <Text style={styles.contactLineLabel}>{t.invoice.contactPhoneLabel}</Text>
+                  {t.invoice.contactPhones}
+                </Text>
+                <Text style={styles.contactLine}>
+                  <Text style={styles.contactLineLabel}>Kpay：</Text>
+                  {t.invoice.contactKpay}
+                </Text>
+                <Text style={styles.contactSite}>{t.invoice.contactSite}</Text>
+              </View>
+              <Text style={styles.footerBrand}>MARKET LINK EXPRESS</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -417,145 +571,102 @@ export default function BatchSignInvoiceModal({
               showsVerticalScrollIndicator
               keyboardShouldPersistTaps="handled"
             >
-              <View ref={shotRef} collapsable={false} style={styles.paper}>
-                <View pointerEvents="none" style={styles.watermarkWrap}>
-                  {WATERMARK_TOPS.map((top) => (
-                    <Text key={top} numberOfLines={1} clipMyanmar style={[styles.watermark, { top }]}>
-                      MARKET LINK
-                    </Text>
-                  ))}
+              <View style={[styles.paperFrame, { width: frameWidth, height: paperHeight * paperScale }]}>
+                <View style={[styles.paperScale, { transform: [{ scale: paperScale }] }]}>
+                  {renderPaper()}
                 </View>
-
-                <View style={styles.paperBody}>
-                  <View style={styles.brandRow}>
-                    <View>
-                      <Text style={styles.brand} myanmarWeight="bold">
-                        MARKET LINK
-                      </Text>
-                      <Text style={styles.brandSub}>EXPRESS</Text>
-                    </View>
-                    <View style={styles.docPlain}>
-                      <Text style={styles.docWord}>INVOICE</Text>
-                      <Text style={styles.docMeta}>
-                        {t.invoice.invoiceNo} —
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.rule} />
-                  <View style={styles.ruleThin} />
-
-                  <View style={styles.meta}>
-                    <MetaRow label={t.invoice.customerName} value={heading.customer || customerName || '—'} />
-                    {heading.phone ? <MetaRow label={t.invoice.phone} value={heading.phone} /> : null}
-                    {heading.destination ? (
-                      <MetaRow label={t.invoice.finalDest} value={heading.destination} />
-                    ) : null}
-                    {heading.station ? <MetaRow label={t.invoice.station} value={heading.station} /> : null}
-                    <MetaRow label={t.invoice.trip} value={heading.trip || t.invoice.notLoaded} />
-                    {heading.packBarcode ? (
-                      <MetaRow label={t.invoice.packNo} value={heading.packBarcode} />
-                    ) : null}
-                    <MetaRow label={t.invoice.pieceCount} value={String(pieceCount)} />
-                    {heading.payment ? <MetaRow label={t.invoice.payment} value={heading.payment} /> : null}
-                    <MetaRow label={t.invoice.issuedOn} value={heading.dateLabel} />
-                  </View>
-
-                  {model.lines.map((line, index) => (
-                    <OrderTable
-                      key={`${line.kind}-${index}`}
-                      line={line}
-                      orderLabel={line.kind === 'packaging' ? t.invoice.orderNos : t.invoice.expressNo}
-                    />
-                  ))}
-
-                  <View style={styles.totals}>
-                    <View style={styles.totalRow}>
-                      <Text style={styles.totalLabel}>{t.invoice.batchTotalWeight}</Text>
-                      <Text style={styles.totalValue}>{formatInvoiceWeight(model.totalWeightKg) || '—'}</Text>
-                    </View>
-                    <View style={styles.feeRow}>
-                      <Text style={styles.feeLabel}>{t.invoice.batchTotalFee}</Text>
-                      <View style={styles.feeStack}>
-                        {model.totalFeeCny != null ? (
-                          <Text style={styles.feeQuote}>
-                            {fmt(t.invoice.settlementQuote, { amount: formatCnyAmount(model.totalFeeCny) })}
-                          </Text>
-                        ) : null}
-                        {model.totalFeeCny != null
-                          ? unitRates.map((label) => (
-                              <Text key={label} style={styles.feeUnit}>
-                                {label}
-                              </Text>
-                            ))
-                          : null}
-                        {model.totalFeeCny != null && model.rate != null ? (
-                          <Text style={styles.feeRate}>
-                            {fmt(t.invoice.settlementRate, { rate: formatMmkAmount(model.rate) })}
-                          </Text>
-                        ) : null}
-                        <Text style={styles.feeValue} myanmarWeight="bold">
-                          {feeLabel(model.totalFeeMmk, t.invoice.freePromo)}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <Text style={styles.payNote}>{t.invoice.payNote}</Text>
-                  <View style={styles.contact}>
-                    <Text style={styles.contactLabel}>{t.invoice.contact}</Text>
-                    <Text style={styles.contactLine}>
-                      <Text style={styles.contactLineLabel}>{t.invoice.contactPhoneLabel}</Text>
-                      {t.invoice.contactPhones}
-                    </Text>
-                    <Text style={styles.contactLine}>
-                      <Text style={styles.contactLineLabel}>Kpay：</Text>
-                      {t.invoice.contactKpay}
-                    </Text>
-                    <Text style={styles.contactSite}>{t.invoice.contactSite}</Text>
-                  </View>
-                  <Text style={styles.footerBrand}>MARKET LINK EXPRESS</Text>
+              </View>
+              <View style={styles.captureHost} pointerEvents="none">
+                <View
+                  ref={shotRef}
+                  collapsable={false}
+                  onLayout={(event) => {
+                    const next = event.nativeEvent.layout.height;
+                    if (next > 0) {
+                      paperHeightRef.current = next;
+                      if (Math.abs(next - paperHeight) > 1) setPaperHeight(next);
+                    }
+                  }}
+                >
+                  {renderPaper()}
                 </View>
               </View>
             </ScrollView>
           ) : null}
 
           <View style={styles.actions}>
-            {onContinue ? (
-              <Pressable
-                style={[styles.continueBtn, (!model || saving) && styles.btnDisabled]}
-                onPress={continueSign}
-                disabled={!model || !heading || signedItemIds.length === 0 || saving}
-                accessibilityRole="button"
-                accessibilityLabel={continueLabel || t.invoice.continueSign}
-              >
-                <Text style={styles.continueBtnText} myanmarWeight="bold">
-                  {continueLabel || t.invoice.continueSign}
-                </Text>
-              </Pressable>
-            ) : null}
-            <Pressable
-              style={[styles.saveBtn, (!model || saving) && styles.btnDisabled]}
-              onPress={() => void handleSave()}
-              disabled={!model || saving}
-              accessibilityRole="button"
-              accessibilityLabel={t.invoice.batchSave}
-            >
-              {saving ? (
-                <ActivityIndicator color="#f6f3ec" size="small" />
-              ) : (
-                <Text style={styles.saveBtnText} myanmarWeight="bold">
-                  {t.invoice.batchSave}
-                </Text>
-              )}
-            </Pressable>
-            <Pressable
-              style={styles.closeBtn}
-              onPress={onClose}
-              accessibilityRole="button"
-              accessibilityLabel={t.invoice.close}
-            >
-              <Text style={styles.closeText}>{t.invoice.close}</Text>
-            </Pressable>
+            {invoiceNo ? (
+              <>
+                <Pressable
+                  style={[styles.saveBtn, saving && styles.btnDisabled]}
+                  onPress={() => void handleSave()}
+                  disabled={saving}
+                  accessibilityRole="button"
+                  accessibilityLabel={t.invoice.batchSave}
+                >
+                  {saving ? (
+                    <ActivityIndicator color="#f6f3ec" size="small" />
+                  ) : (
+                    <Text style={styles.saveBtnText} myanmarWeight="bold">
+                      {t.invoice.batchSave}
+                    </Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  style={styles.continueBtn}
+                  onPress={finishIssued}
+                  accessibilityRole="button"
+                  accessibilityLabel={t.invoice.finishIssued}
+                >
+                  <Text style={styles.continueBtnText} myanmarWeight="bold">
+                    {t.invoice.finishIssued}
+                  </Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                {onContinue ? (
+                  <Pressable
+                    style={[styles.continueBtn, (!model || issuing || saving) && styles.btnDisabled]}
+                    onPress={() => void issueInvoice()}
+                    disabled={!model || !heading || signedItemIds.length === 0 || issuing || saving}
+                    accessibilityRole="button"
+                    accessibilityLabel={continueLabel || t.invoice.signAction}
+                  >
+                    {issuing ? (
+                      <ActivityIndicator color="#f6f3ec" size="small" />
+                    ) : (
+                      <Text style={styles.continueBtnText} myanmarWeight="bold">
+                        {continueLabel || t.invoice.signAction}
+                      </Text>
+                    )}
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  style={[styles.saveBtn, (!model || saving || issuing) && styles.btnDisabled]}
+                  onPress={() => void handleSave()}
+                  disabled={!model || saving || issuing}
+                  accessibilityRole="button"
+                  accessibilityLabel={t.invoice.batchSave}
+                >
+                  {saving ? (
+                    <ActivityIndicator color="#f6f3ec" size="small" />
+                  ) : (
+                    <Text style={styles.saveBtnText} myanmarWeight="bold">
+                      {t.invoice.batchSave}
+                    </Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  style={styles.closeBtn}
+                  onPress={onClose}
+                  accessibilityRole="button"
+                  accessibilityLabel={t.invoice.close}
+                >
+                  <Text style={styles.closeText}>{t.invoice.close}</Text>
+                </Pressable>
+              </>
+            )}
           </View>
         </View>
       </View>
@@ -592,271 +703,76 @@ const styles = StyleSheet.create({
     padding: 12,
     overflow: 'hidden',
   },
+  listContent: { paddingBottom: 4, alignItems: 'center' },
+  paperFrame: { overflow: 'hidden' },
+  paperScale: { width: PAPER_WIDTH, transformOrigin: 'left top' },
+  captureHost: { position: 'absolute', width: PAPER_WIDTH, left: -4000, top: 0, opacity: 0 },
   paper: {
+    width: PAPER_WIDTH,
     position: 'relative',
-    backgroundColor: '#f6f3ec',
+    backgroundColor: '#f7f3ea',
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#1c1917',
+    padding: 5,
   },
-  watermarkWrap: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: 0,
-  },
+  frame: { borderWidth: 1, borderColor: 'rgba(28, 25, 23, 0.28)' },
+  watermarkWrap: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 0 },
   watermark: {
     position: 'absolute',
-    left: -24,
-    right: -24,
-    color: '#1c1917',
-    opacity: 0.1,
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: 0.4,
+    left: -40,
+    right: -40,
+    color: 'rgba(28, 25, 23, 0.045)',
+    fontFamily: SERIF,
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: 8,
     textAlign: 'center',
-    transform: [{ rotate: '-18deg' }],
+    transform: [{ rotate: '-16deg' }],
   },
-  paperBody: {
-    position: 'relative',
-    zIndex: 1,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 12,
-  },
-  brandRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  brand: {
-    color: '#1c1917',
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-  },
-  brandSub: {
-    marginTop: 1,
-    color: '#1c1917',
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
-  docPlain: {
-    flexShrink: 1,
-    alignItems: 'flex-end',
-  },
-  docWord: {
-    color: '#1c1917',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  docMeta: {
-    marginTop: 2,
-    color: '#57534e',
-    fontSize: 10,
-    fontWeight: '700',
-    textAlign: 'right',
-  },
-  rule: {
-    marginTop: 8,
-    height: 2,
-    backgroundColor: '#1c1917',
-  },
-  ruleThin: {
-    marginTop: 2,
-    height: 1,
-    backgroundColor: '#1c1917',
-  },
-  meta: {
-    marginTop: 8,
-    gap: 4,
-  },
+  paperBody: { position: 'relative', zIndex: 1, paddingHorizontal: 28, paddingTop: 28, paddingBottom: 22 },
+  brandRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16 },
+  wordmark: { flexShrink: 1 },
+  brand: { color: '#1c1917', fontFamily: SERIF, fontSize: 28, fontWeight: '700', letterSpacing: 1.1, lineHeight: 28 },
+  brandSub: { marginTop: 4, color: '#1c1917', fontSize: 11, fontWeight: '700', letterSpacing: 4.6 },
+  docPlain: { width: 168, flexShrink: 0, alignItems: 'flex-end' },
+  docWord: { width: '100%', color: '#1c1917', fontSize: 11, fontWeight: '800', letterSpacing: 0.4, textAlign: 'right' },
+  docNo: { width: '100%', marginTop: 2, color: '#1c1917', fontFamily: MONO, fontSize: 13, fontWeight: '800', letterSpacing: 0.2, textAlign: 'right' },
+  rule: { marginTop: 12, height: 2, backgroundColor: '#1c1917' },
+  ruleThin: { marginTop: 3, height: 1, backgroundColor: '#1c1917' },
+  meta: { marginTop: 16 },
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  metaLabel: {
-    color: '#57534e',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  metaValue: {
-    flex: 1,
-    flexShrink: 1,
-    color: '#1c1917',
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'right',
-  },
-  table: {
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#1c1917',
-  },
-  tableHead: {
-    paddingTop: 6,
-    paddingBottom: 4,
-    color: '#57534e',
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-  },
-  orderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    paddingVertical: 4,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#a8a29e',
-  },
-  orderIndex: {
-    width: 22,
-    color: '#a8a29e',
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 16,
-  },
-  orderNo: {
-    flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
-    color: '#1c1917',
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 16,
-  },
-  packWeight: {
-    marginTop: 4,
-    marginBottom: 2,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    backgroundColor: 'rgba(28, 25, 23, 0.05)',
-    color: '#1c1917',
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 16,
-    textAlign: 'right',
-  },
-  totals: {
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#1c1917',
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'baseline',
-    paddingTop: 10,
-  },
-  totalLabel: {
-    color: '#44403c',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  totalValue: {
-    color: '#1c1917',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  feeRow: {
-    marginTop: 6,
+    gap: 16,
     paddingVertical: 6,
-    paddingHorizontal: 8,
-    backgroundColor: '#1c1917',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(28, 25, 23, 0.1)',
   },
-  feeLabel: {
-    color: '#f6f3ec',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  feeStack: { alignItems: 'flex-end', flexShrink: 1, maxWidth: '74%' },
-  feeQuote: {
-    color: '#f6f3ec',
-    fontSize: 12,
-    fontWeight: '800',
-    textAlign: 'right',
-  },
-  feeUnit: {
-    color: '#f6f3ec',
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 1,
-    textAlign: 'right',
-  },
-  feeRate: {
-    color: '#d6d3d1',
-    fontSize: 10,
-    fontWeight: '700',
-    marginTop: 1,
-    marginBottom: 2,
-    textAlign: 'right',
-  },
-  feeValue: {
-    color: '#f6f3ec',
-    fontSize: 16,
-    fontWeight: '800',
-    textAlign: 'right',
-  },
-  payNote: {
-    marginTop: 8,
-    textAlign: 'center',
-    color: '#1c1917',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  contact: {
-    marginTop: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(28, 25, 23, 0.28)',
-    backgroundColor: 'rgba(28, 25, 23, 0.035)',
-    alignItems: 'center',
-  },
-  contactLabel: {
-    color: '#57534e',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  contactLine: {
-    marginTop: 3,
-    color: '#1c1917',
-    fontSize: 11,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  contactLineLabel: {
-    color: '#57534e',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  contactSite: {
-    marginTop: 3,
-    color: '#1c1917',
-    fontSize: 10,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  footerBrand: {
-    marginTop: 6,
-    textAlign: 'center',
-    color: '#78716c',
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 1.4,
-  },
+  metaLabel: { color: '#78716c', fontSize: 12, fontWeight: '600' },
+  metaValue: { flex: 1, color: '#1c1917', fontSize: 14, fontWeight: '700', textAlign: 'right' },
+  table: { marginTop: 16, borderTopWidth: 1, borderTopColor: '#1c1917' },
+  tableHead: { paddingTop: 12, paddingBottom: 4, color: '#78716c', fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
+  orderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#a8a29e' },
+  orderIndex: { width: 28, paddingTop: 2, color: '#a8a29e', fontSize: 12, fontWeight: '700' },
+  orderNo: { flex: 1, minWidth: 0, color: '#1c1917', fontFamily: MONO, fontSize: 13, fontWeight: '600', lineHeight: 18 },
+  packWeight: { marginTop: 8, marginBottom: 2, paddingVertical: 8, paddingHorizontal: 10, backgroundColor: 'rgba(28, 25, 23, 0.05)', color: '#1c1917', fontSize: 13, fontWeight: '700', textAlign: 'right' },
+  totals: { marginTop: 16, borderTopWidth: 1, borderTopColor: '#1c1917' },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 10, gap: 12 },
+  totalLabel: { color: '#44403c', fontSize: 13, fontWeight: '600' },
+  totalValue: { flexShrink: 1, color: '#1c1917', fontSize: 14, fontWeight: '700', textAlign: 'right' },
+  feeRow: { marginTop: 10, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: '#1c1917', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  feeLabel: { color: '#f6f3ec', fontSize: 13, fontWeight: '600' },
+  feeValue: { flexShrink: 1, color: '#f6f3ec', fontSize: 18, fontWeight: '800', textAlign: 'right' },
+  closeout: { marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#1c1917' },
+  payNote: { textAlign: 'center', color: '#1c1917', fontSize: 13, fontWeight: '800', letterSpacing: 1.8 },
+  contact: { marginTop: 10, alignSelf: 'center', width: 460, maxWidth: '100%', paddingVertical: 10, paddingHorizontal: 16, borderWidth: 1, borderColor: 'rgba(28, 25, 23, 0.16)', backgroundColor: 'rgba(28, 25, 23, 0.035)', alignItems: 'center' },
+  contactLabel: { color: '#57534e', fontSize: 11, fontWeight: '800', letterSpacing: 2.4 },
+  contactLine: { marginTop: 7, color: '#1c1917', fontSize: 13, fontWeight: '800', textAlign: 'center', lineHeight: 18 },
+  contactLineLabel: { color: '#57534e', fontSize: 13, fontWeight: '700' },
+  contactSite: { marginTop: 7, color: '#1c1917', fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  footerBrand: { marginTop: 10, textAlign: 'center', color: '#78716c', fontSize: 11, fontWeight: '700', letterSpacing: 2.4 },
   loadingBox: {
     alignItems: 'center',
     paddingVertical: 28,
@@ -870,7 +786,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     overflow: 'hidden',
   },
-  listContent: { paddingBottom: 4 },
+  listContent: { paddingBottom: 4, alignItems: 'center' },
   actions: {
     marginTop: 12,
     flexDirection: 'row',

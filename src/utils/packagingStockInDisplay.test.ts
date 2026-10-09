@@ -1,10 +1,18 @@
 import {
   groupCustomerExpressItems,
+  hasCustomerExpressNo,
   packagingFeeRowWeight,
   parsePackagingStockInLineBarcode,
 } from './packagingStockInDisplay';
 
 describe('packagingStockInDisplay', () => {
+  it('hides package shells that have no express number', () => {
+    expect(hasCustomerExpressNo('DPK301929849175')).toBe(true);
+    expect(hasCustomerExpressNo('')).toBe(false);
+    expect(hasCustomerExpressNo('—')).toBe(false);
+    expect(hasCustomerExpressNo('-')).toBe(false);
+  });
+
   it('parses (n-i) inbound barcodes', () => {
     expect(parsePackagingStockInLineBarcode('MDY555306070926(3-2)')).toEqual({
       base: 'MDY555306070926',

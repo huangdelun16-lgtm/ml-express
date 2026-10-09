@@ -1,8 +1,9 @@
-import { FC, useEffect, useMemo, useState } from 'react';
+import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchSignedInvoices,
   type SignedInvoiceListRow,
 } from '../services/inventoryConsoleService';
+import { saveElementAsPng } from '../utils/saveElementAsPng';
 
 type Props = {
   isEn: boolean;
@@ -128,6 +129,28 @@ const SignedInvoicesPanel: FC<Props> = ({ isEn }) => {
   );
 };
 
+const FROZEN_TOTAL_LABELS: Array<{ kind: 'weight' | 'quote' | 'rate' | 'fee'; labels: string[] }> = [
+  { kind: 'weight', labels: ['总重量', 'Total weight', 'စုစုပေါင်းအလေးချိန်'] },
+  { kind: 'quote', labels: ['入库报价', 'Inbound quote', 'စာရင်းသွင်း ဈေး'] },
+  { kind: 'rate', labels: ['汇率', 'Rate', 'ငွေလဲ'] },
+  { kind: 'fee', labels: ['总费用', 'Total fee', 'စုစုပေါင်းခ'] },
+];
+
+function splitFrozenTotal(line: string): { kind: 'weight' | 'quote' | 'rate' | 'fee' | 'skip'; label: string; value: string } {
+  const text = line.trim();
+  if (!text || /KG\s*=/i.test(text)) return { kind: 'skip', label: '', value: '' };
+  const labels = FROZEN_TOTAL_LABELS.flatMap((group) =>
+    group.labels.map((label) => ({ kind: group.kind, label })),
+  ).sort((a, b) => b.label.length - a.label.length);
+  const matched = labels.find((item) => text === item.label || text.startsWith(item.label));
+  if (!matched) return { kind: 'skip', label: '', value: text };
+  return {
+    kind: matched.kind,
+    label: matched.label,
+    value: text.slice(matched.label.length).trim(),
+  };
+}
+
 function FrozenInvoiceSheet({
   row,
   isEn,
@@ -142,6 +165,26 @@ function FrozenInvoiceSheet({
   const lines = Array.isArray(doc.lines) ? doc.lines : [];
   const totals = Array.isArray(doc.totals) ? doc.totals : [];
   const watermarkTops = [48, 228, 408, 588, 768];
+  const paperRef = useRef<HTMLElement>(null);
+  const [savingPhoto, setSavingPhoto] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const savePhoto = () => {
+    const node = paperRef.current;
+    if (!node || savingPhoto) return;
+    setSavingPhoto(true);
+    setSaveError(null);
+    const safeName = (row.customer_name || 'invoice')
+      .replace(/[^\w\u4e00-\u9fff-]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40);
+    const invoiceNo = String(doc.invoiceNo || row.invoice_no || 'invoice').replace(/[^\w-]+/g, '');
+    void saveElementAsPng(node, `MARKET-LINK-${safeName || 'invoice'}-${invoiceNo}.png`)
+      .catch(() => {
+        setSaveError(isEn ? 'Could not save the photo. Try again.' : '照片没存下来，请再试一次。');
+      })
+      .finally(() => setSavingPhoto(false));
+  };
 
   return (
     <div className="cbl-unsigned-invoice-overlay" role="presentation" onClick={onClose}>
@@ -153,7 +196,7 @@ function FrozenInvoiceSheet({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="cbl-unsigned-invoice-scroll">
-          <article className="cbl-invoice-paper">
+          <article ref={paperRef} className="cbl-invoice-paper">
             <div className="cbl-invoice-watermark" aria-hidden="true">
               {watermarkTops.map((top) => (
                 <span key={top} style={{ top }}>
@@ -168,8 +211,7 @@ function FrozenInvoiceSheet({
                   <span>EXPRESS</span>
                 </div>
                 <div className="cbl-invoice-doc">
-                  <span className="cbl-invoice-doc__word">INVOICE</span>
-                  <span className="cbl-invoice-doc__label">{isEn ? 'Invoice no.' : '发票号'}</span>
+                  <span className="cbl-invoice-doc__word">invoice no</span>
                   <strong className="cbl-invoice-doc__no">{doc.invoiceNo || row.invoice_no}</strong>
                 </div>
               </div>
@@ -198,9 +240,10 @@ function FrozenInvoiceSheet({
                 </section>
               ))}
               <div className="cbl-invoice-totals">
-                {totals.map((line) => (
-                  <div key={line}>
-                    <strong>{line}</strong>
+                {totals.map(splitFrozenTotal).filter((row) => row.kind !== 'skip').map((row, index) => (
+                  <div key={`${row.kind}-${index}`} className={row.kind === 'fee' ? 'cbl-invoice-fee' : undefined}>
+                    <span>{row.label}</span>
+                    <strong>{row.value || '—'}</strong>
                   </div>
                 ))}
               </div>
@@ -230,7 +273,16 @@ function FrozenInvoiceSheet({
           </article>
         </div>
         <div className="cbl-unsigned-invoice-actions">
-          <button type="button" className="cbl-btn" onClick={onClose}>
+          {saveError ? <p className="cbl-invoice-save-error">{saveError}</p> : null}
+          <button
+            type="button"
+            className="cbl-invoice-save"
+            onClick={savePhoto}
+            disabled={savingPhoto}
+          >
+            {savingPhoto ? (isEn ? 'Saving…' : '保存中…') : isEn ? 'Save' : '保存'}
+          </button>
+          <button type="button" className="cbl-invoice-close" onClick={onClose}>
             {isEn ? 'Close' : '关闭'}
           </button>
         </div>

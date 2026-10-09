@@ -13,6 +13,12 @@ const {
   yangonNoonIsoFromYmd,
 } = require('./yangonFinancePeriod');
 const { appendExportCosts, loadExportCostRows } = require('./exportCostFinance');
+const {
+  hasFinanceRange,
+  noteMarkerOr,
+  mergeRowsByKey,
+  safePaidCodes,
+} = require('./financeDatasetWindow');
 
 const HUB_BY_REGION = {
   muse: 'MSE',
@@ -1417,6 +1423,32 @@ async function fetchAllRows(supabase, table, select, options = {}) {
         query = query.in(key, value);
       }
     }
+    if (options.gte) {
+      for (const [key, value] of Object.entries(options.gte)) {
+        query = query.gte(key, value);
+      }
+    }
+    if (options.lt) {
+      for (const [key, value] of Object.entries(options.lt)) {
+        query = query.lt(key, value);
+      }
+    }
+    if (options.lte) {
+      for (const [key, value] of Object.entries(options.lte)) {
+        query = query.lte(key, value);
+      }
+    }
+    if (options.isNull) {
+      for (const column of options.isNull) {
+        query = query.is(column, null);
+      }
+    }
+    if (options.notIn) {
+      for (const [key, value] of Object.entries(options.notIn)) {
+        if (value && value.length) query = query.not(key, 'in', `(${value.join(',')})`);
+      }
+    }
+    if (options.or) query = query.or(options.or);
     if (options.order) {
       for (const ord of options.order) {
         query = query.order(ord.column, {
@@ -1429,13 +1461,307 @@ async function fetchAllRows(supabase, table, select, options = {}) {
     if (error) return { data: rows, error };
     const pageRows = data || [];
     rows.push(...pageRows);
-    if (pageRows.length < pageSize) return { data: rows, error: null };
+    if (pageRows.length < pageSize) return { data: rows, error: null, truncated: false };
   }
-  return { data: rows, error: null };
+  return { data: rows, error: null, truncated: true };
 }
 
-async function loadFinanceDataset(supabase) {
+function pushWindowWarning(warnings, label, result) {
+  if (result?.truncated) warnings.push(`${label}较多，更早的未结清可能没有算进本期`);
+}
+
+function bundleCodesFromMovements(movements) {
+  const codes = new Set();
+  for (const row of movements || []) {
+    const fromItem = String(row.item?.packed_bundle_barcode || '').trim().toUpperCase();
+    if (fromItem) codes.add(fromItem);
+    const fromNote = extractPackedBundleFromNote(String(row.note || ''));
+    if (fromNote) codes.add(fromNote);
+  }
+  return [...codes];
+}
+
+async function fetchRowsByCodes(supabase, table, select, column, codes) {
+  const rows = [];
+  const unique = [...new Set(codes.filter(Boolean))];
+  for (let index = 0; index < unique.length; index += 100) {
+    const chunk = unique.slice(index, index + 100);
+    const { data, error } = await supabase.from(table).select(select).in(column, chunk);
+    if (error) return { data: rows, error, truncated: false };
+    rows.push(...(data || []));
+  }
+  return { data: rows, error: null, truncated: false };
+}
+
+async function loadInboundMovements(supabase, range, warnings) {
+  const select =
+    'id, barcode, type, note, destination, origin_store_code, recipient_name, item_name, created_at, item:inventory_store_items!inner(final_destination, recipient_name, customer_signed_at, barcode, packed_bundle_barcode, note)';
+  const order = [{ column: 'created_at', ascending: false }];
+  const full = () =>
+    fetchAllRows(supabase, 'inventory_stock_movements', select, {
+      eq: { type: 'in' },
+      order,
+      pageSize: 500,
+      maxPages: 40,
+    });
+  if (!hasFinanceRange(range)) return full();
+
+  const [inPeriod, olderNotes, olderUnsigned] = await Promise.all([
+    fetchAllRows(supabase, 'inventory_stock_movements', select, {
+      eq: { type: 'in' },
+      gte: { created_at: range.fromIso },
+      lt: { created_at: range.toExclusiveIso },
+      order,
+      pageSize: 500,
+      maxPages: 8,
+    }),
+    fetchAllRows(supabase, 'inventory_stock_movements', select, {
+      eq: { type: 'in' },
+      lt: { created_at: range.fromIso },
+      or: noteMarkerOr('note'),
+      order,
+      pageSize: 500,
+      maxPages: 20,
+    }),
+    fetchAllRows(supabase, 'inventory_stock_movements', select, {
+      eq: { type: 'in' },
+      lt: { created_at: range.fromIso },
+      isNull: ['item.customer_signed_at'],
+      order,
+      pageSize: 500,
+      maxPages: 20,
+    }),
+  ]);
+  if (inPeriod.error || olderNotes.error || olderUnsigned.error) {
+    warnings.push('本期入库筛选失败，已改读全部入库');
+    return full();
+  }
+  const merged = mergeRowsByKey([inPeriod, olderNotes, olderUnsigned], (row) => String(row.id || ''));
+  pushWindowWarning(warnings, '未结清入库', merged);
+  return merged;
+}
+
+async function loadStockOps(supabase, range, warnings) {
+  const select =
+    'id, type, note, barcode, item_name, qty, operator, destination, origin_store_name, created_at';
+  const order = [{ column: 'created_at', ascending: false }];
+  const full = () =>
+    fetchAllRows(supabase, 'inventory_stock_movements', select, {
+      order,
+      pageSize: 200,
+      maxPages: 10,
+    });
+  if (!hasFinanceRange(range)) return full();
+  const scoped = await fetchAllRows(supabase, 'inventory_stock_movements', select, {
+    gte: { created_at: range.fromIso },
+    lt: { created_at: range.toExclusiveIso },
+    order,
+    pageSize: 200,
+    maxPages: 6,
+  });
+  if (scoped.error) {
+    warnings.push('本期库存流水筛选失败，已改读全部流水');
+    return full();
+  }
+  pushWindowWarning(warnings, '本期库存流水', scoped);
+  return scoped;
+}
+
+async function loadOrderTracking(supabase, range, warnings) {
+  const select =
+    'pack_barcode, order_barcode, order_name, destination_code, inbound_note, inbound_at, recipient_name';
+  const order = [{ column: 'inbound_at', ascending: false }];
+  const full = () =>
+    fetchAllRows(supabase, 'inventory_order_tracking', select, {
+      order,
+      pageSize: 500,
+      maxPages: 40,
+    });
+  if (!hasFinanceRange(range)) return full();
+  const [inPeriod, older] = await Promise.all([
+    fetchAllRows(supabase, 'inventory_order_tracking', select, {
+      gte: { inbound_at: range.fromIso },
+      lt: { inbound_at: range.toExclusiveIso },
+      order,
+      pageSize: 500,
+      maxPages: 8,
+    }),
+    fetchAllRows(supabase, 'inventory_order_tracking', select, {
+      lt: { inbound_at: range.fromIso },
+      or: noteMarkerOr('inbound_note'),
+      order,
+      pageSize: 500,
+      maxPages: 20,
+    }),
+  ]);
+  if (inPeriod.error || older.error) {
+    warnings.push('本期订单筛选失败，已改读全部订单');
+    return full();
+  }
+  const merged = mergeRowsByKey(
+    [inPeriod, older],
+    (row) => String(row.order_barcode || '').trim().toUpperCase(),
+  );
+  pushWindowWarning(warnings, '未结清订单', merged);
+  return merged;
+}
+
+async function loadPackagesForFinance(supabase, range, paidCodes, warnings) {
+  const select =
+    'pack_barcode, pack_name, origin_store_code, origin_store_name, destination_code, leg_destination_code, transport_fee, trip_number, truck_loaded_at, updated_at, status';
+  const status = { status: ['in_transit', 'hub_received', 'completed', 'split_at_hub'] };
+  const full = () =>
+    fetchAllRows(supabase, 'inventory_pkg_tracking', select, {
+      in: status,
+      pageSize: 500,
+      maxPages: 20,
+    });
+  if (!hasFinanceRange(range)) return full();
+  const notIn = paidCodes.length ? { pack_barcode: paidCodes } : undefined;
+  const [inPeriod, inPeriodOpen, olderLoaded, olderOpen] = await Promise.all([
+    fetchAllRows(supabase, 'inventory_pkg_tracking', select, {
+      in: status,
+      gte: { truck_loaded_at: range.fromIso },
+      lt: { truck_loaded_at: range.toExclusiveIso },
+      pageSize: 500,
+      maxPages: 8,
+    }),
+    fetchAllRows(supabase, 'inventory_pkg_tracking', select, {
+      in: status,
+      isNull: ['truck_loaded_at'],
+      gte: { updated_at: range.fromIso },
+      lt: { updated_at: range.toExclusiveIso },
+      pageSize: 500,
+      maxPages: 4,
+    }),
+    fetchAllRows(supabase, 'inventory_pkg_tracking', select, {
+      in: status,
+      lt: { truck_loaded_at: range.fromIso },
+      notIn,
+      pageSize: 500,
+      maxPages: 12,
+    }),
+    fetchAllRows(supabase, 'inventory_pkg_tracking', select, {
+      in: status,
+      isNull: ['truck_loaded_at'],
+      lt: { updated_at: range.fromIso },
+      notIn,
+      pageSize: 500,
+      maxPages: 8,
+    }),
+  ]);
+  if (inPeriod.error || inPeriodOpen.error || olderLoaded.error || olderOpen.error) {
+    warnings.push('本期包裹筛选失败，已改读全部包裹');
+    return full();
+  }
+  const merged = mergeRowsByKey(
+    [inPeriod, inPeriodOpen, olderLoaded, olderOpen],
+    (row) => String(row.pack_barcode || '').trim().toUpperCase(),
+  );
+  pushWindowWarning(warnings, '未付车费包裹', merged);
+  return merged;
+}
+
+async function loadPackedForFinance(supabase, range, paidCodes, warnings) {
+  const select =
+    'bundle_barcode, bundle_name, owner_store_code, transport_fee, truck_leg_destination, trip_number, loaded_at, note, item:inventory_store_items(qty_on_hand)';
+  const order = [{ column: 'created_at', ascending: false }];
+  const full = () =>
+    fetchAllRows(supabase, 'inventory_packed_shipments', select, {
+      order,
+      pageSize: 400,
+      maxPages: 20,
+    });
+  if (!hasFinanceRange(range)) return full();
+  const notIn = paidCodes.length ? { bundle_barcode: paidCodes } : undefined;
+  const [inPeriod, olderUnpaid] = await Promise.all([
+    fetchAllRows(supabase, 'inventory_packed_shipments', select, {
+      gte: { loaded_at: range.fromIso },
+      lt: { loaded_at: range.toExclusiveIso },
+      order,
+      pageSize: 400,
+      maxPages: 8,
+    }),
+    fetchAllRows(supabase, 'inventory_packed_shipments', select, {
+      lt: { loaded_at: range.fromIso },
+      notIn,
+      order,
+      pageSize: 400,
+      maxPages: 12,
+    }),
+  ]);
+  if (inPeriod.error || olderUnpaid.error) {
+    warnings.push('本期发运筛选失败，已改读全部发运');
+    return full();
+  }
+  const merged = mergeRowsByKey(
+    [inPeriod, olderUnpaid],
+    (row) => String(row.bundle_barcode || '').trim().toUpperCase(),
+  );
+  pushWindowWarning(warnings, '未付车费发运', merged);
+  return merged;
+}
+
+async function loadManualEntries(supabase, range, warnings) {
+  const select =
+    'id, entry_date, kind, amount, currency, category, note, created_by, created_at, store_id, store_code, hub_code';
+  const order = [
+    { column: 'entry_date', ascending: false },
+    { column: 'created_at', ascending: false },
+  ];
+  const full = () =>
+    fetchAllRows(supabase, 'cross_border_manual_entries', select, {
+      order,
+      pageSize: 250,
+      maxPages: 10,
+    });
+  if (!hasFinanceRange(range)) return full();
+  const scoped = await fetchAllRows(supabase, 'cross_border_manual_entries', select, {
+    gte: { entry_date: range.periodStart },
+    lte: { entry_date: range.periodEnd },
+    order,
+    pageSize: 250,
+    maxPages: 6,
+  });
+  if (scoped.error) {
+    warnings.push('本期其它开销筛选失败，已改读全部开销');
+    return full();
+  }
+  return scoped;
+}
+
+async function loadRemittances(supabase, range, warnings) {
+  const select =
+    'id, from_store_id, from_store_code, from_hub_code, to_origin_key, to_store_code, amount, remitted_at, note, created_at';
+  const order = [{ column: 'remitted_at', ascending: false }];
+  const full = () =>
+    fetchAllRows(supabase, 'inventory_agency_remittances', select, {
+      order,
+      pageSize: 250,
+      maxPages: 10,
+    });
+  if (!hasFinanceRange(range)) return full();
+  const scoped = await fetchAllRows(supabase, 'inventory_agency_remittances', select, {
+    gte: { remitted_at: range.periodStart },
+    lte: { remitted_at: range.periodEnd },
+    order,
+    pageSize: 250,
+    maxPages: 6,
+  });
+  if (scoped.error && !/does not exist|schema cache/i.test(String(scoped.error.message || ''))) {
+    warnings.push('本期代转汇款筛选失败，已改读全部汇款');
+    return full();
+  }
+  return scoped;
+}
+
+async function loadFinanceDatasetWindowed(supabase, range) {
   const warnings = [];
+  const { data: paidRows, error: paidError } = await supabase
+    .from('inventory_hub_transport_fee_payments')
+    .select('pack_barcode');
+  pushQueryWarning(warnings, '车费支付记录读取失败', paidError);
+  const paidCodes = safePaidCodes((paidRows || []).map((row) => row.pack_barcode));
 
   const [
     movementsResult,
@@ -1443,85 +1769,16 @@ async function loadFinanceDataset(supabase) {
     packagesResult,
     ordersResult,
     packedResult,
-    transportPayResult,
     manualResult,
     remitResult,
   ] = await Promise.all([
-    fetchAllRows(
-      supabase,
-      'inventory_stock_movements',
-      'id, barcode, type, note, destination, origin_store_code, recipient_name, item_name, created_at, item:inventory_store_items!inner(final_destination, recipient_name, customer_signed_at, barcode, packed_bundle_barcode, note)',
-      {
-        eq: { type: 'in' },
-        order: [{ column: 'created_at', ascending: false }],
-        pageSize: 500,
-        maxPages: 40,
-      },
-    ),
-    fetchAllRows(
-      supabase,
-      'inventory_stock_movements',
-      'id, type, note, barcode, item_name, qty, operator, destination, origin_store_name, created_at',
-      {
-        order: [{ column: 'created_at', ascending: false }],
-        pageSize: 200,
-        maxPages: 10,
-      },
-    ),
-    fetchAllRows(
-      supabase,
-      'inventory_pkg_tracking',
-      'pack_barcode, pack_name, origin_store_code, origin_store_name, destination_code, leg_destination_code, transport_fee, trip_number, truck_loaded_at, updated_at, status',
-      {
-        in: { status: ['in_transit', 'hub_received', 'completed', 'split_at_hub'] },
-        pageSize: 500,
-        maxPages: 20,
-      },
-    ),
-    fetchAllRows(
-      supabase,
-      'inventory_order_tracking',
-      'pack_barcode, order_barcode, order_name, destination_code, inbound_note, inbound_at, recipient_name',
-      {
-        order: [{ column: 'inbound_at', ascending: false }],
-        pageSize: 500,
-        maxPages: 40,
-      },
-    ),
-    fetchAllRows(
-      supabase,
-      'inventory_packed_shipments',
-      'bundle_barcode, bundle_name, owner_store_code, transport_fee, truck_leg_destination, trip_number, loaded_at, note, item:inventory_store_items(qty_on_hand)',
-      {
-        order: [{ column: 'created_at', ascending: false }],
-        pageSize: 400,
-        maxPages: 20,
-      },
-    ),
-    supabase.from('inventory_hub_transport_fee_payments').select('pack_barcode'),
-    fetchAllRows(
-      supabase,
-      'cross_border_manual_entries',
-      'id, entry_date, kind, amount, currency, category, note, created_by, created_at, store_id, store_code, hub_code',
-      {
-        order: [
-          { column: 'entry_date', ascending: false },
-          { column: 'created_at', ascending: false },
-        ],
-        pageSize: 250,
-        maxPages: 10,
-      },
-    ),
-    fetchAllRows(
-      supabase,
-      'inventory_agency_remittances',
-      'id, from_store_id, from_store_code, from_hub_code, to_origin_key, to_store_code, amount, remitted_at, note, created_at',
-      {
-        order: [{ column: 'remitted_at', ascending: false }],
-        pageSize: 250,
-        maxPages: 10,
-      },
-    ),
+    loadInboundMovements(supabase, range, warnings),
+    loadStockOps(supabase, range, warnings),
+    loadPackagesForFinance(supabase, range, paidCodes, warnings),
+    loadOrderTracking(supabase, range, warnings),
+    loadPackedForFinance(supabase, range, paidCodes, warnings),
+    loadManualEntries(supabase, range, warnings),
+    loadRemittances(supabase, range, warnings),
   ]);
 
   pushQueryWarning(warnings, '财务流水读取失败', movementsResult.error);
@@ -1529,7 +1786,6 @@ async function loadFinanceDataset(supabase) {
   pushQueryWarning(warnings, '包裹追踪读取失败', packagesResult.error);
   pushQueryWarning(warnings, '订单追踪读取失败', ordersResult.error);
   pushQueryWarning(warnings, '本地包裹读取失败', packedResult.error);
-  pushQueryWarning(warnings, '车费支付记录读取失败', transportPayResult.error);
   pushQueryWarning(warnings, '其它开销读取失败', manualResult.error);
   if (
     remitResult.error &&
@@ -1538,17 +1794,124 @@ async function loadFinanceDataset(supabase) {
     pushQueryWarning(warnings, '代转汇款读取失败', remitResult.error);
   }
 
-  const movements = movementsResult.data || [];
   const orderRows = ordersResult.data || [];
+  const packBarcodes = [
+    ...new Set(orderRows.map((row) => String(row.pack_barcode || '').trim()).filter(Boolean)),
+  ];
+  const havePacks = new Set(
+    (packagesResult.data || []).map((row) => String(row.pack_barcode || '').trim().toUpperCase()),
+  );
+  const missingPacks = packBarcodes.filter((code) => !havePacks.has(code.toUpperCase()));
+  if (missingPacks.length) {
+    const extraPacks = await fetchRowsByCodes(
+      supabase,
+      'inventory_pkg_tracking',
+      'pack_barcode, pack_name, origin_store_code, origin_store_name, destination_code, leg_destination_code, transport_fee, trip_number, truck_loaded_at, updated_at, status',
+      'pack_barcode',
+      missingPacks,
+    );
+    pushQueryWarning(warnings, '订单所属包裹读取失败', extraPacks.error);
+    packagesResult.data = mergeRowsByKey(
+      [packagesResult, extraPacks],
+      (row) => String(row.pack_barcode || '').trim().toUpperCase(),
+    ).data;
+  }
 
+  const tripNumbers = [
+    ...new Set(
+      (packagesResult.data || [])
+        .map((row) => String(row.trip_number || '').trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (tripNumbers.length) {
+    const tripPacks = await fetchRowsByCodes(
+      supabase,
+      'inventory_pkg_tracking',
+      'pack_barcode, pack_name, origin_store_code, origin_store_name, destination_code, leg_destination_code, transport_fee, trip_number, truck_loaded_at, updated_at, status',
+      'trip_number',
+      tripNumbers,
+    );
+    pushQueryWarning(warnings, '同车次包裹读取失败', tripPacks.error);
+    packagesResult.data = mergeRowsByKey(
+      [packagesResult, tripPacks],
+      (row) => String(row.pack_barcode || '').trim().toUpperCase(),
+    ).data;
+  }
+
+  const movements = movementsResult.data || [];
+  const haveBundles = new Set(
+    (packedResult.data || []).map((row) => String(row.bundle_barcode || '').trim().toUpperCase()),
+  );
+  const missingBundles = bundleCodesFromMovements(movements).filter((code) => !haveBundles.has(code));
+  if (missingBundles.length) {
+    const extraPacked = await fetchRowsByCodes(
+      supabase,
+      'inventory_packed_shipments',
+      'bundle_barcode, bundle_name, owner_store_code, transport_fee, truck_leg_destination, trip_number, loaded_at, note, item:inventory_store_items(qty_on_hand)',
+      'bundle_barcode',
+      missingBundles,
+    );
+    pushQueryWarning(warnings, '费用所属包裹读取失败', extraPacked.error);
+    packedResult.data = mergeRowsByKey(
+      [packedResult, extraPacked],
+      (row) => String(row.bundle_barcode || '').trim().toUpperCase(),
+    ).data;
+  }
+
+  const packedTrips = [
+    ...new Set(
+      (packedResult.data || [])
+        .map((row) => String(row.trip_number || '').trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (packedTrips.length) {
+    const tripPacked = await fetchRowsByCodes(
+      supabase,
+      'inventory_packed_shipments',
+      'bundle_barcode, bundle_name, owner_store_code, transport_fee, truck_leg_destination, trip_number, loaded_at, note, item:inventory_store_items(qty_on_hand)',
+      'trip_number',
+      packedTrips,
+    );
+    pushQueryWarning(warnings, '同车次发运读取失败', tripPacked.error);
+    packedResult.data = mergeRowsByKey(
+      [packedResult, tripPacked],
+      (row) => String(row.bundle_barcode || '').trim().toUpperCase(),
+    ).data;
+  }
+
+  return finishFinanceDataset(
+    warnings,
+    movements,
+    opResult.data || [],
+    packagesResult.data || [],
+    orderRows,
+    packedResult.data || [],
+    paidRows || [],
+    manualResult.error ? [] : manualResult.data || [],
+    remitResult.error ? [] : remitResult.data || [],
+    supabase,
+  );
+}
+
+async function finishFinanceDataset(
+  warnings,
+  movements,
+  opMovements,
+  packages,
+  orderRows,
+  packedRows,
+  paidRows,
+  manualEntries,
+  remittances,
+  supabase,
+) {
   const transportPaidBarcodes = new Set();
-  for (const row of transportPayResult.data || []) {
+  for (const row of paidRows || []) {
     const code = String(row.pack_barcode || '').trim().toUpperCase();
     if (code) transportPaidBarcodes.add(code);
   }
-
-  const manualEntries = manualResult.error ? [] : manualResult.data || [];
-  const remittances = remitResult.error ? [] : remitResult.data || [];
 
   const ordersByPack = {};
   for (const order of orderRows || []) {
@@ -1581,7 +1944,7 @@ async function loadFinanceDataset(supabase) {
   }
 
   const packNotesByBarcode = {};
-  for (const row of packedResult.data || []) {
+  for (const row of packedRows || []) {
     const code = String(row.bundle_barcode || '').trim().toUpperCase();
     const note = String(row.note || '').trim();
     if (code && note) packNotesByBarcode[code] = note;
@@ -1590,10 +1953,10 @@ async function loadFinanceDataset(supabase) {
   return {
     dataset: {
       movements,
-      opMovements: opResult.data || [],
-      packages: packagesResult.data || [],
+      opMovements,
+      packages,
       ordersByPack,
-      packedShipments: packedResult.data || [],
+      packedShipments: packedRows || [],
       itemsByBarcode,
       transportPaidBarcodes,
       manualEntries,
@@ -1602,6 +1965,61 @@ async function loadFinanceDataset(supabase) {
     },
     warnings,
   };
+}
+
+async function loadFinanceDatasetUnscoped(supabase) {
+  const warnings = [];
+  const [
+    movementsResult,
+    opResult,
+    packagesResult,
+    ordersResult,
+    packedResult,
+    transportPayResult,
+    manualResult,
+    remitResult,
+  ] = await Promise.all([
+    loadInboundMovements(supabase, null, warnings),
+    loadStockOps(supabase, null, warnings),
+    loadPackagesForFinance(supabase, null, [], warnings),
+    loadOrderTracking(supabase, null, warnings),
+    loadPackedForFinance(supabase, null, [], warnings),
+    supabase.from('inventory_hub_transport_fee_payments').select('pack_barcode'),
+    loadManualEntries(supabase, null, warnings),
+    loadRemittances(supabase, null, warnings),
+  ]);
+
+  pushQueryWarning(warnings, '财务流水读取失败', movementsResult.error);
+  pushQueryWarning(warnings, '库存操作流水读取失败', opResult.error);
+  pushQueryWarning(warnings, '包裹追踪读取失败', packagesResult.error);
+  pushQueryWarning(warnings, '订单追踪读取失败', ordersResult.error);
+  pushQueryWarning(warnings, '本地包裹读取失败', packedResult.error);
+  pushQueryWarning(warnings, '车费支付记录读取失败', transportPayResult.error);
+  pushQueryWarning(warnings, '其它开销读取失败', manualResult.error);
+  if (
+    remitResult.error &&
+    !/does not exist|schema cache/i.test(String(remitResult.error.message || ''))
+  ) {
+    pushQueryWarning(warnings, '代转汇款读取失败', remitResult.error);
+  }
+
+  return finishFinanceDataset(
+    warnings,
+    movementsResult.data || [],
+    opResult.data || [],
+    packagesResult.data || [],
+    ordersResult.data || [],
+    packedResult.data || [],
+    transportPayResult.data || [],
+    manualResult.error ? [] : manualResult.data || [],
+    remitResult.error ? [] : remitResult.data || [],
+    supabase,
+  );
+}
+
+async function loadFinanceDataset(supabase, range) {
+  if (!hasFinanceRange(range)) return loadFinanceDatasetUnscoped(supabase);
+  return loadFinanceDatasetWindowed(supabase, range);
 }
 
 function mapLedgerToCrossBorderExpense(item, store, expenseCategory) {
@@ -1864,7 +2282,7 @@ function hqSummaryFromStore(store, financeEntries) {
 }
 
 async function aggregateFinanceForTransitStores(supabase, transitStores, opts = {}) {
-  const { dataset, warnings } = await loadFinanceDataset(supabase);
+  const { dataset, warnings } = await loadFinanceDataset(supabase, opts.range || null);
   let entriesCache = buildStoreFinanceEntriesCache(transitStores, dataset);
   const range = opts.range || null;
   const storeCode = String(opts.storeCode || '').trim().toUpperCase();
@@ -1919,7 +2337,7 @@ async function fetchStoreFinanceDetail(supabase, storeCode, opts = {}) {
   if (storeErr) return { error: storeErr.message };
   if (!store) return { error: '未找到该中转站' };
 
-  const { dataset, warnings } = await loadFinanceDataset(supabase);
+  const { dataset, warnings } = await loadFinanceDataset(supabase, opts.range || null);
   let entries = buildAllFinanceEntries(store, dataset);
   if (opts.range) {
     entries = filterEntriesForFinancePeriod(entries, opts.range);

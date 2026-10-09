@@ -499,6 +499,7 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
           setInvoiceItems(null);
           releaseScan();
         }}
+        signedBy={operatorName ?? t.common.operator}
         onContinue={continueToSign}
       />
 

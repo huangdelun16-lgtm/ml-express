@@ -1,5 +1,5 @@
 import type { InventoryItem, PackedShipmentDetail, PackedShipmentItem } from '../types/inventory';
-import { parsePackagingStockInLineBarcode } from './inboundBarcode';
+import { isPackagingStockInLineBarcode, parsePackagingStockInLineBarcode } from './inboundBarcode';
 import { isPackageBarcode } from './packageNumber';
 
 /** 多个入库写入快递包 note 时的固定前缀（中/英/缅） */
@@ -131,6 +131,26 @@ export function resolvePackItemSequence(
 
 export function formatPackItemLabel(seq: PackItemSequence): string {
   return `${seq.total}-${seq.index}`;
+}
+
+/** 快递明细 Invoice：单个入库用本单重量，多个入库用整包总重量。 */
+export function invoiceDisplayWeight(input: {
+  barcode: string;
+  weight?: string | null;
+  inboundMovementNote?: string | null;
+  pack?: { note?: string | null; weight?: string | null } | null;
+}): { kind: 'single' | 'package'; value: string } | null {
+  const packaging =
+    isPackagingStockInLineBarcode(input.barcode) ||
+    isPackageBarcode(input.barcode) ||
+    isPackagingStockInInboundNote(input.inboundMovementNote || undefined) ||
+    (input.pack ? isPackagingStockInPack(input.pack) : false);
+  if (packaging) {
+    const total = input.pack?.weight?.trim() || (isPackageBarcode(input.barcode) ? input.weight?.trim() || '' : '');
+    return total ? { kind: 'package', value: total } : null;
+  }
+  const own = input.weight?.trim() || '';
+  return own ? { kind: 'single', value: own } : null;
 }
 
 export function resolvePackagingStockInItemLabel(

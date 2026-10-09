@@ -79,6 +79,13 @@ export function exportCostOptionsFromPacks(
     if (!code) continue;
     const kg = parseWeightKg(pack.weight || '');
     if (kg > 0) packageWeightKg.set(code, kg);
+    if (kg > 0) {
+      for (const line of pack.items) {
+        const parsed = parsePackagingStockInLineBarcode(line.item_barcode || '');
+        if (!parsed) continue;
+        packageWeightKg.set(parsed.base.trim().toUpperCase(), kg);
+      }
+    }
     const trip = (pack.trip_number || tripByBarcode.get(code) || '').trim().toUpperCase();
     if (!trip) continue;
     tripByBarcode.set(code, trip);
@@ -100,6 +107,20 @@ function lookupTrip(keys: Array<string | undefined>, trips: ReadonlyMap<string, 
     if (trip) return trip;
   }
   return '';
+}
+
+function lookupWeight(
+  keys: Array<string | undefined>,
+  weights: ReadonlyMap<string, number> | undefined,
+): number {
+  if (!weights) return 0;
+  for (const key of keys) {
+    const code = key?.trim().toUpperCase();
+    if (!code) continue;
+    const kg = weights.get(code) ?? 0;
+    if (kg > 0) return kg;
+  }
+  return 0;
 }
 
 function weightOf(item: InventoryItemListRow): number {
@@ -149,7 +170,14 @@ export function buildExportCostBoard(
   for (const [base, rows] of groups) {
     const parsed = parsePackagingStockInLineBarcode(rows[0]?.barcode || '');
     const pieceWeight = rows.reduce((sum, row) => sum + weightOf(row), 0);
-    const packWeight = options.packageWeightKg?.get(base) ?? 0;
+    const packWeight = lookupWeight(
+      [
+        base,
+        parsed?.base,
+        ...rows.flatMap((row) => [row.packed_bundle_barcode, row.parent_pack_barcode]),
+      ],
+      options.packageWeightKg,
+    );
     const weightKg = packWeight > 0 ? packWeight : pieceWeight;
     packages.push({
       base: parsed?.base || base,
@@ -168,4 +196,34 @@ export function buildExportCostBoard(
   singles.sort((a, b) => a.barcode.localeCompare(b.barcode));
   packages.sort((a, b) => a.base.localeCompare(b.base));
   return { singles, packages };
+}
+
+/** 出口成本窗口按单号、客户、目的地或车次查找。 */
+export function matchesExportCostQuery(query: string, fields: Array<string | undefined>): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return fields
+    .map((field) => String(field || '').trim().toLowerCase())
+    .filter(Boolean)
+    .join(' ')
+    .includes(q);
+}
+
+/** 已经记过出口成本的订单和包裹不再出现在待填窗口。 */
+export function withoutSavedExportCosts(
+  board: ExportCostBoard,
+  saved: ReadonlyArray<{ subjectKind: 'single' | 'package'; subjectKey: string }>,
+): ExportCostBoard {
+  const singles = new Set<string>();
+  const packages = new Set<string>();
+  for (const row of saved) {
+    const key = row.subjectKey.trim();
+    if (!key) continue;
+    if (row.subjectKind === 'single') singles.add(key);
+    if (row.subjectKind === 'package') packages.add(key.toUpperCase());
+  }
+  return {
+    singles: board.singles.filter((row) => !singles.has(row.id.trim())),
+    packages: board.packages.filter((row) => !packages.has(row.base.trim().toUpperCase())),
+  };
 }

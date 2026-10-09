@@ -34,6 +34,12 @@ export type CustomerExpressDisplayGroup<T extends PackagingDisplayItem> =
       sharedFee: number;
     };
 
+/** 客户明细只列出有快递单号的订单。包装外壳没有快递单，不进这张表。 */
+export function hasCustomerExpressNo(expressBarcode: string | null | undefined): boolean {
+  const code = String(expressBarcode || '').trim();
+  return Boolean(code && code !== '—' && code !== '-');
+}
+
 /** 客户快递明细：同一基础入库号合成一组，总费用只取一次 */
 export function groupCustomerExpressItems<T extends PackagingDisplayItem>(
   items: T[],

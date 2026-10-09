@@ -26,6 +26,8 @@ export type InboundInvoiceData = {
   packaging?: string;
   spec?: string;
   weight?: string;
+  /** 多个入库显示整包总重量，单个入库显示这一件的重量 */
+  weightKind?: 'single' | 'package';
   totalFee?: string;
   paymentLabel?: string;
   note?: string;
@@ -116,7 +118,12 @@ export function InboundInvoiceContent({
       <InvoiceRow label={t.invoice.finalDest} value={data.destination} />
       {data.detailAddress ? <InvoiceRow label={t.invoice.detailAddress} value={data.detailAddress} /> : null}
       {data.spec ? <InvoiceRow label={t.invoice.spec} value={data.spec} /> : null}
-      {data.weight ? <InvoiceRow label={t.invoice.weight} value={data.weight} /> : null}
+      {data.weight ? (
+        <InvoiceRow
+          label={data.weightKind === 'package' ? t.invoice.batchTotalWeight : t.invoice.weight}
+          value={data.weight}
+        />
+      ) : null}
       <InvoiceRow label={t.invoice.qty} value={`${data.qty} ${stockUnitLabel()}`} />
       {isFree ? (
         data.showCnyQuote ? (

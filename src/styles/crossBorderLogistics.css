@@ -1407,8 +1407,8 @@ button.cbl-io-overview-card--btn:hover {
 
 .cbl-customer-items-modal .cbl-customer-modal__stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 0.5fr)) minmax(0, 1.45fr);
-  width: 67%;
+  grid-template-columns: minmax(72px, 0.55fr) minmax(108px, 0.75fr) minmax(88px, 0.6fr) minmax(0, 1.25fr) minmax(0, 1.25fr) minmax(0, 1.25fr);
+  width: 100%;
   gap: 0;
   overflow: hidden;
   border: 1px solid rgba(246, 243, 236, 0.16);
@@ -1481,17 +1481,62 @@ button.cbl-io-overview-card--btn:hover {
   font-weight: 700;
 }
 
+.cbl-customer-items-modal .cbl-customer-modal__stat--fee {
+  border-right: 1px solid rgba(23, 21, 18, 0.08);
+}
+
+.cbl-customer-items-modal .cbl-customer-modal__stat--settled,
+.cbl-customer-items-modal .cbl-customer-modal__stat--open {
+  background: #f6f3ec;
+}
+
+.cbl-customer-items-modal .cbl-customer-modal__stat--settled .cbl-customer-modal__stat-label,
+.cbl-customer-items-modal .cbl-customer-modal__stat--open .cbl-customer-modal__stat-label {
+  color: #78716c;
+}
+
+.cbl-customer-items-modal .cbl-customer-modal__stat--settled .cbl-money,
+.cbl-customer-items-modal .cbl-customer-modal__stat--open .cbl-money {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.cbl-customer-items-modal .cbl-customer-modal__stat--settled strong,
+.cbl-customer-items-modal .cbl-customer-modal__stat--settled .cbl-money-main {
+  color: #166534;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.cbl-customer-items-modal .cbl-customer-modal__stat--open strong,
+.cbl-customer-items-modal .cbl-customer-modal__stat--open .cbl-money-main {
+  color: #9a3412;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.cbl-customer-items-modal .cbl-customer-modal__stat--settled .cbl-money-sub,
+.cbl-customer-items-modal .cbl-customer-modal__stat--open .cbl-money-sub {
+  margin-top: 0;
+  color: #57534e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cbl-customer-items-modal .cbl-customer-modal__stat--open {
+  border-right: none;
+}
+
 @media (max-width: 760px) {
   .cbl-customer-items-modal .cbl-customer-modal__stats {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
   }
 
-  .cbl-customer-items-modal .cbl-customer-modal__stat:nth-child(2) {
-    border-right: none;
-  }
-
-  .cbl-customer-items-modal .cbl-customer-modal__stat--fee {
-    grid-column: 1 / -1;
+  .cbl-customer-items-modal .cbl-customer-modal__stat--fee,
+  .cbl-customer-items-modal .cbl-customer-modal__stat--settled,
+  .cbl-customer-items-modal .cbl-customer-modal__stat--open {
+    grid-column: auto;
   }
 }
 
@@ -1893,24 +1938,15 @@ button.cbl-io-overview-card--btn:hover {
   gap: 1px;
   min-width: 148px;
   max-width: 240px;
-  padding: 7px 10px 8px;
-  border: 1.5px solid #1c1917;
+  padding: 0;
   text-align: right;
 }
 
 .cbl-invoice-doc__word {
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.04em;
   line-height: 1.2;
-}
-
-.cbl-invoice-doc__label {
-  margin-top: 4px;
-  color: #57534e;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
 }
 
 .cbl-invoice-doc__no {

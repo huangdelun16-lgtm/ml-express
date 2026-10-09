@@ -62,6 +62,7 @@ import {
   CROSS_BORDER_FX_SETTINGS_KEY,
   buildCrossBorderFxHistorySetting,
   buildCrossBorderFxSetting,
+  cnyToMmk,
   displayRateForCustomerCategory,
   isCustomerLedgerCategory,
   mmkToCny,
@@ -223,15 +224,6 @@ function formatIsoDate(value?: string | null, lang: string = 'zh'): string {
 function formatMmK(n?: number | null): string {
   if (n == null || !Number.isFinite(n)) return '—';
   return Math.round(n).toLocaleString('en-US');
-}
-
-function formatExportCny(n?: number | null): string {
-  if (n == null || !Number.isFinite(n)) return '0';
-  const rounded = Math.round(n * 100) / 100;
-  return rounded % 1 === 0 ? rounded.toLocaleString('en-US') : rounded.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
 }
 
 function formatCblPeriodHeading(kind: FinancePeriodKind, date: string, isEn: boolean): string {
@@ -414,6 +406,24 @@ type StatCard = {
   tone?: 'alert' | 'warn';
 };
 
+function tabNeedsFinance(tab: string): boolean {
+  return tab === 'overview' || tab === 'finance';
+}
+
+function keepStoreFinance(
+  nextStores: InventoryTransitStore[],
+  prevStores: InventoryTransitStore[] | undefined,
+): InventoryTransitStore[] {
+  if (!prevStores?.length) return nextStores;
+  const byCode = new Map(
+    prevStores.map((store) => [String(store.store_code || '').trim().toUpperCase(), store.finance]),
+  );
+  return nextStores.map((store) => {
+    const finance = byCode.get(String(store.store_code || '').trim().toUpperCase());
+    return finance ? { ...store, finance } : store;
+  });
+}
+
 function orderCustomerLabel(order: InventoryOrderRow): string {
   return order.recipient_name || order.order_name || '—';
 }
@@ -447,6 +457,7 @@ const CrossBorderLogisticsPage: FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [financeLoading, setFinanceLoading] = useState(true);
+  const [financeFailed, setFinanceFailed] = useState(false);
   const [packsLoading, setPacksLoading] = useState(true);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -549,6 +560,12 @@ const CrossBorderLogisticsPage: FC = () => {
   const customersFetchStartedRef = useRef(false);
   const loadSeqRef = useRef(0);
   const financeReqIdRef = useRef(0);
+  const financeLoadedKeyRef = useRef('');
+  const pendingFinanceRef = useRef<{
+    transitStores: InventoryTransitStore[];
+    crossBorderFinance?: InventoryConsoleData['crossBorderFinance'];
+    warnings?: string[];
+  } | null>(null);
   const packsReqIdRef = useRef(0);
   const ordersReqIdRef = useRef(0);
 
@@ -751,7 +768,15 @@ const CrossBorderLogisticsPage: FC = () => {
 
   const loadFinanceEntries = useCallback(async (page: number, pageSize: number) => {
     const reqId = ++financeReqIdRef.current;
+    const scopeKey = [
+      periodKindRef.current,
+      periodDateRef.current,
+      financeStoreCodeRef.current,
+      String(page),
+      String(pageSize),
+    ].join('|');
     setFinanceLoading(true);
+    setFinanceFailed(false);
     try {
       const result = await fetchInventoryConsoleFinance(page, pageSize, {
         period: periodKindRef.current,
@@ -759,17 +784,44 @@ const CrossBorderLogisticsPage: FC = () => {
         storeCode: financeStoreCodeRef.current || undefined,
       });
       if (reqId !== financeReqIdRef.current) return;
-      setData((prev) =>
-        prev
-          ? {
-              ...prev,
-              transitStores: result.transitStores,
-              crossBorderFinance: result.crossBorderFinance,
-            }
-          : prev,
-      );
+      financeLoadedKeyRef.current = scopeKey;
+      setData((prev) => {
+        if (!prev) {
+          pendingFinanceRef.current = {
+            transitStores: result.transitStores,
+            crossBorderFinance: result.crossBorderFinance,
+            warnings: result.warnings,
+          };
+          return prev;
+        }
+        pendingFinanceRef.current = null;
+        const warnings = [...(prev.warnings ?? [])];
+        if (result.warnings?.length) warnings.push(...result.warnings);
+        return {
+          ...prev,
+          transitStores: result.transitStores,
+          crossBorderFinance: result.crossBorderFinance,
+          warnings,
+        };
+      });
+      queueMicrotask(() => {
+        const pending = pendingFinanceRef.current;
+        if (!pending) return;
+        setData((current) => {
+          if (!current || pendingFinanceRef.current !== pending) return current;
+          pendingFinanceRef.current = null;
+          const warnings = [...(current.warnings ?? [])];
+          if (pending.warnings?.length) warnings.push(...pending.warnings);
+          return {
+            ...current,
+            transitStores: pending.transitStores,
+            crossBorderFinance: pending.crossBorderFinance,
+            warnings,
+          };
+        });
+      });
     } catch {
-      /* 保留当前财务数据 */
+      if (reqId === financeReqIdRef.current) setFinanceFailed(true);
     } finally {
       if (reqId === financeReqIdRef.current) {
         setFinanceLoading(false);
@@ -779,7 +831,6 @@ const CrossBorderLogisticsPage: FC = () => {
 
   const load = useCallback(async () => {
     const loadId = ++loadSeqRef.current;
-    const financeReqId = ++financeReqIdRef.current;
     const packsReqId = ++packsReqIdRef.current;
     const ordersReqId = ++ordersReqIdRef.current;
     const filter = packFilterRef.current;
@@ -790,20 +841,23 @@ const CrossBorderLogisticsPage: FC = () => {
     const packList = { page: packsPageRef.current, pageSize, q };
     const orderList = { page: ordersPageRef.current, pageSize, q };
     const shouldReloadCustomers = customersFetchStartedRef.current;
-    setLoading(true);
-    setFinanceLoading(true);
-    setPacksLoading(true);
-    setOrdersLoading(true);
-    setError(null);
-
     const includeTransport = activeTabRef.current === 'transport';
-    const [overviewSettled, financeSettled, packsSettled, ordersSettled] = await Promise.allSettled([
+    const includeFinance = tabNeedsFinance(activeTabRef.current);
+    setLoading(true);
+    if (includeTransport) {
+      setPacksLoading(true);
+      setOrdersLoading(true);
+    }
+    setError(null);
+    financeLoadedKeyRef.current = '';
+    if (includeFinance) {
+      void loadFinanceEntries(financePageRef.current, tablePageSizeRef.current);
+    } else {
+      setFinanceLoading(false);
+    }
+
+    const [overviewSettled, packsSettled, ordersSettled] = await Promise.allSettled([
       fetchInventoryConsoleOverview(),
-      fetchInventoryConsoleFinance(financePageRef.current, tablePageSizeRef.current, {
-        period: periodKindRef.current,
-        date: periodDateRef.current,
-        storeCode: financeStoreCodeRef.current || undefined,
-      }),
       includeTransport
         ? fetchInventoryConsolePacks(filter, stationKeys, packList)
         : Promise.resolve(null),
@@ -814,19 +868,14 @@ const CrossBorderLogisticsPage: FC = () => {
 
     if (loadId !== loadSeqRef.current) return;
 
-    const financeResult = financeSettled.status === 'fulfilled' ? financeSettled.value : null;
     const packsResult = packsSettled.status === 'fulfilled' ? packsSettled.value : null;
     const ordersResult = ordersSettled.status === 'fulfilled' ? ordersSettled.value : null;
-    const financeFresh = financeReqId === financeReqIdRef.current && financeResult != null;
     const packsFresh = packsReqId === packsReqIdRef.current && packsResult != null;
     const ordersFresh = ordersReqId === ordersReqIdRef.current && ordersResult != null;
 
     if (overviewSettled.status === 'fulfilled') {
       const overview = overviewSettled.value;
       const warnings = [...(overview.warnings ?? [])];
-      if (financeResult?.warnings?.length) {
-        warnings.push(...financeResult.warnings);
-      }
       if (packsResult?.warnings?.length) {
         warnings.push(...packsResult.warnings);
       }
@@ -834,12 +883,18 @@ const CrossBorderLogisticsPage: FC = () => {
         warnings.push(...ordersResult.warnings);
       }
 
-      setData((prev) => ({
+      setData((prev) => {
+        const pending = pendingFinanceRef.current;
+        pendingFinanceRef.current = null;
+        const nextWarnings = pending?.warnings?.length
+          ? [...warnings, ...pending.warnings]
+          : warnings;
+        return {
         ok: true,
         at: new Date().toISOString(),
-        transitStores: financeResult && financeFresh
-          ? financeResult.transitStores
-          : (prev?.transitStores ?? overview.transitStores),
+        transitStores: pending
+          ? pending.transitStores
+          : keepStoreFinance(overview.transitStores, prev?.transitStores),
         stats: overview.stats,
         transportFeeTotal: overview.transportFeeTotal,
         openExceptionCount: overview.openExceptionCount ?? 0,
@@ -868,11 +923,10 @@ const CrossBorderLogisticsPage: FC = () => {
         ordersListHasMore: ordersResult && ordersFresh
           ? Boolean(ordersResult.listHasMore)
           : prev?.ordersListHasMore,
-        crossBorderFinance: financeResult && financeFresh
-          ? financeResult.crossBorderFinance
-          : prev?.crossBorderFinance,
-        warnings,
-      }));
+        crossBorderFinance: pending?.crossBorderFinance ?? prev?.crossBorderFinance,
+        warnings: nextWarnings,
+      };
+      });
 
       if (packsFresh) {
         packsFilterLoadedRef.current = transportListKey(
@@ -898,20 +952,17 @@ const CrossBorderLogisticsPage: FC = () => {
     }
 
     setLoading(false);
-    if (financeReqId === financeReqIdRef.current) {
-      setFinanceLoading(false);
-    }
-    if (packsReqId === packsReqIdRef.current) {
+    if (includeTransport && packsReqId === packsReqIdRef.current) {
       setPacksLoading(false);
     }
-    if (ordersReqId === ordersReqIdRef.current) {
+    if (includeTransport && ordersReqId === ordersReqIdRef.current) {
       setOrdersLoading(false);
     }
 
     if (shouldReloadCustomers) {
       void loadCustomers();
     }
-  }, [loadCustomers]);
+  }, [loadCustomers, loadFinanceEntries]);
 
   const initialLoadDoneRef = useRef(false);
 
@@ -927,8 +978,11 @@ const CrossBorderLogisticsPage: FC = () => {
 
   useEffect(() => {
     if (!initialLoadDoneRef.current) return;
+    if (!tabNeedsFinance(activeTab)) return;
+    const key = [periodKind, periodDate, financeStoreCode, financePage, tablePageSize].join('|');
+    if (financeLoadedKeyRef.current === key) return;
     void loadFinanceEntries(financePage, tablePageSize);
-  }, [financePage, tablePageSize, loadFinanceEntries, periodKind, periodDate, financeStoreCode]);
+  }, [activeTab, financePage, tablePageSize, loadFinanceEntries, periodKind, periodDate, financeStoreCode]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -1611,7 +1665,7 @@ const CrossBorderLogisticsPage: FC = () => {
               {isEn ? 'Customer ledger' : '客户账'}
             </h3>
             <p className="cbl-io-overview-card__amount">
-              {financeLoading && totalIncomeAllStations == null ? (
+              {!financeFailed && totalIncomeAllStations == null ? (
                 <span className="cbl-skel-line cbl-skel-line--money" aria-hidden />
               ) : (
                 <DualMoney
@@ -1644,7 +1698,7 @@ const CrossBorderLogisticsPage: FC = () => {
               {isEn ? 'Myanmar ledger' : '缅甸账'}
             </h3>
             <p className="cbl-io-overview-card__amount">
-              {financeLoading && totalExpenseAllStations == null ? (
+              {!financeFailed && totalExpenseAllStations == null ? (
                 <span className="cbl-skel-line cbl-skel-line--money" aria-hidden />
               ) : (
                 <>
@@ -1818,7 +1872,14 @@ const CrossBorderLogisticsPage: FC = () => {
                 <span className="cbl-expense-summary__label">
                   {isEn ? 'Export cost' : '出口成本'}
                 </span>
-                <strong>¥{formatExportCny(exportCostCny ?? expenseSummary?.exportCostCnyTotal ?? 0)}</strong>
+                <strong>
+                  <DualMoney
+                    cny={exportCostCny ?? expenseSummary?.exportCostCnyTotal ?? 0}
+                    mmk={cnyToMmk(exportCostCny ?? expenseSummary?.exportCostCnyTotal ?? 0, fxRate)}
+                    rate={fxRate}
+                    prefix="−"
+                  />
+                </strong>
               </div>
               <div className="cbl-expense-summary__item">
                 <span className="cbl-expense-summary__label">
@@ -1833,7 +1894,7 @@ const CrossBorderLogisticsPage: FC = () => {
                 <strong>{expenseSummary?.entryCount ?? 0}</strong>
               </div>
             </div>
-            {financeLoading && expenseTotalItems === 0 && !expenseEntries.length ? (
+            {!financeFailed && !expenseSummary ? (
               <CblTableSkeleton rows={6} cols={6} />
             ) : expenseTotalItems > 0 ? (
               <>
@@ -1876,7 +1937,12 @@ const CrossBorderLogisticsPage: FC = () => {
                             }
                           >
                             {row.category === 'export_cost' ? (
-                              <>−¥{formatExportCny(row.paidCny ?? row.amount)}</>
+                              <DualMoney
+                                cny={row.paidCny ?? row.amount}
+                                mmk={cnyToMmk(row.paidCny ?? row.amount, fxRate)}
+                                rate={fxRate}
+                                prefix="−"
+                              />
                             ) : isCustomerLedgerCategory(row.category) ? (
                               <DualMoney
                                 mmk={row.amount}
@@ -1959,6 +2025,7 @@ const CrossBorderLogisticsPage: FC = () => {
                       {pagedTransitStores.map((store) => {
                         const finance = store.finance;
                         const cash = stationCashFlow(finance);
+                        const awaitingFinance = !finance && (financeLoading || !financeFailed);
                         return (
                           <tr key={store.id}>
                             <td>
@@ -1988,17 +2055,24 @@ const CrossBorderLogisticsPage: FC = () => {
                                 onClick={() => openFinanceDetail(store, 'ledger')}
                               >
                                 <span className="cbl-finance-count">
-                                  {finance?.ledgerEntryCount ?? 0}
+                                  {awaitingFinance ? '…' : finance?.ledgerEntryCount ?? 0}
                                 </span>
                                 <span className="cbl-finance-unit">{isEn ? 'entries' : '条'}</span>
                               </button>
                             </td>
                             <td className="cbl-finance-cell">
+                              {awaitingFinance ? (
+                                <span className="cbl-skel-line cbl-skel-line--money" aria-hidden />
+                              ) : (
                               <span className="cbl-io-cell__main cbl-io-cell__main--in">
                                 <DualMoney mmk={cash.pending} rate={fxRate} prefix="+" />
                               </span>
+                              )}
                             </td>
                             <td className="cbl-finance-cell cbl-finance-cell--in">
+                              {awaitingFinance ? (
+                                <span className="cbl-skel-line cbl-skel-line--money" aria-hidden />
+                              ) : (
                               <span className="cbl-io-cell__main cbl-io-cell__main--in">
                                 <DualMoney
                                   mmk={cash.collected}
@@ -2007,18 +2081,30 @@ const CrossBorderLogisticsPage: FC = () => {
                                   prefix="+"
                                 />
                               </span>
+                              )}
                             </td>
                             <td className="cbl-finance-cell cbl-finance-cell--out">
+                              {awaitingFinance ? (
+                                <span className="cbl-skel-line cbl-skel-line--money" aria-hidden />
+                              ) : (
                               <span className="cbl-io-cell__main cbl-io-cell__main--out">
                                 −{formatMmK(cash.unpaidTransport)} MMK
                               </span>
+                              )}
                             </td>
                             <td className="cbl-finance-cell">
+                              {awaitingFinance ? (
+                                <span className="cbl-skel-line cbl-skel-line--money" aria-hidden />
+                              ) : (
                               <span className="cbl-io-cell__main">
                                 {formatMmK(cash.paidTransport)} MMK
                               </span>
+                              )}
                             </td>
                             <td className="cbl-finance-cell">
+                              {awaitingFinance ? (
+                                <span className="cbl-skel-line cbl-skel-line--money" aria-hidden />
+                              ) : (
                               <div className="cbl-io-cell">
                                 <span className="cbl-io-cell__main cbl-io-cell__main--in">
                                   <DualMoney
@@ -2031,6 +2117,7 @@ const CrossBorderLogisticsPage: FC = () => {
                                   −{formatMmK(finance?.crossBorderSummary?.manualExpenseTotal ?? 0)} MMK
                                 </span>
                               </div>
+                              )}
                             </td>
                             <td>
                               <button
@@ -2077,6 +2164,7 @@ const CrossBorderLogisticsPage: FC = () => {
           isEn={isEn}
           period={financePeriodParams}
           stores={transitStores}
+          rate={fxRate}
           onTotal={setExportCostCny}
         />
         </div>

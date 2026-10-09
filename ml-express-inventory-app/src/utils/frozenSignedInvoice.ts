@@ -15,6 +15,7 @@ export type FrozenSignedInvoiceLine = {
 };
 
 export type FrozenSignedInvoiceDocument = {
+  invoiceNo?: string;
   customerName: string;
   phone: string;
   destination: string;

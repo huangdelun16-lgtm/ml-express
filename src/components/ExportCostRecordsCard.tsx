@@ -1,17 +1,24 @@
 import { FC, useEffect, useMemo, useState } from 'react';
+import DualMoney from './DualMoney';
 import {
   fetchExportCostRecords,
   type ExportCostRecord,
   type FinancePeriodParams,
   type InventoryTransitStore,
 } from '../services/inventoryConsoleService';
+import { cnyToMmk } from '../utils/crossBorderFx';
 
 type Props = {
   isEn: boolean;
   period: FinancePeriodParams;
   stores: InventoryTransitStore[];
+  rate: number | null;
   onTotal?: (totalCny: number | null) => void;
 };
+
+function exportCostMoney(cny: number, rate: number | null) {
+  return <DualMoney cny={cny} mmk={cnyToMmk(cny, rate)} rate={rate} prefix="−" />;
+}
 
 function money(value: number | string | null | undefined): string {
   const n = Number(value);
@@ -54,7 +61,7 @@ function whenLabel(iso: string): string {
   return date.toLocaleString('zh-CN', { hour12: false });
 }
 
-const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, onTotal }) => {
+const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal }) => {
   const [rows, setRows] = useState<ExportCostRecord[]>([]);
   const [totalCny, setTotalCny] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -134,7 +141,7 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, onTotal }) => 
           </div>
           <div className="cbl-export-cost__stat cbl-export-cost__stat--total">
             <span>{isEn ? 'Total' : '合计'}</span>
-            <strong>¥{loading ? '—' : money(totalCny)}</strong>
+            <strong>{loading ? '—' : exportCostMoney(totalCny, rate)}</strong>
           </div>
           <input
             className="cbl-export-cost__search"
@@ -191,7 +198,9 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, onTotal }) => 
                       </td>
                       <td>{money(row.weight_kg)} Kg</td>
                       <td>¥{money(row.unit_price_cny)}</td>
-                      <td className="cbl-finance-cell cbl-finance-cell--out">¥{money(row.total_cny)}</td>
+                      <td className="cbl-finance-cell cbl-finance-cell--out">
+                        {exportCostMoney(Number(row.total_cny) || 0, rate)}
+                      </td>
                       <td>{row.trip_number?.trim() || '—'}</td>
                       <td>
                         <span className="cbl-code">{row.store_code || '—'}</span>

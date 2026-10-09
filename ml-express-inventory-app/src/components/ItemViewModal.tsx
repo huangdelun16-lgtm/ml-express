@@ -24,7 +24,7 @@ import type { InventoryItemDetail } from '../types/inventory';
 import { exceptionTargetFromItem } from '../utils/inventoryException';
 import { canMarkCustomerSigned, isDestinationHubViewer } from '../utils/customerSign';
 import type { ArrivalNotifyTarget } from '../utils/arrivalNotify';
-import { resolvePackagingStockInItemLabel } from '../utils/packItemSequence';
+import { invoiceDisplayWeight, resolvePackagingStockInItemLabel } from '../utils/packItemSequence';
 import { fetchCrossBorderFxRate } from '../utils/crossBorderFx';
 import { pickNotesFxLock } from '../utils/inboundMovementNote';
 
@@ -52,7 +52,18 @@ function mapDetailToInvoice(
     qty: detail.inbound_qty,
     packaging: detail.packaging?.trim() || undefined,
     spec: detail.spec?.trim() || undefined,
-    weight: detail.weight?.trim() || undefined,
+    ...(() => {
+      const shown = invoiceDisplayWeight({
+        barcode: detail.barcode,
+        weight: detail.weight,
+        inboundMovementNote: detail.inbound_movement_note,
+        pack: detail.pack,
+      });
+      return {
+        weight: shown?.value,
+        weightKind: shown?.kind,
+      };
+    })(),
     totalFee: detail.total_fee,
     paymentLabel: detail.payment_label,
     note: detail.inbound_note,

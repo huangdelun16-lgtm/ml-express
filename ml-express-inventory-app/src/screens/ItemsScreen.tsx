@@ -606,6 +606,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         hubCode={hubCode}
         onClose={() => setInvoiceVisible(false)}
         continueLabel={t.invoice.signAction}
+        signedBy={operatorName ?? t.common.operator}
         onContinue={(handoff) => {
           if (!store) return;
           setInvoiceVisible(false);

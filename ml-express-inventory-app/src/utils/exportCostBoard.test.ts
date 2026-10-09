@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildExportCostBoard, exportCostLineTotal, exportCostOptionsFromPacks } from './exportCostBoard';
+import {
+  buildExportCostBoard,
+  exportCostLineTotal,
+  exportCostOptionsFromPacks,
+  matchesExportCostQuery,
+  withoutSavedExportCosts,
+} from './exportCostBoard';
 import type { InventoryItemListRow } from '../types/inventory';
 
 function row(partial: Partial<InventoryItemListRow> & Pick<InventoryItemListRow, 'id' | 'barcode'>): InventoryItemListRow {
@@ -121,5 +127,72 @@ describe('buildExportCostBoard', () => {
     ]);
     expect(exportCostLineTotal(2.5, 75)).toBe(187.5);
     expect(exportCostLineTotal(0, 75)).toBe(0);
+  });
+
+  it('uses the bundle weight when multiple inbound pieces do not carry weight', () => {
+    const options = exportCostOptionsFromPacks([
+      {
+        loaded: false,
+        bundle_barcode: 'RUI26MDY40026',
+        weight: '18 Kg',
+        items: [
+          { item_barcode: 'MDY420311071026(4-1)' },
+          { item_barcode: 'MDY420311071026(4-2)' },
+        ],
+      },
+    ]);
+    const board = buildExportCostBoard(
+      [
+        row({
+          id: 'a',
+          barcode: 'MDY420311071026(4-1)',
+          customer_name: 'Ei',
+          final_destination: 'MDY',
+          packed_bundle_barcode: 'RUI26MDY40026',
+        }),
+        row({
+          id: 'b',
+          barcode: 'MDY420311071026(4-2)',
+          packed_bundle_barcode: 'RUI26MDY40026',
+        }),
+      ],
+      options,
+    );
+
+    expect(board.packages).toEqual([
+      {
+        base: 'MDY420311071026',
+        customer: 'Ei',
+        destination: 'MDY',
+        pieceCount: 2,
+        declaredTotal: 4,
+        weightKg: 18,
+        tripNumber: '',
+      },
+    ]);
+  });
+
+  it('removes only the orders and packages that already have an export cost', () => {
+    const board = buildExportCostBoard([
+      row({ id: 's1', barcode: 'MDY001', input_barcode: 'KEEP' }),
+      row({ id: 's2', barcode: 'MDY002', input_barcode: 'ADDED' }),
+      row({ id: 'p1', barcode: 'RUI26MDY50002(2-1)' }),
+      row({ id: 'p2', barcode: 'RUI26MDY50002(2-2)' }),
+      row({ id: 'q1', barcode: 'RUI26MDY50009(2-1)' }),
+    ]);
+    const next = withoutSavedExportCosts(board, [
+      { subjectKind: 'single', subjectKey: 's2' },
+      { subjectKind: 'package', subjectKey: 'rui26mdy50002' },
+    ]);
+
+    expect(next.singles.map((item) => item.barcode)).toEqual(['KEEP']);
+    expect(next.packages.map((item) => item.base)).toEqual(['RUI26MDY50009']);
+  });
+
+  it('matches an export cost row by barcode, customer, or trip', () => {
+    expect(matchesExportCostQuery('khaing', ['DPK1', 'Ei Ei Khaing', 'MDY', 'RUI0026'])).toBe(true);
+    expect(matchesExportCostQuery('rui0026', ['DPK1', 'Ei', 'MDY', 'RUI0026'])).toBe(true);
+    expect(matchesExportCostQuery('missing', ['DPK1', 'Ei', 'MDY', ''])).toBe(false);
+    expect(matchesExportCostQuery('  ', ['DPK1'])).toBe(true);
   });
 });

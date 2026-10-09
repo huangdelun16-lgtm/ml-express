@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatPackItemLabel,
   findParentPackForItem,
+  invoiceDisplayWeight,
   isPackagingStockInPack,
   resolvePackItemSequence,
   resolvePackagingStockInItemLabel,
@@ -115,5 +116,25 @@ describe('packItemSequence', () => {
     const parent = findParentPackForItem(items[1], [], items);
     expect(parent?.items).toHaveLength(3);
     expect(resolvePackagingStockInItemLabel('i2', 'MDY002', parent, 'x · 打包入 PKG')).toBe('3-2');
+  });
+
+  it('shows a single order weight, and a package total weight for multiple inbound', () => {
+    expect(
+      invoiceDisplayWeight({ barcode: 'MDY001', weight: '8 Kg' }),
+    ).toEqual({ kind: 'single', value: '8 Kg' });
+    expect(
+      invoiceDisplayWeight({
+        barcode: 'MDY420311071026(4-1)',
+        weight: '',
+        pack: { note: '多个入库', weight: '60 Kg' },
+      }),
+    ).toEqual({ kind: 'package', value: '60 Kg' });
+    expect(
+      invoiceDisplayWeight({
+        barcode: 'RUI26MDY50002',
+        weight: '60 Kg',
+        pack: { note: '多个入库', weight: '60 Kg' },
+      }),
+    ).toEqual({ kind: 'package', value: '60 Kg' });
   });
 });

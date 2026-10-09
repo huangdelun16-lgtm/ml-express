@@ -13,6 +13,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Text from '../components/AppText';
 import HomeTodoQueue from '../components/HomeTodoQueue';
 import ExportCostCard from '../components/ExportCostCard';
+import SignedInvoiceCard from '../components/SignedInvoiceCard';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
@@ -429,6 +430,8 @@ export default function HomeScreen({ navigation }: HomeProps) {
             tone="inbound"
             tiles={inboundTiles}
             navigation={navigation}
+            insertBeforeScreen="HubReceive"
+            insertBefore={<SignedInvoiceCard />}
           />
         ) : null}
 

@@ -305,7 +305,7 @@ export default function CustomerSignFlowModal({
           fxLock: lock ?? undefined,
         });
       }
-      if (request.frozenInvoice) {
+      if (request.frozenInvoice && !request.frozenInvoice.invoiceNo) {
         try {
           await freezeSignedInvoice({
             document: request.frozenInvoice,

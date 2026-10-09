@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -13,6 +13,8 @@ import Text from './AppText';
 import { useTranslation } from '../i18n';
 import {
   exportCostLineTotal,
+  matchesExportCostQuery,
+  withoutSavedExportCosts,
   type ExportCostBoard,
   type ExportCostPackageRow,
   type ExportCostSingleRow,
@@ -51,6 +53,7 @@ type Line = {
   destination: string;
   weightKg: number;
   tripNumber: string;
+  pieces: string;
   meta: string;
 };
 
@@ -58,25 +61,25 @@ export default function ExportCostCard({ board, loading, error, saved, onOpen, o
   const { t, fmt } = useTranslation();
   const { height } = useWindowDimensions();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [leg, setLeg] = useState<ExportLegDestination | ''>('');
-  const [menu, setMenu] = useState(false);
   const [price, setPrice] = useState('');
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
-  const empty = board.singles.length === 0 && board.packages.length === 0;
+  const pending = withoutSavedExportCosts(board, saved);
+  const empty = pending.singles.length === 0 && pending.packages.length === 0;
   const savedByKey = new Map(saved.map((row) => [exportCostKey(row.subjectKind, row.subjectKey), row]));
 
   const close = () => {
     setOpen(false);
     setOpenKey(null);
-    setMenu(false);
+    setQuery('');
   };
 
   const toggleLine = (line: Line) => {
-    if (savedByKey.has(line.key)) return;
+    if (savedByKey.has(line.key) || line.weightKg <= 0) return;
     setFormError('');
-    setMenu(false);
     if (openKey === line.key) {
       setOpenKey(null);
       return;
@@ -104,7 +107,6 @@ export default function ExportCostCard({ board, loading, error, saved, onOpen, o
         tripNumber: line.tripNumber,
       });
       setOpenKey(null);
-      setMenu(false);
       setPrice('');
       setLeg('');
     } catch (err) {
@@ -115,8 +117,25 @@ export default function ExportCostCard({ board, loading, error, saved, onOpen, o
     }
   };
 
-  const singles = board.singles.map((row) => toSingleLine(row, t, fmt));
-  const packages = board.packages.map((row) => toPackageLine(row, t, fmt));
+  const singles = useMemo(
+    () =>
+      pending.singles
+        .filter((row) =>
+          matchesExportCostQuery(query, [row.barcode, row.customer, row.destination, row.tripNumber]),
+        )
+        .map((row) => toSingleLine(row, t, fmt)),
+    [pending.singles, query, t, fmt],
+  );
+  const packages = useMemo(
+    () =>
+      pending.packages
+        .filter((row) =>
+          matchesExportCostQuery(query, [row.base, row.customer, row.destination, row.tripNumber]),
+        )
+        .map((row) => toPackageLine(row, t, fmt)),
+    [pending.packages, query, t, fmt],
+  );
+  const noMatch = !empty && singles.length === 0 && packages.length === 0;
 
   return (
     <>
@@ -145,6 +164,15 @@ export default function ExportCostCard({ board, loading, error, saved, onOpen, o
           <View style={[styles.sheet, { maxHeight: height * 0.88 }]}>
             <Text style={styles.sheetTitle}>{t.home.exportCostTitle}</Text>
             <Text style={styles.sheetHint}>{t.home.exportCostBody}</Text>
+            <TextInput
+              style={styles.search}
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t.home.exportCostSearch}
+              placeholderTextColor="#64748b"
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
             <ScrollView
               style={{ maxHeight: height * 0.64 }}
               contentContainerStyle={styles.list}
@@ -153,41 +181,32 @@ export default function ExportCostCard({ board, loading, error, saved, onOpen, o
               {loading && empty ? <Text style={styles.empty}>{t.common.loading}</Text> : null}
               {!loading && error ? <Text style={styles.empty}>{error}</Text> : null}
               {!loading && !error && empty ? <Text style={styles.empty}>{t.home.exportCostEmpty}</Text> : null}
+              {!loading && !error && noMatch ? <Text style={styles.empty}>{t.home.exportCostNone}</Text> : null}
               <CostSection
-                title={`${t.home.exportCostSingle} ${board.singles.length}`}
+                title={`${t.home.exportCostSingle} ${singles.length}`}
                 lines={singles}
                 openKey={openKey}
                 savedByKey={savedByKey}
                 leg={leg}
-                menu={menu}
                 price={price}
                 savingKey={savingKey}
                 formError={formError}
                 onToggle={toggleLine}
-                onLeg={(next) => {
-                  setLeg(next);
-                  setMenu(false);
-                }}
-                onMenu={() => setMenu((value) => !value)}
+                onLeg={setLeg}
                 onPrice={setPrice}
                 onSubmit={(line) => void submit(line)}
               />
               <CostSection
-                title={`${t.home.exportCostPackage} ${board.packages.length}`}
+                title={`${t.home.exportCostPackage} ${packages.length}`}
                 lines={packages}
                 openKey={openKey}
                 savedByKey={savedByKey}
                 leg={leg}
-                menu={menu}
                 price={price}
                 savingKey={savingKey}
                 formError={formError}
                 onToggle={toggleLine}
-                onLeg={(next) => {
-                  setLeg(next);
-                  setMenu(false);
-                }}
-                onMenu={() => setMenu((value) => !value)}
+                onLeg={setLeg}
                 onPrice={setPrice}
                 onSubmit={(line) => void submit(line)}
               />
@@ -216,6 +235,7 @@ function toSingleLine(
     destination: row.destination,
     weightKg: row.weightKg,
     tripNumber: row.tripNumber,
+    pieces: '',
     meta: [
       row.customer,
       row.destination,
@@ -241,6 +261,7 @@ function toPackageLine(
     destination: row.destination,
     weightKg: row.weightKg,
     tripNumber: row.tripNumber,
+    pieces: `${row.pieceCount}/${row.declaredTotal}`,
     meta: [
       row.customer,
       row.destination,
@@ -263,13 +284,11 @@ function CostSection({
   openKey,
   savedByKey,
   leg,
-  menu,
   price,
   savingKey,
   formError,
   onToggle,
   onLeg,
-  onMenu,
   onPrice,
   onSubmit,
 }: {
@@ -278,13 +297,11 @@ function CostSection({
   openKey: string | null;
   savedByKey: Map<string, SavedExportCost>;
   leg: ExportLegDestination | '';
-  menu: boolean;
   price: string;
   savingKey: string | null;
   formError: string;
   onToggle: (line: Line) => void;
   onLeg: (leg: ExportLegDestination) => void;
-  onMenu: () => void;
   onPrice: (value: string) => void;
   onSubmit: (line: Line) => void;
 }) {
@@ -293,23 +310,31 @@ function CostSection({
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      {lines.map((line, index) => {
+      {lines.map((line) => {
         const saved = savedByKey.get(line.key);
         const expanded = openKey === line.key && !saved;
         const unit = Number(price);
         const total = exportCostLineTotal(unit, line.weightKg);
-        const legLabel = leg === 'MSE' ? t.home.exportCostMse : leg === 'LSO' ? t.home.exportCostLso : t.home.exportCostPickDest;
+        const canAdd = Boolean(leg && unit > 0 && line.weightKg > 0) && savingKey !== line.key;
         return (
-          <View key={line.key} style={[styles.item, index > 0 && styles.itemBorder]}>
-            <Pressable onPress={() => onToggle(line)} disabled={Boolean(saved)} accessibilityRole="button">
+          <View key={line.key} style={[styles.item, line.weightKg <= 0 && styles.itemNoWeight]}>
+            <Pressable onPress={() => onToggle(line)} disabled={Boolean(saved) || line.weightKg <= 0} accessibilityRole="button">
               <Text style={styles.itemTitle} numberOfLines={1}>
                 {line.title}
               </Text>
-              {line.meta ? (
-                <Text style={styles.itemMeta} numberOfLines={2}>
-                  {line.meta}
+              <View style={styles.chips}>
+                {line.customer ? <Text style={styles.chip}>{line.customer}</Text> : null}
+                {line.destination ? <Text style={styles.chip}>{line.destination}</Text> : null}
+                {line.kind === 'package' && line.pieces ? <Text style={styles.chip}>{line.pieces}</Text> : null}
+                {line.weightKg > 0 ? (
+                  <Text style={styles.chip}>{trimKg(line.weightKg)} Kg</Text>
+                ) : (
+                  <Text style={styles.chipWarn}>{t.home.exportCostNoWeight}</Text>
+                )}
+                <Text style={styles.chip}>
+                  {line.tripNumber ? fmt(t.home.exportCostTrip, { trip: line.tripNumber }) : t.home.exportCostTripEmpty}
                 </Text>
-              ) : null}
+              </View>
               {saved ? (
                 <Text style={styles.added}>
                   {t.home.exportCostAdded} · {t.home.exportCostRoute} →{' '}
@@ -320,57 +345,58 @@ function CostSection({
             </Pressable>
             {expanded ? (
               <View style={styles.form}>
-                <View style={styles.formRow}>
-                  <Text style={styles.route}>{t.home.exportCostRoute} →</Text>
-                  <Pressable style={styles.select} onPress={onMenu} accessibilityRole="button">
-                    <Text style={styles.selectText} numberOfLines={1}>
-                      {legLabel}
-                    </Text>
-                  </Pressable>
-                  <TextInput
-                    style={styles.price}
-                    value={price}
-                    onChangeText={(value) => onPrice(value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))}
-                    keyboardType="decimal-pad"
-                    placeholder="¥"
-                    placeholderTextColor="#64748b"
-                  />
+                <Text style={styles.formLabel}>{t.home.exportCostRoute} →</Text>
+                <View style={styles.legRow}>
                   <Pressable
-                    style={[styles.addBtn, (!(leg && unit > 0 && line.weightKg > 0) || savingKey === line.key) && styles.addBtnOff]}
-                    onPress={() => onSubmit(line)}
-                    disabled={!(leg && unit > 0 && line.weightKg > 0) || savingKey === line.key}
+                    style={[styles.legChip, leg === 'MSE' && styles.legChipOn]}
+                    onPress={() => onLeg('MSE')}
                     accessibilityRole="button"
                   >
-                    {savingKey === line.key ? (
-                      <ActivityIndicator color="#0f172a" size="small" />
-                    ) : (
-                      <Text style={styles.addText}>{t.home.exportCostAdd}</Text>
-                    )}
+                    <Text style={[styles.legText, leg === 'MSE' && styles.legTextOn]}>{t.home.exportCostMse}</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.legChip, leg === 'LSO' && styles.legChipOn]}
+                    onPress={() => onLeg('LSO')}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.legText, leg === 'LSO' && styles.legTextOn]}>{t.home.exportCostLso}</Text>
                   </Pressable>
                 </View>
-                {menu ? (
-                  <View style={styles.menu}>
-                    <Pressable style={styles.menuItem} onPress={() => onLeg('MSE')}>
-                      <Text style={styles.menuText}>{t.home.exportCostMse}</Text>
-                    </Pressable>
-                    <Pressable style={styles.menuItem} onPress={() => onLeg('LSO')}>
-                      <Text style={styles.menuText}>{t.home.exportCostLso}</Text>
-                    </Pressable>
-                  </View>
-                ) : null}
+                <Text style={styles.formLabel}>¥/Kg</Text>
+                <TextInput
+                  style={styles.price}
+                  value={price}
+                  onChangeText={(value) => onPrice(value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))}
+                  keyboardType="decimal-pad"
+                  placeholder="¥/Kg"
+                  placeholderTextColor="#64748b"
+                />
                 {line.weightKg > 0 && unit > 0 ? (
-                  <Text style={styles.calc}>
-                    {fmt(t.home.exportCostLineTotal, {
-                      unit: trimKg(unit),
-                      kg: trimKg(line.weightKg),
-                      total: trimKg(total),
-                    })}
-                  </Text>
-                ) : (
-                  <Text style={styles.calcMuted}>
-                    {line.weightKg > 0 ? '' : t.home.exportCostNeedWeight}
-                  </Text>
+                  <View style={styles.totalBox}>
+                    <Text style={styles.totalValue}>¥{trimKg(total)}</Text>
+                    <Text style={styles.calc}>
+                      {fmt(t.home.exportCostLineTotal, {
+                        unit: trimKg(unit),
+                        kg: trimKg(line.weightKg),
+                        total: trimKg(total),
+                      })}
+                    </Text>
+                  </View>
+                ) : line.weightKg > 0 ? null : (
+                  <Text style={styles.weightWarn}>{t.home.exportCostNeedWeight}</Text>
                 )}
+                <Pressable
+                  style={[styles.addBtn, !canAdd && styles.addBtnOff]}
+                  onPress={() => onSubmit(line)}
+                  disabled={!canAdd}
+                  accessibilityRole="button"
+                >
+                  {savingKey === line.key ? (
+                    <ActivityIndicator color="#0f172a" size="small" />
+                  ) : (
+                    <Text style={styles.addText}>{t.home.exportCostAdd}</Text>
+                  )}
+                </Pressable>
                 {formError ? <Text style={styles.formError}>{formError}</Text> : null}
               </View>
             ) : null}
@@ -426,62 +452,109 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   sheetTitle: { color: '#fbbf24', fontSize: 18, fontWeight: '800' },
-  sheetHint: { color: '#94a3b8', fontSize: 12, marginTop: 4, marginBottom: 8, lineHeight: 16 },
+  sheetHint: { color: '#94a3b8', fontSize: 12, marginTop: 4, lineHeight: 16 },
+  search: {
+    marginTop: 10,
+    marginBottom: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.35)',
+    color: '#f8fafc',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+  },
   list: { paddingBottom: 4 },
   empty: { color: '#94a3b8', fontSize: 13, paddingVertical: 16 },
-  section: { marginTop: 8 },
-  sectionTitle: { color: '#e2e8f0', fontSize: 13, fontWeight: '800', marginBottom: 4 },
-  item: { paddingVertical: 8 },
-  itemBorder: { borderTopWidth: 1, borderTopColor: 'rgba(148, 163, 184, 0.18)' },
-  itemTitle: { color: '#f8fafc', fontSize: 14, fontWeight: '700' },
-  itemMeta: { marginTop: 2, color: '#94a3b8', fontSize: 12, lineHeight: 16 },
+  section: { marginTop: 14 },
+  sectionTitle: {
+    color: '#fbbf24',
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  item: {
+    marginBottom: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.28)',
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+  },
+  itemNoWeight: { borderColor: 'rgba(248, 113, 113, 0.7)', backgroundColor: 'rgba(127, 29, 29, 0.28)' },
+  itemTitle: { color: '#f8fafc', fontSize: 15, fontWeight: '800' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  chip: {
+    color: '#e2e8f0',
+    fontSize: 12,
+    fontWeight: '700',
+    backgroundColor: 'rgba(148, 163, 184, 0.16)',
+    borderRadius: 8,
+    overflow: 'hidden',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  chipWarn: {
+    color: '#fecaca',
+    fontSize: 12,
+    fontWeight: '800',
+    backgroundColor: 'rgba(248, 113, 113, 0.22)',
+    borderRadius: 8,
+    overflow: 'hidden',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  weightWarn: { color: '#fecaca', fontSize: 13, fontWeight: '800' },
   added: { marginTop: 4, color: '#4ade80', fontSize: 12, fontWeight: '800' },
   form: { marginTop: 8, gap: 6 },
-  formRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  route: { color: '#fbbf24', fontSize: 13, fontWeight: '800' },
-  select: {
+  formLabel: { color: '#fbbf24', fontSize: 12, fontWeight: '800' },
+  legRow: { flexDirection: 'row', gap: 8 },
+  legChip: {
     flex: 1,
-    minWidth: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(251, 191, 36, 0.45)',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    borderColor: 'rgba(251, 191, 36, 0.4)',
     backgroundColor: '#0f172a',
+    paddingVertical: 6,
+    minHeight: 32,
   },
-  selectText: { color: '#f8fafc', fontSize: 12, fontWeight: '700' },
+  legChipOn: { backgroundColor: '#fbbf24', borderColor: '#fbbf24' },
+  legText: { color: '#f8fafc', fontSize: 12, fontWeight: '800' },
+  legTextOn: { color: '#0f172a' },
   price: {
-    width: 72,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(148, 163, 184, 0.4)',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    height: 36,
     color: '#f8fafc',
     fontSize: 14,
     fontWeight: '700',
     backgroundColor: '#0f172a',
   },
+  totalBox: {
+    borderRadius: 10,
+    backgroundColor: '#0f172a',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'flex-end',
+  },
+  totalValue: { color: '#fbbf24', fontSize: 22, fontWeight: '800' },
   addBtn: {
     borderRadius: 8,
     backgroundColor: '#fbbf24',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    minWidth: 56,
+    paddingVertical: 7,
+    minHeight: 34,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   addBtnOff: { opacity: 0.45 },
   addText: { color: '#0f172a', fontSize: 13, fontWeight: '800' },
-  menu: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(251, 191, 36, 0.35)',
-    backgroundColor: '#0f172a',
-    overflow: 'hidden',
-  },
-  menuItem: { paddingHorizontal: 10, paddingVertical: 10 },
-  menuText: { color: '#f8fafc', fontSize: 13, fontWeight: '700' },
-  calc: { color: '#fde68a', fontSize: 12, fontWeight: '700' },
+  calc: { color: '#fde68a', fontSize: 12, fontWeight: '700', marginTop: 2 },
   calcMuted: { color: '#64748b', fontSize: 12 },
   formError: { color: '#fca5a5', fontSize: 12, fontWeight: '700' },
   closeBtn: {
