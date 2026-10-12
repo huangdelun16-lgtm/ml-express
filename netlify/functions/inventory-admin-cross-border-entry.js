@@ -137,6 +137,7 @@ exports.handler = async (event) => {
     };
   }
 
+  const currency = String(body.currency || 'MMK').trim().toUpperCase() === 'CNY' ? 'CNY' : 'MMK';
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from('cross_border_manual_entries')
@@ -144,7 +145,7 @@ exports.handler = async (event) => {
       entry_date: entryDate,
       kind,
       amount: Math.round(amount),
-      currency: 'MMK',
+      currency,
       category,
       note,
       created_by: createdBy,

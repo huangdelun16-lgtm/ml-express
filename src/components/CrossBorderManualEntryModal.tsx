@@ -26,6 +26,7 @@ const CrossBorderManualEntryModal: React.FC<Props> = ({ open, onClose, onSaved, 
   const [kind, setKind] = useState<Kind>('expense');
   const [entryDate, setEntryDate] = useState(todayIsoDate());
   const [amount, setAmount] = useState('');
+  const [currency, setCurrency] = useState<'MMK' | 'CNY'>('MMK');
   const [category, setCategory] = useState('');
   const [note, setNote] = useState('');
   const [storeCode, setStoreCode] = useState('');
@@ -37,6 +38,7 @@ const CrossBorderManualEntryModal: React.FC<Props> = ({ open, onClose, onSaved, 
     setKind('expense');
     setEntryDate(todayIsoDate());
     setAmount('');
+    setCurrency('MMK');
     setCategory('');
     setNote('');
     setStoreCode(stores[0]?.store_code || '');
@@ -69,6 +71,7 @@ const CrossBorderManualEntryModal: React.FC<Props> = ({ open, onClose, onSaved, 
         entry_date: entryDate.trim(),
         kind,
         amount: Math.round(numeric),
+        currency,
         category: category.trim(),
         note: note.trim(),
         store_code: storeCode.trim(),
@@ -104,8 +107,8 @@ const CrossBorderManualEntryModal: React.FC<Props> = ({ open, onClose, onSaved, 
             </h2>
             <p className="cbl-pricing-modal__sub">
               {isEn
-                ? 'Record manual cross-border income or expense (MMK).'
-                : '手工登记跨境物流相关的收入或支出（MMK）。'}
+                ? 'One entry goes into one book. MMK stays in the kyat book. CNY stays in the yuan book.'
+                : '一条只进一个账。填缅币进缅币账，填人民币进人民币账。'}
             </p>
           </div>
           <button
@@ -159,7 +162,27 @@ const CrossBorderManualEntryModal: React.FC<Props> = ({ open, onClose, onSaved, 
           </label>
 
           <label className="cbl-manual-entry-field">
-            <span>{isEn ? 'Amount (MMK)' : '金额 (MMK)'}</span>
+            <span>{isEn ? 'Currency' : '货币'}</span>
+            <div className="cbl-manual-entry-kind">
+              <button
+                type="button"
+                className={`cbl-manual-entry-kind__btn${currency === 'MMK' ? ' cbl-manual-entry-kind__btn--on' : ''}`}
+                onClick={() => setCurrency('MMK')}
+              >
+                {isEn ? 'MMK' : '缅币'}
+              </button>
+              <button
+                type="button"
+                className={`cbl-manual-entry-kind__btn${currency === 'CNY' ? ' cbl-manual-entry-kind__btn--on' : ''}`}
+                onClick={() => setCurrency('CNY')}
+              >
+                {isEn ? 'CNY' : '人民币'}
+              </button>
+            </div>
+          </label>
+
+          <label className="cbl-manual-entry-field">
+            <span>{isEn ? `Amount (${currency})` : `金额 (${currency === 'CNY' ? '人民币' : '缅币'})`}</span>
             <input
               type="text"
               inputMode="decimal"

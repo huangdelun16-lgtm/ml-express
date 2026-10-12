@@ -41,7 +41,7 @@ const CrossBorderClearTripModal: React.FC<Props> = ({ open, onClose, onCleared, 
   const t = isEn
     ? {
         title: 'Clear one truck trip',
-        sub: 'Deletes the packs on this trip, every order inside those packs, their inbound records, and this trip’s truck-fee payment. Orders on any other trip stay.',
+        sub: 'Deletes this trip’s packs, the orders inside them, their inbound records, truck fee, and the matching invoice, export-cost, and manual-ledger lines. Orders on any other trip stay.',
         trip: 'Trip number',
         tripHint: 'Example: MSE0007',
         lookup: 'Preview',
@@ -60,7 +60,7 @@ const CrossBorderClearTripModal: React.FC<Props> = ({ open, onClose, onCleared, 
       }
     : {
         title: '清空指定车次',
-        sub: '只删除这一车次上的包装、包里的全部订单、这些订单的入库记录，以及这一趟的车费付款。其他车次上的订单不会动。',
+        sub: '只删除这一车次上的包装、包里的订单、入库记录、这一趟的车费，以及这些订单在发票、出口成本和手工账里的记录。其他车次不动。',
         trip: '车次号',
         tripHint: '例如 MSE0007',
         lookup: '查看这趟车',
@@ -187,12 +187,15 @@ const CrossBorderClearTripModal: React.FC<Props> = ({ open, onClose, onCleared, 
               <div className="cbl-clear-trip-preview">
                 <strong>
                   {preview.tripNumber} · {t.packs} {preview.packCount} · {t.orders} {preview.orderCount}
+                  {preview.totalWeight ? ` · ${preview.totalWeight}` : ''}
                 </strong>
                 <ul>
                   {preview.packs.map((pack) => (
                     <li key={pack.packBarcode}>
                       {pack.packBarcode}
+                      {pack.customerName ? ` · ${pack.customerName}` : ''}
                       {pack.route ? ` · ${pack.route}` : ''}
+                      {pack.weight ? ` · ${pack.weight}` : ''}
                       {pack.itemCount ? ` · ${pack.itemCount}` : ''}
                     </li>
                   ))}

@@ -45,6 +45,7 @@ test('adds the export cost into the finance list in CNY and skips other stations
   );
 
   assert.equal(next.summary.exportCostCnyTotal, 20);
+  assert.equal(next.summary.exportCostMmkTotal, 0);
   assert.equal(next.summary.entryCount, 2);
   assert.equal(next.entries[0].category, 'export_cost');
   assert.equal(next.entries[0].title, 'SF1');
@@ -54,4 +55,43 @@ test('adds the export cost into the finance list in CNY and skips other stations
   assert.equal(next.entries[0].statusLabel, '已添加');
   assert.match(next.entries[0].subtitle, /瑞丽 → 木姐/);
   assert.match(next.entries[0].subtitle, /车次 RUI0008/);
+});
+
+test('mmk export cost stays out of the CNY total and keeps its locked kyat', () => {
+  const next = appendExportCosts(
+    { entries: [], summary: { entryCount: 0 } },
+    [
+      {
+        id: 'cny',
+        display_barcode: 'A',
+        leg_destination: 'MSE',
+        weight_kg: 8,
+        unit_price_cny: 13,
+        total_cny: 104,
+        pay_currency: 'CNY',
+        total_mmk: 0,
+        store_code: 'RUILI001',
+        created_at: '2026-10-08T03:00:00.000Z',
+      },
+      {
+        id: 'mmk',
+        display_barcode: 'B',
+        leg_destination: 'LSO',
+        weight_kg: 8,
+        unit_price_cny: 13,
+        total_cny: 0,
+        pay_currency: 'MMK',
+        fx_mmk_per_cny: 670,
+        total_mmk: 69680,
+        store_code: 'RUILI001',
+        created_at: '2026-10-08T04:00:00.000Z',
+      },
+    ],
+    [],
+    { storeCode: 'RUILI001' },
+  );
+  assert.equal(next.summary.exportCostCnyTotal, 104);
+  assert.equal(next.summary.exportCostMmkTotal, 69680);
+  assert.equal(next.entries.find((row) => row.title === 'B').paidCny, 0);
+  assert.equal(next.entries.find((row) => row.title === 'B').paidCurrency, 'MMK');
 });

@@ -20,6 +20,7 @@ import {
   resolvePackagingStockInSignIds,
   uniqueSignFeeMmk,
   uniqueQuoteCny,
+  signCollectAmount,
   validateBatchSignSelection,
 } from './customerBatchSign';
 
@@ -166,5 +167,20 @@ describe('customerBatchSign', () => {
     expect(uniqueQuoteCny(details)).toBe(120);
     expect(fxLockQuoteCnyForItem(details[0], details.slice(0, 2))).toBe(100);
     expect(fxLockQuoteCnyForItem(details[1], details.slice(0, 2))).toBe(0);
+  });
+
+  it('charges the yuan quote as-is, and multiplies by the rate only for kyat', () => {
+    expect(
+      signCollectAmount({ currency: 'CNY', quoteCny: 40, rate: 672, recordedMmk: 999 }),
+    ).toEqual({ kind: 'cny', cny: 40 });
+    expect(
+      signCollectAmount({ currency: 'MMK', quoteCny: 40, rate: 672, recordedMmk: 999 }),
+    ).toEqual({ kind: 'mmk', mmk: 26880, cny: 40, rate: 672 });
+    expect(
+      signCollectAmount({ currency: 'MMK', quoteCny: 40, rate: null, recordedMmk: 999 }),
+    ).toEqual({ kind: 'need-rate' });
+    expect(
+      signCollectAmount({ currency: 'MMK', quoteCny: null, rate: 672, recordedMmk: 1500 }),
+    ).toEqual({ kind: 'mmk', mmk: 1500, cny: null, rate: 672 });
   });
 });

@@ -34,6 +34,7 @@ import {
   packagingStockInSignBatch,
   uniqueQuoteCny,
   uniqueSignFeeMmk,
+  signCollectAmount,
 } from '../utils/customerBatchSign';
 import {
   buildSignFxLock,
@@ -110,7 +111,6 @@ export default function CustomerSignFlowModal({
   const [signatureStrokes, setSignatureStrokes] = useState<SignatureStroke[]>([]);
   const [payCurrency, setPayCurrency] = useState<CrossBorderPaidCurrency>('MMK');
   const [mmkPerCny, setMmkPerCny] = useState<number | null>(null);
-  const [rateBusy, setRateBusy] = useState(false);
 
   useEffect(() => {
     if (!visible || !request || itemIds.length === 0) {
@@ -123,7 +123,6 @@ export default function CustomerSignFlowModal({
       setSignatureStrokes([]);
       setPayCurrency('MMK');
       setMmkPerCny(null);
-      setRateBusy(false);
       setLoading(false);
       setSubmitting(false);
       return;
@@ -147,14 +146,6 @@ export default function CustomerSignFlowModal({
         const resolvedRate = rate ?? request.liveRate ?? null;
         setMmkPerCny(resolvedRate);
         setPayCurrency('MMK');
-
-        const quoteCny = uniqueQuoteCny(loadedDetails);
-        if (quoteCny != null && quoteCny > 0 && (resolvedRate == null || resolvedRate <= 0)) {
-          Alert.alert(t.sign.codAlertTitle, t.sign.rateRequiredBlock, [
-            { text: t.common.ok, onPress: onClose },
-          ]);
-          return;
-        }
 
         const codGroups = buildCodAlertFeeGroups(loadedDetails);
         if (codGroups.length > 0) {
@@ -221,37 +212,21 @@ export default function CustomerSignFlowModal({
   const hasPrepaid = details.some((row) => row.payment_label === '预付');
   const packagingBatch = useMemo(() => packagingStockInSignBatch(details), [details]);
   const quoteCny = useMemo(() => uniqueQuoteCny(details), [details]);
-  const feeMmk = useMemo(() => {
-    if (quoteCny != null && mmkPerCny != null && mmkPerCny > 0) {
-      return cnyToMmk(quoteCny, mmkPerCny) ?? 0;
-    }
-    return uniqueSignFeeMmk(details);
-  }, [details, quoteCny, mmkPerCny]);
-  const needsRate = quoteCny != null && quoteCny > 0 && (mmkPerCny == null || mmkPerCny <= 0);
+  const recordedMmk = useMemo(() => uniqueSignFeeMmk(details), [details]);
+  const collect = useMemo(
+    () =>
+      signCollectAmount({
+        currency: payCurrency,
+        quoteCny,
+        rate: mmkPerCny,
+        recordedMmk,
+      }),
+    [payCurrency, quoteCny, mmkPerCny, recordedMmk],
+  );
+  const needsRate = collect.kind === 'need-rate';
 
-  const selectPayCurrency = async (currency: CrossBorderPaidCurrency) => {
-    if (currency === 'MMK') {
-      setPayCurrency('MMK');
-      return;
-    }
-    let rate = mmkPerCny;
-    if (rate == null || rate <= 0) {
-      setRateBusy(true);
-      try {
-        rate = await fetchCrossBorderFxRate({ force: true });
-        if (rate == null && request?.liveRate != null && request.liveRate > 0) {
-          rate = request.liveRate;
-        }
-        setMmkPerCny(rate);
-      } finally {
-        setRateBusy(false);
-      }
-    }
-    if (rate == null || rate <= 0) {
-      feedbackService.notify(t.sign.needComplete, t.sign.cnyNeedsRate);
-      return;
-    }
-    setPayCurrency('CNY');
+  const selectPayCurrency = (currency: CrossBorderPaidCurrency) => {
+    setPayCurrency(currency);
   };
 
   const submit = async () => {
@@ -259,11 +234,6 @@ export default function CustomerSignFlowModal({
 
     if (needsRate) {
       feedbackService.notify(t.sign.needComplete, t.sign.rateRequiredBlock);
-      return;
-    }
-
-    if (payCurrency === 'CNY' && (mmkPerCny == null || mmkPerCny <= 0)) {
-      feedbackService.notify(t.sign.needComplete, t.sign.cnyNeedsRate);
       return;
     }
 
@@ -395,7 +365,7 @@ export default function CustomerSignFlowModal({
                 <View style={styles.choiceRow}>
                   <Pressable
                     style={[styles.choiceBtn, payCurrency === 'MMK' && styles.choiceBtnActive]}
-                    onPress={() => void selectPayCurrency('MMK')}
+                    onPress={() => selectPayCurrency('MMK')}
                   >
                     <Text
                       style={[
@@ -407,13 +377,8 @@ export default function CustomerSignFlowModal({
                     </Text>
                   </Pressable>
                   <Pressable
-                    style={[
-                      styles.choiceBtn,
-                      payCurrency === 'CNY' && styles.choiceBtnActive,
-                      mmkPerCny == null && !rateBusy && styles.choiceBtnMuted,
-                    ]}
-                    onPress={() => void selectPayCurrency('CNY')}
-                    disabled={rateBusy}
+                    style={[styles.choiceBtn, payCurrency === 'CNY' && styles.choiceBtnActive]}
+                    onPress={() => selectPayCurrency('CNY')}
                   >
                     <Text
                       style={[
@@ -421,16 +386,34 @@ export default function CustomerSignFlowModal({
                         payCurrency === 'CNY' && styles.choiceBtnTextActive,
                       ]}
                     >
-                      {rateBusy ? t.sign.loadingRate : t.sign.payCny}
+                      {t.sign.payCny}
                     </Text>
                   </Pressable>
                 </View>
 
-                {quoteCny != null && mmkPerCny != null && mmkPerCny > 0 ? (
-                  <Text style={styles.payAmount}>{settlementLines(quoteCny, mmkPerCny, t)}</Text>
-                ) : feeMmk > 0 ? (
+                {collect.kind === 'cny' ? (
+                  <>
+                    <Text style={styles.payAmount}>
+                      {fmt(t.sign.collectCny, { amount: formatCnyAmount(collect.cny) })}
+                    </Text>
+                    <Text style={styles.payHint}>{t.sign.cnyNoMultiply}</Text>
+                  </>
+                ) : collect.kind === 'need-rate' ? (
+                  <Text style={styles.payHint}>{t.sign.noRateHint}</Text>
+                ) : collect.cny != null && collect.rate != null ? (
+                  <>
+                    <Text style={styles.payAmount}>
+                      {fmt(t.sign.mmkFromQuote, {
+                        cny: formatCnyAmount(collect.cny),
+                        rate: formatMmkAmount(collect.rate),
+                        mmk: formatMmkAmount(collect.mmk),
+                      })}
+                    </Text>
+                    <Text style={styles.payHint}>{t.sign.mmkMultiplyHint}</Text>
+                  </>
+                ) : recordedMmk > 0 ? (
                   <Text style={styles.payAmount}>
-                    {fmt(t.sign.collectMmk, { amount: formatMmkAmount(feeMmk) })}
+                    {fmt(t.sign.collectMmk, { amount: formatMmkAmount(recordedMmk) })}
                   </Text>
                 ) : details.some((row) => hasRecordedFee(row.total_fee) || row.quote_cny?.trim()) ? (
                   <Text style={styles.payAmount}>
@@ -440,16 +423,14 @@ export default function CustomerSignFlowModal({
                   </Text>
                 ) : null}
 
-                {mmkPerCny != null ? (
+                {payCurrency === 'MMK' && mmkPerCny != null ? (
                   <>
                     <Text style={styles.payMeta}>
                       {fmt(t.sign.rateLine, { rate: formatMmkAmount(mmkPerCny) })}
                     </Text>
                     <Text style={styles.payHint}>{t.sign.fxLockedHint}</Text>
                   </>
-                ) : (
-                  <Text style={styles.payHint}>{t.sign.noRateHint}</Text>
-                )}
+                ) : null}
 
                 {hasPrepaid ? (
                   <Text style={styles.payHint}>

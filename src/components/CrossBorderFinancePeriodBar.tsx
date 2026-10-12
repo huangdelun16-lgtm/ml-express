@@ -12,7 +12,7 @@ type Props = {
   onKindChange: (kind: FinancePeriodKind) => void;
   onDateChange: (date: string) => void;
   onStoreCodeChange: (code: string) => void;
-  onExport: () => void;
+  onExport?: () => void;
 };
 
 function toMonthValue(date: string): string {
@@ -39,6 +39,13 @@ const CrossBorderFinancePeriodBar: React.FC<Props> = ({
             key={item}
             type="button"
             className={`cbl-period-bar__kind${kind === item ? ' cbl-period-bar__kind--on' : ''}`}
+            data-cbl-tip={
+              item === 'day'
+                ? isEn ? 'Totals for one day' : '看某一天'
+                : item === 'month'
+                  ? isEn ? 'Totals for one month' : '看某一月'
+                  : isEn ? 'Totals for one year' : '看某一年'
+            }
             onClick={() => onKindChange(item)}
           >
             {item === 'day' ? (isEn ? 'Day' : '日') : item === 'month' ? (isEn ? 'Month' : '月') : isEn ? 'Year' : '年'}
@@ -84,14 +91,17 @@ const CrossBorderFinancePeriodBar: React.FC<Props> = ({
         ))}
       </select>
       <span className="cbl-period-bar__tz">Asia/Yangon</span>
-      <button
-        type="button"
-        className="cbl-btn cbl-btn--light cbl-btn--sm"
-        onClick={onExport}
-        disabled={Boolean(exporting)}
-      >
-        {exporting ? (isEn ? 'Exporting…' : '导出中…') : isEn ? 'Export Excel' : '导出 Excel'}
-      </button>
+      {onExport ? (
+        <button
+          type="button"
+          className="cbl-btn cbl-btn--light cbl-btn--sm"
+          data-cbl-tip={isEn ? 'Download this period as Excel' : '把这一期导出成 Excel'}
+          onClick={onExport}
+          disabled={Boolean(exporting)}
+        >
+          {exporting ? (isEn ? 'Exporting…' : '导出中…') : isEn ? 'Export Excel' : '导出 Excel'}
+        </button>
+      ) : null}
     </div>
   );
 };

@@ -5,6 +5,7 @@ import {
   buildCrossBorderFxHistorySetting,
   buildCrossBorderFxSetting,
   cnyToMmk,
+  customerListCny,
   customerExpressLedgerCategory,
   displayRateForCustomerCategory,
   formatCnyAmount,
@@ -57,6 +58,10 @@ describe('crossBorderFx', () => {
     expect(mmkToCny(188000, null)).toBeNull();
     expect(cnyToMmk(37.6, null)).toBeNull();
     expect(mmkToCny(188000, 0)).toBeNull();
+    expect(
+      customerListCny({ totalFee: 1749600, totalQuoteCny: 2400, feeWithoutQuote: 134400 }, 672),
+    ).toBe(2600);
+    expect(customerListCny({ totalFee: 6225420 }, 672)).toBeCloseTo(9264.02, 2);
     expect(cnyToMmk(Number.NaN, 5000)).toBeNull();
   });
 

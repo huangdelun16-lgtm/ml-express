@@ -52,6 +52,19 @@ export function pickMmkPerCnyRate(
   return null;
 }
 
+/** 客户列表人民币：报价（含多个入库，已去重）加上没有报价的缅币按汇率折算。 */
+export function customerListCny(
+  summary: { totalFee: number; totalQuoteCny?: number | null; feeWithoutQuote?: number | null },
+  rate: number | null,
+): number | null {
+  const quote = Number(summary.totalQuoteCny);
+  const hasSplit = Number.isFinite(quote) && summary.feeWithoutQuote != null;
+  if (!hasSplit) return mmkToCny(summary.totalFee, rate);
+  const converted = mmkToCny(Number(summary.feeWithoutQuote) || 0, rate) ?? 0;
+  const total = (quote > 0 ? quote : 0) + converted;
+  return total > 0 ? Math.round(total * 100) / 100 : mmkToCny(summary.totalFee, rate);
+}
+
 export function mmkToCny(mmk: number, rate: number | null): number | null {
   if (rate == null || rate <= 0 || !Number.isFinite(rate) || !Number.isFinite(mmk)) return null;
   return mmk / rate;

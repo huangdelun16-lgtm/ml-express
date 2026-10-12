@@ -35,7 +35,7 @@ const CrossBorderClearTestDataModal: React.FC<Props> = ({ open, onClose, onClear
   const t = isEn
     ? {
         title: 'Clear all cross-border business data',
-        sub: 'Permanently deletes every Inventory cloud record: express items, packs, hub scans, in-transit tracking, ledger, settlements, remittances, and exceptions. Keeps transit accounts, salespersons, registered customers, and pricing. Station apps clear matching local data on next sync.',
+        sub: 'Permanently deletes every cross-border cloud record: express items, packs, hub scans, tracking, ledger, settlements, remittances, exceptions, export costs, and signed invoices. Keeps transit accounts, salespersons, registered customers, and pricing. Station apps clear matching local data on next sync.',
         password: 'Your admin password',
         confirmLabel: 'Confirmation phrase',
         confirmHint: `Type exactly: ${INVENTORY_TEST_DATA_CONFIRM_PHRASE}`,
@@ -47,7 +47,7 @@ const CrossBorderClearTestDataModal: React.FC<Props> = ({ open, onClose, onClear
       }
     : {
         title: '清空全部跨境业务数据',
-        sub: '将永久删除云端全部跨境业务：快递明细、包装、到站签收、在途追踪、流水、跨境会计、站点结算、代转、未关单异常。保留中转站账号、推销员、登记客户和计费。各 Inventory App 在「设置 → 立即同步」后会清理本机对应数据。',
+        sub: '将永久删除云端全部跨境业务：快递明细、包装、到站签收、在途追踪、流水、跨境会计、站点结算、代转、未关单异常、出口成本和已签收发票。保留中转站账号、推销员、登记客户和计费。各 Inventory App 在「设置 → 立即同步」后会清理本机对应数据。',
         password: '当前 Admin 登录密码',
         confirmLabel: '确认短语',
         confirmHint: `请准确输入：${INVENTORY_TEST_DATA_CONFIRM_PHRASE}`,

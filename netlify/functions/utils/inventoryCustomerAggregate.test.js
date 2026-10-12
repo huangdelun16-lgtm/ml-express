@@ -47,6 +47,90 @@ test('a packed bundle shell is not an extra order, but its weight still counts',
   assert.equal(summary.totalFee, 162500);
 });
 
+test('multiple inbound quote is kept once and fee-only orders stay separate', () => {
+  const pieces = [1, 2].map((index) =>
+    row({
+      inboundBarcode: `MDY1(2-${index})`,
+      packedBundleBarcode: 'RUI26MDY50002',
+      quoteCny: index === 1 ? 2400 : 0,
+      fee: index === 1 ? 1615200 : 0,
+      weightKg: 0,
+    }),
+  );
+  const solo = row({
+    inboundBarcode: 'MDY9',
+    packedBundleBarcode: '',
+    quoteCny: 0,
+    fee: 134400,
+    weightKg: 5,
+  });
+  const [summary] = aggregateCustomerSummaries(pieces.concat(solo), null);
+  assert.equal(summary.totalQuoteCny, 2400);
+  assert.equal(summary.feeWithoutQuote, 134400);
+  assert.equal(summary.totalFee, 1749600);
+  assert.equal(summary.totalCny, 2400);
+  assert.equal(summary.totalMmk, 1749600);
+});
+
+test('list fee is the quote and weight price of the same pieces, pack shell is not priced again', () => {
+  const pricing = {
+    liveRate: 672,
+    cnyPerKg: { 'MDY2609101001|RUI|MDY': 40 },
+  };
+  const packLines = [1, 2].map((index) =>
+    row({
+      inboundBarcode: `MDY420(2-${index})`,
+      packedBundleBarcode: 'RUI26MDY20001',
+      quoteCny: index === 1 ? 2760 : 0,
+      fee: 0,
+      weightKg: 0,
+      origin: 'RUILI001',
+      destination: 'MDY',
+      customerCode: 'MDY2609101001',
+    }),
+  );
+  const weighted = row({
+    inboundBarcode: 'MDY2746',
+    packedBundleBarcode: '',
+    quoteCny: 0,
+    fee: 1584000,
+    weightKg: 60,
+    origin: 'RUILI001',
+    destination: 'MDY',
+    customerCode: 'MDY2609101001',
+  });
+  const signed = row({
+    inboundBarcode: 'MDY1526(5-1)',
+    packedBundleBarcode: '',
+    quoteCny: 0,
+    fee: 1980000,
+    weightKg: 0,
+    customerSigned: true,
+    fxMmkPerCny: 669,
+    origin: 'RUILI001',
+    destination: 'MDY',
+    customerCode: 'MDY2609101001',
+  });
+  const shell = row({
+    inboundBarcode: 'RUI26MDY50002',
+    packedBundleBarcode: '',
+    quoteCny: 2400,
+    fee: 0,
+    weightKg: 60,
+    origin: 'RUILI001',
+    destination: 'MDY',
+    customerCode: 'MDY2609101001',
+  });
+  const [summary] = aggregateCustomerSummaries(
+    packLines.concat(weighted, signed, shell),
+    null,
+    pricing,
+  );
+  assert.equal(summary.totalWeightKg, 120);
+  assert.equal(Math.round(summary.totalCny * 100) / 100, Math.round((2760 + 2400 + 1980000 / 669) * 100) / 100);
+  assert.equal(summary.totalMmk, Math.round(2760 * 672) + Math.round(2400 * 672) + 1980000);
+});
+
 test('trip number follows the pack, and an unpacked row stays blank', () => {
   const rows = [
     row({ inboundBarcode: 'A', packedBundleBarcode: 'RUI26MDY50001' }),
@@ -89,6 +173,35 @@ test('packaging line quotes are kept once on the first piece', () => {
   applyPackFeeDedup(rows, {});
   assert.equal(rows.reduce((sum, item) => sum + item.quoteCny, 0), 100);
   assert.equal(rows.find((item) => item.inboundBarcode === 'MDY1(3-1)').quoteCny, 100);
+});
+
+test('signed income is legacy MMK, explicit CNY, and one packaging fee', () => {
+  const [summary] = aggregateCustomerSummaries(
+    [
+      row({ inboundBarcode: 'OLD1', fee: 1000, customerSigned: true, quoteCny: 80 }),
+      row({
+        inboundBarcode: 'CNY1',
+        fee: 67000,
+        quoteCny: 12.5,
+        paidCurrency: 'CNY',
+        paidCny: 12.5,
+        customerSigned: true,
+      }),
+      row({
+        inboundBarcode: 'OPEN',
+        fee: 99999,
+        paidCurrency: 'CNY',
+        paidCny: 50,
+        customerSigned: false,
+      }),
+      row({ inboundBarcode: 'PK(2-1)', fee: 4000, customerSigned: true, paidCurrency: 'MMK' }),
+      row({ inboundBarcode: 'PK(2-2)', fee: 4000, customerSigned: true, paidCurrency: 'MMK' }),
+      row({ inboundBarcode: 'RUI26MDY40009', fee: 4000, customerSigned: true }),
+    ],
+    null,
+  );
+  assert.equal(summary.signedMmkIncome, 5000);
+  assert.equal(summary.signedCnyIncome, 12.5);
 });
 
 test('packaging (3-n) line fees are deduped for total income', () => {

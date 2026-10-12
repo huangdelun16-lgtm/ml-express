@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildExportCostBoard,
   exportCostLineTotal,
+  settleExportCost,
   exportCostOptionsFromPacks,
   matchesExportCostQuery,
   withoutSavedExportCosts,
@@ -127,6 +128,17 @@ describe('buildExportCostBoard', () => {
     ]);
     expect(exportCostLineTotal(2.5, 75)).toBe(187.5);
     expect(exportCostLineTotal(0, 75)).toBe(0);
+    expect(settleExportCost({ totalCny: 104, currency: 'CNY', mmkPerCny: 670 })).toEqual({
+      totalCny: 104,
+      totalMmk: 0,
+      mmkPerCny: null,
+    });
+    expect(settleExportCost({ totalCny: 104, currency: 'MMK', mmkPerCny: 670 })).toEqual({
+      totalCny: 0,
+      totalMmk: 69680,
+      mmkPerCny: 670,
+    });
+    expect(settleExportCost({ totalCny: 104, currency: 'MMK', mmkPerCny: null })).toBeNull();
   });
 
   it('uses the bundle weight when multiple inbound pieces do not carry weight', () => {

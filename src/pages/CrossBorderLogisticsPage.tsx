@@ -18,6 +18,7 @@ import {
   fetchInventoryConsoleOverview,
   fetchInventoryConsoleOrders,
   fetchInventoryConsolePacks,
+  fetchInventoryCustomerItems,
   fetchInventoryCustomerSummaries,
   fetchCrossBorderRegisteredCustomers,
   fetchCrossBorderSalespersons,
@@ -38,6 +39,7 @@ import {
   type StoreFinanceDetailMode,
   type CrossBorderExpenseCategory,
   type FinancePeriodParams,
+  fetchExportCostRecords,
   INVENTORY_CONSOLE_LIST_LIMIT,
 } from '../services/inventoryConsoleService';
 import {
@@ -51,6 +53,10 @@ import {
   type ConsoleCustomerKindFilter,
 } from '../utils/crossBorderConsoleCustomers';
 import {
+  mergeSignedIncomeItems,
+  readSignedCurrencyIncome,
+} from '../utils/signedCurrencyIncome';
+import {
   orderTouchesStation,
   packTouchesStation,
   stationFilterKeys,
@@ -63,7 +69,9 @@ import {
   buildCrossBorderFxHistorySetting,
   buildCrossBorderFxSetting,
   cnyToMmk,
+  customerListCny,
   displayRateForCustomerCategory,
+  formatCnyAmount,
   isCustomerLedgerCategory,
   mmkToCny,
   mergeFxHistoryForSave,
@@ -275,19 +283,34 @@ function formatPackTransportFeeForRow(
   return feeLabel;
 }
 
-function blendCustomerLedgerCny(
-  collectedMmk: number,
-  collectedCny: number | null | undefined,
-  pendingMmk: number,
-  manualMmk: number,
-  liveRate: number | null,
-): number | null {
-  const pendingCny = mmkToCny(pendingMmk, liveRate);
-  const manualCny = mmkToCny(manualMmk, liveRate);
-  const collectedReady = collectedMmk <= 0 || collectedCny != null;
-  const floatingReady = pendingMmk + manualMmk <= 0 || liveRate != null;
-  if (!collectedReady || !floatingReady) return null;
-  return (collectedMmk > 0 ? collectedCny ?? 0 : 0) + (pendingCny ?? 0) + (manualCny ?? 0);
+function incomeBookAmount(amount: number | null | undefined, kind: 'mmk' | 'cny'): string {
+  if (amount == null || !Number.isFinite(amount)) return '—';
+  return kind === 'mmk' ? formatMmK(amount) : formatCnyAmount(amount);
+}
+
+function IncomeLedgerAmount({
+  amount,
+  kind,
+  loading,
+  hero,
+  prefix,
+}: {
+  amount: number | null;
+  kind: 'mmk' | 'cny';
+  loading: boolean;
+  hero?: boolean;
+  prefix?: string;
+}) {
+  if (loading) {
+    return <span className={`cbl-skel-line${hero ? ' cbl-skel-line--money' : ''}`} aria-hidden />;
+  }
+  return (
+    <strong className={hero ? 'cbl-io-ledger__hero' : 'cbl-io-ledger__amt'}>
+      {prefix}
+      {incomeBookAmount(amount, kind)}
+      {hero && amount != null ? <em>{kind === 'mmk' ? 'MMK' : 'CNY'}</em> : null}
+    </strong>
+  );
 }
 
 function stationCashFlow(finance?: InventoryTransitStoreFinance) {
@@ -383,13 +406,14 @@ function packTransportStatusBadgeClass(pack: InventoryPackRow): string {
 
 type TransportView = 'packs' | 'orders';
 
-const CBL_TAB_ITEMS: { id: CblPageTab; zh: string; en: string }[] = [
-  { id: 'overview', zh: '总览', en: 'Overview' },
-  { id: 'finance', zh: '财务', en: 'Finance' },
-  { id: 'customers', zh: '客户', en: 'Customers' },
-  { id: 'transport', zh: '运输', en: 'Transport' },
-  { id: 'invoices', zh: 'Invoice', en: 'Invoice' },
-  { id: 'settings', zh: '设置', en: 'Settings' },
+const CBL_TAB_ITEMS: { id: CblPageTab; zh: string; en: string; tipZh: string; tipEn: string }[] = [
+  { id: 'overview', zh: '总览', en: 'Overview', tipZh: '待办，以及本期收入和支出', tipEn: 'What needs attention, plus this period' },
+  { id: 'finance', zh: '财务', en: 'Finance', tipZh: '本期收支，按站点拆开', tipEn: 'This period, split by station' },
+  { id: 'export-cost', zh: '出口成本', en: 'Export cost', tipZh: '瑞丽发出的成本，不进总支出', tipEn: 'Ruili dispatch cost, outside total expense' },
+  { id: 'customers', zh: '客户', en: 'Customers', tipZh: '客户名单和费用', tipEn: 'Customer list and fees' },
+  { id: 'transport', zh: '运输', en: 'Transport', tipZh: '包裹和订单走到哪了', tipEn: 'Packs and orders in motion' },
+  { id: 'invoices', zh: 'Invoice', en: 'Invoice', tipZh: '已经签收的发票', tipEn: 'Invoices already signed' },
+  { id: 'settings', zh: '设置', en: 'Settings', tipZh: '汇率、账号和计费', tipEn: 'Rate, accounts, and pricing' },
 ];
 
 type StatCardAction =
@@ -402,9 +426,117 @@ type StatCard = {
   label: string;
   value: string;
   hint: string;
+  tip: string;
   action: StatCardAction;
-  tone?: 'alert' | 'warn';
+  tone?: 'alert' | 'warn' | 'due';
 };
+
+type CblHoverTipState = {
+  text: string;
+  top: number;
+  left: number;
+  place: 'above' | 'below';
+};
+
+function CblHoverTipLayer({ rootRef }: { rootRef: { current: HTMLDivElement | null } }) {
+  const [tip, setTip] = useState<CblHoverTipState | null>(null);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    let timer = 0;
+    let current: HTMLElement | null = null;
+
+    const hostOf = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return null;
+      const host = target.closest<HTMLElement>('[data-cbl-tip]');
+      if (!host || !root.contains(host) || host.matches(':disabled')) return null;
+      return host;
+    };
+
+    const place = (el: HTMLElement) => {
+      const text = el.getAttribute('data-cbl-tip')?.trim();
+      if (!text) {
+        setTip(null);
+        return;
+      }
+      const rect = el.getBoundingClientRect();
+      const inChrome = Boolean(el.closest('.cbl-page-chrome'));
+      const above = !inChrome && rect.top > 48;
+      setTip({
+        text,
+        left: Math.min(window.innerWidth - 16, Math.max(16, rect.left + rect.width / 2)),
+        top: above ? rect.top - 8 : rect.bottom + 8,
+        place: above ? 'above' : 'below',
+      });
+    };
+
+    const show = (el: HTMLElement, delay: number) => {
+      window.clearTimeout(timer);
+      current = el;
+      timer = window.setTimeout(() => {
+        if (current === el) place(el);
+      }, delay);
+    };
+
+    const hide = () => {
+      window.clearTimeout(timer);
+      current = null;
+      setTip(null);
+    };
+
+    const onOver = (event: MouseEvent) => {
+      const el = hostOf(event.target);
+      if (!el || el === current) return;
+      show(el, 220);
+    };
+    const onOut = (event: MouseEvent) => {
+      const el = hostOf(event.target);
+      if (!el || el !== current) return;
+      if (hostOf(event.relatedTarget) === el) return;
+      hide();
+    };
+    const onFocus = (event: FocusEvent) => {
+      const el = hostOf(event.target);
+      if (!el) return;
+      show(el, 0);
+    };
+    const onBlur = (event: FocusEvent) => {
+      if (hostOf(event.target) !== current) return;
+      hide();
+    };
+    const onScroll = () => {
+      if (current) place(current);
+    };
+
+    root.addEventListener('mouseover', onOver);
+    root.addEventListener('mouseout', onOut);
+    root.addEventListener('focusin', onFocus);
+    root.addEventListener('focusout', onBlur);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', hide);
+    return () => {
+      window.clearTimeout(timer);
+      root.removeEventListener('mouseover', onOver);
+      root.removeEventListener('mouseout', onOut);
+      root.removeEventListener('focusin', onFocus);
+      root.removeEventListener('focusout', onBlur);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', hide);
+    };
+  }, [rootRef]);
+
+  if (!tip) return null;
+  return (
+    <div
+      className={`cbl-hover-tip${tip.place === 'below' ? ' is-below' : ''}`}
+      style={{ top: tip.top, left: tip.left }}
+      role="tooltip"
+    >
+      {tip.text}
+    </div>
+  );
+}
 
 function tabNeedsFinance(tab: string): boolean {
   return tab === 'overview' || tab === 'finance';
@@ -450,6 +582,7 @@ function registeredCustomerToSummary(
 
 const CrossBorderLogisticsPage: FC = () => {
   const navigate = useNavigate();
+  const pageRef = useRef<HTMLDivElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const { language } = useLanguage();
   const { isMobile } = useResponsive();
@@ -494,6 +627,9 @@ const CrossBorderLogisticsPage: FC = () => {
     [],
   );
   const [customersLoading, setCustomersLoading] = useState(false);
+  const [signedIncome, setSignedIncome] = useState<{ mmk: number; cny: number } | null>(null);
+  const [signedIncomeFailed, setSignedIncomeFailed] = useState(false);
+  const signedIncomeLoadRef = useRef<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<CrossBorderRegisteredCustomer | null>(
     null,
@@ -514,6 +650,7 @@ const CrossBorderLogisticsPage: FC = () => {
   const [periodDate, setPeriodDate] = useState(() => yangonTodayYmd());
   const [financeStoreCode, setFinanceStoreCode] = useState('');
   const [exportCostCny, setExportCostCny] = useState<number | null>(null);
+  const [exportCostMmk, setExportCostMmk] = useState<number | null>(null);
   const [exportingCsv, setExportingCsv] = useState(false);
   const [fxRate, setFxRate] = useState<number | null>(null);
   const [fxDraft, setFxDraft] = useState('');
@@ -588,6 +725,25 @@ const CrossBorderLogisticsPage: FC = () => {
       storeCode: financeStoreCode || undefined,
     };
   }, [periodKind, periodDate, financeStoreCode]);
+
+  useEffect(() => {
+    if (activeTab !== 'overview' && activeTab !== 'finance' && activeTab !== 'export-cost') return;
+    let cancelled = false;
+    void fetchExportCostRecords(financePeriodParams)
+      .then((result) => {
+        if (cancelled) return;
+        setExportCostCny(result.totalCny);
+        setExportCostMmk(result.totalMmk);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setExportCostCny(null);
+        setExportCostMmk(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, financePeriodParams]);
 
   const statementPeriod = useMemo((): FinancePeriodParams => {
     return { period: periodKind, date: periodDate };
@@ -765,6 +921,45 @@ const CrossBorderLogisticsPage: FC = () => {
       window.setTimeout(run, 200);
     }
   }, [loadCustomers]);
+
+  useEffect(() => {
+    if (activeTab !== 'overview') return;
+    if (signedIncomeLoadRef.current === 'loading' || signedIncomeLoadRef.current === 'ready') return;
+    signedIncomeLoadRef.current = 'loading';
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { summaries } = await fetchInventoryCustomerSummaries();
+        if (cancelled) return;
+        const direct = readSignedCurrencyIncome(summaries);
+        const next = direct
+          ? direct
+          : mergeSignedIncomeItems(
+              await Promise.all(
+                summaries.map((summary) =>
+                  fetchInventoryCustomerItems(
+                    summary.customerName,
+                    summary.customerPhone,
+                    summary.customerCode,
+                  ).then((result) => result.items),
+                ),
+              ),
+            );
+        if (cancelled) return;
+        signedIncomeLoadRef.current = 'ready';
+        setSignedIncome(next);
+        setSignedIncomeFailed(false);
+      } catch {
+        if (cancelled) return;
+        signedIncomeLoadRef.current = 'error';
+        setSignedIncomeFailed(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (signedIncomeLoadRef.current === 'loading') signedIncomeLoadRef.current = 'idle';
+    };
+  }, [activeTab]);
 
   const loadFinanceEntries = useCallback(async (page: number, pageSize: number) => {
     const reqId = ++financeReqIdRef.current;
@@ -1132,15 +1327,46 @@ const CrossBorderLogisticsPage: FC = () => {
     }
   }, [periodKind, periodDate, financeStoreCode, isEn, fxRate, data?.transitStores]);
 
-  /** 总收入/总支出与下方「跨境财务」同源：全站汇总 */
-  const totalIncomeAllStations = useMemo(() => {
-    if (!expenseSummary) return null;
-    return (
-      (expenseSummary.collectedTotal ?? 0) +
-      (expenseSummary.pendingInflowTotal ?? 0) +
-      (expenseSummary.manualIncomeTotal ?? 0)
-    );
-  }, [expenseSummary]);
+  const incomeBooks = useMemo(() => {
+    const pendingMmk = expenseSummary?.pendingInflowTotal ?? 0;
+    const otherMmk = expenseSummary?.manualIncomeTotal ?? 0;
+    const financeReady = Boolean(expenseSummary) || financeFailed;
+    const pendingCny = !financeReady ? null : pendingMmk <= 0 ? 0 : mmkToCny(pendingMmk, fxRate);
+    const signedReady = signedIncome != null || signedIncomeFailed;
+    const signedMmk = signedIncomeFailed ? null : signedIncome?.mmk ?? null;
+    const signedCny = signedIncomeFailed ? null : signedIncome?.cny ?? null;
+    return {
+      mmk: signedMmk,
+      cny: signedCny,
+      signedLoading: !signedReady,
+      rows: [
+        {
+          id: 'collected',
+          zh: '已收',
+          en: 'Collected',
+          mmk: signedMmk,
+          cny: signedCny,
+          loading: !signedReady,
+        },
+        {
+          id: 'pending',
+          zh: '待入账',
+          en: 'Pending',
+          mmk: financeReady ? 0 : null,
+          cny: pendingCny,
+          loading: !financeReady,
+        },
+        {
+          id: 'other',
+          zh: '其它收入',
+          en: 'Other income',
+          mmk: financeReady ? expenseSummary?.manualIncomeMmkTotal ?? otherMmk : null,
+          cny: financeReady ? expenseSummary?.manualIncomeCnyTotal ?? 0 : null,
+          loading: !financeReady,
+        },
+      ],
+    };
+  }, [expenseSummary, financeFailed, fxRate, signedIncome, signedIncomeFailed]);
 
   const totalExpenseAllStations = useMemo(() => {
     if (!expenseSummary) return null;
@@ -1361,6 +1587,7 @@ const CrossBorderLogisticsPage: FC = () => {
         label: isEn ? 'Open exceptions' : '未关异常',
         value: String(exceptions),
         hint: isEn ? 'Needs HQ review' : '需总部处理',
+        tip: isEn ? 'Open the exception list' : '打开未关异常',
         action: { kind: 'exceptions' },
         tone: exceptions > 0 ? 'alert' : undefined,
       },
@@ -1369,6 +1596,7 @@ const CrossBorderLogisticsPage: FC = () => {
         label: isEn ? 'In transit' : '在途订单',
         value: String(s.ordersInTransit),
         hint: isEn ? 'Not yet scanned in' : '尚未到站扫入',
+        tip: isEn ? 'Open in-transit orders' : '打开在途订单',
         action: { kind: 'orders', filter: 'in_transit' },
       },
       {
@@ -1376,13 +1604,16 @@ const CrossBorderLogisticsPage: FC = () => {
         label: isEn ? 'Awaiting pickup' : '到站待签收',
         value: String(s.ordersHubReceived),
         hint: isEn ? 'Arrived at a hub' : '已扫入站、待签收',
+        tip: isEn ? 'Open orders waiting to be signed' : '打开待签收订单',
         action: { kind: 'orders', filter: 'awaiting_pickup' },
+        tone: s.ordersHubReceived > 0 ? 'due' : undefined,
       },
       {
         id: 'pending-inflow',
         label: isEn ? 'Pending inflow' : '待入账',
         value: formatMmK(pendingIn),
         hint: isEn ? 'COD still to collect · MMK' : '到付待收 · 缅币',
+        tip: isEn ? 'Open finance for money still to collect' : '打开财务，看待入账',
         action: { kind: 'finance' },
         tone: pendingIn > 0 ? 'warn' : undefined,
       },
@@ -1391,6 +1622,7 @@ const CrossBorderLogisticsPage: FC = () => {
         label: isEn ? 'Unpaid truck' : '待付车费',
         value: formatMmK(unpaidTruck),
         hint: isEn ? 'Inbound truck fees · MMK' : '待付装车费 · 缅币',
+        tip: isEn ? 'Open finance for unpaid truck fees' : '打开财务，看待付车费',
         action: { kind: 'finance' },
         tone: unpaidTruck > 0 ? 'warn' : undefined,
       },
@@ -1398,6 +1630,7 @@ const CrossBorderLogisticsPage: FC = () => {
   }, [data, expenseSummary, isEn]);
 
   const isStatCardActive = (action: StatCardAction) => {
+    if (activeTab !== 'transport') return false;
     if (action.kind === 'orders') return transportView === 'orders' && orderFilter === action.filter;
     return false;
   };
@@ -1424,18 +1657,18 @@ const CrossBorderLogisticsPage: FC = () => {
     setActiveTab('transport');
   };
 
-  const packFilters: { id: PackStatusFilter; label: string }[] = [
-    { id: 'hub_received', label: isEn ? 'Needs action' : '待处理' },
-    { id: 'in_transit', label: isEn ? 'In transit' : '在途' },
-    { id: 'completed', label: isEn ? 'Completed' : '已完成' },
-    { id: 'all', label: isEn ? 'All' : '全部' },
+  const packFilters: { id: PackStatusFilter; label: string; tip: string }[] = [
+    { id: 'hub_received', label: isEn ? 'Needs action' : '待处理', tip: isEn ? 'Packs that arrived and still need work' : '已到站、还要处理的包裹' },
+    { id: 'in_transit', label: isEn ? 'In transit' : '在途', tip: isEn ? 'Packs not scanned in yet' : '还没到站的包裹' },
+    { id: 'completed', label: isEn ? 'Completed' : '已完成', tip: isEn ? 'This leg is finished' : '这一段已经走完' },
+    { id: 'all', label: isEn ? 'All' : '全部', tip: isEn ? 'Every pack' : '全部包裹' },
   ];
 
-  const orderFilters: { id: OrderStatusFilter; label: string }[] = [
-    { id: 'awaiting_pickup', label: isEn ? 'Needs action' : '待处理' },
-    { id: 'in_transit', label: isEn ? 'In transit' : '在途' },
-    { id: 'signed', label: isEn ? 'Signed' : '已签收' },
-    { id: 'all', label: isEn ? 'All' : '全部' },
+  const orderFilters: { id: OrderStatusFilter; label: string; tip: string }[] = [
+    { id: 'awaiting_pickup', label: isEn ? 'Needs action' : '待处理', tip: isEn ? 'Arrived, not signed yet' : '已到站、还没签收' },
+    { id: 'in_transit', label: isEn ? 'In transit' : '在途', tip: isEn ? 'Not scanned in yet' : '还没到站的订单' },
+    { id: 'signed', label: isEn ? 'Signed' : '已签收', tip: isEn ? 'Customer already signed' : '客户已经签收' },
+    { id: 'all', label: isEn ? 'All' : '全部', tip: isEn ? 'Every order' : '全部订单' },
   ];
 
   const openPackOrders = (target: PackOrdersTarget) => {
@@ -1499,7 +1732,8 @@ const CrossBorderLogisticsPage: FC = () => {
   }, null);
 
   return (
-    <div className="cbl-page cbl-page--standalone">
+    <div className="cbl-page cbl-page--standalone" ref={pageRef}>
+      <CblHoverTipLayer rootRef={pageRef} />
       <div className="cbl-inner">
         <div className="cbl-page-chrome">
           <header className="cbl-standalone-header">
@@ -1518,7 +1752,7 @@ const CrossBorderLogisticsPage: FC = () => {
                 onClick={() => load()}
                 disabled={loading}
                 aria-label={refreshLabel}
-                title={refreshLabel}
+                data-cbl-tip={isEn ? 'Reload this page' : '重新读取这一页'}
               >
                 <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
                   <path
@@ -1535,6 +1769,7 @@ const CrossBorderLogisticsPage: FC = () => {
                 type="button"
                 className="cbl-chrome-btn cbl-chrome-btn--back"
                 onClick={() => navigate('/admin/dashboard')}
+                data-cbl-tip={isEn ? 'Back to the dashboard' : '返回控制台'}
               >
                 {backLabel}
               </button>
@@ -1554,6 +1789,7 @@ const CrossBorderLogisticsPage: FC = () => {
                   aria-selected={selected}
                   aria-controls={`cbl-panel-${tab.id}`}
                   className={`cbl-page-tabs__tab${selected ? ' is-on' : ''}${showAlert ? ' has-alert' : ''}`}
+                  data-cbl-tip={isEn ? tab.tipEn : tab.tipZh}
                   onClick={() => setActiveTab(tab.id)}
                 >
                   {isEn ? tab.en : tab.zh}
@@ -1631,7 +1867,8 @@ const CrossBorderLogisticsPage: FC = () => {
                   type="button"
                   className={`cbl-stat cbl-stat--btn${isStatCardActive(card.action) ? ' is-active' : ''}${
                     card.tone ? ` cbl-stat--${card.tone}` : ''
-                  }`}
+                  }${card.value.replace(/,/g, '') === '0' && !card.tone ? ' is-idle' : ''}`}
+                  data-cbl-tip={card.tip}
                   onClick={() => handleStatClick(card.action)}
                 >
                   <div className="cbl-stat__label">{card.label}</div>
@@ -1639,13 +1876,50 @@ const CrossBorderLogisticsPage: FC = () => {
                   <div className="cbl-stat__hint">{card.hint}</div>
                 </button>
               ))
-            : Array.from({ length: 5 }, (_, i) => (
+            : null}
+          {statsCards.length ? (
+            <button
+              type="button"
+              className={`cbl-stat cbl-stat--btn cbl-stat--cost${
+                (exportCostCny ?? expenseSummary?.exportCostCnyTotal ?? 0) > 0 ||
+                (exportCostMmk ?? expenseSummary?.exportCostMmkTotal ?? 0) > 0
+                  ? ''
+                  : ' is-idle'
+              }`}
+              data-cbl-tip={isEn ? 'Open export cost. Not part of total expense.' : '打开出口成本。不计入总支出。'}
+              onClick={() => setActiveTab('export-cost')}
+            >
+              <div className="cbl-stat__label">{isEn ? 'Export cost' : '出口成本'}</div>
+              <div className="cbl-stat__value">
+                {!financeFailed && !expenseSummary ? (
+                  '\u00a0'
+                ) : (
+                  <DualMoney
+                    cny={exportCostCny ?? expenseSummary?.exportCostCnyTotal ?? 0}
+                    mmk={exportCostMmk ?? expenseSummary?.exportCostMmkTotal ?? 0}
+                    rate={null}
+                    prefix={
+                      (exportCostCny ?? expenseSummary?.exportCostCnyTotal ?? 0) > 0 ||
+                      (exportCostMmk ?? expenseSummary?.exportCostMmkTotal ?? 0) > 0
+                        ? '−'
+                        : ''
+                    }
+                  />
+                )}
+              </div>
+              <div className="cbl-stat__hint">
+                {isEn ? 'Ruili dispatch · CNY expense' : '瑞丽发出 · 人民币支出'}
+              </div>
+            </button>
+          ) : (
+            Array.from({ length: 6 }, (_, i) => (
                 <div key={`cbl-stat-skel-${i}`} className="cbl-stat is-skeleton" aria-hidden>
                   <div className="cbl-stat__label">{'\u00a0'}</div>
                   <div className="cbl-stat__value">{'\u00a0'}</div>
                   <div className="cbl-stat__hint">{'\u00a0'}</div>
                 </div>
-              ))}
+              ))
+          )}
         </div>
 
         <h2 className="cbl-section-label">
@@ -1659,56 +1933,113 @@ const CrossBorderLogisticsPage: FC = () => {
           <button
             type="button"
             className="cbl-io-overview-card cbl-io-overview-card--in cbl-io-overview-card--btn"
+            data-cbl-tip={isEn ? 'Open finance to see what makes up income' : '打开财务，看收入是怎么构成的'}
             onClick={() => setActiveTab('finance')}
           >
-            <h3 className="cbl-io-overview-card__title">
-              {isEn ? 'Customer ledger' : '客户账'}
-            </h3>
-            <p className="cbl-io-overview-card__amount">
-              {!financeFailed && totalIncomeAllStations == null ? (
-                <span className="cbl-skel-line cbl-skel-line--money" aria-hidden />
-              ) : (
-                <DualMoney
-                  mmk={totalIncomeAllStations ?? 0}
-                  rate={fxRate}
-                  cny={
-                    expenseSummary
-                      ? blendCustomerLedgerCny(
-                          expenseSummary.collectedTotal ?? 0,
-                          expenseSummary.collectedCny,
-                          expenseSummary.pendingInflowTotal ?? 0,
-                          expenseSummary.manualIncomeTotal ?? 0,
-                          fxRate,
-                        )
-                      : undefined
-                  }
-                />
-              )}
-            </p>
-            <p className="cbl-io-overview-card__hint">
-              {isEn ? 'Collected + pending + other income' : '已收 + 待入账 + 其它收入'}
-            </p>
+            <div className="cbl-io-overview-card__head">
+              <h3 className="cbl-io-overview-card__title">
+                {isEn ? 'Total income' : '总收入'}
+              </h3>
+              <span className="cbl-io-overview-card__scope">{isEn ? 'All signed' : '全部已签收'}</span>
+            </div>
+            <div className="cbl-io-ledger">
+              <span />
+              <span className="cbl-io-ledger__h">{isEn ? 'MMK book' : '缅币账'}</span>
+              <span className="cbl-io-ledger__h">{isEn ? 'CNY book' : '人民币账'}</span>
+              <span />
+              <IncomeLedgerAmount amount={incomeBooks.mmk} kind="mmk" loading={incomeBooks.signedLoading} hero />
+              <IncomeLedgerAmount amount={incomeBooks.cny} kind="cny" loading={incomeBooks.signedLoading} hero />
+              <span className="cbl-io-ledger__rule" />
+              {incomeBooks.rows.map((row) => (
+                <div key={row.id} className="cbl-io-ledger__row">
+                  <span className="cbl-io-ledger__name">{isEn ? row.en : row.zh}</span>
+                  <IncomeLedgerAmount amount={row.mmk} kind="mmk" loading={row.loading} />
+                  <IncomeLedgerAmount amount={row.cny} kind="cny" loading={row.loading} />
+                </div>
+              ))}
+            </div>
           </button>
           <button
             type="button"
             className="cbl-io-overview-card cbl-io-overview-card--out cbl-io-overview-card--btn"
+            data-cbl-tip={isEn ? 'Open finance to see what makes up expense' : '打开财务，看支出是怎么构成的'}
             onClick={() => setActiveTab('finance')}
           >
-            <h3 className="cbl-io-overview-card__title">
-              {isEn ? 'Myanmar ledger' : '缅甸账'}
-            </h3>
-            <p className="cbl-io-overview-card__amount">
-              {!financeFailed && totalExpenseAllStations == null ? (
-                <span className="cbl-skel-line cbl-skel-line--money" aria-hidden />
-              ) : (
-                <>
-                  {formatMmK(totalExpenseAllStations ?? 0)} <span>MMK</span>
-                </>
-              )}
-            </p>
-            <p className="cbl-io-overview-card__hint">
-              {isEn ? 'Unpaid truck + paid truck + other expense' : '待付车费 + 已付车费 + 其它支出'}
-            </p>
+            <div className="cbl-io-overview-card__head">
+              <h3 className="cbl-io-overview-card__title">
+                {isEn ? 'Total expense' : '总支出'}
+              </h3>
+              <span className="cbl-io-overview-card__scope">{isEn ? 'This period' : '本期'}</span>
+            </div>
+            <div className="cbl-io-ledger">
+              <span />
+              <span className="cbl-io-ledger__h">{isEn ? 'MMK book' : '缅币账'}</span>
+              <span className="cbl-io-ledger__h">{isEn ? 'CNY book' : '人民币账'}</span>
+              <span />
+              <IncomeLedgerAmount
+                amount={totalExpenseAllStations}
+                kind="mmk"
+                loading={!financeFailed && totalExpenseAllStations == null}
+                hero
+              />
+              <IncomeLedgerAmount
+                amount={
+                  exportCostCny ?? (expenseSummary ? expenseSummary.exportCostCnyTotal ?? 0 : null)
+                }
+                kind="cny"
+                loading={!financeFailed && !expenseSummary && exportCostCny == null}
+                hero
+              />
+              <span className="cbl-io-ledger__rule" />
+              {(
+                [
+                  {
+                    id: 'unpaid',
+                    zh: '待付车费',
+                    en: 'Truck unpaid',
+                    mmk: expenseSummary?.transportUnpaidTotal ?? 0,
+                    cny: expenseSummary ? 0 : null,
+                  },
+                  {
+                    id: 'paid',
+                    zh: '已付车费',
+                    en: 'Truck paid',
+                    mmk: expenseSummary?.transportPaidTotal ?? 0,
+                    cny: expenseSummary ? 0 : null,
+                  },
+                  {
+                    id: 'other',
+                    zh: '其它支出',
+                    en: 'Other expense',
+                    mmk: expenseSummary?.manualExpenseTotal ?? 0,
+                    cny: expenseSummary ? 0 : null,
+                  },
+                  {
+                    id: 'export',
+                    zh: '出口成本',
+                    en: 'Export cost',
+                    mmk: exportCostMmk ?? expenseSummary?.exportCostMmkTotal ?? 0,
+                    cny: exportCostCny ?? (expenseSummary ? expenseSummary.exportCostCnyTotal ?? 0 : null),
+                  },
+                ] as const
+              ).map((row) => (
+                <div key={row.id} className="cbl-io-ledger__row">
+                  <span className="cbl-io-ledger__name">{isEn ? row.en : row.zh}</span>
+                  <IncomeLedgerAmount
+                    amount={row.mmk}
+                    kind="mmk"
+                    loading={!financeFailed && !expenseSummary}
+                    prefix={row.id === 'export' && (row.mmk ?? 0) > 0 ? '−' : ''}
+                  />
+                  <IncomeLedgerAmount
+                    amount={row.cny}
+                    kind="cny"
+                    loading={!financeFailed && !expenseSummary}
+                    prefix={row.id === 'export' && (row.cny ?? 0) > 0 ? '−' : ''}
+                  />
+                </div>
+              ))}
+            </div>
           </button>
         </div>
 
@@ -1753,6 +2084,7 @@ const CrossBorderLogisticsPage: FC = () => {
                         <button
                           type="button"
                           className="cbl-btn cbl-btn--primary cbl-btn--sm"
+                          data-cbl-tip={isEn ? 'Open this exception' : '处理这条异常'}
                           onClick={() => setViewingException(row)}
                         >
                           {isEn ? 'Review' : '处理'}
@@ -1792,6 +2124,7 @@ const CrossBorderLogisticsPage: FC = () => {
               <button
                 type="button"
                 className="cbl-btn cbl-btn--primary cbl-btn--sm cbl-finance-intro__btn"
+                data-cbl-tip={isEn ? 'Record other income or expense' : '记一笔其它收入或支出'}
                 onClick={() => setShowManualEntryModal(true)}
               >
                 {isEn ? '+ Other' : '+ 其它开销'}
@@ -1845,7 +2178,12 @@ const CrossBorderLogisticsPage: FC = () => {
                   {isEn ? 'Other income' : '其它收入'}
                 </span>
                 <strong className="cbl-expense-summary__in">
-                  <DualMoney mmk={expenseSummary?.manualIncomeTotal ?? 0} rate={fxRate} prefix="+" />
+                  <DualMoney
+                    mmk={expenseSummary?.manualIncomeMmkTotal ?? expenseSummary?.manualIncomeTotal ?? 0}
+                    cny={expenseSummary?.manualIncomeCnyTotal ?? 0}
+                    rate={null}
+                    prefix="+"
+                  />
                 </strong>
               </div>
               <div className="cbl-expense-summary__item">
@@ -1875,9 +2213,14 @@ const CrossBorderLogisticsPage: FC = () => {
                 <strong>
                   <DualMoney
                     cny={exportCostCny ?? expenseSummary?.exportCostCnyTotal ?? 0}
-                    mmk={cnyToMmk(exportCostCny ?? expenseSummary?.exportCostCnyTotal ?? 0, fxRate)}
-                    rate={fxRate}
-                    prefix="−"
+                    mmk={exportCostMmk ?? expenseSummary?.exportCostMmkTotal ?? 0}
+                    rate={null}
+                    prefix={
+                      (exportCostCny ?? expenseSummary?.exportCostCnyTotal ?? 0) > 0 ||
+                      (exportCostMmk ?? expenseSummary?.exportCostMmkTotal ?? 0) > 0
+                        ? '−'
+                        : ''
+                    }
                   />
                 </strong>
               </div>
@@ -2052,6 +2395,7 @@ const CrossBorderLogisticsPage: FC = () => {
                               <button
                                 type="button"
                                 className="cbl-finance-btn"
+                                data-cbl-tip={isEn ? 'Open this station’s ledger' : '查看这个站点的流水'}
                                 onClick={() => openFinanceDetail(store, 'ledger')}
                               >
                                 <span className="cbl-finance-count">
@@ -2123,6 +2467,7 @@ const CrossBorderLogisticsPage: FC = () => {
                               <button
                                 type="button"
                                 className="cbl-btn cbl-btn--light cbl-btn--sm"
+                                data-cbl-tip={isEn ? 'Open the station statement' : '打开这个站点的对账单'}
                                 onClick={() => setReconcileModalStore(store)}
                               >
                                 {isEn ? 'Statement' : '对账单'}
@@ -2160,13 +2505,30 @@ const CrossBorderLogisticsPage: FC = () => {
             </div>
           </section>
         </div>
-        <ExportCostRecordsCard
-          isEn={isEn}
-          period={financePeriodParams}
-          stores={transitStores}
-          rate={fxRate}
-          onTotal={setExportCostCny}
-        />
+        </div>
+        )}
+
+        {activeTab === 'export-cost' && (
+        <div id="cbl-panel-export-cost" role="tabpanel" aria-labelledby="cbl-tab-export-cost">
+          <CrossBorderFinancePeriodBar
+            kind={periodKind}
+            date={periodDate}
+            storeCode={financeStoreCode}
+            stores={transitStores}
+            isEn={isEn}
+            onKindChange={(kind) => {
+              setPeriodKind(kind);
+            }}
+            onDateChange={setPeriodDate}
+            onStoreCodeChange={setFinanceStoreCode}
+          />
+          <ExportCostRecordsCard
+            isEn={isEn}
+            period={financePeriodParams}
+            stores={transitStores}
+            rate={fxRate}
+            onTotal={setExportCostCny}
+          />
         </div>
         )}
 
@@ -2186,6 +2548,7 @@ const CrossBorderLogisticsPage: FC = () => {
                 <button
                   type="button"
                   className="cbl-btn cbl-btn--primary cbl-btn--sm"
+                  data-cbl-tip={isEn ? 'Create a registered customer' : '新建一个已登记客户'}
                   onClick={() => {
                     setEditingCustomer(null);
                     setCustomerPrefill(null);
@@ -2200,18 +2563,22 @@ const CrossBorderLogisticsPage: FC = () => {
               <div className="cbl-list-toolbar" role="tablist" aria-label={isEn ? 'Customer lists' : '客户名单'}>
                 {(
                   [
-                    { id: 'unfiled', zh: '未建档', en: 'Unfiled', count: customerKindCounts.unfiled },
+                    { id: 'unfiled', zh: '未建档', en: 'Unfiled', count: customerKindCounts.unfiled, tipZh: '库存扫到、还没登记的客户', tipEn: 'Seen on inbound, not registered yet' },
                     {
                       id: 'registered',
                       zh: '已登记',
                       en: 'Registered',
                       count: customerKindCounts.registered,
+                      tipZh: '总部已建档的客户',
+                      tipEn: 'Customers already on file',
                     },
                     {
                       id: 'all',
                       zh: '全部',
                       en: 'All',
                       count: customerKindCounts.unfiled + customerKindCounts.registered,
+                      tipZh: '未建档和已登记放在一起',
+                      tipEn: 'Unfiled and registered together',
                     },
                   ] as const
                 ).map((item) => (
@@ -2221,6 +2588,7 @@ const CrossBorderLogisticsPage: FC = () => {
                     role="tab"
                     aria-selected={customerKindFilter === item.id}
                     className={`cbl-chip ${customerKindFilter === item.id ? 'is-active' : ''}`}
+                    data-cbl-tip={isEn ? item.tipEn : item.tipZh}
                     onClick={() => setCustomerKindFilter(item.id)}
                   >
                     {isEn ? item.en : item.zh}
@@ -2282,6 +2650,7 @@ const CrossBorderLogisticsPage: FC = () => {
                                   <button
                                     type="button"
                                     className="cbl-customer-name-btn"
+                                    data-cbl-tip={isEn ? 'Open this customer’s orders' : '查看这个客户的订单'}
                                     onClick={() => modalTarget && setCustomerModalTarget(modalTarget)}
                                   >
                                     <span className="cbl-code">{code}</span>
@@ -2304,6 +2673,7 @@ const CrossBorderLogisticsPage: FC = () => {
                                   <button
                                     type="button"
                                     className="cbl-customer-name-btn"
+                                    data-cbl-tip={isEn ? 'Open this customer’s orders' : '查看这个客户的订单'}
                                     onClick={() => modalTarget && setCustomerModalTarget(modalTarget)}
                                   >
                                     <span className="cbl-customer-name-btn__name">{name}</span>
@@ -2356,7 +2726,19 @@ const CrossBorderLogisticsPage: FC = () => {
                                 </div>
                               </td>
                               <td>
-                                {summary ? <DualMoney mmk={summary.totalFee} rate={fxRate} /> : '—'}
+                                {summary ? (
+                                  <DualMoney
+                                    mmk={summary.totalMmk != null ? summary.totalMmk : summary.totalFee}
+                                    rate={fxRate}
+                                    cny={
+                                      (summary.totalCny != null
+                                        ? summary.totalCny
+                                        : customerListCny(summary, fxRate)) ?? undefined
+                                    }
+                                  />
+                                ) : (
+                                  '—'
+                                )}
                               </td>
                               <td>
                                 {registered ? (
@@ -2398,6 +2780,7 @@ const CrossBorderLogisticsPage: FC = () => {
                                   <button
                                     type="button"
                                     className="cbl-btn cbl-btn--primary cbl-btn--sm"
+                                    data-cbl-tip={isEn ? 'Register this customer at HQ' : '把这个客户登记进总部'}
                                     onClick={() => {
                                       setEditingCustomer(null);
                                       setCustomerPrefill({
@@ -2448,6 +2831,7 @@ const CrossBorderLogisticsPage: FC = () => {
                       <button
                         type="button"
                         className="cbl-btn cbl-btn--light cbl-btn--sm"
+                        data-cbl-tip={isEn ? 'Switch to registered customers' : '切到已登记名单'}
                         onClick={() => setCustomerKindFilter('registered')}
                       >
                         {isEn ? 'View registered' : '查看已登记'}
@@ -2473,6 +2857,7 @@ const CrossBorderLogisticsPage: FC = () => {
                   role="tab"
                   aria-selected={transportView === 'packs'}
                   className={`cbl-chip ${transportView === 'packs' ? 'is-active' : ''}`}
+                  data-cbl-tip={isEn ? 'List by pack' : '按包裹看运输'}
                   onClick={() => setTransportView('packs')}
                 >
                   {isEn ? 'Packs' : '包裹'}
@@ -2482,6 +2867,7 @@ const CrossBorderLogisticsPage: FC = () => {
                   role="tab"
                   aria-selected={transportView === 'orders'}
                   className={`cbl-chip ${transportView === 'orders' ? 'is-active' : ''}`}
+                  data-cbl-tip={isEn ? 'List by order' : '按订单看运输'}
                   onClick={() => setTransportView('orders')}
                 >
                   {isEn ? 'Orders' : '订单'}
@@ -2508,6 +2894,7 @@ const CrossBorderLogisticsPage: FC = () => {
                     className={`cbl-chip ${
                       (transportView === 'packs' ? packFilter : orderFilter) === f.id ? 'is-active' : ''
                     }`}
+                    data-cbl-tip={f.tip}
                     onClick={() => {
                       if (transportView === 'packs') {
                         setPackFilter(f.id as PackStatusFilter);
@@ -2599,6 +2986,7 @@ const CrossBorderLogisticsPage: FC = () => {
                               <button
                                 type="button"
                                 className="cbl-customer-name-btn"
+                                data-cbl-tip={isEn ? 'See the orders in this pack' : '查看这个包裹里的订单'}
                                 onClick={() =>
                                   openPackOrders({
                                     pack_barcode: pack.pack_barcode,
@@ -2732,6 +3120,7 @@ const CrossBorderLogisticsPage: FC = () => {
                               <button
                                 type="button"
                                 className="cbl-customer-name-btn"
+                                data-cbl-tip={isEn ? 'See the orders in this pack' : '查看这个包裹里的订单'}
                                 onClick={() => openPackOrders({ pack_barcode: order.pack_barcode })}
                               >
                                 <span className="cbl-code">{order.pack_barcode}</span>
@@ -2826,6 +3215,7 @@ const CrossBorderLogisticsPage: FC = () => {
                   <button
                     type="button"
                     className="cbl-btn cbl-btn--primary cbl-btn--sm cbl-fx-bar__save"
+                    data-cbl-tip={isEn ? 'Save this rate for the console and the app' : '保存后，本页和 Inventory App 用同一条汇率'}
                     onClick={() => void saveFxRate()}
                     disabled={fxSaving}
                   >
@@ -2881,6 +3271,7 @@ const CrossBorderLogisticsPage: FC = () => {
                   <button
                     type="button"
                     className="cbl-btn cbl-btn--primary"
+                    data-cbl-tip={isEn ? 'Add accounts, or reset a password' : '添加账号，或重置密码'}
                     onClick={() => setShowAccountMgmtModal(true)}
                   >
                     {isEn ? 'Account management' : '跨境账号管理'}
@@ -2899,6 +3290,7 @@ const CrossBorderLogisticsPage: FC = () => {
                   <button
                     type="button"
                     className="cbl-btn cbl-btn--primary"
+                    data-cbl-tip={isEn ? 'Route prices, in CNY per kg' : '路线单价，按每公斤人民币'}
                     onClick={() => setShowPricingModal(true)}
                   >
                     {isEn ? 'Pricing' : '跨境计费'}
@@ -2906,6 +3298,7 @@ const CrossBorderLogisticsPage: FC = () => {
                   <button
                     type="button"
                     className="cbl-btn"
+                    data-cbl-tip={isEn ? 'The truck fee for a trip' : '某一车次的装车费'}
                     onClick={() => setShowTruckFeeModal(true)}
                   >
                     {isEn ? 'Truck fees' : '装车车费'}
@@ -2928,6 +3321,7 @@ const CrossBorderLogisticsPage: FC = () => {
                   <button
                     type="button"
                     className="cbl-btn cbl-btn--danger-outline"
+                    data-cbl-tip={isEn ? 'Clears one trip. Other trips stay.' : '只清这一车，其它车次不动'}
                     onClick={() => setShowClearTripModal(true)}
                   >
                     {isEn ? 'Clear one trip' : '清空指定车次'}
@@ -2935,6 +3329,7 @@ const CrossBorderLogisticsPage: FC = () => {
                   <button
                     type="button"
                     className="cbl-btn cbl-btn--danger-outline"
+                    data-cbl-tip={isEn ? 'Clears every cross-border business record' : '清空全部跨境业务，不能撤销'}
                     onClick={() => setShowClearTestModal(true)}
                   >
                     {isEn ? 'Clear all business data' : '清空全部跨境业务数据'}

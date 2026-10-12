@@ -174,6 +174,17 @@ export type InventoryCustomerSummary = {
   totalPieces: number;
   totalWeightKg: number;
   totalFee: number;
+  /** 多个入库和有报价的订单，人民币只计一次 */
+  totalQuoteCny?: number;
+  /** 没有人民币报价、只记下缅币的费用 */
+  feeWithoutQuote?: number;
+  /** 和明细同一套：报价、签收锁定、未签收单价×重量 */
+  totalCny?: number | null;
+  totalMmk?: number | null;
+  /** 该客户全部已签收、且签收币种不是人民币的缅币。不含未签收。 */
+  signedMmkIncome?: number;
+  /** 该客户签收时明确选了人民币的金额。不含未签收，也不含缅币签收。 */
+  signedCnyIncome?: number;
   orderCount: number;
 };
 
@@ -302,9 +313,12 @@ export type CrossBorderFinanceSummary = {
   agencyPayableTotal?: number;
   agencyRemittedTotal?: number;
   manualIncomeTotal: number;
+  manualIncomeMmkTotal?: number;
+  manualIncomeCnyTotal?: number;
   manualExpenseTotal: number;
-  /** 出口成本合计，人民币 */
+  /** 出口成本合计。人民币只含选了人民币的记录；缅币是各单锁定汇率，不跟总部活汇率。 */
   exportCostCnyTotal?: number;
+  exportCostMmkTotal?: number;
 };
 
 export type CrossBorderFinancePagination = {
@@ -318,6 +332,7 @@ export type CrossBorderManualEntryDraft = {
   entry_date: string;
   kind: 'income' | 'expense';
   amount: number;
+  currency?: 'MMK' | 'CNY';
   category: string;
   note: string;
   store_code: string;
@@ -892,6 +907,8 @@ export type InventoryTestDataClearResult = {
     agencyRemittances?: number;
     exceptionPhotos?: number;
     exceptions?: number;
+    exportCosts?: number;
+    signedInvoices?: number;
   };
   clearedAt: string;
   message?: string;
@@ -927,9 +944,12 @@ export type InventoryTripClearPreview = {
     route: string;
     itemCount: number;
     loadedAt: string | null;
+    customerName?: string;
+    weight?: string;
   }>;
   orderSamples: string[];
   keptOnOtherTrip: number;
+  totalWeight?: string;
 };
 
 export type InventoryTripClearResult = {
@@ -1391,6 +1411,9 @@ export type ExportCostRecord = {
   weight_kg: number | string;
   unit_price_cny: number | string;
   total_cny: number | string;
+  total_mmk?: number | string;
+  pay_currency?: string;
+  fx_mmk_per_cny?: number | string | null;
   trip_number: string;
   store_code: string;
   created_by: string;
@@ -1399,7 +1422,7 @@ export type ExportCostRecord = {
 
 export async function fetchExportCostRecords(
   period?: FinancePeriodParams | null,
-): Promise<{ rows: ExportCostRecord[]; totalCny: number }> {
+): Promise<{ rows: ExportCostRecord[]; totalCny: number; totalMmk: number }> {
   const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
   url.searchParams.set('section', 'export-costs');
   applyFinancePeriodParams(url, period);
@@ -1417,6 +1440,7 @@ export async function fetchExportCostRecords(
   return {
     rows: payload.exportCosts as ExportCostRecord[],
     totalCny: Number(payload.totalCny) || 0,
+    totalMmk: Number(payload.totalMmk) || 0,
   };
 }
 

@@ -1,7 +1,8 @@
 /**
  * Admin 跨境物流 — 清空指定车次
- * 只删该车次的包装、包内快递、追踪、流水、车费付款和这些订单上的异常。
- * 不删其他车次，不改账号、客户、计费、手工记账和站点结算。
+ * 只删该车次的包装、包内快递、追踪、流水、车费，以及这些订单在发票、出口成本和手工账里的记录。
+ * 发票或手工账如果还挂着其他车次的订单，只拿掉这一车的部分。
+ * 不删其他车次，不改账号、客户、计费和站点结算。
  * 需 admin 角色；真正删除还要登录密码，并再输入一次车次号。
  */
 
@@ -10,7 +11,15 @@ const { verifyAdminToken } = require('./verify-admin');
 const { getAdminTokenFromEvent } = require('./utils/adminToken');
 const { verifyLogin } = require('./admin-password');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
-const { chunk, parseTripNumber, planTripClear } = require('./utils/clearInventoryTrip');
+const {
+  chunk,
+  parseTripNumber,
+  planTripClear,
+  buildTripClearKeys,
+  planExportCostClear,
+  planSignedInvoiceClear,
+  planManualEntryClear,
+} = require('./utils/clearInventoryTrip');
 
 function parseBody(event) {
   if (!event.body) return {};
@@ -56,11 +65,71 @@ async function deleteIn(supabase, table, column, values) {
   return count;
 }
 
+async function updateById(supabase, table, id, patch) {
+  const { error } = await supabase.from(table).update(patch).eq('id', id);
+  if (error) {
+    if (missingTable(error)) return false;
+    throw error;
+  }
+  return true;
+}
+
+async function selectAll(supabase, table, columns) {
+  const rows = [];
+  const pageSize = 400;
+  for (let from = 0; from < 20000; from += pageSize) {
+    const { data, error } = await supabase
+      .from(table)
+      .select(columns)
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) {
+      if (missingTable(error)) return [];
+      throw error;
+    }
+    const page = data || [];
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+  throw new Error(`${table} 行数过多，已停止，以免只清掉一部分`);
+}
+
+function uniqueCodes(values) {
+  const seen = new Set();
+  const out = [];
+  for (const value of values) {
+    const text = String(value || '').trim();
+    const key = text.toUpperCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
+  }
+  return out;
+}
+
+function relatedBarcodes(plan) {
+  return uniqueCodes([
+    ...(plan.packBarcodes || []),
+    ...(plan.orderBarcodes || []),
+    ...(plan.deleteItemBarcodes || []),
+    ...(plan.lineBarcodes || []),
+  ]);
+}
+
+function movementInputCodes(plan) {
+  const packs = new Set((plan.packBarcodes || []).map((code) => String(code || '').trim().toUpperCase()));
+  return uniqueCodes([
+    ...(plan.orderBarcodes || []),
+    ...(plan.deleteItemBarcodes || []),
+    ...(plan.lineBarcodes || []),
+  ]).filter((code) => !packs.has(code.toUpperCase()));
+}
+
 async function loadTripScope(supabase, tripNumber) {
   const { data: packs, error: packError } = await supabase
     .from('inventory_pkg_tracking')
     .select(
-      'id, pack_barcode, pack_name, origin_store_code, destination_code, leg_destination_code, item_count, truck_loaded_at, trip_number',
+      'id, pack_barcode, pack_name, origin_store_code, destination_code, leg_destination_code, item_count, total_weight, truck_loaded_at, trip_number',
     )
     .ilike('trip_number', tripNumber);
   if (packError) throw packError;
@@ -111,14 +180,14 @@ async function loadTripScope(supabase, tripNumber) {
     'inventory_order_tracking',
     'pack_barcode',
     packBarcodes,
-    'id, pack_barcode, order_barcode, express_barcode, order_name',
+    'id, pack_barcode, order_barcode, express_barcode, order_name, recipient_name',
   );
   const rawLines = await selectIn(
     supabase,
     'inventory_packed_shipment_items',
     'pack_id',
     Array.from(shipmentById.keys()),
-    'pack_id, item_id, item_barcode',
+    'pack_id, item_id, item_barcode, input_barcode',
   );
   const shipmentItems = rawLines.map((line) => ({
     ...line,
@@ -137,7 +206,7 @@ async function loadTripScope(supabase, tripNumber) {
     if (code) lookupCodes.add(code);
   }
 
-  const itemColumns = 'id, barcode, input_barcode, packed_bundle_barcode, name';
+  const itemColumns = 'id, barcode, input_barcode, packed_bundle_barcode, name, recipient_name, weight';
   const [byBarcode, byInput, byPack] = await Promise.all([
     selectIn(supabase, 'inventory_store_items', 'barcode', Array.from(lookupCodes), itemColumns),
     selectIn(supabase, 'inventory_store_items', 'input_barcode', Array.from(lookupCodes), itemColumns),
@@ -167,6 +236,7 @@ function previewBody(tripNumber, plan) {
     packs: plan.packSummaries.slice(0, 12),
     orderSamples: plan.orderSamples.slice(0, 8),
     keptOnOtherTrip: plan.keptOnOtherTrip.length,
+    totalWeight: plan.totalWeight || '',
   };
 }
 
@@ -269,31 +339,86 @@ exports.handler = async (event) => {
       };
     }
 
+    const keys = buildTripClearKeys(tripNumber, plan);
+    const barcodes = relatedBarcodes(plan);
+    const [exportRows, invoiceRows, manualRows] = await Promise.all([
+      selectAll(
+        supabase,
+        'inventory_export_costs',
+        'id, subject_kind, subject_key, display_barcode, trip_number',
+      ),
+      selectAll(
+        supabase,
+        'inventory_signed_invoices',
+        'id, trip_label, piece_count, document, item_ids',
+      ),
+      selectAll(supabase, 'cross_border_manual_entries', 'id, category, note'),
+    ]);
+    const exportPlan = planExportCostClear(exportRows, keys);
+    const invoicePlan = planSignedInvoiceClear(invoiceRows, keys);
+    const manualPlan = planManualEntryClear(manualRows, keys);
+
+    let signedInvoicesUpdated = 0;
+    for (const patch of invoicePlan.updates) {
+      const updated = await updateById(supabase, 'inventory_signed_invoices', patch.id, {
+        trip_label: patch.trip_label,
+        piece_count: patch.piece_count,
+        document: patch.document,
+        item_ids: patch.item_ids,
+      });
+      if (updated) signedInvoicesUpdated += 1;
+    }
+    let manualEntriesUpdated = 0;
+    const manualUpdatedAt = new Date().toISOString();
+    for (const patch of manualPlan.updates) {
+      const updated = await updateById(supabase, 'cross_border_manual_entries', patch.id, {
+        category: patch.category,
+        note: patch.note,
+        updated_at: manualUpdatedAt,
+      });
+      if (updated) manualEntriesUpdated += 1;
+    }
     const exceptionRows = [];
     const seenExceptions = new Set();
     for (const row of [
-      ...(await selectIn(
-        supabase,
-        'inventory_exceptions',
-        'pack_barcode',
-        plan.packBarcodes,
-        'id',
-      )),
-      ...(await selectIn(
-        supabase,
-        'inventory_exceptions',
-        'item_barcode',
-        plan.deleteItemBarcodes,
-        'id',
-      )),
+      ...(await selectIn(supabase, 'inventory_exceptions', 'pack_barcode', plan.packBarcodes, 'id')),
+      ...(await selectIn(supabase, 'inventory_exceptions', 'item_barcode', barcodes, 'id')),
+      ...(await selectIn(supabase, 'inventory_exceptions', 'express_barcode', barcodes, 'id')),
+      ...(await selectIn(supabase, 'inventory_exceptions', 'item_id', plan.deleteItemIds, 'id')),
     ]) {
       if (!row?.id || seenExceptions.has(row.id)) continue;
       seenExceptions.add(row.id);
       exceptionRows.push(row.id);
     }
 
+    const stockByItem = await deleteIn(
+      supabase,
+      'inventory_stock_movements',
+      'item_id',
+      plan.deleteItemIds,
+    );
+    const stockByBarcode = await deleteIn(supabase, 'inventory_stock_movements', 'barcode', barcodes);
+    const stockByInput = await deleteIn(
+      supabase,
+      'inventory_stock_movements',
+      'input_barcode',
+      movementInputCodes(plan),
+    );
+
     const deleted = {
+      exportCosts: await deleteIn(supabase, 'inventory_export_costs', 'id', exportPlan.deleteIds),
+      signedInvoices: await deleteIn(supabase, 'inventory_signed_invoices', 'id', invoicePlan.deleteIds),
+      signedInvoicesUpdated,
+      manualEntries: await deleteIn(supabase, 'cross_border_manual_entries', 'id', manualPlan.deleteIds),
+      manualEntriesUpdated,
+      exceptionPhotos: await deleteIn(
+        supabase,
+        'inventory_exception_photos',
+        'exception_id',
+        exceptionRows,
+      ),
       exceptions: await deleteIn(supabase, 'inventory_exceptions', 'id', exceptionRows),
+      stockMovements: stockByItem + stockByBarcode + stockByInput,
       transportFeePayments: await deleteIn(
         supabase,
         'inventory_hub_transport_fee_payments',
@@ -323,7 +448,7 @@ exports.handler = async (event) => {
         orderCount: plan.orderCount,
         keptOnOtherTrip: plan.keptOnOtherTrip.length,
         deleted,
-        message: `车次 ${tripNumber} 已清空：${plan.packSummaries.length} 个包装、${plan.orderCount} 笔订单。其他车次未改动。请在装过这趟车的 Inventory App 下拉刷新。`,
+        message: `车次 ${tripNumber} 已清空：${plan.packSummaries.length} 个包装、${plan.orderCount} 笔订单，以及这些订单在发票、出口成本和财务里的对应记录。其他车次未改动。请在装过这趟车的 Inventory App 下拉刷新。`,
       }),
     };
   } catch (error) {

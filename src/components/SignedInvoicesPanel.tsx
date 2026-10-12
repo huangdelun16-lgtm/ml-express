@@ -109,7 +109,7 @@ const SignedInvoicesPanel: FC<Props> = ({ isEn }) => {
                 {visible.map((row) => (
                   <tr key={row.id}>
                     <td>
-                      <button type="button" className="cbl-btn cbl-btn--ghost cbl-btn--small" onClick={() => setOpen(row)}>
+                      <button type="button" className="cbl-btn cbl-btn--ghost cbl-btn--small" data-cbl-tip={isEn ? 'Open this invoice' : '查看这张发票'} onClick={() => setOpen(row)}>
                         {row.invoice_no}
                       </button>
                     </td>

@@ -53,6 +53,19 @@ export function exportCostLineTotal(unitPriceCny: number, weightKg: number): num
   return Math.round(unitPriceCny * weightKg * 100) / 100;
 }
 
+/** 选人民币只记人民币。选缅币按这一单的汇率锁死缅币，人民币合计记 0。 */
+export function settleExportCost(input: {
+  totalCny: number;
+  currency: 'CNY' | 'MMK';
+  mmkPerCny: number | null;
+}): { totalCny: number; totalMmk: number; mmkPerCny: number | null } | null {
+  if (!(input.totalCny > 0)) return null;
+  if (input.currency === 'CNY') return { totalCny: input.totalCny, totalMmk: 0, mmkPerCny: null };
+  const rate = input.mmkPerCny;
+  if (rate == null || !(rate > 0)) return null;
+  return { totalCny: 0, totalMmk: Math.round(input.totalCny * rate), mmkPerCny: rate };
+}
+
 export function exportCostOptionsFromPacks(
   packs: Array<{
     loaded: boolean;

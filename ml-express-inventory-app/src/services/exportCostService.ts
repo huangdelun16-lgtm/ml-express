@@ -10,6 +10,9 @@ export type SavedExportCost = {
   weightKg: number;
   unitPriceCny: number;
   totalCny: number;
+  totalMmk: number;
+  payCurrency: 'CNY' | 'MMK';
+  mmkPerCny: number | null;
   tripNumber: string;
 };
 
@@ -22,6 +25,8 @@ export type ExportCostDraft = {
   legDestination: ExportLegDestination;
   weightKg: number;
   unitPriceCny: number;
+  payCurrency: 'CNY' | 'MMK';
+  mmkPerCny: number | null;
   tripNumber: string;
   createdBy: string;
 };
@@ -33,6 +38,9 @@ type CostRow = {
   weight_kg?: number | string;
   unit_price_cny?: number | string;
   total_cny?: number | string;
+  total_mmk?: number | string;
+  pay_currency?: string;
+  fx_mmk_per_cny?: number | string | null;
   trip_number?: string;
 };
 
@@ -48,6 +56,9 @@ function asCost(row: CostRow | null | undefined): SavedExportCost | null {
     weightKg: Number(row?.weight_kg) || 0,
     unitPriceCny: Number(row?.unit_price_cny) || 0,
     totalCny: Number(row?.total_cny) || 0,
+    totalMmk: Number(row?.total_mmk) || 0,
+    payCurrency: String(row?.pay_currency || '').toUpperCase() === 'MMK' ? 'MMK' : 'CNY',
+    mmkPerCny: Number(row?.fx_mmk_per_cny) > 0 ? Number(row?.fx_mmk_per_cny) : null,
     tripNumber: String(row?.trip_number || '').trim().toUpperCase(),
   };
 }
@@ -76,6 +87,8 @@ export async function addExportCost(draft: ExportCostDraft): Promise<SavedExport
     p_leg_destination: draft.legDestination,
     p_weight_kg: draft.weightKg,
     p_unit_price_cny: draft.unitPriceCny,
+    p_pay_currency: draft.payCurrency,
+    p_mmk_per_cny: draft.payCurrency === 'MMK' ? draft.mmkPerCny : null,
     p_trip_number: draft.tripNumber,
     p_created_by: draft.createdBy,
   });

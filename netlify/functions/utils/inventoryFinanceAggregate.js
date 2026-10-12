@@ -881,16 +881,23 @@ function buildCrossBorderFinanceSummary(entries, storeCode, hubCode) {
   };
 
   let manualIncome = 0;
+  let manualIncomeCny = 0;
   let manualExpense = 0;
+  let manualExpenseCny = 0;
   let agencyRemitted = 0;
 
   for (const entry of entries) {
-    if (entry.category === 'manual_income') {
-      manualIncome += entry.amount ?? 0;
-      continue;
-    }
-    if (entry.category === 'manual_expense') {
-      manualExpense += entry.amount ?? 0;
+    if (entry.category === 'manual_income' || entry.category === 'manual_expense') {
+      const currency = String(entry.paidCurrency || entry.currency || 'MMK').toUpperCase();
+      const amt = entry.amount ?? 0;
+      if (entry.category === 'manual_income') {
+        if (currency === 'CNY') manualIncomeCny += amt;
+        else manualIncome += amt;
+      } else if (currency === 'CNY') {
+        manualExpenseCny += amt;
+      } else {
+        manualExpense += amt;
+      }
       continue;
     }
     if (entry.category === 'agency_remit') {
@@ -940,7 +947,10 @@ function buildCrossBorderFinanceSummary(entries, storeCode, hubCode) {
     agencyPayableTotal: round(buckets.dest_agency_collected),
     agencyRemittedTotal: round(agencyRemitted),
     manualIncomeTotal: round(manualIncome),
+    manualIncomeMmkTotal: round(manualIncome),
+    manualIncomeCnyTotal: round(manualIncomeCny),
     manualExpenseTotal: round(manualExpense),
+    manualExpenseCnyTotal: round(manualExpenseCny),
   };
 }
 
@@ -1037,6 +1047,7 @@ function mapManualRowToLedger(row) {
     title: income ? '其它收入' : '其它支出',
     subtitle: [category, note].filter(Boolean).join(' · ') || '—',
     amount,
+    paidCurrency: String(row.currency || 'MMK').toUpperCase() === 'CNY' ? 'CNY' : 'MMK',
     amountDisplay: income
       ? `+${formatMmk(amount)}`
       : amount > 0
@@ -2073,6 +2084,7 @@ function mapManualToCrossBorderExpense(row) {
     title: isIncome ? '其它收入' : '其它支出',
     subtitle: subtitleParts.join(' · ') || '—',
     amount,
+    paidCurrency: String(row.currency || 'MMK').toUpperCase() === 'CNY' ? 'CNY' : 'MMK',
     amountDisplay: isIncome
       ? `+${formatMmk(amount)}`
       : amount > 0
@@ -2135,7 +2147,9 @@ function aggregateCrossBorderExpenses(transitStores, entriesCache, dataset) {
   let agencyPayableTotal = 0;
   let agencyRemittedTotal = 0;
   let manualIncome = 0;
+  let manualIncomeCny = 0;
   let manualExpense = 0;
+  let manualExpenseCny = 0;
   const seenManual = new Set();
 
   for (const store of transitStores || []) {
@@ -2160,7 +2174,9 @@ function aggregateCrossBorderExpenses(transitStores, entriesCache, dataset) {
     agencyPayableTotal += storeSummary.agencyPayableTotal || 0;
     agencyRemittedTotal += storeSummary.agencyRemittedTotal || 0;
     manualIncome += storeSummary.manualIncomeTotal || 0;
+    manualIncomeCny += storeSummary.manualIncomeCnyTotal || 0;
     manualExpense += storeSummary.manualExpenseTotal || 0;
+    manualExpenseCny += storeSummary.manualExpenseCnyTotal || 0;
 
     const rc = buildReconciliationSummary(financeEntries, store.store_code, hubCode, {
       includeEntries: true,
@@ -2219,8 +2235,15 @@ function aggregateCrossBorderExpenses(transitStores, entriesCache, dataset) {
     const mapped = mapManualToCrossBorderExpense(row);
     entries.push(mapped);
     const amt = mapped.amount ?? 0;
-    if (mapped.category === 'manual_income') leftoverManualIncome += amt;
-    if (mapped.category === 'manual_expense') leftoverManualExpense += amt;
+    const cny = mapped.paidCurrency === 'CNY';
+    if (mapped.category === 'manual_income') {
+      if (cny) manualIncomeCny += amt;
+      else leftoverManualIncome += amt;
+    }
+    if (mapped.category === 'manual_expense') {
+      if (cny) manualExpenseCny += amt;
+      else leftoverManualExpense += amt;
+    }
   }
   manualIncome += leftoverManualIncome;
   manualExpense += leftoverManualExpense;
@@ -2243,7 +2266,10 @@ function aggregateCrossBorderExpenses(transitStores, entriesCache, dataset) {
       agencyPayableTotal: Math.round(agencyPayableTotal),
       agencyRemittedTotal: Math.round(agencyRemittedTotal),
       manualIncomeTotal: Math.round(manualIncome),
+      manualIncomeMmkTotal: Math.round(manualIncome),
+      manualIncomeCnyTotal: Math.round(manualIncomeCny),
       manualExpenseTotal: Math.round(manualExpense),
+      manualExpenseCnyTotal: Math.round(manualExpenseCny),
     },
     entries,
   };

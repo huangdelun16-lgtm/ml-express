@@ -23,12 +23,18 @@ function exportCostInPeriod(createdAt, range) {
   return t >= Date.parse(range.fromIso) && t < Date.parse(range.toExclusiveIso);
 }
 
+function isMmkExportCost(row) {
+  return String(row?.pay_currency || '').trim().toUpperCase() === 'MMK';
+}
+
 function mapExportCostEntry(row, stationName) {
+  const mmkSettle = isMmkExportCost(row);
   const total = roundCny(row.total_cny);
   const unit = roundCny(row.unit_price_cny);
   const kg = roundCny(row.weight_kg);
   const trip = String(row.trip_number || '').trim();
   const dest = legName(row.leg_destination);
+  const totalMmk = Math.round(Number(row.total_mmk) || 0);
   return {
     id: `export:${row.id}`,
     category: 'export_cost',
@@ -36,15 +42,17 @@ function mapExportCostEntry(row, stationName) {
     subtitle: [
       `瑞丽 → ${dest}`,
       `${moneyText(kg)} Kg × ¥${moneyText(unit)}`,
+      mmkSettle && Number(row.fx_mmk_per_cny) > 0 ? `汇率 ${row.fx_mmk_per_cny}` : '',
       trip ? `车次 ${trip}` : '车次 —',
       String(row.customer_name || '').trim(),
     ]
       .filter(Boolean)
       .join(' · '),
-    amount: total,
-    amountDisplay: `¥${moneyText(total)}`,
-    paidCny: total,
-    paidCurrency: 'CNY',
+    amount: mmkSettle ? totalMmk : total,
+    amountDisplay: mmkSettle ? `${totalMmk} MMK` : `¥${moneyText(total)}`,
+    paidCny: mmkSettle ? 0 : total,
+    paidCurrency: mmkSettle ? 'MMK' : 'CNY',
+    totalMmk: mmkSettle ? totalMmk : 0,
     occurredAt: row.created_at || '',
     barcode: String(row.display_barcode || ''),
     itemName: String(row.customer_name || ''),
@@ -67,8 +75,14 @@ function selectExportCostRows(rows, scope = {}) {
     const at = Date.parse(row.created_at || '');
     return Number.isFinite(at) && at >= fromMs && at < toMs;
   });
-  const totalCny = roundCny(exportCosts.reduce((sum, row) => sum + (Number(row.total_cny) || 0), 0));
-  return { exportCosts, totalCny };
+  const totalCny = roundCny(
+    exportCosts.reduce((sum, row) => sum + (isMmkExportCost(row) ? 0 : Number(row.total_cny) || 0), 0),
+  );
+  const totalMmk = exportCosts.reduce(
+    (sum, row) => sum + (isMmkExportCost(row) ? Math.round(Number(row.total_mmk) || 0) : 0),
+    0,
+  );
+  return { exportCosts, totalCny, totalMmk };
 }
 
 function appendExportCosts(finance, rows, stores, opts = {}) {
@@ -81,14 +95,16 @@ function appendExportCosts(finance, rows, stores, opts = {}) {
     ]),
   );
   const entries = (finance?.entries || []).slice();
-  let total = 0;
+  let totalCny = 0;
+  let totalMmk = 0;
   for (const row of rows || []) {
     const code = String(row.store_code || '').trim().toUpperCase();
     if (storeCode && code !== storeCode) continue;
     if (!exportCostInPeriod(row.created_at, range)) continue;
     const mapped = mapExportCostEntry(row, names.get(code) || code);
     entries.push(mapped);
-    total = roundCny(total + mapped.paidCny);
+    totalCny = roundCny(totalCny + (mapped.paidCny || 0));
+    totalMmk += mapped.totalMmk || 0;
   }
   entries.sort((a, b) => new Date(b.occurredAt || 0).getTime() - new Date(a.occurredAt || 0).getTime());
   return {
@@ -97,7 +113,8 @@ function appendExportCosts(finance, rows, stores, opts = {}) {
     summary: {
       ...(finance?.summary || {}),
       entryCount: entries.length,
-      exportCostCnyTotal: total,
+      exportCostCnyTotal: totalCny,
+      exportCostMmkTotal: totalMmk,
     },
   };
 }
@@ -106,7 +123,7 @@ async function loadExportCostRows(supabase, warnings) {
   const { data, error } = await supabase
     .from('inventory_export_costs')
     .select(
-      'id, display_barcode, subject_key, customer_name, leg_destination, weight_kg, unit_price_cny, total_cny, trip_number, store_code, created_at',
+      'id, display_barcode, subject_key, customer_name, leg_destination, weight_kg, unit_price_cny, total_cny, pay_currency, fx_mmk_per_cny, total_mmk, trip_number, store_code, created_at',
     )
     .order('created_at', { ascending: false })
     .limit(500);

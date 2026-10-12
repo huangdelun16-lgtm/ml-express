@@ -1156,7 +1156,7 @@ async function handleExportCosts(supabase, warnings, financeScope) {
   const { data, error } = await supabase
     .from('inventory_export_costs')
     .select(
-      'id, subject_kind, display_barcode, customer_name, final_destination, leg_origin, leg_destination, weight_kg, unit_price_cny, total_cny, trip_number, store_code, created_by, created_at',
+      'id, subject_kind, display_barcode, customer_name, final_destination, leg_origin, leg_destination, weight_kg, unit_price_cny, total_cny, pay_currency, fx_mmk_per_cny, total_mmk, trip_number, store_code, created_by, created_at',
     )
     .order('created_at', { ascending: false })
     .limit(500);

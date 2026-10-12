@@ -167,6 +167,32 @@ export function uniqueSignFeeMmk(details: SignFeeRow[]): number {
   return independent + groupedTotal;
 }
 
+/** 签收时按所选币种出应收。人民币用报价本身；缅币才用报价乘汇率。 */
+export function signCollectAmount(input: {
+  currency: 'MMK' | 'CNY';
+  quoteCny: number | null;
+  rate: number | null;
+  recordedMmk: number;
+}):
+  | { kind: 'cny'; cny: number }
+  | { kind: 'need-rate' }
+  | { kind: 'mmk'; mmk: number; cny: number | null; rate: number | null } {
+  if (input.quoteCny != null) {
+    if (input.currency === 'CNY') return { kind: 'cny', cny: input.quoteCny };
+    if (input.rate == null || input.rate <= 0) {
+      if (input.quoteCny <= 0) return { kind: 'mmk', mmk: 0, cny: input.quoteCny, rate: null };
+      return { kind: 'need-rate' };
+    }
+    return {
+      kind: 'mmk',
+      mmk: Math.round(input.quoteCny * input.rate),
+      cny: input.quoteCny,
+      rate: input.rate,
+    };
+  }
+  return { kind: 'mmk', mmk: input.recordedMmk, cny: null, rate: input.rate };
+}
+
 function parseQuoteCny(raw?: string | null): number | null {
   const trimmed = String(raw ?? '').trim();
   if (!trimmed) return null;

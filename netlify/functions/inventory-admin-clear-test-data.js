@@ -1,6 +1,6 @@
 /**
  * Admin 跨境物流 — 一键清空云端全部跨境业务数据
- * （快递明细、包装、到站签收、在途追踪、流水、跨境会计、结算、代转、异常件）
+ * （快递明细、包装、到站签收、在途追踪、流水、跨境会计、结算、代转、异常件、出口成本、已签收发票）
  * 不删中转站账号、推销员、登记客户、计费。
  * 需 admin 角色 + 登录密码 + 确认短语
  */
@@ -10,6 +10,7 @@ const { verifyAdminToken } = require('./verify-admin');
 const { getAdminTokenFromEvent } = require('./utils/adminToken');
 const { verifyLogin } = require('./admin-password');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
+const { BUSINESS_WIPE_TABLES } = require('./utils/clearCrossBorderBusiness');
 
 const CONFIRM_PHRASE = '清空全部跨境业务数据';
 
@@ -115,40 +116,10 @@ exports.handler = async (event) => {
   });
 
   try {
-    const deleted = {
-      orderTracking: 0,
-      transportFeePayments: 0,
-      pkgTracking: 0,
-      packedShipmentItems: 0,
-      packedShipments: 0,
-      stockMovements: 0,
-      storeItems: 0,
-      crossBorderManualEntries: 0,
-      stationSettlements: 0,
-      agencyRemittances: 0,
-      exceptionPhotos: 0,
-      exceptions: 0,
-    };
-
-    deleted.orderTracking = await wipeTable(supabase, 'inventory_order_tracking');
-    deleted.transportFeePayments = await wipeTable(
-      supabase,
-      'inventory_hub_transport_fee_payments',
-      'pack_barcode',
-    );
-    deleted.pkgTracking = await wipeTable(supabase, 'inventory_pkg_tracking');
-    deleted.packedShipmentItems = await wipeTable(supabase, 'inventory_packed_shipment_items');
-    deleted.packedShipments = await wipeTable(supabase, 'inventory_packed_shipments');
-    deleted.stockMovements = await wipeTable(supabase, 'inventory_stock_movements');
-    deleted.storeItems = await wipeTable(supabase, 'inventory_store_items');
-    deleted.crossBorderManualEntries = await wipeTable(
-      supabase,
-      'cross_border_manual_entries',
-    );
-    deleted.stationSettlements = await wipeTable(supabase, 'inventory_station_settlements');
-    deleted.agencyRemittances = await wipeTable(supabase, 'inventory_agency_remittances');
-    deleted.exceptionPhotos = await wipeTable(supabase, 'inventory_exception_photos');
-    deleted.exceptions = await wipeTable(supabase, 'inventory_exceptions');
+    const deleted = {};
+    for (const spec of BUSINESS_WIPE_TABLES) {
+      deleted[spec.key] = await wipeTable(supabase, spec.table, spec.idColumn || 'id');
+    }
 
     const clearedAt = new Date().toISOString();
     const { error: settingsErr } = await supabase.from('system_settings').upsert(
@@ -175,7 +146,7 @@ exports.handler = async (event) => {
         deleted,
         clearedAt,
         message:
-          '云端全部跨境业务数据已清空（快递明细、包装、到站/在途追踪、流水、跨境会计、结算、代转、异常件）。中转站账号、推销员、登记客户和计费保留。请在各 Inventory App 打开「设置 → 立即同步」。',
+          '云端全部跨境业务数据已清空（快递明细、包装、到站/在途追踪、流水、跨境会计、结算、代转、异常件、出口成本、已签收发票）。中转站账号、推销员、登记客户和计费保留。请在各 Inventory App 打开「设置 → 立即同步」。',
       }),
     };
   } catch (error) {

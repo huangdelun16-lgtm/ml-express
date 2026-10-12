@@ -14,6 +14,7 @@ import { useTranslation } from '../i18n';
 import {
   exportCostLineTotal,
   matchesExportCostQuery,
+  settleExportCost,
   withoutSavedExportCosts,
   type ExportCostBoard,
   type ExportCostPackageRow,
@@ -40,6 +41,8 @@ type Props = {
     legDestination: ExportLegDestination;
     weightKg: number;
     unitPriceCny: number;
+    payCurrency: 'CNY' | 'MMK';
+    mmkPerCny: number | null;
     tripNumber: string;
   }) => Promise<void>;
 };
@@ -65,6 +68,8 @@ export default function ExportCostCard({ board, loading, error, saved, onOpen, o
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [leg, setLeg] = useState<ExportLegDestination | ''>('');
   const [price, setPrice] = useState('');
+  const [currency, setCurrency] = useState<'CNY' | 'MMK' | ''>('');
+  const [rate, setRate] = useState('');
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
   const pending = withoutSavedExportCosts(board, saved);
@@ -87,11 +92,23 @@ export default function ExportCostCard({ board, loading, error, saved, onOpen, o
     setOpenKey(line.key);
     setLeg('');
     setPrice('');
+    setCurrency('');
+    setRate('');
   };
 
   const submit = async (line: Line) => {
     const unit = Number(price);
-    if (!leg || !(unit > 0) || !(line.weightKg > 0) || savingKey) return;
+    const totalCny = exportCostLineTotal(unit, line.weightKg);
+    const mmkPerCny = Number(rate);
+    const settled =
+      currency === 'CNY' || currency === 'MMK'
+        ? settleExportCost({
+            totalCny,
+            currency,
+            mmkPerCny: currency === 'MMK' ? mmkPerCny : null,
+          })
+        : null;
+    if (!leg || !settled || savingKey) return;
     setSavingKey(line.key);
     setFormError('');
     try {
@@ -104,11 +121,15 @@ export default function ExportCostCard({ board, loading, error, saved, onOpen, o
         legDestination: leg,
         weightKg: line.weightKg,
         unitPriceCny: unit,
+        payCurrency: currency === 'MMK' ? 'MMK' : 'CNY',
+        mmkPerCny: currency === 'MMK' ? mmkPerCny : null,
         tripNumber: line.tripNumber,
       });
       setOpenKey(null);
       setPrice('');
       setLeg('');
+      setCurrency('');
+      setRate('');
     } catch (err) {
       const message = err instanceof Error ? err.message : '';
       setFormError(/already added/i.test(message) ? t.home.exportCostAlready : t.home.exportCostSaveFailed);
@@ -189,11 +210,15 @@ export default function ExportCostCard({ board, loading, error, saved, onOpen, o
                 savedByKey={savedByKey}
                 leg={leg}
                 price={price}
+                currency={currency}
+                rate={rate}
                 savingKey={savingKey}
                 formError={formError}
                 onToggle={toggleLine}
                 onLeg={setLeg}
                 onPrice={setPrice}
+                onCurrency={setCurrency}
+                onRate={setRate}
                 onSubmit={(line) => void submit(line)}
               />
               <CostSection
@@ -203,11 +228,15 @@ export default function ExportCostCard({ board, loading, error, saved, onOpen, o
                 savedByKey={savedByKey}
                 leg={leg}
                 price={price}
+                currency={currency}
+                rate={rate}
                 savingKey={savingKey}
                 formError={formError}
                 onToggle={toggleLine}
                 onLeg={setLeg}
                 onPrice={setPrice}
+                onCurrency={setCurrency}
+                onRate={setRate}
                 onSubmit={(line) => void submit(line)}
               />
             </ScrollView>
@@ -285,11 +314,15 @@ function CostSection({
   savedByKey,
   leg,
   price,
+  currency,
+  rate,
   savingKey,
   formError,
   onToggle,
   onLeg,
   onPrice,
+  onCurrency,
+  onRate,
   onSubmit,
 }: {
   title: string;
@@ -298,11 +331,15 @@ function CostSection({
   savedByKey: Map<string, SavedExportCost>;
   leg: ExportLegDestination | '';
   price: string;
+  currency: 'CNY' | 'MMK' | '';
+  rate: string;
   savingKey: string | null;
   formError: string;
   onToggle: (line: Line) => void;
   onLeg: (leg: ExportLegDestination) => void;
   onPrice: (value: string) => void;
+  onCurrency: (currency: 'CNY' | 'MMK') => void;
+  onRate: (value: string) => void;
   onSubmit: (line: Line) => void;
 }) {
   const { t, fmt } = useTranslation();
@@ -315,7 +352,16 @@ function CostSection({
         const expanded = openKey === line.key && !saved;
         const unit = Number(price);
         const total = exportCostLineTotal(unit, line.weightKg);
-        const canAdd = Boolean(leg && unit > 0 && line.weightKg > 0) && savingKey !== line.key;
+        const mmkPerCny = Number(rate);
+        const settled =
+          currency === 'CNY' || currency === 'MMK'
+            ? settleExportCost({
+                totalCny: total,
+                currency,
+                mmkPerCny: currency === 'MMK' ? mmkPerCny : null,
+              })
+            : null;
+        const canAdd = Boolean(leg && settled) && savingKey !== line.key;
         return (
           <View key={line.key} style={[styles.item, line.weightKg <= 0 && styles.itemNoWeight]}>
             <Pressable onPress={() => onToggle(line)} disabled={Boolean(saved) || line.weightKg <= 0} accessibilityRole="button">
@@ -335,13 +381,16 @@ function CostSection({
                   {line.tripNumber ? fmt(t.home.exportCostTrip, { trip: line.tripNumber }) : t.home.exportCostTripEmpty}
                 </Text>
               </View>
-              {saved ? (
-                <Text style={styles.added}>
-                  {t.home.exportCostAdded} · {t.home.exportCostRoute} →{' '}
-                  {saved.legDestination === 'MSE' ? t.home.exportCostMse : t.home.exportCostLso} · ¥
-                  {trimKg(saved.totalCny)}
-                </Text>
-              ) : null}
+                {saved ? (
+                  <Text style={styles.added}>
+                    {t.home.exportCostAdded} · {t.home.exportCostRoute} →{' '}
+                    {saved.legDestination === 'MSE' ? t.home.exportCostMse : t.home.exportCostLso}
+                    {' · '}
+                    {saved.payCurrency === 'MMK'
+                      ? `${Math.round(saved.totalMmk).toLocaleString('en-US')} MMK`
+                      : `¥${trimKg(saved.totalCny)}`}
+                  </Text>
+                ) : null}
             </Pressable>
             {expanded ? (
               <View style={styles.form}>
@@ -362,27 +411,73 @@ function CostSection({
                     <Text style={[styles.legText, leg === 'LSO' && styles.legTextOn]}>{t.home.exportCostLso}</Text>
                   </Pressable>
                 </View>
-                <Text style={styles.formLabel}>¥/Kg</Text>
-                <TextInput
-                  style={styles.price}
-                  value={price}
-                  onChangeText={(value) => onPrice(value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))}
-                  keyboardType="decimal-pad"
-                  placeholder="¥/Kg"
-                  placeholderTextColor="#64748b"
-                />
-                {line.weightKg > 0 && unit > 0 ? (
-                  <View style={styles.totalBox}>
-                    <Text style={styles.totalValue}>¥{trimKg(total)}</Text>
-                    <Text style={styles.calc}>
-                      {fmt(t.home.exportCostLineTotal, {
-                        unit: trimKg(unit),
-                        kg: trimKg(line.weightKg),
-                        total: trimKg(total),
-                      })}
-                    </Text>
-                  </View>
-                ) : line.weightKg > 0 ? null : (
+                {line.weightKg > 0 ? (
+                  <>
+                    <Text style={styles.formLabel}>{t.home.exportCostCurrency}</Text>
+                    <View style={styles.legRow}>
+                      <Pressable
+                        style={[styles.legChip, currency === 'MMK' && styles.legChipOn]}
+                        onPress={() => onCurrency('MMK')}
+                        accessibilityRole="button"
+                      >
+                        <Text style={[styles.legText, currency === 'MMK' && styles.legTextOn]}>
+                          {t.home.exportCostMmk}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        style={[styles.legChip, currency === 'CNY' && styles.legChipOn]}
+                        onPress={() => onCurrency('CNY')}
+                        accessibilityRole="button"
+                      >
+                        <Text style={[styles.legText, currency === 'CNY' && styles.legTextOn]}>
+                          {t.home.exportCostCny}
+                        </Text>
+                      </Pressable>
+                    </View>
+                    {currency === 'MMK' ? (
+                      <View style={styles.rateRow}>
+                        <Text style={styles.ratePrefix}>{t.home.exportCostRatePrefix}</Text>
+                        <TextInput
+                          style={[styles.price, styles.rateInput]}
+                          value={rate}
+                          onChangeText={(value) =>
+                            onRate(value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))
+                          }
+                          keyboardType="decimal-pad"
+                          placeholder="670"
+                          placeholderTextColor="#64748b"
+                        />
+                        <Text style={styles.ratePrefix}>{t.home.exportCostRateUnit}</Text>
+                      </View>
+                    ) : null}
+                    <View style={styles.priceRow}>
+                      <Text style={styles.formLabel}>¥/Kg</Text>
+                      <TextInput
+                        style={[styles.price, styles.rateInput]}
+                        value={price}
+                        onChangeText={(value) => onPrice(value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))}
+                        keyboardType="decimal-pad"
+                        placeholder="¥/Kg"
+                        placeholderTextColor="#64748b"
+                      />
+                    </View>
+                    {unit > 0 ? (
+                      <Text style={styles.calc}>
+                        {currency === 'MMK' && settled
+                          ? fmt(t.home.exportCostMmkLine, {
+                              total: trimKg(total),
+                              rate: trimKg(mmkPerCny),
+                              mmk: Math.round(settled.totalMmk).toLocaleString('en-US'),
+                            })
+                          : fmt(t.home.exportCostLineTotal, {
+                              unit: trimKg(unit),
+                              kg: trimKg(line.weightKg),
+                              total: trimKg(total),
+                            })}
+                      </Text>
+                    ) : null}
+                  </>
+                ) : (
                   <Text style={styles.weightWarn}>{t.home.exportCostNeedWeight}</Text>
                 )}
                 <Pressable
@@ -507,8 +602,9 @@ const styles = StyleSheet.create({
   },
   weightWarn: { color: '#fecaca', fontSize: 13, fontWeight: '800' },
   added: { marginTop: 4, color: '#4ade80', fontSize: 12, fontWeight: '800' },
-  form: { marginTop: 8, gap: 6 },
+  form: { marginTop: 6, gap: 4 },
   formLabel: { color: '#fbbf24', fontSize: 12, fontWeight: '800' },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   legRow: { flexDirection: 'row', gap: 8 },
   legChip: {
     flex: 1,
@@ -536,14 +632,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     backgroundColor: '#0f172a',
   },
-  totalBox: {
-    borderRadius: 10,
-    backgroundColor: '#0f172a',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    alignItems: 'flex-end',
-  },
-  totalValue: { color: '#fbbf24', fontSize: 22, fontWeight: '800' },
+  rateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  rateInput: { flex: 1 },
+  ratePrefix: { color: '#fde68a', fontSize: 13, fontWeight: '700' },
   addBtn: {
     borderRadius: 8,
     backgroundColor: '#fbbf24',

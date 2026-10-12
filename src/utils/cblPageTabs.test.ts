@@ -3,6 +3,7 @@ import { parseCblPageTab, withCblPageTab } from './cblPageTabs';
 describe('parseCblPageTab', () => {
   it('keeps known tabs', () => {
     expect(parseCblPageTab('finance')).toBe('finance');
+    expect(parseCblPageTab('export-cost')).toBe('export-cost');
     expect(parseCblPageTab('customers')).toBe('customers');
     expect(parseCblPageTab('transport')).toBe('transport');
     expect(parseCblPageTab('invoices')).toBe('invoices');

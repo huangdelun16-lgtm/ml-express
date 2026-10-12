@@ -9,6 +9,7 @@ const {
   normalizeCustomerName,
   normalizeCustomerPhone,
 } = require('./crossBorderCustomerRegistry');
+const { sumSignedCurrencyIncome } = require('./signedCurrencyIncome');
 
 function parseAmount(raw) {
   if (raw == null) return 0;
@@ -582,7 +583,108 @@ async function attachPackWeights(supabase, rows, warnings) {
   }
 }
 
-function aggregateCustomerSummaries(rows, registry) {
+const ROUTE_HUBS = new Set(['RUI', 'MSE', 'LSO', 'POL', 'MDY', 'NPW', 'TGI', 'YGN']);
+const HUB_ALIASES = {
+  RUI: 'RUI',
+  RUILI: 'RUI',
+  MSE: 'MSE',
+  MUSE: 'MSE',
+  LSO: 'LSO',
+  LASHIO: 'LSO',
+  POL: 'POL',
+  MDY: 'MDY',
+  MANDALAY: 'MDY',
+  NPW: 'NPW',
+  NAYPYIDAW: 'NPW',
+  TGI: 'TGI',
+  TAUNGGYI: 'TGI',
+  YGN: 'YGN',
+  YANGON: 'YGN',
+};
+
+function normalizeRouteHub(raw) {
+  const upper = String(raw || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s（）()]/g, '');
+  if (!upper) return '';
+  if (HUB_ALIASES[upper]) return HUB_ALIASES[upper];
+  const prefix = upper.replace(/[0-9]/g, '').slice(0, 3);
+  if (HUB_ALIASES[prefix]) return HUB_ALIASES[prefix];
+  return ROUTE_HUBS.has(prefix) ? prefix : '';
+}
+
+function isPackageShellBarcode(barcode) {
+  return /^[A-Z]{3}\d{2}[A-Z]{3}\d+\d{4}$/.test(String(barcode || '').trim().toUpperCase());
+}
+
+function positiveAmount(raw) {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function indexCnyPerKg(rows) {
+  const map = {};
+  for (const row of rows || []) {
+    const key = String(row.settings_key || '');
+    const amount = Number(row.settings_value);
+    if (!Number.isFinite(amount) || amount < 0) continue;
+    const customer = key.match(
+      /^pricing\.cross_border\.customer\.([A-Z0-9]+)\.route\.([A-Z]+)\.([A-Z]+)\.cny_per_kg$/,
+    );
+    const generic = key.match(/^pricing\.cross_border\.route\.([A-Z]+)\.([A-Z]+)\.cny_per_kg$/);
+    if (customer) map[`${customer[1]}|${customer[2]}|${customer[3]}`] = amount;
+    else if (generic) map[`|${generic[1]}|${generic[2]}`] = amount;
+  }
+  return map;
+}
+
+function lookupCnyPerKg(pricing, origin, destination, customerCode) {
+  const rates = pricing?.cnyPerKg;
+  if (!rates) return null;
+  const from = normalizeRouteHub(origin);
+  const to = normalizeRouteHub(destination);
+  if (!from || !to || from === to) return null;
+  const code = String(customerCode || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+  if (code && Object.prototype.hasOwnProperty.call(rates, `${code}|${from}|${to}`)) {
+    return rates[`${code}|${from}|${to}`];
+  }
+  if (Object.prototype.hasOwnProperty.call(rates, `|${from}|${to}`)) return rates[`|${from}|${to}`];
+  return null;
+}
+
+/**
+ * 和客户明细同一套总费用：已签收用报价和签收时的缅币；
+ * 未签收有报价就用报价；否则未签收按人民币单价 × 重量。多个入库的包裹壳不再另计。
+ */
+function customerDisplayMoney(row, pricing, customerCode) {
+  const quote = positiveAmount(row.quoteCny);
+  const recorded = positiveAmount(row.fee);
+  const locked = positiveAmount(row.fxMmkPerCny);
+  const live = positiveAmount(pricing?.liveRate);
+  if (row.customerSigned) {
+    return {
+      cny: quote ?? (recorded != null && locked != null ? recorded / locked : null),
+      mmk: recorded ?? (quote != null && locked != null ? Math.round(quote * locked) : null),
+    };
+  }
+  if (quote != null) {
+    const converted = live != null ? Math.round(quote * live) : null;
+    return { cny: quote, mmk: converted ?? recorded };
+  }
+  if (isPackageShellBarcode(row.inboundBarcode)) return { cny: null, mmk: recorded };
+  const unit = lookupCnyPerKg(pricing, row.origin, row.destination, customerCode);
+  if (unit != null && Number(row.weightKg) > 0 && (recorded != null || unit === 0)) {
+    const cny = unit * Number(row.weightKg);
+    return { cny, mmk: live != null ? Math.round(cny * live) : null };
+  }
+  return { cny: null, mmk: recorded };
+}
+
+function aggregateCustomerSummaries(rows, registry, pricing) {
   const packCodes = new Set();
   for (const row of rows) {
     const pack = String(row.packedBundleBarcode || '').trim().toUpperCase();
@@ -625,6 +727,13 @@ function aggregateCustomerSummaries(rows, registry) {
         totalPieces: 0,
         totalWeightKg: 0,
         totalFee: 0,
+        totalQuoteCny: 0,
+        feeWithoutQuote: 0,
+        displayCny: 0,
+        displayMmk: 0,
+        sawCny: false,
+        sawMmk: false,
+        signedRows: [],
         orderCount: 0,
       };
     }
@@ -637,6 +746,21 @@ function aggregateCustomerSummaries(rows, registry) {
     g.totalPieces += row.qty;
     g.totalWeightKg += row.weightKg;
     g.totalFee += row.fee;
+    const quote = Number(row.quoteCny) || 0;
+    if (quote > 0) g.totalQuoteCny += quote;
+    else g.feeWithoutQuote += row.fee;
+    g.signedRows.push(row);
+    if (!isPackageShellBarcode(row.inboundBarcode)) {
+      const money = customerDisplayMoney(row, pricing, g.customerCode || row.customerCode);
+      if (money.cny != null && Number.isFinite(money.cny)) {
+        g.displayCny += money.cny;
+        g.sawCny = true;
+      }
+      if (money.mmk != null && Number.isFinite(money.mmk)) {
+        g.displayMmk += money.mmk;
+        g.sawMmk = true;
+      }
+    }
     g.orderCount += 1;
     const pack = String(row.packedBundleBarcode || '').trim().toUpperCase();
     if (pack && row.weightKg > 0) packHasPieceWeight.add(pack);
@@ -649,11 +773,27 @@ function aggregateCustomerSummaries(rows, registry) {
   }
 
   return Object.values(map)
-    .map((g) => ({
-      ...g,
-      totalWeightKg: Math.round(g.totalWeightKg * 100) / 100,
-      totalFee: Math.round(g.totalFee),
-    }))
+    .map((g) => {
+      const totalCny = g.sawCny ? Math.round(g.displayCny * 100) / 100 : null;
+      const totalMmk = g.sawMmk ? Math.round(g.displayMmk) : null;
+      const signed = sumSignedCurrencyIncome(g.signedRows);
+      delete g.displayCny;
+      delete g.displayMmk;
+      delete g.sawCny;
+      delete g.sawMmk;
+      delete g.signedRows;
+      return {
+        ...g,
+        totalWeightKg: Math.round(g.totalWeightKg * 100) / 100,
+        totalFee: Math.round(g.totalFee),
+        totalQuoteCny: Math.round(g.totalQuoteCny * 100) / 100,
+        feeWithoutQuote: Math.round(g.feeWithoutQuote),
+        totalCny,
+        totalMmk,
+        signedMmkIncome: signed.mmk,
+        signedCnyIncome: signed.cny,
+      };
+    })
     .sort((a, b) => b.totalFee - a.totalFee || b.orderCount - a.orderCount);
 }
 
@@ -663,10 +803,28 @@ async function fetchCustomerSummaries(supabase) {
   if (registryWarning) warnings.push(registryWarning);
   const { rows, warnings: loadWarnings } = await loadExpressItemsDataset(supabase);
   warnings.push(...loadWarnings);
+  const pricing = await loadCustomerListPricing(supabase);
   return {
-    summaries: aggregateCustomerSummaries(rows, registry),
+    summaries: aggregateCustomerSummaries(rows, registry, pricing),
     warnings,
   };
+}
+
+async function loadCustomerListPricing(supabase) {
+  const pricing = { liveRate: null, cnyPerKg: {} };
+  const { data } = await supabase
+    .from('system_settings')
+    .select('settings_key, settings_value')
+    .like('settings_key', 'pricing.cross_border%cny_per_kg');
+  pricing.cnyPerKg = indexCnyPerKg(data);
+  const { data: fxRow } = await supabase
+    .from('system_settings')
+    .select('settings_value')
+    .eq('settings_key', 'pricing.cross_border.fx.mmk_per_cny')
+    .maybeSingle();
+  const rate = Number(fxRow?.settings_value);
+  if (Number.isFinite(rate) && rate > 0) pricing.liveRate = rate;
+  return pricing;
 }
 
 async function fetchCustomerItems(supabase, customerName, customerPhone, customerCode) {

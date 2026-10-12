@@ -408,6 +408,8 @@ export default function HomeScreen({ navigation }: HomeProps) {
                     legDestination: draft.legDestination,
                     weightKg: draft.weightKg,
                     unitPriceCny: draft.unitPriceCny,
+                    payCurrency: draft.payCurrency,
+                    mmkPerCny: draft.mmkPerCny,
                     tripNumber: draft.tripNumber,
                     createdBy: operatorName || '',
                   });

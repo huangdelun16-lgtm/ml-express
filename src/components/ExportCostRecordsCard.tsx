@@ -1,12 +1,12 @@
 import { FC, useEffect, useMemo, useState } from 'react';
-import DualMoney from './DualMoney';
+import DualMoney, { formatMmK } from './DualMoney';
+import { formatCnyAmount } from '../utils/crossBorderFx';
 import {
   fetchExportCostRecords,
   type ExportCostRecord,
   type FinancePeriodParams,
   type InventoryTransitStore,
 } from '../services/inventoryConsoleService';
-import { cnyToMmk } from '../utils/crossBorderFx';
 
 type Props = {
   isEn: boolean;
@@ -16,8 +16,16 @@ type Props = {
   onTotal?: (totalCny: number | null) => void;
 };
 
-function exportCostMoney(cny: number, rate: number | null) {
-  return <DualMoney cny={cny} mmk={cnyToMmk(cny, rate)} rate={rate} prefix="−" />;
+function exportCostMoney(row: ExportCostRecord) {
+  const mmkSettle = String(row.pay_currency || '').toUpperCase() === 'MMK';
+  const cny = mmkSettle ? 0 : Number(row.total_cny) || 0;
+  const mmk = mmkSettle ? Math.round(Number(row.total_mmk) || 0) : 0;
+  return <DualMoney cny={cny} mmk={mmk} rate={null} prefix={cny > 0 || mmk > 0 ? '−' : ''} />;
+}
+
+function exportCostBarAmount(value: number, kind: 'cny' | 'mmk'): string {
+  const text = kind === 'cny' ? formatCnyAmount(value) : formatMmK(value);
+  return value > 0 ? `−${text}` : text;
 }
 
 function money(value: number | string | null | undefined): string {
@@ -61,9 +69,10 @@ function whenLabel(iso: string): string {
   return date.toLocaleString('zh-CN', { hour12: false });
 }
 
-const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal }) => {
+const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, onTotal }) => {
   const [rows, setRows] = useState<ExportCostRecord[]>([]);
   const [totalCny, setTotalCny] = useState(0);
+  const [totalMmk, setTotalMmk] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
@@ -84,6 +93,7 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
         if (cancelled) return;
         setRows(result.rows);
         setTotalCny(result.totalCny);
+        setTotalMmk(result.totalMmk);
         onTotal?.(result.totalCny);
       })
       .catch((err: unknown) => {
@@ -91,6 +101,7 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
         const message = err instanceof Error ? err.message : '';
         setRows([]);
         setTotalCny(0);
+        setTotalMmk(0);
         onTotal?.(null);
         setError(friendlyExportCostError(message, isEn));
       })
@@ -134,23 +145,33 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
         </div>
       </div>
       <div className="cbl-card__body">
-        <div className="cbl-export-cost__bar">
+        <div className="cbl-export-cost__stats">
           <div className="cbl-export-cost__stat">
-            <span>{isEn ? 'Orders' : '单数'}</span>
-            <strong>{loading ? '—' : rows.length}</strong>
+            <span className="cbl-export-cost__label">{isEn ? 'Orders' : '单数'}</span>
+            <strong className="cbl-export-cost__figure">{loading ? '—' : rows.length}</strong>
           </div>
-          <div className="cbl-export-cost__stat cbl-export-cost__stat--total">
-            <span>{isEn ? 'Total' : '合计'}</span>
-            <strong>{loading ? '—' : exportCostMoney(totalCny, rate)}</strong>
+          <div className="cbl-export-cost__stat">
+            <span className="cbl-export-cost__label">
+              {isEn ? 'CNY' : '人民币'}
+              {isEn ? null : <span className="cbl-export-cost__ccy">CNY</span>}
+            </span>
+            <strong className="cbl-export-cost__figure">{loading ? '—' : exportCostBarAmount(totalCny, 'cny')}</strong>
           </div>
-          <input
-            className="cbl-export-cost__search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={isEn ? 'Search barcode, customer, trip' : '搜单号、客户、车次'}
-            aria-label={isEn ? 'Search export costs' : '搜索出口成本'}
-          />
+          <div className="cbl-export-cost__stat">
+            <span className="cbl-export-cost__label">
+              {isEn ? 'MMK' : '缅币'}
+              {isEn ? null : <span className="cbl-export-cost__ccy">MMK</span>}
+            </span>
+            <strong className="cbl-export-cost__figure">{loading ? '—' : exportCostBarAmount(totalMmk, 'mmk')}</strong>
+          </div>
         </div>
+        <input
+          className="cbl-export-cost__search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={isEn ? 'Search barcode, customer, trip' : '搜单号、客户、车次'}
+          aria-label={isEn ? 'Search export costs' : '搜索出口成本'}
+        />
         {loading ? (
           <div className="cbl-export-cost__empty">{isEn ? 'Loading…' : '加载中…'}</div>
         ) : error ? (
@@ -199,7 +220,7 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
                       <td>{money(row.weight_kg)} Kg</td>
                       <td>¥{money(row.unit_price_cny)}</td>
                       <td className="cbl-finance-cell cbl-finance-cell--out">
-                        {exportCostMoney(Number(row.total_cny) || 0, rate)}
+                        {exportCostMoney(row)}
                       </td>
                       <td>{row.trip_number?.trim() || '—'}</td>
                       <td>
