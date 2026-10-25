@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import DestinationPickerField from './DestinationPickerField';
-import PackagingPickerField from './PackagingPickerField';
 import { InboundFormField, InboundFormSection, inboundFormStyles } from './InboundFormPrimitives';
 import { DimensionSpecField, LockedSuffixField } from './StructuredItemFields';
 import { useTranslation } from '../i18n';
@@ -22,7 +21,6 @@ export type InboundOrderFormBodyValues = {
   specW: string;
   specH: string;
   weightN: string;
-  packaging: string;
   recipientName: string;
   recipientPhone: string;
   destination: string;
@@ -38,7 +36,6 @@ type Props = {
   onProductNameChange: (v: string) => void;
   onSpecChange: (parts: { l: string; w: string; h: string }) => void;
   onWeightChange: (v: string) => void;
-  onPackagingChange: (v: string) => void;
   onRecipientNameChange: (v: string) => void;
   onRecipientPhoneChange: (v: string) => void;
   onDestinationChange: (v: string) => void;
@@ -69,7 +66,6 @@ export default function InboundOrderFormBody({
   onProductNameChange,
   onSpecChange,
   onWeightChange,
-  onPackagingChange,
   onRecipientNameChange,
   onRecipientPhoneChange,
   onDestinationChange,
@@ -115,11 +111,6 @@ export default function InboundOrderFormBody({
           onSubmitEditing={fieldChain.propsFor('product').onSubmitEditing}
           blurOnSubmit={fieldChain.propsFor('product').blurOnSubmit}
         />
-        {canEdit ? (
-          <PackagingPickerField value={values.packaging} onChange={onPackagingChange} />
-        ) : (
-          <InboundFormField label={t.forms.packaging} value={values.packaging} editable={false} />
-        )}
         {canEdit ? (
           <DimensionSpecField
             l={values.specL}

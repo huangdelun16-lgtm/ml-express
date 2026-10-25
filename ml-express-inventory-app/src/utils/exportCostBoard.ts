@@ -41,11 +41,9 @@ export type ExportCostBoardOptions = {
   tripByBarcode?: ReadonlyMap<string, string>;
 };
 
-/** 还没签收的入库。装过车的也留在名单里。 */
+/** 已入库、还没记出口成本的都留下。签收与否不影响，装过车的也留。 */
 export function isPendingExportItem(item: InventoryItemListRow): boolean {
-  if (!item.stocked_in) return false;
-  if (item.customer_signed) return false;
-  return true;
+  return item.stocked_in;
 }
 
 export function exportCostLineTotal(unitPriceCny: number, weightKg: number): number {

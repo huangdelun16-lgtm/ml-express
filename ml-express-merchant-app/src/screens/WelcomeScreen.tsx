@@ -165,7 +165,7 @@ export default function WelcomeScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle="light-content" />
       
       <LinearGradient
         colors={dynamicScreen ? [dynamicScreen.bg_color_start!, dynamicScreen.bg_color_end!] : ['#0f172a', '#1e293b', '#0f172a']}

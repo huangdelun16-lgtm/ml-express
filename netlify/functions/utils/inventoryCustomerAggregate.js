@@ -10,6 +10,10 @@ const {
   normalizeCustomerPhone,
 } = require('./crossBorderCustomerRegistry');
 const { sumSignedCurrencyIncome } = require('./signedCurrencyIncome');
+const {
+  selectStaleUnregisteredOrders,
+  deleteUnregisteredOrderGraph,
+} = require('./purgeUnregisteredCustomers');
 
 function parseAmount(raw) {
   if (raw == null) return 0;
@@ -735,6 +739,7 @@ function aggregateCustomerSummaries(rows, registry, pricing) {
         sawMmk: false,
         signedRows: [],
         orderCount: 0,
+        oldestInboundAt: '',
       };
     }
     return map[key];
@@ -743,6 +748,10 @@ function aggregateCustomerSummaries(rows, registry, pricing) {
   const packHasPieceWeight = new Set();
   for (const row of orders) {
     const g = ensure(row);
+    const inboundAt = String(row.inboundAt || '').trim();
+    if (inboundAt && (!g.oldestInboundAt || inboundAt < g.oldestInboundAt)) {
+      g.oldestInboundAt = inboundAt;
+    }
     g.totalPieces += row.qty;
     g.totalWeightKg += row.weightKg;
     g.totalFee += row.fee;
@@ -797,12 +806,26 @@ function aggregateCustomerSummaries(rows, registry, pricing) {
     .sort((a, b) => b.totalFee - a.totalFee || b.orderCount - a.orderCount);
 }
 
+async function dropStaleUnregistered(supabase, rows, registry, warnings) {
+  const stale = selectStaleUnregisteredOrders(rows, registry, Date.now());
+  if (!stale.length) return rows;
+  try {
+    await deleteUnregisteredOrderGraph(supabase, stale);
+  } catch (error) {
+    warnings.push(`未登记客户超时清理失败：${error.message}`);
+    return rows;
+  }
+  const drop = new Set(stale.map((row) => row.id));
+  return rows.filter((row) => !drop.has(row.id));
+}
+
 async function fetchCustomerSummaries(supabase) {
   const warnings = [];
   const { registry, warning: registryWarning } = await loadCrossBorderCustomerRegistry(supabase);
   if (registryWarning) warnings.push(registryWarning);
-  const { rows, warnings: loadWarnings } = await loadExpressItemsDataset(supabase);
-  warnings.push(...loadWarnings);
+  const loaded = await loadExpressItemsDataset(supabase);
+  warnings.push(...loaded.warnings);
+  const rows = await dropStaleUnregistered(supabase, loaded.rows, registry, warnings);
   const pricing = await loadCustomerListPricing(supabase);
   return {
     summaries: aggregateCustomerSummaries(rows, registry, pricing),
@@ -831,8 +854,9 @@ async function fetchCustomerItems(supabase, customerName, customerPhone, custome
   const warnings = [];
   const { registry, warning: registryWarning } = await loadCrossBorderCustomerRegistry(supabase);
   if (registryWarning) warnings.push(registryWarning);
-  const { rows, warnings: loadWarnings } = await loadExpressItemsDataset(supabase);
-  warnings.push(...loadWarnings);
+  const loaded = await loadExpressItemsDataset(supabase);
+  warnings.push(...loaded.warnings);
+  const rows = await dropStaleUnregistered(supabase, loaded.rows, registry, warnings);
 
   const codeUpper = String(customerCode || '').trim().toUpperCase();
   const registered = codeUpper && registry?.byCode?.[codeUpper] ? registry.byCode[codeUpper] : null;
@@ -870,9 +894,18 @@ async function fetchCustomerItems(supabase, customerName, customerPhone, custome
   };
 }
 
+async function purgeStaleUnregisteredCustomers(supabase) {
+  const warnings = [];
+  const { registry } = await loadCrossBorderCustomerRegistry(supabase);
+  const { rows } = await loadExpressItemsDataset(supabase);
+  const next = await dropStaleUnregistered(supabase, rows, registry, warnings);
+  return { removed: rows.length - next.length, warnings };
+}
+
 module.exports = {
   fetchCustomerSummaries,
   fetchCustomerItems,
+  purgeStaleUnregisteredCustomers,
   customerKey,
   aggregateCustomerSummaries,
   applyPackFeeDedup,

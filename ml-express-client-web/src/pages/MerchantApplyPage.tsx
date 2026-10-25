@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import NavigationBar from '../components/home/NavigationBar';
@@ -162,6 +162,9 @@ const DEFAULT_FORM: FormState = {
 const MerchantApplyPage: React.FC = () => {
   const navigate = useNavigate();
   const { language, setLanguage } = useLanguage();
+  useLayoutEffect(() => {
+    setLanguage('my');
+  }, [setLanguage]);
   const isEn = language === 'en';
   const isMy = language === 'my';
   const packingLang: PackingLang = isEn ? 'en' : isMy ? 'my' : 'zh';

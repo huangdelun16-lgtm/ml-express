@@ -424,6 +424,42 @@
   border-color: #c4b5fd;
 }
 
+.sys-settings__section-banner--mail {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.sys-settings__card--wide,
+.sys-settings__mail-preview {
+  grid-column: 1 / -1;
+}
+
+.sys-settings__mail-preview {
+  padding: 0.9rem 1rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--sys-border);
+  background: #fff;
+}
+
+.sys-settings__mail-preview h3 {
+  margin: 0 0 0.45rem;
+  font-size: 0.92rem;
+}
+
+.sys-settings__mail-preview-subject {
+  margin: 0 0 0.55rem;
+  font-weight: 700;
+}
+
+.sys-settings__mail-preview pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: var(--sys-text);
+}
+
 .sys-settings__section-banner code {
   font-size: 0.72rem;
   background: #fff;

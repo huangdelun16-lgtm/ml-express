@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import DestinationPickerField from '../components/DestinationPickerField';
 import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
@@ -47,6 +48,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'StockOut'>;
 
 export default function StockOutScreen({ navigation }: Props) {
   const { t, fmt } = useTranslation();
+  const { scrollY, onScroll } = useCollapsingHomeScroll();
   const { operatorName, store, hubCode } = useAuth();
   const [packs, setPacks] = useState<PackedShipmentDetail[]>([]);
   const [loadingPacks, setLoadingPacks] = useState(false);
@@ -350,11 +352,19 @@ export default function StockOutScreen({ navigation }: Props) {
     : '';
 
   return (
+    <View style={styles.root}>
+    <CollapsingHomeHeader title={t.nav.stockOut} onHome={() => navigation.goBack()} scrollY={scrollY} />
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
         <Text style={styles.title}>{t.stockOut.title}</Text>
         <Text style={styles.subtitle}>{t.stockOut.subtitle}</Text>
         <OnlineRequiredBanner />
@@ -510,11 +520,13 @@ export default function StockOutScreen({ navigation }: Props) {
         onDone={handleSuccessDone}
       />
     </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0f172a' },
+  scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 40 },
   title: { color: '#f8fafc', fontSize: 22, fontWeight: '800', marginBottom: 6 },
   subtitle: { color: '#94a3b8', fontSize: 13, lineHeight: 20, marginBottom: 16 },

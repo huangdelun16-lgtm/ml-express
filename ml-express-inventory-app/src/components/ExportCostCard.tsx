@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import Text from './AppText';
+import PhoneBarcodeScanModal from './PhoneBarcodeScanModal';
 import { useTranslation } from '../i18n';
 import {
   exportCostLineTotal,
@@ -25,6 +28,7 @@ import {
   type ExportLegDestination,
   type SavedExportCost,
 } from '../services/exportCostService';
+import { normalizeScanCode } from '../utils/barcodeScan';
 
 type Props = {
   board: ExportCostBoard;
@@ -63,8 +67,13 @@ type Line = {
 export default function ExportCostCard({ board, loading, error, saved, onOpen, onAdd }: Props) {
   const { t, fmt } = useTranslation();
   const { height } = useWindowDimensions();
+  const listRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+  const focusedField = useRef<View | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [scanOpen, setScanOpen] = useState(false);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [leg, setLeg] = useState<ExportLegDestination | ''>('');
   const [price, setPrice] = useState('');
@@ -76,8 +85,36 @@ export default function ExportCostCard({ board, loading, error, saved, onOpen, o
   const empty = pending.singles.length === 0 && pending.packages.length === 0;
   const savedByKey = new Map(saved.map((row) => [exportCostKey(row.subjectKind, row.subjectKey), row]));
 
+  const revealFocused = (kb: number) => {
+    const node = focusedField.current;
+    if (!node || kb <= 0) return;
+    node.measureInWindow((_x, y, _w, fieldHeight) => {
+      const visibleBottom = height - kb - 16;
+      const overflow = y + fieldHeight - visibleBottom;
+      if (overflow > 0) {
+        listRef.current?.scrollTo({ y: scrollY.current + overflow + 12, animated: true });
+      }
+    });
+  };
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, (event) => {
+      const next = event.endCoordinates.height;
+      setKeyboardHeight(next);
+      setTimeout(() => revealFocused(next), 80);
+    });
+    const hide = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [height]);
+
   const close = () => {
     setOpen(false);
+    setScanOpen(false);
     setOpenKey(null);
     setQuery('');
   };
@@ -180,24 +217,58 @@ export default function ExportCostCard({ board, loading, error, saved, onOpen, o
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
-        <View style={styles.overlay}>
+        <View style={[styles.overlay, keyboardHeight > 0 && { justifyContent: 'flex-end', paddingBottom: 8 }]}>
           <Pressable style={styles.backdrop} onPress={close} accessibilityLabel={t.common.close} />
-          <View style={[styles.sheet, { maxHeight: height * 0.88 }]}>
+          <View
+            style={[
+              styles.sheet,
+              {
+                maxHeight: Math.max(280, height - keyboardHeight - (keyboardHeight > 0 ? 20 : height * 0.08)),
+                marginBottom: keyboardHeight,
+              },
+            ]}
+          >
             <Text style={styles.sheetTitle}>{t.home.exportCostTitle}</Text>
             <Text style={styles.sheetHint}>{t.home.exportCostBody}</Text>
-            <TextInput
-              style={styles.search}
-              value={query}
-              onChangeText={setQuery}
-              placeholder={t.home.exportCostSearch}
-              placeholderTextColor="#64748b"
-              autoCorrect={false}
-              autoCapitalize="none"
-            />
+            <View style={styles.searchRow}>
+              <TextInput
+                style={styles.search}
+                value={query}
+                onChangeText={setQuery}
+                placeholder={t.home.exportCostSearch}
+                placeholderTextColor="#64748b"
+                autoCorrect={false}
+                autoCapitalize="none"
+              />
+              <Pressable
+                style={styles.scanBtn}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setScanOpen(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t.scanInput.scanBtn}
+              >
+                <Text style={styles.scanBtnText} myanmarWeight="bold">
+                  {t.scanInput.scanBtn}
+                </Text>
+              </Pressable>
+            </View>
             <ScrollView
-              style={{ maxHeight: height * 0.64 }}
+              ref={listRef}
+              style={{
+                maxHeight: Math.max(
+                  160,
+                  height - keyboardHeight - (keyboardHeight > 0 ? 168 : height * 0.28),
+                ),
+              }}
               contentContainerStyle={styles.list}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              onScroll={(event) => {
+                scrollY.current = event.nativeEvent.contentOffset.y;
+              }}
+              scrollEventThrottle={16}
             >
               {loading && empty ? <Text style={styles.empty}>{t.common.loading}</Text> : null}
               {!loading && error ? <Text style={styles.empty}>{error}</Text> : null}
@@ -220,6 +291,10 @@ export default function ExportCostCard({ board, loading, error, saved, onOpen, o
                 onCurrency={setCurrency}
                 onRate={setRate}
                 onSubmit={(line) => void submit(line)}
+                onFieldFocus={(node) => {
+                  focusedField.current = node;
+                  setTimeout(() => revealFocused(keyboardHeight || 320), 60);
+                }}
               />
               <CostSection
                 title={`${t.home.exportCostPackage} ${packages.length}`}
@@ -238,12 +313,31 @@ export default function ExportCostCard({ board, loading, error, saved, onOpen, o
                 onCurrency={setCurrency}
                 onRate={setRate}
                 onSubmit={(line) => void submit(line)}
+                onFieldFocus={(node) => {
+                  focusedField.current = node;
+                  setTimeout(() => revealFocused(keyboardHeight || 320), 60);
+                }}
               />
             </ScrollView>
             <Pressable style={styles.closeBtn} onPress={close} accessibilityRole="button">
               <Text style={styles.closeText}>{t.common.close}</Text>
             </Pressable>
           </View>
+          {scanOpen ? (
+            <View style={styles.scanCover}>
+              <PhoneBarcodeScanModal
+                embedded
+                visible
+                onClose={() => setScanOpen(false)}
+                onScanned={(code) => {
+                  const normalized = normalizeScanCode(code);
+                  if (normalized) setQuery(normalized);
+                  setScanOpen(false);
+                }}
+                title={t.scanInput.phoneScan}
+              />
+            </View>
+          ) : null}
         </View>
       </Modal>
     </>
@@ -324,6 +418,7 @@ function CostSection({
   onCurrency,
   onRate,
   onSubmit,
+  onFieldFocus,
 }: {
   title: string;
   lines: Line[];
@@ -341,8 +436,10 @@ function CostSection({
   onCurrency: (currency: 'CNY' | 'MMK') => void;
   onRate: (value: string) => void;
   onSubmit: (line: Line) => void;
+  onFieldFocus: (node: View | null) => void;
 }) {
   const { t, fmt } = useTranslation();
+  const hosts = useRef(new Map<string, View | null>());
   if (lines.length === 0) return null;
   return (
     <View style={styles.section}>
@@ -435,7 +532,13 @@ function CostSection({
                       </Pressable>
                     </View>
                     {currency === 'MMK' ? (
-                      <View style={styles.rateRow}>
+                      <View
+                        style={styles.rateRow}
+                        collapsable={false}
+                        ref={(node) => {
+                          hosts.current.set(`${line.key}:rate`, node);
+                        }}
+                      >
                         <Text style={styles.ratePrefix}>{t.home.exportCostRatePrefix}</Text>
                         <TextInput
                           style={[styles.price, styles.rateInput]}
@@ -443,6 +546,7 @@ function CostSection({
                           onChangeText={(value) =>
                             onRate(value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))
                           }
+                          onFocus={() => onFieldFocus(hosts.current.get(`${line.key}:rate`) ?? null)}
                           keyboardType="decimal-pad"
                           placeholder="670"
                           placeholderTextColor="#64748b"
@@ -450,12 +554,19 @@ function CostSection({
                         <Text style={styles.ratePrefix}>{t.home.exportCostRateUnit}</Text>
                       </View>
                     ) : null}
-                    <View style={styles.priceRow}>
+                    <View
+                      style={styles.priceRow}
+                      collapsable={false}
+                      ref={(node) => {
+                        hosts.current.set(`${line.key}:price`, node);
+                      }}
+                    >
                       <Text style={styles.formLabel}>¥/Kg</Text>
                       <TextInput
                         style={[styles.price, styles.rateInput]}
                         value={price}
                         onChangeText={(value) => onPrice(value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))}
+                        onFocus={() => onFieldFocus(hosts.current.get(`${line.key}:price`) ?? null)}
                         keyboardType="decimal-pad"
                         placeholder="¥/Kg"
                         placeholderTextColor="#64748b"
@@ -529,6 +640,16 @@ const styles = StyleSheet.create({
   rowHint: { color: '#94a3b8', fontSize: 12, fontWeight: '600', marginTop: 2, lineHeight: 16 },
   chevron: { fontSize: 28, fontWeight: '300', lineHeight: 28, color: '#fbbf24' },
   overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 },
+  scanCover: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 30,
+    elevation: 30,
+    backgroundColor: '#0f172a',
+  },
   backdrop: {
     position: 'absolute',
     top: 0,
@@ -548,9 +669,16 @@ const styles = StyleSheet.create({
   },
   sheetTitle: { color: '#fbbf24', fontSize: 18, fontWeight: '800' },
   sheetHint: { color: '#94a3b8', fontSize: 12, marginTop: 4, lineHeight: 16 },
-  search: {
+  searchRow: {
     marginTop: 10,
     marginBottom: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  search: {
+    flex: 1,
+    minHeight: 42,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: 'rgba(148, 163, 184, 0.35)',
@@ -559,7 +687,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     fontSize: 14,
   },
-  list: { paddingBottom: 4 },
+  scanBtn: {
+    minHeight: 42,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.55)',
+    backgroundColor: 'rgba(251, 191, 36, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scanBtnText: { color: '#fbbf24', fontSize: 14, fontWeight: '800' },
+  list: { paddingBottom: 28 },
   empty: { color: '#94a3b8', fontSize: 13, paddingVertical: 16 },
   section: { marginTop: 14 },
   sectionTitle: {

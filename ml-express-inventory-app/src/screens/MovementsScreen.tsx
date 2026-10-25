@@ -9,7 +9,9 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
 import { useAuth } from '../contexts/AuthContext';
 import {
   formatTimeAgo,
@@ -20,6 +22,7 @@ import {
 } from '../i18n';
 import { listFinanceLedger } from '../services/financeLedgerService';
 import type { FinanceLedgerEntry, FinanceLedgerResult } from '../types/financeLedger';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type TabKey = 'all' | 'income' | 'transport' | 'ops';
 
@@ -108,6 +111,8 @@ function EmptyState({ tab }: { tab: TabKey }) {
 
 export default function MovementsScreen() {
   const { t } = useTranslation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { scrollY, onScroll } = useCollapsingHomeScroll();
   const { store, hubCode } = useAuth();
   const [tab, setTab] = useState<TabKey>('all');
   const [loading, setLoading] = useState(true);
@@ -173,9 +178,12 @@ export default function MovementsScreen() {
 
   if (!store || !hubCode) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.emptyIcon}>🔐</Text>
-        <Text style={styles.emptyTitle}>{t.common.loginStoreFirst}</Text>
+      <View style={styles.root}>
+        <CollapsingHomeHeader title={t.nav.movements} onHome={() => navigation.goBack()} scrollY={scrollY} />
+        <View style={styles.center}>
+          <Text style={styles.emptyIcon}>🔐</Text>
+          <Text style={styles.emptyTitle}>{t.common.loginStoreFirst}</Text>
+        </View>
       </View>
     );
   }
@@ -219,6 +227,7 @@ export default function MovementsScreen() {
 
   return (
     <View style={styles.root}>
+      <CollapsingHomeHeader title={t.nav.movements} onHome={() => navigation.goBack()} scrollY={scrollY} />
       {loading && entries.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator color="#a78bfa" size="large" />
@@ -226,7 +235,10 @@ export default function MovementsScreen() {
         </View>
       ) : (
         <FlatList
+          style={styles.listView}
           data={displayed}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           ListHeaderComponent={listHeader}
@@ -248,6 +260,7 @@ export default function MovementsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0f172a' },
+  listView: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   loadingText: { color: '#94a3b8', marginTop: 14, fontSize: 14, fontWeight: '600' },
   headerBlock: { paddingTop: 4 },

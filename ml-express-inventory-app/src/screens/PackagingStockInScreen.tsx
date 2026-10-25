@@ -39,6 +39,7 @@ import {
 } from '../utils/itemFieldFormat';
 import { inboundBarcodeTimestampFromPackDate, inboundDateToIso, todayInMyanmar } from '../utils/stockInDate';
 import { hasInboundScanDraft } from '../utils/inboundLeaveDraft';
+import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
 import { useInboundLeaveGuard } from '../hooks/useInboundLeaveGuard';
 import { destinationFromCustomerCode, normalizePackDestination } from '../constants/destinationOptions';
 import { resolveStoreHubCode } from '../utils/storeZone';
@@ -90,6 +91,7 @@ function emptyLine(code: string): PackagingScanLine {
 export default function PackagingStockInScreen({ navigation }: Props) {
   const { operatorName, store, hubCode } = useAuth();
   const { t, fmt } = useTranslation();
+  const { scrollY, onScroll } = useCollapsingHomeScroll();
   const stepLabels: Record<WizardStep, string> = {
     1: t.packagingStockIn.step1,
     2: t.packagingStockIn.step2,
@@ -486,6 +488,8 @@ export default function PackagingStockInScreen({ navigation }: Props) {
   const primaryAction = step === 3 ? () => void submit() : goNext;
 
   return (
+    <View style={styles.root}>
+    <CollapsingHomeHeader title={t.nav.packagingStockIn} onHome={requestLeave} scrollY={scrollY} />
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === 'ios' && !Platform.isPad ? 'padding' : undefined}
@@ -495,6 +499,8 @@ export default function PackagingStockInScreen({ navigation }: Props) {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        onScroll={onScroll}
+        scrollEventThrottle={16}
       >
       <InboundWizardHeader
         step={step}
@@ -740,6 +746,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
         onClose={() => setBarcodeModalData(null)}
       />
     </KeyboardAvoidingView>
+    </View>
   );
 }
 

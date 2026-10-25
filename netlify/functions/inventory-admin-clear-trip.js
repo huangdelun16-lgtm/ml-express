@@ -365,6 +365,8 @@ exports.handler = async (event) => {
         piece_count: patch.piece_count,
         document: patch.document,
         item_ids: patch.item_ids,
+        total_fee_cny: patch.total_fee_cny,
+        total_fee_mmk: patch.total_fee_mmk,
       });
       if (updated) signedInvoicesUpdated += 1;
     }

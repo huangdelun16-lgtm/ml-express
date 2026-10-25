@@ -112,6 +112,7 @@ describe('buildExportCostBoard', () => {
     );
 
     expect(board.singles.map((item) => [item.barcode, item.tripNumber])).toEqual([
+      ['DONE', ''],
       ['LEFT', 'RUI0009'],
       ['STAY', ''],
     ]);
@@ -188,8 +189,9 @@ describe('buildExportCostBoard', () => {
     const board = buildExportCostBoard([
       row({ id: 's1', barcode: 'MDY001', input_barcode: 'KEEP' }),
       row({ id: 's2', barcode: 'MDY002', input_barcode: 'ADDED' }),
-      row({ id: 'p1', barcode: 'RUI26MDY50002(2-1)' }),
-      row({ id: 'p2', barcode: 'RUI26MDY50002(2-2)' }),
+      row({ id: 'signed', barcode: 'MDY003', input_barcode: 'SIGNED', customer_signed: true }),
+      row({ id: 'p1', barcode: 'RUI26MDY50002(2-1)', customer_signed: true }),
+      row({ id: 'p2', barcode: 'RUI26MDY50002(2-2)', customer_signed: true }),
       row({ id: 'q1', barcode: 'RUI26MDY50009(2-1)' }),
     ]);
     const next = withoutSavedExportCosts(board, [
@@ -197,7 +199,7 @@ describe('buildExportCostBoard', () => {
       { subjectKind: 'package', subjectKey: 'rui26mdy50002' },
     ]);
 
-    expect(next.singles.map((item) => item.barcode)).toEqual(['KEEP']);
+    expect(next.singles.map((item) => item.barcode)).toEqual(['KEEP', 'SIGNED']);
     expect(next.packages.map((item) => item.base)).toEqual(['RUI26MDY50009']);
   });
 

@@ -22,6 +22,18 @@ export const regionToCityKey = (region?: string): string | null => {
   return region;
 };
 
+/** 把「62A,104x105」「30th Street, x 66th」收成可读门牌。 */
+export function formatStoreAddress(raw?: string | null): string {
+  const text = String(raw || '').trim();
+  if (!text) return '未填写地址';
+  return text
+    .replace(/\s*,\s*[xX×]\s*/g, ' × ')
+    .replace(/(\d)\s*[xX×]\s*(\d)/g, '$1 × $2')
+    .replace(/\s*,\s*/g, ', ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 export const DEFAULT_OPERATING_HOURS = '08:00 - 22:00';
 
 export const OPERATING_HOURS_PRESETS = [

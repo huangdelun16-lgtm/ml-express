@@ -21,6 +21,8 @@ type Props = {
   onReportException?: () => void;
   canEdit?: boolean;
   canSignDelivered?: boolean;
+  nextLabel?: string | null;
+  onNext?: () => void;
 };
 
 export default function ItemActionModal({
@@ -36,6 +38,8 @@ export default function ItemActionModal({
   onReportException,
   canEdit = true,
   canSignDelivered = false,
+  nextLabel,
+  onNext,
 }: Props) {
   const { t } = useTranslation();
 
@@ -98,6 +102,11 @@ export default function ItemActionModal({
           )}
 
           <View style={styles.actionGrid}>
+            {nextLabel && onNext ? (
+              <Pressable style={[styles.chip, styles.chipNext]} onPress={onNext}>
+                <Text style={styles.chipText}>{nextLabel}</Text>
+              </Pressable>
+            ) : null}
             <Pressable style={[styles.chip, styles.chipView]} onPress={onView}>
               <Text style={styles.chipText}>{t.common.show}</Text>
             </Pressable>
@@ -215,6 +224,7 @@ const styles = StyleSheet.create({
   chipTextMuted: { color: '#e2e8f0' },
   chipTextPack: { color: '#e9d5ff' },
   chipView: { backgroundColor: '#2563eb' },
+  chipNext: { flexBasis: '100%', backgroundColor: '#7c3aed', minHeight: 42 },
   chipEdit: {
     backgroundColor: '#0f172a',
     borderWidth: 1,

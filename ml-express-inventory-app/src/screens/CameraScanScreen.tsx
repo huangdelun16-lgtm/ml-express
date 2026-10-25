@@ -1,7 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import BarcodeScannerView from '../components/BarcodeScannerView';
+import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
 import BatchSignInvoiceModal from '../components/BatchSignInvoiceModal';
 import CustomerSignFlowModal, { type CustomerSignFlowRequest } from '../components/CustomerSignFlowModal';
 import ExceptionReportModal from '../components/ExceptionReportModal';
@@ -38,6 +39,7 @@ type Nav = {
     name: string,
     params?: { presetBarcode?: string; presetCode?: string; openPackBarcode?: string },
   ) => void;
+  goBack: () => void;
 };
 
 type ScanResult = {
@@ -70,6 +72,7 @@ function asInvoiceRow(item: InventoryItem): InventoryItemListRow {
 }
 
 export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
+  const { scrollY, onScroll } = useCollapsingHomeScroll();
   const { t, fmt } = useTranslation();
   const { store, hubCode, operatorName } = useAuth();
   const isFocused = useIsFocused();
@@ -377,6 +380,7 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
 
   return (
     <View style={styles.root}>
+      <CollapsingHomeHeader title={t.nav.cameraScan} onHome={() => navigation.goBack()} scrollY={scrollY} />
       <View style={styles.scannerArea}>
         <BarcodeScannerView
           active={isFocused && !dialogOpen}
@@ -387,7 +391,13 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
         />
       </View>
 
-      <View style={styles.resultPanel}>
+      <ScrollView
+        style={styles.resultScroll}
+        contentContainerStyle={styles.resultPanel}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        keyboardShouldPersistTaps="handled"
+      >
         {multiMode ? (
           <View style={styles.multiBox}>
             <Text style={styles.multiHint}>{fmt(t.cameraScan.multiHint, { count: basket.length })}</Text>
@@ -487,7 +497,7 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
             </View>
           </View>
         ) : null}
-      </View>
+      </ScrollView>
 
       <BatchSignInvoiceModal
         visible={invoiceItems != null}
@@ -545,7 +555,8 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0f172a' },
-  scannerArea: { flex: 1, minHeight: 300 },
+  scannerArea: { flex: 1, minHeight: 220 },
+  resultScroll: { maxHeight: 320, flexShrink: 1 },
   resultPanel: {
     backgroundColor: '#0f172a',
     borderTopWidth: 1,

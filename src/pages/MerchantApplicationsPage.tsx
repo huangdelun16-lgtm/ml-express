@@ -137,16 +137,11 @@ function credentialsNotifyText(notify: MerchantApplicationNotifyResult | null, i
   if (notify.emailSent && notify.emailTo) {
     parts.push(isEn ? `Email sent to ${notify.emailTo}` : `已发邮件至 ${notify.emailTo}`);
   }
-  if (parts.length > 0) {
-    if (notify.errors.length > 0) {
-      parts.push(isEn ? 'some messages failed' : '部分发送失败，可再复制告知');
-    }
-    return parts.join(isEn ? ' · ' : '；');
-  }
   if (notify.errors.length > 0) {
-    return isEn
-      ? 'SMS/email failed — please copy and send manually'
-      : '短信/邮件发送失败，请复制账号线下告知';
+    parts.push(notify.errors.join(isEn ? '; ' : '；'));
+  }
+  if (parts.length > 0) {
+    return parts.join(isEn ? ' · ' : '；');
   }
   return isEn
     ? 'Messaging not configured — please copy and share manually'

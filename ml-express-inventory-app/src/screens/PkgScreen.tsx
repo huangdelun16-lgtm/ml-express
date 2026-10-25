@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
-  FlatList,
+  Animated,
   Pressable,
   StyleSheet,
   Text,
@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import PkgActionModal from '../components/PkgActionModal';
 import PkgEditModal from '../components/PkgEditModal';
@@ -37,9 +38,25 @@ function formatTime(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export default function PkgScreen() {
+export default function PkgScreen({ navigation }: { navigation: { goBack: () => void } }) {
   const { store, hubCode, operatorName } = useAuth();
   const { t, fmt, language } = useTranslation();
+  const insets = useSafeAreaInsets();
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerBodyHeight = scrollY.interpolate({
+    inputRange: [0, 64],
+    outputRange: [48, 0],
+    extrapolate: 'clamp',
+  });
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 48],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+  const onListScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    { useNativeDriver: false },
+  );
   const [search, setSearch] = useState('');
   const [packs, setPacks] = useState<PackedShipmentListRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -65,24 +82,44 @@ export default function PkgScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={styles.onlineBannerWrap}>
-        <OnlineRequiredBanner />
+      <View style={{ paddingTop: insets.top, backgroundColor: '#0f172a' }}>
+        <Animated.View style={[styles.navRow, { height: headerBodyHeight, opacity: headerOpacity }]}>
+          <Pressable
+            style={styles.homeBtn}
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Home"
+          >
+            <Text style={styles.homeChevron}>‹</Text>
+            <Text style={styles.homeLabel}>Home</Text>
+          </Pressable>
+          <Text style={styles.screenTitle} numberOfLines={1}>{t.nav.pkg}</Text>
+        </Animated.View>
+        <TextInput
+          style={styles.search}
+          placeholder={t.pkg.search}
+          placeholderTextColor="#64748b"
+          value={search}
+          onChangeText={setSearch}
+          onSubmitEditing={() => void load()}
+          returnKeyType="search"
+          accessibilityLabel={t.common.search}
+        />
       </View>
-      <TextInput
-        style={styles.search}
-        placeholder={t.pkg.search}
-        placeholderTextColor="#64748b"
-        value={search}
-        onChangeText={setSearch}
-        onSubmitEditing={() => void load()}
-        returnKeyType="search"
-        accessibilityLabel={t.common.search}
-      />
 
-      <FlatList
+      <Animated.FlatList
         data={packs}
         keyExtractor={(item) => item.id}
+        style={styles.listView}
         contentContainerStyle={packs.length === 0 ? styles.emptyList : styles.list}
+        keyboardShouldPersistTaps="handled"
+        onScroll={onListScroll}
+        scrollEventThrottle={16}
+        ListHeaderComponent={
+          <View style={styles.onlineBannerWrap}>
+            <OnlineRequiredBanner />
+          </View>
+        }
         onRefresh={async () => {
           setRefreshing(true);
           try {
@@ -293,15 +330,38 @@ export default function PkgScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0f172a' },
-  onlineBannerWrap: { marginHorizontal: 16, marginTop: 16, marginBottom: -6 },
+  listView: { flex: 1 },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  homeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 36,
+    paddingLeft: 8,
+    paddingRight: 14,
+    borderRadius: 18,
+    backgroundColor: '#334155',
+    gap: 2,
+  },
+  homeChevron: { color: '#f8fafc', fontSize: 26, lineHeight: 28, marginTop: -2 },
+  homeLabel: { color: '#f8fafc', fontSize: 16, fontWeight: '700' },
+  screenTitle: { color: '#f8fafc', fontSize: 17, fontWeight: '800', flexShrink: 1 },
+  onlineBannerWrap: { marginBottom: 8 },
   search: {
-    margin: 16,
+    marginHorizontal: 16,
+    marginTop: 8,
     marginBottom: 8,
     backgroundColor: '#f8fafc',
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
+    paddingVertical: 10,
+    minHeight: 40,
+    fontSize: 14,
     color: '#0f172a',
   },
   list: { paddingHorizontal: 16, paddingBottom: 24 },

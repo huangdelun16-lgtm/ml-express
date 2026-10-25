@@ -10,12 +10,11 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { captureRef } from 'react-native-view-shot';
 import Text from './AppText';
 import { resolveAppError, useTranslation } from '../i18n';
 import { feedbackService } from '../services/FeedbackService';
 import { SIGNED_INVOICE_PAGE, listSignedInvoices } from '../services/signedInvoiceArchive';
-import { persistInvoicePng } from '../utils/saveInvoiceImage';
+import { captureInvoiceView, persistInvoicePng } from '../utils/saveInvoiceImage';
 import {
   signedInvoiceAmountLabel,
   signedInvoiceMatches,
@@ -83,12 +82,7 @@ export default function SignedInvoiceCard() {
     if (!paperRef.current || saving) return;
     setSaving(true);
     try {
-      const uri = await captureRef(paperRef.current, {
-        format: 'png',
-        quality: 1,
-        result: 'tmpfile',
-        useRenderInContext: true,
-      });
+      const uri = await captureInvoiceView(paperRef);
       await persistInvoicePng(uri);
       feedbackService.notify(t.invoice.batchSaved);
     } catch (err) {
@@ -273,11 +267,11 @@ function InvoicePaper({
         </View>
       </View>
       <View style={styles.actions}>
-        <Pressable style={styles.saveBtn} onPress={onSave} disabled={saving} accessibilityRole="button">
-          {saving ? <ActivityIndicator color="#e2e8f0" size="small" /> : <Text style={styles.saveText}>{t.common.save}</Text>}
+        <Pressable style={[styles.pairBtn, styles.saveBtn]} onPress={onSave} disabled={saving} accessibilityRole="button">
+          {saving ? <ActivityIndicator color="#f8fafc" size="small" /> : <Text style={styles.saveText}>{t.common.save}</Text>}
         </Pressable>
-        <Pressable style={styles.closeBtn} onPress={onClose} accessibilityRole="button">
-          <Text style={styles.closeText}>{t.common.close}</Text>
+        <Pressable style={[styles.pairBtn, styles.paperCloseBtn]} onPress={onClose} accessibilityRole="button">
+          <Text style={styles.paperCloseText}>{t.common.close}</Text>
         </Pressable>
       </View>
     </>
@@ -520,16 +514,24 @@ const styles = StyleSheet.create({
   contactLineLabel: { color: '#57534e', fontSize: 13, fontWeight: '700' },
   contactSite: { marginTop: 7, color: '#1c1917', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   footerBrand: { marginTop: 10, textAlign: 'center', color: '#78716c', fontSize: 11, fontWeight: '700', letterSpacing: 2.4 },
-  actions: { marginTop: 10, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
-  saveBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    minWidth: 72,
+  actions: { marginTop: 12, flexDirection: 'row', alignItems: 'stretch', gap: 10 },
+  pairBtn: {
+    flex: 1,
+    height: 48,
     alignItems: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.35)',
-    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    borderRadius: 12,
   },
-  saveText: { color: '#e2e8f0', fontWeight: '700' },
+  saveBtn: {
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.35)',
+  },
+  saveText: { color: '#f8fafc', fontWeight: '800', fontSize: 16 },
+  paperCloseBtn: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.55)',
+  },
+  paperCloseText: { color: '#e2e8f0', fontWeight: '800', fontSize: 16 },
 });

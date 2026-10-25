@@ -229,6 +229,12 @@ function formatIsoDate(value?: string | null, lang: string = 'zh'): string {
   }
 }
 
+function unfiledWaitDays(value?: string | null): number {
+  const stamp = Date.parse(String(value || ''));
+  if (!Number.isFinite(stamp)) return 0;
+  return Math.floor((Date.now() - stamp) / 86400000);
+}
+
 function formatMmK(n?: number | null): string {
   if (n == null || !Number.isFinite(n)) return '—';
   return Math.round(n).toLocaleString('en-US');
@@ -1459,10 +1465,15 @@ const CrossBorderLogisticsPage: FC = () => {
     }),
     [unifiedCustomers],
   );
-  const kindFilteredCustomers = useMemo(
-    () => filterCustomersByKind(unifiedCustomers, customerKindFilter),
-    [unifiedCustomers, customerKindFilter],
-  );
+  const kindFilteredCustomers = useMemo(() => {
+    const rows = filterCustomersByKind(unifiedCustomers, customerKindFilter);
+    if (customerKindFilter !== 'unfiled') return rows;
+    return rows.slice().sort((a, b) => {
+      const left = String(a.summary?.oldestInboundAt || '9999');
+      const right = String(b.summary?.oldestInboundAt || '9999');
+      return left.localeCompare(right);
+    });
+  }, [unifiedCustomers, customerKindFilter]);
   const filteredUnifiedCustomers = useMemo(
     () => filterUnifiedCustomers(kindFilteredCustomers, customerSearch),
     [kindFilteredCustomers, customerSearch],
@@ -2681,6 +2692,20 @@ const CrossBorderLogisticsPage: FC = () => {
                                   {paused ? (
                                     <span className="cbl-badge cbl-badge--gray">
                                       {isEn ? 'Paused' : '已暂停'}
+                                    </span>
+                                  ) : null}
+                                  {row.kind === 'express' && unfiledWaitDays(summary?.oldestInboundAt) >= 3 ? (
+                                    <span
+                                      className="cbl-badge cbl-badge--amber"
+                                      data-cbl-tip={
+                                        isEn
+                                          ? 'This name has inbound orders and is still not registered. Register it or the list keeps growing.'
+                                          : '有入库、还没建档。请补登记，避免未建档名单一直堆着。'
+                                      }
+                                    >
+                                      {isEn
+                                        ? `Waiting ${unfiledWaitDays(summary?.oldestInboundAt)}d`
+                                        : `已等待 ${unfiledWaitDays(summary?.oldestInboundAt)} 天`}
                                     </span>
                                   ) : null}
                                 </div>

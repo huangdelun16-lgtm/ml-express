@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import PackagingStockInBarcodeText from './PackagingStockInBarcodeText';
 import { useTranslation } from '../i18n';
 import type { PackedShipmentDetail } from '../types/inventory';
@@ -14,22 +14,32 @@ type Props = {
 
 export default function PkgOrdersModal({ visible, pack, onClose }: Props) {
   const { t, fmt: format } = useTranslation();
+  const { height: windowHeight } = useWindowDimensions();
   if (!pack) return null;
 
   const orderCount = resolvePackOrderCount(pack);
+  const lines = pack.items;
+  const sheetHeight = Math.round(windowHeight * 0.86);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
+      <View style={styles.overlay}>
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t.common.close} />
+        <View style={[styles.card, { maxHeight: sheetHeight, height: lines.length > 4 ? sheetHeight : undefined }]}>
           <Text style={styles.title}>{t.forms.ordersInPack}</Text>
           <Text style={styles.packageNo} selectable>
             {pack.bundle_barcode}
           </Text>
           <Text style={styles.subtitle}>{format(t.forms.orderCount, { count: orderCount })}</Text>
 
-          <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-            {pack.items.map((line, index) => {
+          <ScrollView
+            style={lines.length > 4 ? styles.listFill : undefined}
+            contentContainerStyle={styles.listContent}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator
+          >
+            {lines.map((line, index) => {
               const orderNumber = resolveItemOrderNumber(line);
               const productSubtitle = resolveItemProductSubtitle(line);
               return (
@@ -75,8 +85,8 @@ export default function PkgOrdersModal({ visible, pack, onClose }: Props) {
           <Pressable style={styles.btn} onPress={onClose}>
             <Text style={styles.btnText}>{t.common.close}</Text>
           </Pressable>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -84,9 +94,16 @@ export default function PkgOrdersModal({ visible, pack, onClose }: Props) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15,23,42,0.75)',
     justifyContent: 'center',
     padding: 20,
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(15,23,42,0.75)',
   },
   card: {
     backgroundColor: '#1e293b',
@@ -94,7 +111,7 @@ const styles = StyleSheet.create({
     padding: 18,
     borderWidth: 1,
     borderColor: '#334155',
-    maxHeight: '80%',
+    width: '100%',
   },
   title: { color: '#c4b5fd', fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
   packageNo: {
@@ -105,7 +122,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   subtitle: { color: '#94a3b8', fontSize: 13, marginTop: 4, marginBottom: 12 },
-  list: { maxHeight: 360 },
+  listFill: { flex: 1 },
   listContent: { gap: 8, paddingBottom: 4 },
   orderRow: {
     flexDirection: 'row',

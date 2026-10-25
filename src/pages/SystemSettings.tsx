@@ -12,9 +12,17 @@ import {
   parseAndroidReleaseSettings,
   validateAndroidReleaseSettings,
 } from '../utils/androidReleaseSettings';
+import {
+  APPROVAL_EMAIL_BODY_KEY,
+  APPROVAL_EMAIL_SUBJECT_KEY,
+  DEFAULT_APPROVAL_EMAIL_BODY,
+  DEFAULT_APPROVAL_EMAIL_SUBJECT,
+  approvalEmailBodyKeepsCredentials,
+  previewApprovalEmail,
+} from '../utils/merchantApprovalEmailTemplate';
 import '../styles/adminSystemSettings.css';
 
-type SettingCategory = 'general' | 'pricing' | 'apps' | 'automation' | 'tracking' | 'security';
+type SettingCategory = 'general' | 'merchant_mail' | 'pricing' | 'apps' | 'automation' | 'tracking' | 'security';
 
 type SettingFieldType = 'text' | 'number' | 'textarea' | 'switch' | 'select';
 
@@ -30,6 +38,7 @@ interface SettingDefinition {
   type: SettingFieldType;
   defaultValue: string | number | boolean;
   placeholder?: string;
+  rows?: number;
   suffix?: string;
   options?: Array<{ label: string; value: string }>;
   helpText?: string;
@@ -82,6 +91,26 @@ const settingDefinitions: SettingDefinition[] = [
     type: 'textarea',
     defaultValue: '电话热线\n官方邮箱\nMessenger 即时聊天',
     placeholder: '电话热线\n官方邮箱\n即时聊天'
+  },
+  {
+    key: APPROVAL_EMAIL_SUBJECT_KEY,
+    label: '邮件主题',
+    description: '商家收到的 Gmail 标题。可写入 {{店铺名称}}。',
+    category: 'merchant_mail',
+    type: 'text',
+    defaultValue: DEFAULT_APPROVAL_EMAIL_SUBJECT,
+    placeholder: DEFAULT_APPROVAL_EMAIL_SUBJECT
+  },
+  {
+    key: APPROVAL_EMAIL_BODY_KEY,
+    label: '邮件正文',
+    description: '点「通过并开通账号」后，这段文字会发到申请单里的商家邮箱。',
+    category: 'merchant_mail',
+    type: 'textarea',
+    rows: 12,
+    defaultValue: DEFAULT_APPROVAL_EMAIL_BODY,
+    placeholder: DEFAULT_APPROVAL_EMAIL_BODY,
+    helpText: '请保留 {{店铺代码}} 和 {{密码}}。商家地址用 {{商家网站}}、{{商家App苹果}}、{{商家App安卓}}，发出时会换成正式链接。'
   },
   {
     key: 'pricing.base_fee',
@@ -356,6 +385,7 @@ const settingDefinitions: SettingDefinition[] = [
 
 const categories: Array<{ id: SettingCategory; name: string; description: string; icon: string }> = [
   { id: 'general', name: '基础信息', description: '公司信息、营业时间与客服渠道配置', icon: '🏢' },
+  { id: 'merchant_mail', name: '入驻邮件', description: '审核通过后发给商家 Gmail 的主题和正文', icon: '✉️' },
   { id: 'apps', name: '应用更新', description: 'Inventory Android APK 版本与下载地址', icon: '📦' },
   { id: 'pricing', name: '计费规则', description: '客户端运费规则与骑手结算参数（分区配置）', icon: '💸' },
   { id: 'automation', name: '自动化', description: '派单策略、超时改派等自动化流程', icon: '🤖' },
@@ -557,6 +587,13 @@ const SystemSettings: React.FC = () => {
     setSuccessMessage(null);
     setErrorMessage(null);
 
+    const approvalBody = String(settingsValues[APPROVAL_EMAIL_BODY_KEY] || '');
+    if (approvalBody.trim() && !approvalEmailBodyKeepsCredentials(approvalBody)) {
+      setErrorMessage('入驻邮件正文需要保留 {{店铺代码}} 和 {{密码}}，否则商家收不到登录账号。');
+      setSaving(false);
+      return;
+    }
+
     if (Boolean(settingsValues['security.ip_whitelist_enabled'])) {
       const whitelistText = String(settingsValues['security.ip_whitelist'] || '').trim();
       if (!whitelistText) {
@@ -666,7 +703,7 @@ const SystemSettings: React.FC = () => {
           className="sys-settings__textarea"
           value={String(value ?? '')}
           placeholder={def.placeholder}
-          rows={4}
+          rows={def.rows || 4}
           onChange={event => handleValueChange(def.key, event.target.value)}
         />
       );
@@ -723,7 +760,7 @@ const SystemSettings: React.FC = () => {
     const displayDesc = def.description;
 
     return (
-      <div key={def.key} className="sys-settings__card">
+      <div key={def.key} className={`sys-settings__card${def.category === 'merchant_mail' ? ' sys-settings__card--wide' : ''}`}>
         <div className="sys-settings__card-head">
           <div>
             <h3 className="sys-settings__card-title">{displayLabel}</h3>
@@ -925,6 +962,33 @@ const SystemSettings: React.FC = () => {
                     </p>
                   </div>
                   {pricingCourierDefinitions.map(renderSettingCard)}
+                </>
+              ) : activeTab === 'merchant_mail' ? (
+                <>
+                  <div className="sys-settings__section-banner sys-settings__section-banner--mail">
+                    <h3>
+                      <span>✉️</span> 通过并开通账号
+                    </h3>
+                    <p>
+                      只改发给商家邮箱的内容。店铺代码和密码仍在审核通过时生成，用占位符写进正文。短信不在这里改。
+                    </p>
+                  </div>
+                  {currentDefinitions.map(renderSettingCard)}
+                  <div className="sys-settings__mail-preview">
+                    <h3>预览</h3>
+                    <p className="sys-settings__mail-preview-subject">
+                      {previewApprovalEmail(
+                        String(settingsValues[APPROVAL_EMAIL_SUBJECT_KEY] || ''),
+                        String(settingsValues[APPROVAL_EMAIL_BODY_KEY] || ''),
+                      ).subject}
+                    </p>
+                    <pre>
+                      {previewApprovalEmail(
+                        String(settingsValues[APPROVAL_EMAIL_SUBJECT_KEY] || ''),
+                        String(settingsValues[APPROVAL_EMAIL_BODY_KEY] || ''),
+                      ).body}
+                    </pre>
+                  </div>
                 </>
               ) : activeTab === 'apps' ? (
                 <>

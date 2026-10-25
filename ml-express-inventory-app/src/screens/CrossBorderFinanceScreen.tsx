@@ -9,7 +9,8 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { useFocusEffect, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -33,6 +34,7 @@ import type { FinanceLedgerEntry, FinanceLedgerResult } from '../types/financeLe
 import { ownershipKeyFromStoreCode } from '../utils/storeOwnership';
 import { resolveFinancePeriod } from '../utils/yangonFinancePeriod';
 import AppText from '../components/AppText';
+import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
 import CrossBorderManualEntryModal from '../components/CrossBorderManualEntryModal';
 import FinanceLedgerRow from '../components/finance/FinanceLedgerRow';
 import FinanceSummaryHero, { FinanceLedgerChrome } from '../components/finance/FinanceSummaryHero';
@@ -53,6 +55,8 @@ type FinanceRoute = RouteProp<RootStackParamList, 'CrossBorderFinance'>;
 
 export default function CrossBorderFinanceScreen() {
   const { t, fmt } = useTranslation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { scrollY, onScroll } = useCollapsingHomeScroll();
   const route = useRoute<FinanceRoute>();
   const { store, hubCode, operatorName } = useAuth();
   const [tab, setTab] = useState<FinanceTabKey>('all');
@@ -351,7 +355,13 @@ export default function CrossBorderFinanceScreen() {
 
   if (!store || !hubCode) {
     return (
-      <View style={styles.center}>
+      <View style={styles.root}>
+        <CollapsingHomeHeader
+          title={t.nav.crossBorderFinance}
+          onHome={() => navigation.goBack()}
+          scrollY={scrollY}
+        />
+        <View style={styles.center}>
         <View style={styles.emptyMark}>
           <View style={styles.emptyMarkLine} />
           <View style={[styles.emptyMarkLine, styles.emptyMarkLineMid]} />
@@ -360,12 +370,18 @@ export default function CrossBorderFinanceScreen() {
         <AppText style={styles.emptyTitle} myanmarWeight="bold">
           {t.common.loginStoreFirst}
         </AppText>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.root}>
+      <CollapsingHomeHeader
+        title={t.nav.crossBorderFinance}
+        onHome={() => navigation.goBack()}
+        scrollY={scrollY}
+      />
       {loading && entries.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.slateSoft} size="large" />
@@ -452,7 +468,10 @@ export default function CrossBorderFinanceScreen() {
           </View>
           <View style={styles.listWrap}>
         <FlatList
+          style={styles.listView}
           data={displayed}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           ListHeaderComponent={
@@ -559,6 +578,7 @@ export default function CrossBorderFinanceScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  listView: { flex: 1 },
   body: { flex: 1 },
   topBlock: { paddingHorizontal: space.lg, paddingTop: 8 },
   listWrap: { flex: 1, position: 'relative' },

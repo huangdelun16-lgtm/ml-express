@@ -9,7 +9,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { captureRef } from 'react-native-view-shot';
+import { captureInvoiceView, persistInvoicePng, shareInvoicePng } from '../utils/saveInvoiceImage';
 import Text from './AppText';
 import { getPaymentLabelDisplay, useTranslation } from '../i18n';
 import { getItemDetails, listItems } from '../services/inventoryService';
@@ -36,7 +36,6 @@ import {
   invoiceLineMeasure,
   type FrozenInvoiceHandoff,
 } from '../utils/frozenSignedInvoice';
-import { persistInvoicePng, shareInvoicePng } from '../utils/saveInvoiceImage';
 import { freezeSignedInvoice } from '../services/signedInvoiceArchive';
 
 type Props = {
@@ -319,12 +318,7 @@ export default function BatchSignInvoiceModal({
     if (!model || saving) return;
     setSaving(true);
     try {
-      const uri = await captureRef(shotRef, {
-        format: 'png',
-        quality: 1,
-        result: 'tmpfile',
-        useRenderInContext: true,
-      });
+      const uri = await captureInvoiceView(shotRef);
       const result = await persistInvoicePng(uri);
       if (result === 'saved') {
         try {
@@ -576,21 +570,6 @@ export default function BatchSignInvoiceModal({
                   {renderPaper()}
                 </View>
               </View>
-              <View style={styles.captureHost} pointerEvents="none">
-                <View
-                  ref={shotRef}
-                  collapsable={false}
-                  onLayout={(event) => {
-                    const next = event.nativeEvent.layout.height;
-                    if (next > 0) {
-                      paperHeightRef.current = next;
-                      if (Math.abs(next - paperHeight) > 1) setPaperHeight(next);
-                    }
-                  }}
-                >
-                  {renderPaper()}
-                </View>
-              </View>
             </ScrollView>
           ) : null}
 
@@ -669,6 +648,23 @@ export default function BatchSignInvoiceModal({
             )}
           </View>
         </View>
+        {model && heading ? (
+          <View style={styles.captureHost} pointerEvents="none">
+            <View
+              ref={shotRef}
+              collapsable={false}
+              onLayout={(event) => {
+                const next = event.nativeEvent.layout.height;
+                if (next > 0) {
+                  paperHeightRef.current = next;
+                  if (Math.abs(next - paperHeight) > 1) setPaperHeight(next);
+                }
+              }}
+            >
+              {renderPaper()}
+            </View>
+          </View>
+        ) : null}
       </View>
     </Modal>
   );
@@ -706,7 +702,7 @@ const styles = StyleSheet.create({
   listContent: { paddingBottom: 4, alignItems: 'center' },
   paperFrame: { overflow: 'hidden' },
   paperScale: { width: PAPER_WIDTH, transformOrigin: 'left top' },
-  captureHost: { position: 'absolute', width: PAPER_WIDTH, left: -4000, top: 0, opacity: 0 },
+  captureHost: { position: 'absolute', width: PAPER_WIDTH, left: -4000, top: 0 },
   paper: {
     width: PAPER_WIDTH,
     position: 'relative',

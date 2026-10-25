@@ -193,10 +193,10 @@ test('removes only cleared orders from a mixed invoice and deletes an empty one'
   assert.equal(mixed.piece_count, 1);
   assert.deepEqual(mixed.item_ids, ['item-9']);
   assert.deepEqual(mixed.document.lines[0].expressNos, ['ORD-9']);
-  assert.equal(mixed.document.lines[0].measure, '10 Kg');
+  assert.equal(mixed.document.lines[0].measure, '5 Kg');
   assert.equal(mixed.document.trip, '');
   assert.equal(mixed.document.packNo, '');
-  assert.deepEqual(mixed.document.totals, totals);
+  assert.deepEqual(mixed.document.totals, ['总重量 5 Kg', '总费用 ¥50']);
   assert.equal(mixed.document.meta.find((item) => item.label === '件数').value, '1');
   assert.equal(mixed.document.meta.find((item) => item.label === '客户姓名').value, 'Ei Ei');
   assert.equal(plan.updates.some((row) => row.id === 'other-trip'), false);
@@ -204,8 +204,8 @@ test('removes only cleared orders from a mixed invoice and deletes an empty one'
   const partial = plan.updates.find((row) => row.id === 'partial-other');
   assert.equal(partial.trip_label, 'MSE0008');
   assert.deepEqual(partial.document.lines[0].expressNos, ['ORD-8']);
-  assert.equal(partial.document.trip, 'MSE0008');
-  assert.deepEqual(partial.document.totals, ['总费用 ¥40']);
+  assert.equal(partial.document.lines[0].measure, '1 Kg');
+  assert.deepEqual(partial.document.totals, ['总费用 ¥20']);
   assert.deepEqual(partial.item_ids, ['item-8']);
 });
 

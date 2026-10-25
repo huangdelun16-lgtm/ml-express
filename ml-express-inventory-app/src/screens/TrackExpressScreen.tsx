@@ -8,10 +8,14 @@ import {
   View,
 } from 'react-native';
 import ScanInputBar from '../components/ScanInputBar';
+import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
 import ItemsListRow from '../components/ItemsListRow';
 import CustomerSignFlowModal, { type CustomerSignFlowRequest } from '../components/CustomerSignFlowModal';
 import { SignaturePreview } from '../components/SignaturePad';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import {
   fmt,
   getOrderStatusLabel,
@@ -434,6 +438,8 @@ function CloudOnlyPanel({
 
 export default function TrackExpressScreen({ route }: { route?: Route }) {
   const { t, fmt } = useTranslation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { scrollY, onScroll } = useCollapsingHomeScroll();
   const { store, hubCode, operatorName } = useAuth();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -550,7 +556,15 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
   };
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <View style={styles.root}>
+    <CollapsingHomeHeader title={t.nav.trackExpress} onHome={() => navigation.goBack()} scrollY={scrollY} />
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+    >
       <Text style={styles.intro}>{t.trackExpress.intro}</Text>
 
       <ScanInputBar
@@ -646,11 +660,13 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
         onError={(message) => feedbackService.notify(t.common.signFailed, message)}
       />
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0f172a' },
+  scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 32 },
   intro: { color: '#94a3b8', fontSize: 13, lineHeight: 20, marginBottom: 16 },
   searchBtn: {

@@ -103,7 +103,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             const storeId = incomingProducts[0].store_id;
             const { data: store, error } = await supabase
               .from('delivery_stores')
-              .select('*')
+              .select('id, store_name, phone, manager_phone, address, latitude, longitude')
               .eq('id', storeId)
               .single();
             

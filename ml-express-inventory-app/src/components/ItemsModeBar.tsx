@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Text from './AppText';
 import { useTranslation } from '../i18n';
+import { colors } from '../theme';
 
 export type ItemsListMode = 'normal' | 'pack' | 'sign';
 
@@ -31,7 +32,7 @@ export default function ItemsModeBar({
       {listMode === 'normal' ? (
         <>
           <Pressable
-            style={styles.packBtn}
+            style={[styles.packBtn, styles.pairBtn]}
             onPress={onEnterPack}
             accessibilityRole="button"
             accessibilityLabel={t.items.packBtn}
@@ -41,7 +42,7 @@ export default function ItemsModeBar({
             </Text>
           </Pressable>
           <Pressable
-            style={styles.signSelectBtn}
+            style={[styles.signSelectBtn, styles.pairBtn]}
             onPress={onEnterSign}
             accessibilityRole="button"
             accessibilityLabel={t.items.batchSignBtn}
@@ -111,41 +112,47 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+    gap: 10,
+    paddingTop: 2,
+    paddingBottom: 12,
+  },
+  pairBtn: {
+    flex: 1,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   packBtn: {
-    backgroundColor: '#7c3aed',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    backgroundColor: colors.purple,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   packBtnDisabled: { opacity: 0.5 },
-  packBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  packBtnText: { color: colors.white, fontWeight: '800', fontSize: 14 },
   signSelectBtn: {
-    backgroundColor: '#0f172a',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#059669',
+    backgroundColor: 'rgba(5,150,105,0.16)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1.5,
+    borderColor: colors.successBorder,
   },
-  signSelectBtnText: { color: '#6ee7b7', fontWeight: '800', fontSize: 14 },
+  signSelectBtnText: { color: colors.successText, fontWeight: '800', fontSize: 14 },
   invoiceBtn: {
     backgroundColor: '#0369a1',
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
-  invoiceBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  invoiceBtnText: { color: colors.white, fontWeight: '800', fontSize: 15 },
   ghostBtn: {
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#475569',
+    borderColor: colors.borderMuted,
   },
-  ghostBtnText: { color: '#94a3b8', fontWeight: '700' },
-  packHint: { flex: 1, color: '#64748b', fontSize: 12, minWidth: 120 },
+  ghostBtnText: { color: colors.slateSoft, fontWeight: '700' },
+  packHint: { flex: 1, color: colors.muted, fontSize: 12, minWidth: 120 },
 });

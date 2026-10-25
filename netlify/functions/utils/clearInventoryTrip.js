@@ -304,8 +304,122 @@ function shouldDropExpress(value, anchored, keys) {
 /**
  * 一张发票里混有多个订单时，只拿掉属于被清车次的单号。
  * 拿完没有任何订单号、也没有留下的货物 id，才删整张发票。
- * 定档金额是整张发票的合计，没有按订单拆开，部分保留时不改金额。
+ * 留下的明细按重量和费用重算合计。包裹总重仍按一整包计一次。
  */
+function parseKgAndCny(text) {
+  const raw = String(text || '');
+  const kgMatch = raw.match(/([\d,.]+)\s*Kg/i);
+  const cnyMatch = raw.match(/¥\s*([\d,.]+)/);
+  const kg = kgMatch ? Number(String(kgMatch[1]).replace(/,/g, '')) : 0;
+  const cny = cnyMatch ? Number(String(cnyMatch[1]).replace(/,/g, '')) : null;
+  return {
+    kg: Number.isFinite(kg) ? kg : 0,
+    cny: cny != null && Number.isFinite(cny) ? cny : null,
+  };
+}
+
+function formatKgAmount(value) {
+  if (!(value > 0)) return '0';
+  const rounded = Math.round(value * 100) / 100;
+  return rounded % 1 === 0 ? String(rounded) : String(rounded);
+}
+
+function formatCnyAmount(value) {
+  const rounded = Math.round(Number(value) * 100) / 100;
+  return rounded.toLocaleString('en-US', { maximumFractionDigits: 2 });
+}
+
+function isPackMeasure(measure) {
+  return /包裹总重/.test(String(measure || ''));
+}
+
+function scaleMeasure(measure, ratio) {
+  if (!(ratio > 0) || ratio === 1) return measure;
+  return String(measure || '')
+    .replace(/([\d,.]+)(\s*Kg)/i, (_, num, unit) => {
+      const value = Number(String(num).replace(/,/g, ''));
+      if (!Number.isFinite(value)) return `${num}${unit}`;
+      return `${formatKgAmount(value * ratio)}${unit}`;
+    })
+    .replace(/¥\s*([\d,.]+)/g, (_, num) => {
+      const value = Number(String(num).replace(/,/g, ''));
+      if (!Number.isFinite(value)) return `¥${num}`;
+      return `¥${formatCnyAmount(value * ratio)}`;
+    });
+}
+
+function sumLineMoney(lines) {
+  let kg = 0;
+  let cny = 0;
+  let sawCny = false;
+  for (const line of lines || []) {
+    const parsed = parseKgAndCny(line?.measure);
+    kg += parsed.kg;
+    if (parsed.cny != null) {
+      sawCny = true;
+      cny += parsed.cny;
+    }
+  }
+  return { kg, cny: sawCny ? Math.round(cny * 100) / 100 : null };
+}
+
+/**
+ * 留下的明细按行重算重量和费用。
+ * 包裹总重是一整包只计一次，行里还留着单号就不拆。
+ * 普通重量行按留下的单号比例拆。
+ */
+function repriceKeptInvoice(originalLines, nextLines, doc) {
+  const original = sumLineMoney(originalLines);
+  const remaining = sumLineMoney(nextLines);
+  let cny =
+    remaining.cny != null
+      ? remaining.cny
+      : doc?.totalFeeCny != null && original.kg > 0
+        ? Math.round((Number(doc.totalFeeCny) * remaining.kg) / original.kg * 100) / 100
+        : doc?.totalFeeCny != null
+          ? Number(doc.totalFeeCny)
+          : null;
+  let mmk = Number(doc?.totalFeeMmk) || 0;
+  if (original.cny != null && original.cny > 0 && remaining.cny != null && mmk > 0) {
+    mmk = Math.round((mmk * remaining.cny) / original.cny);
+  } else if (original.kg > 0 && mmk > 0) {
+    mmk = Math.round((mmk * remaining.kg) / original.kg);
+  } else if (cny != null && original.cny != null && original.cny > 0 && Number(doc?.totalFeeCny) > 0 && mmk <= 0) {
+    cny = remaining.cny != null ? remaining.cny : cny;
+  }
+  const feeLine = (doc?.totals || []).find((line) => /总费用|Total fee|ပို့ဆောင်ခ/.test(String(line)));
+  const feeIsMmk = /MMK/i.test(String(feeLine || '')) || (mmk > 0 && !/¥/.test(String(feeLine || '')));
+  const totals = (Array.isArray(doc?.totals) ? doc.totals : []).map((line) => {
+    const text = String(line);
+    if (/总重量|Total weight|စုစုပေါင်းအလေး/.test(text)) {
+      return text.replace(/([\d,.]+)\s*Kg/i, `${formatKgAmount(remaining.kg)} Kg`);
+    }
+    if (/入库报价|Quote/.test(text) && cny != null) {
+      return text.replace(/¥\s*([\d,.]+)/, `¥${formatCnyAmount(cny)}`);
+    }
+    if (/总费用|Total fee|ပို့ဆောင်ခ/.test(text)) {
+      if (feeIsMmk && mmk > 0) {
+        return text.replace(/([\d,.]+)(\s*MMK)/i, `${Math.round(mmk).toLocaleString('en-US')}$2`);
+      }
+      const parsedFee = parseKgAndCny(text);
+      if (parsedFee.cny != null && original.kg > 0) {
+        const nextCny = Math.round(((parsedFee.cny * remaining.kg) / original.kg) * 100) / 100;
+        cny = nextCny;
+        return text.replace(/¥\s*([\d,.]+)/, `¥${formatCnyAmount(nextCny)}`);
+      }
+      if (cny != null && /¥/.test(text)) {
+        return text.replace(/¥\s*([\d,.]+)/, `¥${formatCnyAmount(cny)}`);
+      }
+    }
+    return line;
+  });
+  return {
+    totals,
+    totalFeeCny: cny != null && cny > 0 ? cny : null,
+    totalFeeMmk: mmk > 0 ? mmk : 0,
+  };
+}
+
 function planSignedInvoiceClear(rows, keys) {
   const deleteIds = [];
   const updates = [];
@@ -332,7 +446,14 @@ function planSignedInvoiceClear(rows, keys) {
         keptNos.push(no);
       }
       if (!keptNos.length) continue;
-      nextLines.push({ ...line, expressNos: keptNos });
+      const originalCount = expressNos.filter((no) => isRealExpress(no)).length;
+      const ratio =
+        isPackMeasure(line?.measure) || originalCount <= 0 ? 1 : keptNos.length / originalCount;
+      nextLines.push({
+        ...line,
+        expressNos: keptNos,
+        measure: scaleMeasure(line?.measure, ratio),
+      });
     }
     const originalIds = Array.isArray(row.item_ids) ? row.item_ids : [];
     const nextIds = originalIds.filter((id) => {
@@ -357,7 +478,10 @@ function planSignedInvoiceClear(rows, keys) {
       if (aliasesHit(item.value, keys.barcodes) && kind !== 'pieces') return { ...item, value: '' };
       return item;
     });
-    const nextDoc = { ...doc, lines: nextLines, meta, pieceCount };
+    const priced = repriceKeptInvoice(lines, nextLines, doc);
+    const nextDoc = { ...doc, lines: nextLines, meta, pieceCount, totals: priced.totals };
+    nextDoc.totalFeeCny = priced.totalFeeCny;
+    nextDoc.totalFeeMmk = priced.totalFeeMmk;
     if (anchor.anchoredTrip) nextDoc.trip = '';
     if (aliasesHit(doc.packNo, keys.barcodes)) nextDoc.packNo = '';
     updates.push({
@@ -366,6 +490,8 @@ function planSignedInvoiceClear(rows, keys) {
       piece_count: pieceCount,
       document: nextDoc,
       item_ids: nextIds,
+      total_fee_cny: priced.totalFeeCny,
+      total_fee_mmk: priced.totalFeeMmk,
     });
   }
   return { deleteIds, updates };

@@ -54,6 +54,7 @@ export default function AppNavigator() {
       ? { headerTitle: ({ children }: { children?: React.ReactNode }) => <MyanmarStackTitle>{children}</MyanmarStackTitle> }
       : {}),
     contentStyle: { backgroundColor: colors.bgDeep },
+    headerShown: false,
   };
 
   return (
@@ -77,8 +78,16 @@ export default function AppNavigator() {
       <Stack.Screen name="HubReceive" getComponent={() => require('../screens/HubReceiveScreen').default} options={{ title: t.nav.hubReceive }} />
       <Stack.Screen name="Exceptions" getComponent={() => require('../screens/ExceptionsScreen').default} options={{ title: t.nav.exceptions }} />
       <Stack.Screen name="ShipmentTrack" getComponent={() => require('../screens/ShipmentTrackScreen').default} options={{ title: t.nav.shipmentTrack }} />
-      <Stack.Screen name="Items" getComponent={() => require('../screens/ItemsScreen').default} options={{ title: t.nav.items }} />
-      <Stack.Screen name="Pkg" getComponent={() => require('../screens/PkgScreen').default} options={{ title: t.nav.pkg }} />
+      <Stack.Screen
+        name="Items"
+        getComponent={() => require('../screens/ItemsScreen').default}
+        options={{ title: t.nav.items, headerShown: false }}
+      />
+      <Stack.Screen
+        name="Pkg"
+        getComponent={() => require('../screens/PkgScreen').default}
+        options={{ title: t.nav.pkg, headerShown: false }}
+      />
       <Stack.Screen name="TrackExpress" getComponent={() => require('../screens/TrackExpressScreen').default} options={{ title: t.nav.trackExpress }} />
       <Stack.Screen name="ItemForm" getComponent={() => require('../screens/ItemFormScreen').default} options={{ title: t.nav.itemForm }} />
       <Stack.Screen name="Movements" getComponent={() => require('../screens/MovementsScreen').default} options={{ title: t.nav.movements }} />

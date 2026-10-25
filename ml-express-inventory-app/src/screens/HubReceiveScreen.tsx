@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
 import ExceptionReportModal from '../components/ExceptionReportModal';
 import ArrivalNotifySheet from '../components/ArrivalNotifySheet';
 import CustomerSignFlowModal, { type CustomerSignFlowRequest } from '../components/CustomerSignFlowModal';
@@ -24,10 +25,12 @@ import { colors, space } from '../theme';
 
 export default function HubReceiveScreen({
   route,
+  navigation,
 }: NativeStackScreenProps<RootStackParamList, 'HubReceive'>) {
   const openPackBarcode = route.params?.openPackBarcode?.trim().toUpperCase() ?? '';
   const flow = useHubReceiveFlow(openPackBarcode);
   const { t, store } = flow;
+  const { scrollY, onScroll } = useCollapsingHomeScroll();
   const [exceptionTarget, setExceptionTarget] = useState<ExceptionReportTarget | null>(null);
   const [signRequest, setSignRequest] = useState<CustomerSignFlowRequest | null>(null);
   const scanGroups = useMemo(
@@ -59,18 +62,25 @@ export default function HubReceiveScreen({
 
   if (!store) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.hint}>{t.common.loginHubFirst}</Text>
+      <View style={styles.root}>
+        <CollapsingHomeHeader title={t.nav.hubReceive} onHome={() => navigation.goBack()} scrollY={scrollY} />
+        <View style={styles.center}>
+          <Text style={styles.hint}>{t.common.loginHubFirst}</Text>
+        </View>
       </View>
     );
   }
 
   return (
+    <View style={styles.root}>
+    <CollapsingHomeHeader title={t.nav.hubReceive} onHome={() => navigation.goBack()} scrollY={scrollY} />
     <ScrollView
-      style={styles.root}
+      style={styles.scroll}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
+      onScroll={onScroll}
+      scrollEventThrottle={16}
     >
       <OnlineRequiredBanner />
       <HubReceiveStatusPanels
@@ -174,11 +184,13 @@ export default function HubReceiveScreen({
         onClose={() => setExceptionTarget(null)}
       />
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  scroll: { flex: 1 },
   content: { padding: space.lg, paddingBottom: 48 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
   hint: { color: colors.muted },

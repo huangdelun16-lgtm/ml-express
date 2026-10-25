@@ -16,7 +16,7 @@ type PlacePredictionsService = {
   getPlacePredictions: (
     request: {
       input: string;
-      location?: unknown;
+      location?: google.maps.LatLng;
       radius?: number;
       componentRestrictions?: { country: string };
       language?: string;

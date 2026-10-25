@@ -15,6 +15,8 @@ type Props = {
   busy?: boolean;
   scannedCount?: number;
   scannedList?: ReactNode;
+  /** 已在另一层 Modal 里时，不再套一层窗口，否则 iOS 上点了不出现 */
+  embedded?: boolean;
 };
 
 export default function PhoneBarcodeScanModal({
@@ -27,6 +29,7 @@ export default function PhoneBarcodeScanModal({
   busy = false,
   scannedCount = 0,
   scannedList,
+  embedded = false,
 }: Props) {
   const { t, fmt } = useTranslation();
   const [listVisible, setListVisible] = useState(false);
@@ -43,71 +46,79 @@ export default function PhoneBarcodeScanModal({
 
   const countLabel = fmt(t.hubReceive.cameraScannedCount, { count: scannedCount });
 
+  if (!visible) return null;
+
+  const body = (
+    <View style={styles.root}>
+      <View style={styles.header}>
+        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button">
+          <Text style={styles.close}>{continuous ? t.hubReceive.cameraDone : t.common.close}</Text>
+        </Pressable>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {title ?? t.scanInput.phoneScan}
+        </Text>
+        {continuous ? (
+          <Pressable
+            style={[styles.countBtn, scannedCount > 0 && styles.countBtnActive]}
+            onPress={() => setListVisible((open) => !open)}
+            accessibilityRole="button"
+            accessibilityLabel={t.hubReceive.cameraViewScanned}
+          >
+            <Text style={[styles.count, scannedCount > 0 && styles.countActive]}>{countLabel}</Text>
+            <Text style={[styles.countChevron, scannedCount > 0 && styles.countActive]}>
+              {listVisible ? '▴' : '▾'}
+            </Text>
+          </Pressable>
+        ) : (
+          <View style={{ width: 48 }} />
+        )}
+      </View>
+      <View style={styles.body}>
+        <BarcodeScannerView
+          active={visible && !busy && !listVisible}
+          onScan={handleScanned}
+          subtitle={subtitle ?? t.forms.scanAutoFill}
+        />
+        {listVisible ? (
+          <View style={styles.sheetWrap} pointerEvents="box-none">
+            <Pressable
+              style={styles.sheetDim}
+              onPress={() => setListVisible(false)}
+              accessibilityLabel={t.hubReceive.cameraContinueScan}
+            />
+            <View style={styles.sheet}>
+              <View style={styles.sheetHandle} />
+              <Text style={styles.sheetTitle}>{t.hubReceive.scanBasketTitle}</Text>
+              <ScrollView
+                style={styles.sheetScroll}
+                contentContainerStyle={styles.sheetScrollContent}
+                keyboardShouldPersistTaps="handled"
+              >
+                {scannedCount > 0 && scannedList ? (
+                  scannedList
+                ) : (
+                  <Text style={styles.empty}>{t.hubReceive.cameraScannedEmpty}</Text>
+                )}
+              </ScrollView>
+              <Pressable
+                style={styles.continueBtn}
+                onPress={() => setListVisible(false)}
+                accessibilityRole="button"
+              >
+                <Text style={styles.continueBtnText}>{t.hubReceive.cameraContinueScan}</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+
+  if (embedded) return body;
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={styles.root}>
-        <View style={styles.header}>
-          <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button">
-            <Text style={styles.close}>{continuous ? t.hubReceive.cameraDone : t.common.close}</Text>
-          </Pressable>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {title ?? t.scanInput.phoneScan}
-          </Text>
-          {continuous ? (
-            <Pressable
-              style={[styles.countBtn, scannedCount > 0 && styles.countBtnActive]}
-              onPress={() => setListVisible((open) => !open)}
-              accessibilityRole="button"
-              accessibilityLabel={t.hubReceive.cameraViewScanned}
-            >
-              <Text style={[styles.count, scannedCount > 0 && styles.countActive]}>{countLabel}</Text>
-              <Text style={[styles.countChevron, scannedCount > 0 && styles.countActive]}>
-                {listVisible ? '▴' : '▾'}
-              </Text>
-            </Pressable>
-          ) : (
-            <View style={{ width: 48 }} />
-          )}
-        </View>
-        <View style={styles.body}>
-          <BarcodeScannerView
-            active={visible && !busy && !listVisible}
-            onScan={handleScanned}
-            subtitle={subtitle ?? t.forms.scanAutoFill}
-          />
-          {listVisible ? (
-            <View style={styles.sheetWrap} pointerEvents="box-none">
-              <Pressable
-                style={styles.sheetDim}
-                onPress={() => setListVisible(false)}
-                accessibilityLabel={t.hubReceive.cameraContinueScan}
-              />
-              <View style={styles.sheet}>
-                <View style={styles.sheetHandle} />
-                <Text style={styles.sheetTitle}>{t.hubReceive.scanBasketTitle}</Text>
-                <ScrollView
-                  style={styles.sheetScroll}
-                  contentContainerStyle={styles.sheetScrollContent}
-                  keyboardShouldPersistTaps="handled"
-                >
-                  {scannedCount > 0 && scannedList ? (
-                    scannedList
-                  ) : (
-                    <Text style={styles.empty}>{t.hubReceive.cameraScannedEmpty}</Text>
-                  )}
-                </ScrollView>
-                <Pressable
-                  style={styles.continueBtn}
-                  onPress={() => setListVisible(false)}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.continueBtnText}>{t.hubReceive.cameraContinueScan}</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : null}
-        </View>
-      </View>
+      {body}
     </Modal>
   );
 }

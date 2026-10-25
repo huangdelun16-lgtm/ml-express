@@ -19,6 +19,7 @@ const {
   resolveNextMerchantStoreCode,
 } = require('./utils/merchantApplication');
 const { notifyMerchantCredentials } = require('./utils/notifyMerchantCredentials');
+const { loadApprovalEmailTemplate } = require('./utils/merchantApprovalEmail');
 
 
 const APPLICATION_COLUMNS =
@@ -289,7 +290,8 @@ exports.handler = async (event) => {
           errors: [],
         };
         try {
-          notify = await notifyMerchantCredentials(application, credentials);
+          const emailTemplate = await loadApprovalEmailTemplate(supabase);
+          notify = await notifyMerchantCredentials(application, credentials, emailTemplate);
         } catch (notifyErr) {
           console.error('merchant credentials notify failed:', notifyErr);
           notify.errors.push(notifyErr.message || '账号通知发送失败');

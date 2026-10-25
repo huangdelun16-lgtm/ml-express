@@ -2,13 +2,15 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
+  Animated,
+  Keyboard,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import ExceptionReportModal from '../components/ExceptionReportModal';
@@ -17,10 +19,12 @@ import ItemActionModal from '../components/ItemActionModal';
 import ItemViewModal from '../components/ItemViewModal';
 import ItemsListRow from '../components/ItemsListRow';
 import ItemsModeBar, { type ItemsListMode } from '../components/ItemsModeBar';
-import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
 import PackExpressModal from '../components/PackExpressModal';
 import RegionFilterBar from '../components/RegionFilterBar';
+import PhoneBarcodeScanModal from '../components/PhoneBarcodeScanModal';
+import { normalizeScanCode } from '../utils/barcodeScan';
+import { itemMatchesKeyword } from '../utils/itemKeywordMatch';
 import { useAuth } from '../contexts/AuthContext';
 import { packOrderBarcodeData, listItemOrderBarcodeData, type PackBarcodePayload } from '../utils/orderBarcodeData';
 import { runBarcodeLabelPrintWithAlert } from '../services/labelPrintFlow';
@@ -63,6 +67,7 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 type Nav = {
   navigate: (name: keyof RootStackParamList, params?: object) => void;
   setParams: (params: { initialMode?: 'pack' | 'sign' }) => void;
+  goBack: () => void;
 };
 
 type ItemsRoute = RouteProp<RootStackParamList, 'Items'>;
@@ -72,8 +77,25 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const incompleteOnly = false;
   const { operatorName, store, hubCode } = useAuth();
   const { t, fmt } = useTranslation();
+  const insets = useSafeAreaInsets();
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerBodyHeight = scrollY.interpolate({
+    inputRange: [0, 64],
+    outputRange: [48, 0],
+    extrapolate: 'clamp',
+  });
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 48],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+  const onListScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    { useNativeDriver: false },
+  );
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [scanVisible, setScanVisible] = useState(false);
   const [items, setItems] = useState<InventoryItemListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -83,6 +105,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     return mode === 'pack' || mode === 'sign' ? mode : 'normal';
   });
   const [filterRegion, setFilterRegion] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'' | 'unpacked' | 'signed'>('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [packModalVisible, setPackModalVisible] = useState(false);
   const [actionItem, setActionItem] = useState<InventoryItemListRow | null>(null);
@@ -150,7 +173,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
 
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [listMode, filterRegion]);
+  }, [listMode, filterRegion, statusFilter]);
 
   useEffect(() => {
     if (!actionItem || !store) {
@@ -175,6 +198,14 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const displayedItems = useMemo(() => {
     let list = items.filter((i) => !isExpressPackItem(i));
     if (filterRegion) list = list.filter((i) => resolveItemDestinationCode(i) === filterRegion);
+    if (statusFilter === 'unpacked') {
+      list = list.filter((item) => {
+        const released = item.hub_transit_released && !item.hub_transit_shipped;
+        return !(item.packed && !released);
+      });
+    } else if (statusFilter === 'signed') {
+      list = list.filter((item) => isCustomerSignedItem(item));
+    }
     if (incompleteOnly) {
       list = list.filter((item) => {
         if (isCustomerSignedItem(item)) return false;
@@ -194,7 +225,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
       }
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
     });
-  }, [items, filterRegion, incompleteOnly]);
+  }, [items, filterRegion, statusFilter, incompleteOnly]);
 
   const selectedItems = useMemo(
     () => displayedItems.filter((i) => selectedIds.has(i.id)),
@@ -341,6 +372,43 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     );
   };
 
+  const applyScannedCode = (raw: string) => {
+    const code = normalizeScanCode(raw);
+    setScanVisible(false);
+    if (!code) return;
+    setSearch(code);
+    setDebouncedSearch(code);
+    const matches = items.filter((item) => itemMatchesKeyword(item, code));
+    if (matches.length === 1) setActionItem(matches[0]);
+  };
+
+  const expressNextLabel = (item: InventoryItemListRow | null) => {
+    if (!item || !store || isExpressPackItem(item) || isCustomerSignedItem(item)) return null;
+    if (canMarkCustomerSigned(store, item)) return t.items.nextSign;
+    if (item.stocked_in && !item.packed && item.qty_on_hand > 0) return t.items.nextPack;
+    if (!item.stocked_in) return t.items.nextStockIn;
+    return null;
+  };
+
+  const runExpressNextStep = () => {
+    if (!actionItem || !store) return;
+    const item = actionItem;
+    setActionItem(null);
+    if (canMarkCustomerSigned(store, item)) {
+      void openCustomerSign([item]);
+      return;
+    }
+    if (item.stocked_in && !item.packed && item.qty_on_hand > 0) {
+      setSelectedIds(new Set([item.id]));
+      setListMode('pack');
+      setPackModalVisible(true);
+      return;
+    }
+    if (!item.stocked_in) {
+      navigation.navigate('StockIn', { presetBarcode: item.input_barcode || item.barcode });
+    }
+  };
+
   const handlePackBarcodeDone = () => {
     setOrderBarcodeData(null);
     setOrderBarcodeRequireDone(false);
@@ -351,52 +419,83 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
 
   return (
     <View style={styles.root}>
-      <FlatList
+      <View style={{ paddingTop: insets.top, backgroundColor: '#0f172a' }}>
+        <Animated.View style={[styles.navRow, { height: headerBodyHeight, opacity: headerOpacity }]}>
+          <Pressable
+            style={styles.homeBtn}
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Home"
+          >
+            <Text style={styles.homeChevron}>‹</Text>
+            <Text style={styles.homeLabel}>Home</Text>
+          </Pressable>
+          <Text style={styles.screenTitle} numberOfLines={1}>{t.nav.items}</Text>
+        </Animated.View>
+        <View style={styles.toolbar}>
+          <TextInput
+            style={styles.search}
+            placeholder={
+              listMode === 'pack' ? t.items.searchPack : t.items.searchList
+            }
+            placeholderTextColor="#94a3b8"
+            value={search}
+            onChangeText={setSearch}
+            onSubmitEditing={() => {
+              const nextSearch = search.trim();
+              if (nextSearch === debouncedSearch) void load(true);
+              else setDebouncedSearch(nextSearch);
+            }}
+            returnKeyType="search"
+          accessibilityLabel={t.common.search}
+        />
+        <Pressable
+          style={styles.scanBtn}
+          onPress={() => {
+            Keyboard.dismiss();
+            setScanVisible(true);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t.scanInput.scanBtn}
+        >
+          <Text style={styles.scanBtnText}>{t.scanInput.scanBtn}</Text>
+        </Pressable>
+        {listMode === 'normal' ? (
+            <Pressable
+              style={styles.addBtn}
+              onPress={() => navigation.navigate('ItemForm')}
+              accessibilityRole="button"
+              accessibilityLabel={t.items.newBtn}
+            >
+              <Text style={styles.addText}>{t.items.newBtn}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+      <Animated.FlatList
         data={displayedItems}
         keyExtractor={(it) => it.id}
         contentContainerStyle={styles.list}
+        style={styles.listView}
+        keyboardShouldPersistTaps="handled"
+        onScroll={onListScroll}
+        scrollEventThrottle={16}
         ListHeaderComponent={
           <View>
-            <View style={styles.toolbar}>
-              <TextInput
-                style={styles.search}
-                placeholder={
-                  listMode === 'pack' ? t.items.searchPack : t.items.searchList
-                }
-                placeholderTextColor="#94a3b8"
-                value={search}
-                onChangeText={setSearch}
-                onSubmitEditing={() => {
-                  const nextSearch = search.trim();
-                  if (nextSearch === debouncedSearch) void load(true);
-                  else setDebouncedSearch(nextSearch);
-                }}
-                returnKeyType="search"
-                accessibilityLabel={t.common.search}
-              />
-              {listMode === 'normal' ? (
-                <Pressable
-                  style={styles.addBtn}
-                  onPress={() => navigation.navigate('ItemForm')}
-                  accessibilityRole="button"
-                  accessibilityLabel={t.items.newBtn}
-                >
-                  <Text style={styles.addText}>{t.items.newBtn}</Text>
-                </Pressable>
-              ) : null}
-            </View>
-
-            <View style={styles.onlineBannerWrap}>
-              <OnlineRequiredBanner />
-            </View>
-
             {incompleteOnly ? (
               <View style={styles.incompleteBanner}>
                 <Text style={styles.incompleteBannerText}>{t.items.incompleteFilterBanner}</Text>
               </View>
             ) : null}
 
-            <RegionFilterBar value={filterRegion} onChange={setFilterRegion} />
+            <RegionFilterBar
+              value={filterRegion}
+              onChange={setFilterRegion}
+              status={statusFilter}
+              onStatusChange={setStatusFilter}
+              unpackedLabel={t.items.statusNotPacked}
+              signedLabel={t.items.statusSigned}
+            />
 
             <ItemsModeBar
               listMode={listMode}
@@ -453,7 +552,9 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
             <Text style={styles.empty}>
               {listMode === 'pack'
                 ? t.items.noPackable
-                : filterRegion
+                : statusFilter
+                  ? t.items.noStatus
+                  : filterRegion
                   ? fmt(t.items.noRegion, { region: regionDisplayLabel(filterRegion) })
                   : t.items.empty}
             </Text>
@@ -479,6 +580,14 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         )}
       />
 
+      <PhoneBarcodeScanModal
+        visible={scanVisible}
+        onClose={() => setScanVisible(false)}
+        onScanned={applyScannedCode}
+        title={t.scanInput.scanBtn}
+        subtitle={t.items.searchList}
+      />
+
       <ItemActionModal
         visible={!!actionItem}
         item={actionItem}
@@ -490,6 +599,8 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
           setActionItem(null);
         }}
         canEdit={!!actionItem && actionCanEdit}
+        nextLabel={expressNextLabel(actionItem)}
+        onNext={expressNextLabel(actionItem) ? runExpressNextStep : undefined}
         onEdit={() => {
           if (!actionItem || !store) return;
           if (!actionCanEdit) {
@@ -642,11 +753,38 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0f172a' },
-  toolbar: { flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 8 },
-  onlineBannerWrap: { marginHorizontal: 16 },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  homeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 36,
+    paddingLeft: 8,
+    paddingRight: 14,
+    borderRadius: 18,
+    backgroundColor: '#334155',
+    gap: 2,
+  },
+  homeChevron: { color: '#f8fafc', fontSize: 26, lineHeight: 28, marginTop: -2 },
+  homeLabel: { color: '#f8fafc', fontSize: 16, fontWeight: '700' },
+  screenTitle: { color: '#f8fafc', fontSize: 17, fontWeight: '800', flexShrink: 1 },
+  toolbar: {
+    flexShrink: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+    backgroundColor: '#0f172a',
+  },
   incompleteBanner: {
-    marginHorizontal: 16,
-    marginBottom: 8,
+    marginBottom: 10,
     padding: 12,
     borderRadius: 10,
     backgroundColor: 'rgba(245,158,11,0.12)',
@@ -657,30 +795,43 @@ const styles = StyleSheet.create({
   search: {
     flex: 1,
     backgroundColor: '#fff',
+    color: '#0f172a',
     borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minHeight: 40,
+    fontSize: 14,
   },
   addBtn: {
     backgroundColor: '#2563eb',
     borderRadius: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
+    minHeight: 40,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  addText: { color: '#fff', fontWeight: '800' },
+  addText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  scanBtn: {
+    backgroundColor: '#1e293b',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#475569',
+    paddingHorizontal: 12,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanBtnText: { color: '#f8fafc', fontWeight: '800', fontSize: 14 },
   inlineLoading: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginHorizontal: 16,
     marginBottom: 8,
   },
   inlineError: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginHorizontal: 16,
     marginBottom: 8,
     padding: 10,
     borderRadius: 8,
@@ -697,6 +848,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   retryBtnText: { color: '#fecaca', fontWeight: '800', fontSize: 12 },
-  list: { paddingHorizontal: 12, paddingTop: 6, paddingBottom: 24 },
+  listView: { flex: 1 },
+  list: { paddingHorizontal: 16, paddingTop: 2, paddingBottom: 28 },
   empty: { color: '#94a3b8', textAlign: 'center', marginTop: 40, lineHeight: 22 },
 });

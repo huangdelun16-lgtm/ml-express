@@ -1162,7 +1162,6 @@ export const deliveryStoreService = {
       'operating_hours',
       'is_closed_today',
       'vacation_dates',
-      'password',
       'avatar_url',
     ] as const;
 

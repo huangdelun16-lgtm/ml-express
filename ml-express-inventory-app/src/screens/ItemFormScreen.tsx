@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import ItemFormFields from '../components/ItemFormFields';
+import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
 import InboundOrderFormBody from '../components/InboundOrderFormBody';
 import { useItemFormState } from '../hooks/useItemFormState';
 import { useAuth } from '../contexts/AuthContext';
@@ -51,6 +52,7 @@ export default function ItemFormScreen({
 }) {
   const { operatorName, store, hubCode } = useAuth();
   const { t } = useTranslation();
+  const { scrollY, onScroll } = useCollapsingHomeScroll();
   const itemId = route.params?.itemId;
   const isEdit = !!itemId;
   const form = useItemFormState();
@@ -72,7 +74,6 @@ export default function ItemFormScreen({
   const [specW, setSpecW] = useState('');
   const [specH, setSpecH] = useState('');
   const [weightN, setWeightN] = useState('');
-  const [packaging, setPackaging] = useState('');
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
   const [destination, setDestination] = useState('');
@@ -105,7 +106,6 @@ export default function ItemFormScreen({
       setSpecH(spec.h);
       setWeightN(parseWeight(detail.weight).n);
       setUnitN(parseUnit(detail.unit).n);
-      setPackaging(detail.packaging);
       setRecipientName(detail.customer_name?.trim() ?? '');
       setRecipientPhone(detail.recipient_phone?.trim() ?? '');
       setDestination(normalizePackDestination(detail.destination ?? ''));
@@ -172,10 +172,6 @@ export default function ItemFormScreen({
       feedbackService.notify(t.common.tip, t.itemForm.alertName);
       return;
     }
-    if (!packaging) {
-      feedbackService.notify(t.common.tip, t.itemForm.alertPackaging);
-      return;
-    }
 
     setLoading(true);
     try {
@@ -188,7 +184,6 @@ export default function ItemFormScreen({
           unit,
           weight: weightStr,
           note: note.trim(),
-          packaging,
           recipientName: recipientName.trim(),
           recipientPhone: recipientPhone.trim(),
           destination: destination.trim(),
@@ -234,11 +229,19 @@ export default function ItemFormScreen({
   };
 
   return (
+    <View style={styles.root}>
+    <CollapsingHomeHeader title={t.nav.itemForm} onHome={() => navigation.goBack()} scrollY={scrollY} />
     <KeyboardAvoidingView
-      style={styles.root}
+      style={styles.form}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={styles.form}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
         <View style={styles.hero}>
           <Text style={styles.title}>{isEdit ? t.itemForm.editTitle : t.itemForm.newTitle}</Text>
           <Text style={styles.subtitle}>
@@ -269,7 +272,6 @@ export default function ItemFormScreen({
               specW,
               specH,
               weightN,
-              packaging,
               recipientName,
               recipientPhone,
               destination,
@@ -284,7 +286,6 @@ export default function ItemFormScreen({
               setSpecH(h);
             }}
             onWeightChange={setWeightN}
-            onPackagingChange={setPackaging}
             onRecipientNameChange={setRecipientName}
             onRecipientPhoneChange={setRecipientPhone}
             onDestinationChange={setDestination}
@@ -320,11 +321,13 @@ export default function ItemFormScreen({
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0f172a' },
+  form: { flex: 1 },
   content: { padding: 16, paddingBottom: 48 },
   hero: { marginBottom: 18 },
   title: { color: '#f8fafc', fontSize: 24, fontWeight: '900' },

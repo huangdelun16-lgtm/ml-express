@@ -904,7 +904,6 @@ export async function updateItemInboundProfile(
     unit: string;
     weight: string;
     note: string;
-    packaging: string;
     recipientName: string;
     recipientPhone: string;
     destination: string;
@@ -916,6 +915,7 @@ export async function updateItemInboundProfile(
   if (!allowed) throw svc('editDeniedHubReceived');
   const item = await getItemById(id);
   if (!item) throw svc('orderNotFoundOrDeleted');
+  // 包装记在入库流水上。这里只改商品资料，不回写 packaging，已有包装值保持不变。
   await cloudUpsertItem({
     ...item,
     name: params.name,

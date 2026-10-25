@@ -142,6 +142,69 @@
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
 }
 
+.login-forgot-row,
+.login-back-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.7rem;
+}
+
+.login-back-row {
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.login-forgot,
+.login-back {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.login-forgot:hover,
+.login-back:hover {
+  color: #93c5fd;
+}
+
+.login-recover-hint {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  margin: 0 0 1.4rem;
+}
+
+.login-help-message {
+  background: rgba(59, 130, 246, 0.1);
+  color: #dbeafe;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  margin-bottom: 1.5rem;
+  text-align: left;
+  border: 1px solid rgba(59, 130, 246, 0.28);
+  line-height: 1.55;
+}
+
+.login-help-message p,
+.error-message p {
+  margin: 0;
+}
+
+.login-help-phone-line {
+  margin-top: 0.65rem !important;
+}
+
+.login-help-message a,
+.error-message a {
+  color: #fbbf24;
+  font-weight: 800;
+  text-decoration: none;
+}
+
 .login-button {
   width: 100%;
   padding: 1.25rem;

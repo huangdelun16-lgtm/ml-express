@@ -55,6 +55,18 @@ test('email HTML escapes store name', () => {
   assert.equal(mail.html.includes('<script>'), false);
   assert.match(mail.html, /A &lt;script&gt;店/);
   assert.match(mail.html, /YGN002/);
+  assert.match(mail.html, /XY99ZZ88/);
+  assert.match(mail.text, /ဆိုင်ကုဒ်/);
+  assert.match(mail.text, /စကားဝှက်/);
+});
+
+test('gmail config gap is shown as an email error', () => {
+  const result = summarizeNotifyAttempts([
+    { channel: 'email', to: 'shop@gmail.com', sent: false, skipped: true, error: 'gmail_not_configured' },
+  ]);
+  assert.equal(result.emailSent, false);
+  assert.equal(result.errors.length, 1);
+  assert.match(result.errors[0], /GMAIL_USER/);
 });
 
 test('summarizeNotifyAttempts ignores skipped config gaps', () => {

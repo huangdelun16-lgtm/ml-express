@@ -234,14 +234,14 @@ const DeliveryStoreOverlays: React.FC = () => {
                       </div>
                     </div>
                     <div className="store-form-field">
-                      <label>密码 <span>*</span></label>
+                      <label>密码 {!isEditing && <span>*</span>}</label>
                       <input
                         type="password"
                         name="password"
                         value={formData.password}
                         onChange={handleInputChange}
-                        placeholder="合伙店铺登录密码"
-                        required
+                        placeholder={isEditing ? '留空则不修改密码' : '合伙店铺登录密码'}
+                        required={!isEditing}
                       />
                     </div>
                     <div className="store-form-field">

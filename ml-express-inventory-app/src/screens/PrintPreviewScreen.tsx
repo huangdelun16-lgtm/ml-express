@@ -8,7 +8,9 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
 import BluetoothScanModal from '../components/BluetoothScanModal';
 import { feedbackService } from '../services/FeedbackService';
 import LabelPaperSpecEditor from '../components/LabelPaperSpecEditor';
@@ -42,6 +44,7 @@ import {
   type LabelPaperSpec,
 } from '../constants/labelPaperSpec';
 import { useTranslation } from '../i18n';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import { getActiveBluetoothDevice } from '../services/bluetoothScanner';
 import {
   clearLabelPrinterSettings,
@@ -86,6 +89,8 @@ function defaultPreviewSettings(paper: LabelPaperSpec = DEFAULT_LABEL_PAPER): La
 
 export default function PrintPreviewScreen() {
   const { t } = useTranslation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { scrollY, onScroll } = useCollapsingHomeScroll();
   const [connectedPrinter, setConnectedPrinter] = useState<ScannedBluetoothDevice | null>(null);
   const [scanVisible, setScanVisible] = useState(false);
   const [copies, setCopies] = useState(1);
@@ -321,7 +326,14 @@ export default function PrintPreviewScreen() {
 
   return (
     <View style={styles.root}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <CollapsingHomeHeader title={t.nav.printPreview} onHome={() => navigation.goBack()} scrollY={scrollY} />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
         {dirty ? <Text style={styles.unsavedHint}>{t.settings.printPreviewUnsavedHint}</Text> : null}
 
         <View style={styles.previewPanel}>
@@ -523,6 +535,7 @@ export default function PrintPreviewScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#020617' },
+  scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 24 },
   unsavedHint: {
     color: '#fbbf24',

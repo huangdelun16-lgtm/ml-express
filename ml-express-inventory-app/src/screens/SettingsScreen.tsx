@@ -13,6 +13,7 @@ import Constants from 'expo-constants';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ChangePasswordModal from '../components/ChangePasswordModal';
+import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
 import BluetoothScanModal from '../components/BluetoothScanModal';
 import LanguageSwitcherRow from '../components/LanguageSwitcherRow';
 import { useAuth } from '../contexts/AuthContext';
@@ -100,6 +101,7 @@ export default function SettingsScreen() {
   } = useAuth();
   const { t, fmt } = useTranslation();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { scrollY, onScroll } = useCollapsingHomeScroll();
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
   const [bluetoothScanVisible, setBluetoothScanVisible] = useState(false);
   const [connectedBluetooth, setConnectedBluetooth] = useState<ScannedBluetoothDevice | null>(null);
@@ -193,7 +195,14 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+    <View style={styles.root}>
+    <CollapsingHomeHeader title={t.nav.settings} onHome={() => navigation.goBack()} scrollY={scrollY} />
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.content}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+    >
       <View style={styles.hero}>
         <View style={styles.heroTop}>
           <View style={styles.heroAvatar}>
@@ -355,11 +364,13 @@ export default function SettingsScreen() {
         }}
       />
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#020617' },
+  scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 40 },
   hero: {
     backgroundColor: '#0f172a',

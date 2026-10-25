@@ -20,10 +20,12 @@ import {
   resolveNextStoreCodeForPrefix,
 } from '../utils/merchantStoreCode';
 import { feedbackService } from '../services/FeedbackService';
+import { adminAuthenticatedFetch } from '../services/authService';
 import ProductReviewRejectModal from '../components/ProductReviewRejectModal';
 import StoreLicenseDocsModal from '../components/StoreLicenseDocsModal';
 import { fetchStoreLicenseDocuments } from '../services/merchantApplicationService';
 import '../styles/merchantApplications.css';
+import '../styles/partnerStoreList.css';
 import { applyProductReviewDecision } from '../services/productReviewQueueService';
 import { isValidRejectReason } from '../utils/productReviewDecision';
 import { normalizeStorePackingSlaMinutes } from '../services/_shared/packingCountdown';
@@ -38,6 +40,7 @@ import {
   DEFAULT_OPERATING_HOURS,
   parseOperatingHours,
   formatOperatingHours,
+  formatStoreAddress,
   regionToCityKey,
   DEFAULT_ADMIN_PRODUCT_FORM,
   normalizeProductListingStatus,
@@ -51,6 +54,7 @@ const DeliveryStoreManagement: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const storeListSearchQ = (searchParams.get('q') || '').trim().toLowerCase();
+  const [storeQuery, setStoreQuery] = useState(storeListSearchQ);
   const openProductsDeepLink = searchParams.get('products') === '1';
   const openedProductsKeyRef = useRef('');
   const { isMobile } = useResponsive();
@@ -148,6 +152,8 @@ const DeliveryStoreManagement: React.FC = () => {
   const [pendingReviewByStoreId, setPendingReviewByStoreId] = useState<Record<string, number>>({});
   /** 各合伙店铺商品总数（store_id → 件数） */
   const [productCountByStoreId, setProductCountByStoreId] = useState<Record<string, number>>({});
+  const [pendingAcceptByStoreId, setPendingAcceptByStoreId] = useState<Record<string, number>>({});
+  const mapRef = useRef<google.maps.Map | null>(null);
 
   // 用于“实时营业状态”badge（根据 operating_hours 计算当前是否在营业时间段）
   const [now, setNow] = useState(() => new Date());
@@ -298,31 +304,73 @@ const DeliveryStoreManagement: React.FC = () => {
     return minDistance <= 50 ? closestCity : null;
   };
 
+  useEffect(() => {
+    setStoreQuery(storeListSearchQ);
+  }, [storeListSearchQ]);
+
+  const copyNotice = async (label: string, value: string) => {
+    const text = value.trim();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setSuccessMessage(`已复制${label} ${text}`);
+      setErrorMessage(null);
+    } catch {
+      setErrorMessage(`复制${label}失败，请手动选择`);
+    }
+  };
+
+  const resetStorePassword = async (store: DeliveryStore) => {
+    if (!store.id) return;
+    const custom = window.prompt(
+      `为「${store.store_name}」设置新登录密码（至少 6 位）。留空则自动生成。`,
+      '',
+    );
+    if (custom === null) return;
+    const typed = custom.trim();
+    if (typed && typed.length < 6) {
+      setErrorMessage('密码至少 6 位');
+      return;
+    }
+    try {
+      const response = await adminAuthenticatedFetch('/.netlify/functions/merchant-admin-store-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storeId: store.id, password: typed || undefined }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || '重置密码失败');
+      }
+      setErrorMessage(null);
+      setSuccessMessage(`「${store.store_name}」新密码：${payload.password}。请告知商家，刷新后不再显示。`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '重置密码失败');
+    }
+  };
+
   /** 合伙店铺列表（不含 Inventory 中转站，中转站由「跨境物流」独立管理） */
   const stores = useMemo(() => {
     const merchantStores = allStores.filter((store) => store.store_type !== 'transit_station');
-    let filtered: DeliveryStore[];
-    if (storeListSearchQ) {
-      filtered = merchantStores.filter(
-        (store) =>
-          (store.store_name || '').toLowerCase().includes(storeListSearchQ) ||
-          (store.store_code || '').toLowerCase().includes(storeListSearchQ),
-      );
-    } else {
-      filtered = merchantStores.filter((store) => {
-        const regionCity = regionToCityKey(store.region);
-        if (regionCity) return regionCity === selectedCity;
-        const storeCity = getStoreCity(store);
-        return storeCity === selectedCity;
-      });
-    }
+    const query = storeQuery.trim().toLowerCase();
+    const fromDeepLink = query.length > 0 && query === storeListSearchQ;
+    const inCity = (store: DeliveryStore) => {
+      const regionCity = regionToCityKey(store.region);
+      if (regionCity) return regionCity === selectedCity;
+      return getStoreCity(store) === selectedCity;
+    };
+    const matchesQuery = (store: DeliveryStore) =>
+      (store.store_name || '').toLowerCase().includes(query) ||
+      (store.store_code || '').toLowerCase().includes(query);
+    const base = fromDeepLink ? merchantStores : merchantStores.filter(inCity);
+    const filtered = query ? base.filter(matchesQuery) : base;
     return filtered.slice().sort((a, b) => {
       const pa = a.id ? (pendingReviewByStoreId[a.id] ?? 0) : 0;
       const pb = b.id ? (pendingReviewByStoreId[b.id] ?? 0) : 0;
       if (pb !== pa) return pb - pa;
       return (a.store_name || '').localeCompare(b.store_name || '', 'zh-Hans');
     });
-  }, [allStores, selectedCity, pendingReviewByStoreId, storeListSearchQ]);
+  }, [allStores, selectedCity, pendingReviewByStoreId, storeListSearchQ, storeQuery]);
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [currentStoreQR, setCurrentStoreQR] = useState<DeliveryStore | null>(null);
@@ -811,6 +859,15 @@ const DeliveryStoreManagement: React.FC = () => {
   // 处理店铺卡片点击（在地图上标注位置）
   const handleStoreClick = (store: DeliveryStore) => {
     setSelectedStore(store);
+    const lat = Number(store.latitude);
+    const lng = Number(store.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const position = { lat, lng };
+    setMapCenter(position);
+    const map = mapRef.current;
+    if (!map) return;
+    map.panTo(position);
+    if ((map.getZoom() || 0) < 15) map.setZoom(15);
   };
 
   useEffect(() => {
@@ -824,8 +881,21 @@ const DeliveryStoreManagement: React.FC = () => {
         setErrorMessage(null); // 清除之前的错误信息
       }
       const data = await deliveryStoreService.getAllStores();
-      setAllStores(data); // 存储所有合伙店铺
-      setRetryCount(0); // 重置重试计数
+      setAllStores(data);
+      setRetryCount(0);
+      const pendingRes = await supabase
+        .from('packages')
+        .select('delivery_store_id')
+        .eq('status', '待确认');
+      if (!pendingRes.error) {
+        const counts: Record<string, number> = {};
+        for (const row of pendingRes.data || []) {
+          const id = String(row.delivery_store_id || '').trim();
+          if (!id) continue;
+          counts[id] = (counts[id] || 0) + 1;
+        }
+        setPendingAcceptByStoreId(counts);
+      }
     } catch (error) {
       console.error('加载合伙店铺列表失败:', error);
       setErrorMessage('加载合伙店铺列表失败，请刷新页面重试');
@@ -1116,12 +1186,12 @@ const DeliveryStoreManagement: React.FC = () => {
       !formData.address ||
       !formData.latitude ||
       !formData.longitude ||
-      !formData.password ||
       !formData.region ||
       !formData.phone ||
       !formData.manager_name ||
       !formData.manager_phone ||
-      !formData.operating_hours
+      !formData.operating_hours ||
+      (!isEditing && !formData.password)
     ) {
       const msg = '请填写所有必填项（含地图位置、联系电话与店长信息）';
       setFormSubmitError(msg);
@@ -1169,7 +1239,7 @@ const DeliveryStoreManagement: React.FC = () => {
           }
         }
 
-        const { latitude, longitude, service_area_radius, capacity, ...restFormData } = formData;
+        const { latitude, longitude, service_area_radius, capacity, password, ...restFormData } = formData;
         const packing_sla_minutes =
           normalizeStorePackingSlaMinutes(formData.packing_sla_minutes) ?? 12;
 
@@ -1185,7 +1255,22 @@ const DeliveryStoreManagement: React.FC = () => {
 
         if (result) {
           const productNote = savedProductName ? `，并已上架商品「${savedProductName}」` : '';
-          setSuccessMessage(`合伙店铺信息更新成功${productNote}！`);
+          let passwordNote = '';
+          const nextPassword = String(password || '').trim();
+          if (nextPassword) {
+            const response = await adminAuthenticatedFetch('/.netlify/functions/merchant-admin-store-password', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ storeId: editingStore.id, password: nextPassword }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              setErrorMessage(`店铺资料已保存，密码没有改成功：${payload.error || '请用卡片上的重置密码再试'}`);
+            } else {
+              passwordNote = ` 新密码：${payload.password}`;
+            }
+          }
+          setSuccessMessage(`合伙店铺信息更新成功${productNote}！${passwordNote}`);
           setShowForm(false);
           setEditingStore(null);
           setIsEditing(false);
@@ -1686,7 +1771,9 @@ const DeliveryStoreManagement: React.FC = () => {
             <span style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
               合伙店铺列表
               <span style={{ fontSize: '0.9rem', fontWeight: 'normal', opacity: 0.8 }}>
-                ({myanmarCities[selectedCity].name}: {stores.length} 个)
+                ({storeQuery.trim()
+                  ? `${myanmarCities[selectedCity].name} · 匹配 ${stores.length} 个`
+                  : `${myanmarCities[selectedCity].name}: ${stores.length} 个`})
               </span>
             </span>
             {pendingProductReviewCount > 0 && (
@@ -1712,12 +1799,22 @@ const DeliveryStoreManagement: React.FC = () => {
               </button>
             )}
           </h2>
+          <label className="ps-search">
+            <input
+              type="search"
+              value={storeQuery}
+              placeholder="搜索店名或店铺代码"
+              onChange={(event) => setStoreQuery(event.target.value)}
+            />
+          </label>
           {loading ? (
             <p>加载中...</p>
           ) : stores.length === 0 ? (
             <p style={{ opacity: 0.7 }}>
-              {allStores.length === 0 
-                ? '暂无合伙店铺数据' 
+              {storeQuery.trim()
+                ? `没有找到「${storeQuery.trim()}」`
+                : allStores.length === 0
+                ? '暂无合伙店铺数据'
                 : `${myanmarCities[selectedCity].name}地区暂无合伙店铺`}
             </p>
           ) : (
@@ -1757,20 +1854,32 @@ const DeliveryStoreManagement: React.FC = () => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }}>{store.store_name}</h3>
-                      {store.region && (
-                        <span style={{ 
-                          background: 'rgba(72, 187, 120, 0.2)', 
-                          color: '#48bb78', 
-                          padding: '2px 6px', 
-                          borderRadius: '4px',
-                          fontWeight: 'bold',
-                          fontSize: '0.7rem',
-                          border: '1px solid rgba(72, 187, 120, 0.3)'
-                        }}>
-                          {REGIONS.find(r => r.id === store.region)?.prefix || store.region}
-                        </span>
-                      )}
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }}>
+                      <button
+                        type="button"
+                        className="ps-name"
+                        title="在右侧地图定位这家店"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStoreClick(store);
+                        }}
+                      >
+                        {store.store_name}
+                      </button>
+                    </h3>
+                      {store.store_code ? (
+                        <button
+                          type="button"
+                          className="ps-code"
+                          title="点击复制店铺代码"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void copyNotice('店铺代码', store.store_code);
+                          }}
+                        >
+                          {store.store_code}
+                        </button>
+                      ) : null}
                       {pendingN > 0 && (
                         <button
                           type="button"
@@ -1795,266 +1904,103 @@ const DeliveryStoreManagement: React.FC = () => {
                         </button>
                       )}
                     </div>
-                    <span
-                      style={{
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        background:
-                          store.status === 'maintenance'
-                            ? 'rgba(245, 101, 101, 0.3)'
-                            : store.status === 'inactive'
-                              ? 'rgba(160, 174, 192, 0.3)'
-                              : hoursState.shouldBeOpen
-                                ? 'rgba(72, 187, 120, 0.3)'
-                                : 'rgba(148, 163, 184, 0.32)',
-                        fontSize: '0.8rem'
-                      }}
-                    >
-                      {store.status === 'maintenance' && '维护中'}
-                      {store.status === 'inactive' && '暂停营业'}
-                      {store.status === 'active' && (hoursState.shouldBeOpen ? '营业中' : '休息中')}
-                    </span>
+                    <div className="ps-corner">
+                      <span
+                        className={`ps-status${
+                          store.status === 'active' && hoursState.shouldBeOpen ? ' ps-status--open' : ''
+                        }${store.status === 'inactive' || store.status === 'maintenance' ? ' ps-status--off' : ''}`}
+                      >
+                        {store.status === 'maintenance' && '维护中'}
+                        {store.status === 'inactive' && '暂停营业'}
+                        {store.status === 'active' && (hoursState.shouldBeOpen ? '营业中' : '休息中')}
+                      </span>
+                      <div className="ps-corner__actions">
+                        <button
+                          type="button"
+                          className="ps-mini"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCloseStore(store);
+                          }}
+                        >
+                          {store.status === 'active' ? '暂停' : '恢复'}
+                        </button>
+                        <button
+                          type="button"
+                          className="ps-mini ps-mini--danger"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteStore(store);
+                          }}
+                        >
+                          删除
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <p style={{ margin: '4px 0', opacity: 0.8, fontSize: '0.9rem' }}>{store.address}</p>
+                  <p className="ps-address" title={store.address || '未填写地址'}>{formatStoreAddress(store.address)}</p>
                   <p style={{ margin: '4px 0 0', opacity: 0.78, fontSize: '0.85rem' }}>
                     🛍️ 共 {productTotal} 条商品
                   </p>
-                  <div style={{ display: 'flex', gap: '12px', fontSize: '0.85rem', opacity: 0.7, marginTop: '6px' }}>
-                    <span>📞 {store.phone}</span>
+                  <div className="ps-contacts">
+                    {store.phone ? (
+                      <button
+                        type="button"
+                        className="ps-copy"
+                        title="点击复制店铺电话"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void copyNotice('店铺电话', store.phone);
+                        }}
+                      >
+                        📞 {store.phone}
+                      </button>
+                    ) : (
+                      <span className="ps-missing">未填店铺电话</span>
+                    )}
                     <span>👤 {store.manager_name}</span>
+                    {store.manager_phone && store.manager_phone !== store.phone ? (
+                      <button
+                        type="button"
+                        className="ps-copy"
+                        title="点击复制负责人电话"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void copyNotice('负责人电话', store.manager_phone);
+                        }}
+                      >
+                        📞 {store.manager_phone}
+                      </button>
+                    ) : null}
+                    {store.email ? (
+                      <button
+                        type="button"
+                        className="ps-copy"
+                        title="点击复制邮箱"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void copyNotice('邮箱', store.email || '');
+                        }}
+                      >
+                        ✉️ {store.email}
+                      </button>
+                    ) : (
+                      <span className="ps-missing">未填邮箱</span>
+                    )}
                     <span>⏰ {store.operating_hours}</span>
                   </div>
-                  <div style={{ marginTop: '8px', fontSize: '0.8rem', opacity: 0.6 }}>
+                  <div className="ps-meta">
                     <span>类型: {STORE_TYPE_LABELS[store.store_type] || store.store_type}</span>
-                    <span style={{ marginLeft: '12px' }}>容量: {store.capacity}</span>
-                    <span style={{ marginLeft: '12px' }}>负载: {store.current_load}</span>
+                    <span>待接单 {store.id ? (pendingAcceptByStoreId[store.id] ?? 0) : 0}</span>
+                    <span>COD {store.cod_settlement_day || '7'} 天</span>
                   </div>
-                  <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        generateStoreQRCode(store);
-                      }}
-                      style={{
-                        background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem',
-                        fontWeight: '500',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        boxShadow: '0 2px 6px rgba(39, 174, 96, 0.3)',
-                        transition: 'all 0.3s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(39, 174, 96, 0.4)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 2px 6px rgba(39, 174, 96, 0.3)';
-                      }}
-                    >
-                      店长收件码
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        viewStoreProducts(store);
-                      }}
-                      style={{
-                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem',
-                        fontWeight: '500',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        boxShadow: '0 2px 6px rgba(245, 158, 11, 0.3)',
-                        transition: 'all 0.3s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(245, 158, 11, 0.4)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 2px 6px rgba(245, 158, 11, 0.3)';
-                      }}
-                    >
-                      进入店铺
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void openStoreLicenseDocs(store);
-                      }}
-                      style={{
-                        background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem',
-                        fontWeight: '500',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        boxShadow: '0 2px 6px rgba(79, 70, 229, 0.3)',
-                        transition: 'all 0.3s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(79, 70, 229, 0.4)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 2px 6px rgba(79, 70, 229, 0.3)';
-                      }}
-                    >
-                      证件
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        editStore(store);
-                      }}
-                      style={{
-                        background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem',
-                        fontWeight: '500',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        boxShadow: '0 2px 6px rgba(44, 82, 130, 0.3)',
-                        transition: 'all 0.3s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(44, 82, 130, 0.4)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 2px 6px rgba(44, 82, 130, 0.3)';
-                      }}
-                    >
-                      编辑
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        loadStoragePackages(store);
-                      }}
-                      style={{
-                        background: 'linear-gradient(135deg, #e67e22 0%, #f39c12 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem',
-                        fontWeight: '500',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        boxShadow: '0 2px 6px rgba(230, 126, 34, 0.3)',
-                        transition: 'all 0.3s ease',
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(230, 126, 34, 0.4)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 2px 6px rgba(230, 126, 34, 0.3)';
-                      }}
-                    >
-                      入库
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCloseStore(store);
-                      }}
-                      style={{
-                        background: store.status === 'active' 
-                          ? 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)'
-                          : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem',
-                        fontWeight: '500',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        boxShadow: store.status === 'active' 
-                          ? '0 2px 6px rgba(243, 156, 18, 0.3)'
-                          : '0 2px 6px rgba(39, 174, 96, 0.3)',
-                        transition: 'all 0.3s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.boxShadow = store.status === 'active' 
-                          ? '0 4px 8px rgba(243, 156, 18, 0.4)'
-                          : '0 4px 8px rgba(39, 174, 96, 0.4)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = store.status === 'active' 
-                          ? '0 2px 6px rgba(243, 156, 18, 0.3)'
-                          : '0 2px 6px rgba(39, 174, 96, 0.3)';
-                      }}
-                    >
-                      {store.status === 'active' ? '暂停' : '恢复'}
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteStore(store);
-                      }}
-                      style={{
-                        background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem',
-                        fontWeight: '500',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        boxShadow: '0 2px 6px rgba(231, 76, 60, 0.3)',
-                        transition: 'all 0.3s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(231, 76, 60, 0.4)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 2px 6px rgba(231, 76, 60, 0.3)';
-                      }}
-                    >
-                      删除
-                    </button>
+                  <div className="ps-actions">
+                    <button type="button" className="ps-btn ps-btn--go" onClick={(e) => { e.stopPropagation(); viewStoreProducts(store); }}>进入店铺</button>
+                    <button type="button" className="ps-btn ps-btn--edit" onClick={(e) => { e.stopPropagation(); editStore(store); }}>编辑</button>
+                    <button type="button" className="ps-btn ps-btn--qr" onClick={(e) => { e.stopPropagation(); generateStoreQRCode(store); }}>店长收件码</button>
+                    <button type="button" className="ps-btn ps-btn--quiet" onClick={(e) => { e.stopPropagation(); void resetStorePassword(store); }}>重置密码</button>
+                    <button type="button" className="ps-btn ps-btn--quiet" onClick={(e) => { e.stopPropagation(); void openStoreLicenseDocs(store); }}>证件</button>
+                    <button type="button" className="ps-btn ps-btn--quiet" onClick={(e) => { e.stopPropagation(); loadStoragePackages(store); }}>入库</button>
                   </div>
                 </div>
                 );
@@ -2174,6 +2120,9 @@ const DeliveryStoreManagement: React.FC = () => {
                   mapContainerStyle={{ width: '100%', height: '100%', borderRadius: '12px' }}
                 center={mapCenter}
                 zoom={12}
+                  onLoad={(map) => {
+                    mapRef.current = map;
+                  }}
                   options={{
                     disableDefaultUI: false,
                     zoomControl: true,
@@ -2186,7 +2135,7 @@ const DeliveryStoreManagement: React.FC = () => {
                   <Marker
                     key={store.id}
                     position={{ lat: store.latitude, lng: store.longitude }}
-                    onClick={() => setSelectedStore(store)}
+                    onClick={() => handleStoreClick(store)}
                     icon={{
                       url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
                         <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">

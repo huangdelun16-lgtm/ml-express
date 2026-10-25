@@ -11,7 +11,9 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
 import { useAuth } from '../contexts/AuthContext';
 import {
   formatTimeAgo,
@@ -28,12 +30,15 @@ import {
 import type { InventoryExceptionRecord } from '../types/inventoryException';
 import { canResolveInventoryException } from '../utils/inventoryException';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import { colors, radius, space } from '../theme';
 
 type TabKey = 'open' | 'resolved';
 
 export default function ExceptionsScreen() {
   const { t } = useTranslation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { scrollY, onScroll } = useCollapsingHomeScroll();
   const { operatorName } = useAuth();
   const [tab, setTab] = useState<TabKey>('open');
   const [rows, setRows] = useState<InventoryExceptionRecord[]>([]);
@@ -99,6 +104,7 @@ export default function ExceptionsScreen() {
 
   return (
     <View style={styles.root}>
+      <CollapsingHomeHeader title={t.nav.exceptions} onHome={() => navigation.goBack()} scrollY={scrollY} />
       <View style={styles.tabRow}>
         {tabs.map((item) => {
           const active = tab === item.key;
@@ -118,7 +124,10 @@ export default function ExceptionsScreen() {
         <ActivityIndicator color="#f59e0b" style={styles.loader} />
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={rows}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           keyExtractor={(item) => item.id}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor="#f59e0b" />

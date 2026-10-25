@@ -186,6 +186,8 @@ export type InventoryCustomerSummary = {
   /** 该客户签收时明确选了人民币的金额。不含未签收，也不含缅币签收。 */
   signedCnyIncome?: number;
   orderCount: number;
+  /** 未建档客户最早一笔入库时间，用来标出放太久的名单 */
+  oldestInboundAt?: string;
 };
 
 export type InventoryCustomerExpressItem = {

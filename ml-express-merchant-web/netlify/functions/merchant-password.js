@@ -23,7 +23,7 @@ const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.SUPAB
 const TRANSIT_STATION = 'transit_station';
 
 const STORE_SELECT =
-  'id,store_code,store_name,email,phone,address,status,store_type,created_at,region,password,password_hash,packing_sla_minutes,avatar_url';
+  'id,store_code,store_name,email,phone,address,status,store_type,created_at,region,packing_sla_minutes,avatar_url';
 
 function isBcrypt(value) {
   const s = String(value || '');
@@ -90,26 +90,19 @@ async function loginStore(storeCode, password) {
     return { success: false, error: '缺少店铺代码或密码' };
   }
 
-  const store = await fetchStoreByCode(code);
-  if (!store) {
-    return { success: false, error: '店铺代码不存在' };
+  const response = await fetch(`${supabaseUrl}/rest/v1/rpc/merchant_authenticate_store`, {
+    method: 'POST',
+    headers: restHeaders(),
+    body: JSON.stringify({ p_store_code: code, p_password: String(password) }),
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) {
+    return { success: false, error: result?.message || result?.error || '登录校验失败' };
   }
-  if (String(store.store_type || '').trim() === TRANSIT_STATION) {
-    return {
-      success: false,
-      error: '该账号为跨境中转站账号，请使用 Inventory App 登录，无法在商家端登录。',
-    };
+  if (!result || result.success !== true) {
+    return { success: false, error: (result && result.error) || '密码错误' };
   }
-  if (store.status && store.status !== 'active') {
-    return { success: false, error: `账号状态异常 (${store.status})，请联系管理员。` };
-  }
-
-  const ok = await passwordsMatch(password, store);
-  if (!ok) {
-    return { success: false, error: '密码错误' };
-  }
-
-  return { success: true, store: stripSecrets(store) };
+  return { success: true, store: result.store };
 }
 
 async function updateStorePassword(storeId, currentPassword, newPassword) {
@@ -120,33 +113,65 @@ async function updateStorePassword(storeId, currentPassword, newPassword) {
     return { success: false, error: '缺少必要参数' };
   }
 
-  const store = await fetchStoreById(storeId);
-  if (!store) {
-    return { success: false, error: '店铺不存在' };
+  const response = await fetch(`${supabaseUrl}/rest/v1/rpc/merchant_change_store_password`, {
+    method: 'POST',
+    headers: restHeaders(),
+    body: JSON.stringify({
+      p_store_id: storeId,
+      p_current: String(currentPassword),
+      p_new: String(newPassword),
+    }),
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) {
+    return { success: false, error: result?.message || result?.error || '数据库更新失败' };
   }
-  if (String(store.store_type || '').trim() === TRANSIT_STATION) {
-    return { success: false, error: '中转站账号请在 Inventory App 修改密码' };
-  }
-
-  const ok = await passwordsMatch(currentPassword, store);
-  if (!ok) {
-    return { success: false, error: '原密码错误' };
-  }
-
-  // 仍写入 password 明文列，兼容尚未改服务端校验的商家 Web
-  const patchResponse = await fetch(
-    `${supabaseUrl}/rest/v1/delivery_stores?id=eq.${encodeURIComponent(storeId)}`,
-    {
-      method: 'PATCH',
-      headers: restHeaders({ Prefer: 'return=minimal' }),
-      body: JSON.stringify({ password: String(newPassword).trim() }),
-    },
-  );
-
-  if (!patchResponse.ok) {
-    return { success: false, error: '数据库更新失败' };
+  if (!result || result.success !== true) {
+    return { success: false, error: (result && result.error) || '原密码错误' };
   }
   return { success: true };
+}
+
+function hasRegisteredPhone(store) {
+  const digits = String((store && store.phone) || '').replace(/\D/g, '');
+  return digits.length >= 6;
+}
+
+function hasRegisteredEmail(store) {
+  const email = String((store && store.email) || '').trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+/**
+ * 商家网站「忘记密码」：只核对店铺是否存在。
+ * 不发短信、不发邮件、不生成新密码，响应里也不带 password / phone / email。
+ */
+async function requestPasswordHelp(storeCode) {
+  if (!supabaseUrl || !supabaseKey) {
+    return { success: false, code: 'config' };
+  }
+  const code = String(storeCode || '').trim().toUpperCase();
+  if (!code) {
+    return { success: false, code: 'missing_code' };
+  }
+
+  const store = await fetchStoreByCode(code);
+  if (!store) {
+    return { success: false, code: 'not_found' };
+  }
+  if (String(store.store_type || '').trim() === TRANSIT_STATION) {
+    return { success: false, code: 'transit_station' };
+  }
+  if (store.status && store.status !== 'active') {
+    return { success: false, code: 'inactive' };
+  }
+
+  return {
+    success: true,
+    code: 'contact_admin',
+    hasPhone: hasRegisteredPhone(store),
+    hasEmail: hasRegisteredEmail(store),
+  };
 }
 
 exports.handler = async (event) => {
@@ -184,6 +209,17 @@ exports.handler = async (event) => {
       );
       return {
         statusCode: result.success ? 200 : result.error === '原密码错误' ? 401 : 400,
+        headers,
+        body: JSON.stringify(result),
+      };
+    }
+
+    if (action === 'requestPasswordHelp') {
+      const result = await requestPasswordHelp(body.storeCode || body.username);
+      const statusCode =
+        result.code === 'config' ? 500 : result.code === 'missing_code' ? 400 : 200;
+      return {
+        statusCode,
         headers,
         body: JSON.stringify(result),
       };

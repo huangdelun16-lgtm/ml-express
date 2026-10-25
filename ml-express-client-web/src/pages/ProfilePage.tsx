@@ -801,7 +801,7 @@ const ProfilePage: React.FC = () => {
           try {
             const { data: store, error } = await supabase
               .from('delivery_stores')
-              .select('*')
+              .select('id, store_name, store_code, phone, email, address, manager_phone, operating_hours, is_closed_today, vacation_dates, status, store_type')
               .eq('store_code', user.store_code || '')
               .or(`id.eq.${user.store_id || ''}`)
               .maybeSingle();
@@ -1139,38 +1139,30 @@ const ProfilePage: React.FC = () => {
       return;
     }
 
-    // 验证当前密码
-    if (storeInfo.password !== passwordForm.currentPassword) {
-      feedbackService.notify(language === 'zh' ? '当前密码错误' : 
-            language === 'en' ? 'Current password is incorrect' : 
-            'လက်ရှိစကားဝှက် မှားနေပါသည်');
-      return;
-    }
-
     try {
-      // 更新密码
-      const { error } = await supabase
-        .from('delivery_stores')
-        .update({ password: passwordForm.newPassword })
-        .eq('id', storeInfo.id);
-
-      if (error) {
-        LoggerService.error('更新密码失败:', error);
-        feedbackService.notify(language === 'zh' ? '更新密码失败，请稍后重试' : 
-              language === 'en' ? 'Failed to update password, please try again later' : 
-              'စကားဝှက် ပြောင်းလဲရန် မအောင်မြင်ပါ');
+      const response = await fetch('https://mlexpress-merchants.com/.netlify/functions/merchant-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          action: 'updatePassword',
+          storeId: storeInfo.id,
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+        }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || result.success !== true) {
+        feedbackService.notify(
+          language === 'zh' ? '当前密码错误或更新失败' :
+            language === 'en' ? 'Current password is incorrect or update failed' :
+            'စကားဝှက် မှားနေပါသည် သို့မဟုတ် ပြင်၍မရပါ',
+        );
         return;
       }
-
-      // 更新本地存储的店铺信息
-      setStoreInfo({ ...storeInfo, password: passwordForm.newPassword });
-      
-      // 清空表单并关闭模态框
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setShowPasswordModal(false);
-      
-      feedbackService.notify(language === 'zh' ? '密码修改成功！' : 
-            language === 'en' ? 'Password changed successfully!' : 
+      feedbackService.notify(language === 'zh' ? '密码修改成功！' :
+            language === 'en' ? 'Password changed successfully!' :
             'စကားဝှက် ပြောင်းလဲခြင်း အောင်မြင်ပါသည်!');
     } catch (error) {
       LoggerService.error('更新密码异常:', error);

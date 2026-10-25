@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
 import TripPackagesModal from '../components/TripPackagesModal';
 import { useAuth } from '../contexts/AuthContext';
 import { getPkgStatusLabel, useTranslation } from '../i18n';
@@ -28,7 +29,10 @@ import { splitOutboundByTrip, type TruckTripSummary } from '../utils/truckTripGr
 
 type Tab = 'inbound' | 'outbound';
 
-type Nav = { navigate: (name: string, params?: { presetCode?: string }) => void };
+type Nav = {
+  navigate: (name: string, params?: { presetCode?: string }) => void;
+  goBack: () => void;
+};
 
 type OutboundListItem =
   | { kind: 'trip'; key: string; trip: TruckTripSummary }
@@ -102,6 +106,7 @@ function TripTrackCard({ trip, onPress }: { trip: TruckTripSummary; onPress: () 
 
 export default function ShipmentTrackScreen({ navigation }: { navigation: Nav }) {
   const { t, fmt } = useTranslation();
+  const { scrollY, onScroll } = useCollapsingHomeScroll();
   const { store } = useAuth();
   const hubCode = store ? resolveStoreHubCode(store) : '';
   const [tab, setTab] = useState<Tab>('inbound');
@@ -144,6 +149,7 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
 
   return (
     <View style={styles.root}>
+      <CollapsingHomeHeader title={t.nav.shipmentTrack} onHome={() => navigation.goBack()} scrollY={scrollY} />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
           {fmt(t.crossBorderFinance.heroHub, {
@@ -174,6 +180,9 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
       </View>
 
       <FlatList<OutboundListItem | PkgTrackingDetail>
+        style={styles.listView}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         data={(tab === 'inbound' ? inbound : outboundItems) as Array<OutboundListItem | PkgTrackingDetail>}
         keyExtractor={(item) =>
           tab === 'inbound'
@@ -247,6 +256,7 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0f172a' },
+  listView: { flex: 1 },
   header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   headerTitle: { color: '#f8fafc', fontSize: 16, fontWeight: '900' },
   headerSub: { color: '#64748b', fontSize: 12, marginTop: 4 },

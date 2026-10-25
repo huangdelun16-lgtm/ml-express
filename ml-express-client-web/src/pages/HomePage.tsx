@@ -197,7 +197,7 @@ const HomePage: React.FC = () => {
             console.log('正在查找关联店铺:', storeId);
             const { data: store, error: storeError } = await supabase
               .from('delivery_stores')
-              .select('*')
+              .select('id, store_name, phone, manager_phone, address, latitude, longitude')
               .eq('id', storeId)
               .maybeSingle();
             

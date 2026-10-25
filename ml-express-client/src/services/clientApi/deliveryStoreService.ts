@@ -16,7 +16,7 @@ export const deliveryStoreService = {
     try {
       const base = supabase
         .from('delivery_stores')
-        .select('*')
+        .select('id, store_name, store_code, address, phone, email, manager_phone, store_type, status, operating_hours, mall_visible, notes, region, latitude, longitude')
         .eq('status', 'active')
         .order('store_name', { ascending: true });
 
@@ -24,7 +24,7 @@ export const deliveryStoreService = {
       if (error?.message?.includes('mall_visible')) {
         const fallback = await supabase
           .from('delivery_stores')
-          .select('*')
+          .select('id, store_name, store_code, address, phone, email, manager_phone, store_type, status, operating_hours, mall_visible, notes, region, latitude, longitude')
           .eq('status', 'active')
           .neq('store_type', 'transit_station')
           .order('store_name', { ascending: true });
@@ -44,7 +44,7 @@ export const deliveryStoreService = {
     try {
       const { data, error } = await supabase
         .from('delivery_stores')
-        .select('*')
+        .select('id, store_name, store_code, address, phone, email, manager_phone, store_type, status, operating_hours, mall_visible, notes, region, latitude, longitude')
         .eq('id', storeId)
         .single();
 

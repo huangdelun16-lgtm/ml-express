@@ -17,6 +17,7 @@ import { generateUniqueInboundBarcode } from '../utils/inboundBarcode';
 import { formatSpec, formatWeight, parseSpec, parseWeight } from '../utils/itemFieldFormat';
 import { inboundDateToIso, todayInMyanmar } from '../utils/stockInDate';
 import { hasInboundScanDraft } from '../utils/inboundLeaveDraft';
+import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
 import { useInboundLeaveGuard } from '../hooks/useInboundLeaveGuard';
 import { destinationFromCustomerCode, normalizePackDestination } from '../constants/destinationOptions';
 import { resolveStoreHubCode } from '../utils/storeZone';
@@ -44,6 +45,7 @@ type Props = {
 export default function StockInScreen({ route, navigation }: Props) {
   const { operatorName, store, hubCode } = useAuth();
   const { t, fmt } = useTranslation();
+  const { scrollY, onScroll } = useCollapsingHomeScroll();
   const stepLabels: Record<WizardStep, string> = {
     1: t.stockIn.step1,
     2: t.stockIn.step2,
@@ -400,6 +402,8 @@ export default function StockInScreen({ route, navigation }: Props) {
   const primaryAction = step === 3 ? () => void submit() : goNext;
 
   return (
+    <View style={styles.root}>
+    <CollapsingHomeHeader title={t.nav.stockIn} onHome={requestLeave} scrollY={scrollY} />
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === 'ios' && !Platform.isPad ? 'padding' : undefined}
@@ -409,6 +413,8 @@ export default function StockInScreen({ route, navigation }: Props) {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        onScroll={onScroll}
+        scrollEventThrottle={16}
       >
       <InboundWizardHeader step={step} stepLabels={stepLabels} />
         <OnlineRequiredBanner />
@@ -522,6 +528,7 @@ export default function StockInScreen({ route, navigation }: Props) {
         onClose={() => setBarcodeModalData(null)}
       />
     </KeyboardAvoidingView>
+    </View>
   );
 }
 

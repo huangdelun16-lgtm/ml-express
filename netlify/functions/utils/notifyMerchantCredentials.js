@@ -5,19 +5,8 @@
 
 const twilio = require('twilio');
 const nodemailer = require('nodemailer');
-
-const MERCHANT_WEB_URL = 'https://mlexpress-merchants.com';
+const { MERCHANT_WEB_URL, renderMerchantApprovalEmail } = require('./merchantApprovalEmail');
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (ch) => {
-    if (ch === '&') return '&amp;';
-    if (ch === '<') return '&lt;';
-    if (ch === '>') return '&gt;';
-    if (ch === '"') return '&quot;';
-    return '&#39;';
-  });
-}
 
 function toE164Myanmar(raw) {
   const digits = String(raw || '').replace(/\D/g, '');
@@ -51,44 +40,8 @@ function buildCredentialsSms({ storeName, storeCode, password }) {
   ].join('\n');
 }
 
-function buildCredentialsEmail({ storeName, storeCode, password }) {
-  const name = escapeHtml(storeName);
-  const code = escapeHtml(storeCode);
-  const pwd = escapeHtml(password);
-  const loginUrl = escapeHtml(MERCHANT_WEB_URL);
-  return {
-    subject: `【ML Express】${storeName} 入驻已通过 — 登录账号`,
-    text: buildCredentialsSms({ storeName, storeCode, password }),
-    html: `<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8" /></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:Segoe UI,Arial,sans-serif;">
-  <div style="max-width:560px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
-    <div style="padding:28px 24px;background:linear-gradient(135deg,#166534,#15803d);color:#fff;">
-      <div style="font-size:13px;opacity:.85;">MARKET LINK EXPRESS</div>
-      <h1 style="margin:8px 0 0;font-size:22px;">商家入驻已通过</h1>
-    </div>
-    <div style="padding:28px 24px;color:#0f172a;">
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">
-        「${name}」已开通合伙店铺账号。请用下面的店铺代码和密码登录商家后台，并尽快修改密码。
-      </p>
-      <div style="display:block;padding:16px;border-radius:12px;background:#f0fdf4;border:1px solid #bbf7d0;margin-bottom:12px;">
-        <div style="font-size:12px;color:#15803d;">店铺代码</div>
-        <div style="font-size:22px;font-weight:700;letter-spacing:.04em;margin-top:4px;">${code}</div>
-      </div>
-      <div style="display:block;padding:16px;border-radius:12px;background:#f0fdf4;border:1px solid #bbf7d0;">
-        <div style="font-size:12px;color:#15803d;">登录密码</div>
-        <div style="font-size:22px;font-weight:700;letter-spacing:.08em;margin-top:4px;">${pwd}</div>
-      </div>
-      <p style="margin:20px 0 0;font-size:14px;">
-        登录地址：<a href="${loginUrl}" style="color:#166534;">${loginUrl}</a>
-      </p>
-      <p style="margin:12px 0 0;font-size:13px;color:#64748b;">请勿将密码转发给无关人员。</p>
-    </div>
-  </div>
-</body>
-</html>`,
-  };
+function buildCredentialsEmail(credentials, template) {
+  return renderMerchantApprovalEmail(credentials, template);
 }
 
 function emptyNotifyResult() {
@@ -112,7 +65,13 @@ function summarizeNotifyAttempts(attempts) {
       result.emailSent = true;
       result.emailTo = item.to;
     }
-    if (!item.sent && !item.skipped && item.error) {
+    if (item.channel === 'email' && !item.sent && item.error) {
+      result.errors.push(
+        item.error === 'gmail_not_configured'
+          ? '管理后台未配置 Gmail，邮件没有发出。请在 Netlify 设置 GMAIL_USER 和 GMAIL_APP_PASSWORD。'
+          : item.error,
+      );
+    } else if (!item.sent && !item.skipped && item.error) {
       result.errors.push(item.error);
     }
   }
@@ -149,12 +108,12 @@ async function sendOneSms(to, body) {
   return { channel: 'sms', to, sent: true };
 }
 
-async function sendOneEmail(to, credentials) {
+async function sendOneEmail(to, credentials, template) {
   const cfg = gmailReady();
   if (!cfg) {
     return { channel: 'email', to, sent: false, skipped: true, error: 'gmail_not_configured' };
   }
-  const mail = buildCredentialsEmail(credentials);
+  const mail = buildCredentialsEmail(credentials, template);
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: { user: cfg.user, pass: cfg.pass },
@@ -169,7 +128,7 @@ async function sendOneEmail(to, credentials) {
   return { channel: 'email', to, sent: true };
 }
 
-async function notifyMerchantCredentials(application, credentials) {
+async function notifyMerchantCredentials(application, credentials, emailTemplate) {
   const attempts = [];
   const storeName = String(credentials?.storeName || application?.store_name || '').trim();
   const storeCode = String(credentials?.storeCode || '').trim();
@@ -197,7 +156,7 @@ async function notifyMerchantCredentials(application, credentials) {
   const email = String(application?.email || '').trim();
   if (email && EMAIL_RE.test(email)) {
     try {
-      attempts.push(await sendOneEmail(email, payload));
+      attempts.push(await sendOneEmail(email, payload, emailTemplate));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('merchant credentials email failed:', email, message);
