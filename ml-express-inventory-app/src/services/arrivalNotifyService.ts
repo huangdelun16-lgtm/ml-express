@@ -90,7 +90,7 @@ export async function openArrivalNotifyAction(
   body: string,
 ): Promise<'opened' | 'copied' | 'called' | 'failed'> {
   if (action.kind === 'wechat') {
-    const text = action.copyText.trim();
+    const text = body.trim() || action.copyText.trim();
     if (!text) return 'failed';
     await Clipboard.setStringAsync(text);
     return 'copied';

@@ -1,5 +1,5 @@
 import { isSupabaseConfigured, supabase } from './supabase';
-import { parseWeightKg } from '../utils/itemFieldFormat';
+import type { ExportCostLedgerSource } from '../utils/exportCostLedger';
 
 export type ExportLegDestination = 'MSE' | 'LSO';
 
@@ -42,6 +42,10 @@ type CostRow = {
   pay_currency?: string;
   fx_mmk_per_cny?: number | string | null;
   trip_number?: string;
+  id?: string;
+  display_barcode?: string;
+  customer_name?: string;
+  created_at?: string;
 };
 
 function asCost(row: CostRow | null | undefined): SavedExportCost | null {
@@ -96,6 +100,34 @@ export async function addExportCost(draft: ExportCostDraft): Promise<SavedExport
   const saved = asCost(data as CostRow);
   if (!saved) throw new Error('export cost missing');
   return saved;
+}
+
+export async function listExportCostLedgerSources(): Promise<ExportCostLedgerSource[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await supabase.rpc('inventory_list_export_costs');
+  if (error) throw error;
+  const rows = Array.isArray(data) ? data : [];
+  const sources: ExportCostLedgerSource[] = [];
+  for (const raw of rows) {
+    const row = raw as CostRow;
+    const cost = asCost(row);
+    const id = String(row.id || '').trim();
+    if (!cost || !id) continue;
+    sources.push({
+      id,
+      displayBarcode: String(row.display_barcode || '').trim(),
+      customerName: String(row.customer_name || '').trim(),
+      legDestination: cost.legDestination,
+      weightKg: cost.weightKg,
+      unitPriceCny: cost.unitPriceCny,
+      totalCny: cost.totalCny,
+      totalMmk: cost.totalMmk,
+      payCurrency: cost.payCurrency,
+      tripNumber: cost.tripNumber,
+      createdAt: String(row.created_at || '').trim(),
+    });
+  }
+  return sources;
 }
 
 export async function listLoadedPackTrips(): Promise<Array<{ barcode: string; trip: string; weightKg: number }>> {

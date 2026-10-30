@@ -4,6 +4,7 @@ import {
   Alert,
   Animated,
   Keyboard,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -13,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
+import ScrollPositionRail from '../components/ScrollPositionRail';
 import ExceptionReportModal from '../components/ExceptionReportModal';
 import ArrivalNotifySheet from '../components/ArrivalNotifySheet';
 import ItemActionModal from '../components/ItemActionModal';
@@ -79,19 +81,23 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const { t, fmt } = useTranslation();
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
-  const headerBodyHeight = scrollY.interpolate({
-    inputRange: [0, 64],
-    outputRange: [48, 0],
-    extrapolate: 'clamp',
-  });
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [0, 48],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
-  const onListScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { useNativeDriver: false },
+  const [listViewport, setListViewport] = useState(0);
+  const [listContent, setListContent] = useState(0);
+  const [chromeHeight, setChromeHeight] = useState(0);
+  const chromeOpacity = useMemo(() => {
+    const travel = chromeHeight > 0 ? chromeHeight : 1000;
+    return scrollY.interpolate({
+      inputRange: [0, travel * 0.42, travel],
+      outputRange: [1, 0.8, 0],
+      extrapolate: 'clamp',
+    });
+  }, [scrollY, chromeHeight]);
+  const onListScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+        useNativeDriver: true,
+      }),
+    [scrollY],
   );
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -418,100 +424,118 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   };
 
   return (
-    <View style={styles.root}>
-      <View style={{ paddingTop: insets.top, backgroundColor: '#0f172a' }}>
-        <Animated.View style={[styles.navRow, { height: headerBodyHeight, opacity: headerOpacity }]}>
-          <Pressable
-            style={styles.homeBtn}
-            onPress={() => navigation.goBack()}
-            accessibilityRole="button"
-            accessibilityLabel="Home"
-          >
-            <Text style={styles.homeChevron}>‹</Text>
-            <Text style={styles.homeLabel}>Home</Text>
-          </Pressable>
-          <Text style={styles.screenTitle} numberOfLines={1}>{t.nav.items}</Text>
-        </Animated.View>
-        <View style={styles.toolbar}>
-          <TextInput
-            style={styles.search}
-            placeholder={
-              listMode === 'pack' ? t.items.searchPack : t.items.searchList
-            }
-            placeholderTextColor="#94a3b8"
-            value={search}
-            onChangeText={setSearch}
-            onSubmitEditing={() => {
-              const nextSearch = search.trim();
-              if (nextSearch === debouncedSearch) void load(true);
-              else setDebouncedSearch(nextSearch);
-            }}
-            returnKeyType="search"
-          accessibilityLabel={t.common.search}
-        />
-        <Pressable
-          style={styles.scanBtn}
-          onPress={() => {
-            Keyboard.dismiss();
-            setScanVisible(true);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={t.scanInput.scanBtn}
-        >
-          <Text style={styles.scanBtnText}>{t.scanInput.scanBtn}</Text>
-        </Pressable>
-        {listMode === 'normal' ? (
-            <Pressable
-              style={styles.addBtn}
-              onPress={() => navigation.navigate('ItemForm')}
-              accessibilityRole="button"
-              accessibilityLabel={t.items.newBtn}
-            >
-              <Text style={styles.addText}>{t.items.newBtn}</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={styles.listView} onLayout={(event) => setListViewport(event.nativeEvent.layout.height)}>
       <Animated.FlatList
         data={displayedItems}
         keyExtractor={(it) => it.id}
         contentContainerStyle={styles.list}
         style={styles.listView}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
+        decelerationRate="fast"
+        bounces
+        removeClippedSubviews={Platform.OS === 'android'}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={8}
+        updateCellsBatchingPeriod={50}
         onScroll={onListScroll}
-        scrollEventThrottle={16}
+        scrollEventThrottle={1}
+        onContentSizeChange={(_, height) => setListContent(height)}
         ListHeaderComponent={
           <View>
+            <Animated.View
+              style={{ opacity: chromeOpacity }}
+              onLayout={(event) => {
+                const next = Math.ceil(event.nativeEvent.layout.height);
+                setChromeHeight((current) => (Math.abs(current - next) > 1 ? next : current));
+              }}
+            >
+              <View style={styles.navRow}>
+                <Pressable
+                  style={styles.homeBtn}
+                  onPress={() => navigation.goBack()}
+                  accessibilityRole="button"
+                  accessibilityLabel="Home"
+                >
+                  <Text style={styles.homeChevron}>‹</Text>
+                  <Text style={styles.homeLabel}>Home</Text>
+                </Pressable>
+                <Text style={styles.screenTitle} numberOfLines={1}>{t.nav.items}</Text>
+              </View>
+              <View style={styles.toolbar}>
+                <TextInput
+                  style={styles.search}
+                  placeholder={
+                    listMode === 'pack' ? t.items.searchPack : t.items.searchList
+                  }
+                  placeholderTextColor="#94a3b8"
+                  value={search}
+                  onChangeText={setSearch}
+                  onSubmitEditing={() => {
+                    const nextSearch = search.trim();
+                    if (nextSearch === debouncedSearch) void load(true);
+                    else setDebouncedSearch(nextSearch);
+                  }}
+                  returnKeyType="search"
+                  accessibilityLabel={t.common.search}
+                />
+                <Pressable
+                  style={styles.scanBtn}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setScanVisible(true);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t.scanInput.scanBtn}
+                >
+                  <Text style={styles.scanBtnText}>{t.scanInput.scanBtn}</Text>
+                </Pressable>
+                {listMode === 'normal' ? (
+                  <Pressable
+                    style={styles.addBtn}
+                    onPress={() => navigation.navigate('ItemForm')}
+                    accessibilityRole="button"
+                    accessibilityLabel={t.items.newBtn}
+                  >
+                    <Text style={styles.addText}>{t.items.newBtn}</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              <View style={styles.filterDock}>
+                <RegionFilterBar
+                  value={filterRegion}
+                  onChange={setFilterRegion}
+                  status={statusFilter}
+                  onStatusChange={setStatusFilter}
+                  unpackedLabel={t.items.statusNotPacked}
+                  signedLabel={t.items.statusSigned}
+                  resultCount={displayedItems.length}
+                />
+                <ItemsModeBar
+                  listMode={listMode}
+                  selectedCount={selectedIds.size}
+                  onEnterPack={() => {
+                    setFilterRegion('');
+                    setListMode('pack');
+                  }}
+                  onEnterSign={() => {
+                    setFilterRegion('');
+                    setListMode('sign');
+                  }}
+                  onCancel={exitSelectMode}
+                  onOpenPack={openPackModal}
+                  onOpenInvoice={handleOpenInvoice}
+                />
+              </View>
+            </Animated.View>
             {incompleteOnly ? (
               <View style={styles.incompleteBanner}>
                 <Text style={styles.incompleteBannerText}>{t.items.incompleteFilterBanner}</Text>
               </View>
             ) : null}
-
-            <RegionFilterBar
-              value={filterRegion}
-              onChange={setFilterRegion}
-              status={statusFilter}
-              onStatusChange={setStatusFilter}
-              unpackedLabel={t.items.statusNotPacked}
-              signedLabel={t.items.statusSigned}
-            />
-
-            <ItemsModeBar
-              listMode={listMode}
-              selectedCount={selectedIds.size}
-              onEnterPack={() => {
-                setFilterRegion('');
-                setListMode('pack');
-              }}
-              onEnterSign={() => {
-                setFilterRegion('');
-                setListMode('sign');
-              }}
-              onCancel={exitSelectMode}
-              onOpenPack={openPackModal}
-              onOpenInvoice={handleOpenInvoice}
-            />
 
             {loadError ? (
               <View style={styles.inlineError}>
@@ -579,6 +603,8 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
           />
         )}
       />
+      <ScrollPositionRail scrollY={scrollY} viewportHeight={listViewport} contentHeight={listContent} />
+      </View>
 
       <PhoneBarcodeScanModal
         visible={scanVisible}
@@ -756,8 +782,8 @@ const styles = StyleSheet.create({
   navRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    overflow: 'hidden',
     paddingHorizontal: 16,
+    paddingVertical: 6,
     gap: 10,
   },
   homeBtn: {
@@ -796,32 +822,38 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     color: '#0f172a',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minHeight: 40,
-    fontSize: 14,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minHeight: 44,
+    fontSize: 15,
   },
   addBtn: {
     backgroundColor: '#2563eb',
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 12,
-    minHeight: 40,
+    minHeight: 44,
+    minWidth: 64,
     justifyContent: 'center',
     alignItems: 'center',
   },
   addText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   scanBtn: {
-    backgroundColor: '#1e293b',
-    borderRadius: 10,
+    backgroundColor: '#0c4a6e',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#475569',
+    borderColor: '#38bdf8',
     paddingHorizontal: 12,
-    minHeight: 40,
+    minHeight: 44,
+    minWidth: 64,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scanBtnText: { color: '#f8fafc', fontWeight: '800', fontSize: 14 },
+  scanBtnText: { color: '#f0f9ff', fontWeight: '800', fontSize: 14 },
+  filterDock: {
+    paddingHorizontal: 16,
+    backgroundColor: '#0f172a',
+  },
   inlineLoading: {
     flexDirection: 'row',
     alignItems: 'center',

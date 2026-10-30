@@ -209,6 +209,44 @@ test('removes only cleared orders from a mixed invoice and deletes an empty one'
   assert.deepEqual(partial.item_ids, ['item-8']);
 });
 
+test('keeps a flat extra fee when a cleared trip removes part of the invoice', () => {
+  const keys = sampleKeys();
+  const plan = planSignedInvoiceClear(
+    [
+      {
+        id: 'with-extra',
+        trip_label: 'MSE0007',
+        piece_count: 2,
+        item_ids: ['item-1', 'item-9'],
+        document: {
+          trip: 'MSE0007',
+          packNo: '',
+          pieceCount: 2,
+          totalFeeCny: 120,
+          totalFeeMmk: 80400,
+          extraFeeCny: 20,
+          extraFeeMmk: 13400,
+          extraFeeReason: '短途送货',
+          totals: ['总重量 10 Kg', '入库报价 ¥100', '附加费 短途送货 ¥20', '总费用 80,400 MMK'],
+          lines: [{ title: '单号', expressNos: ['ORD-1', 'ORD-9'], measure: '10 Kg' }],
+          meta: [{ label: '件数', value: '2' }],
+        },
+      },
+    ],
+    keys,
+  );
+  const row = plan.updates.find((item) => item.id === 'with-extra');
+  assert.equal(row.document.extraFeeCny, 20);
+  assert.deepEqual(row.document.totals, [
+    '总重量 5 Kg',
+    '入库报价 ¥50',
+    '附加费 短途送货 ¥20',
+    '总费用 46,900 MMK',
+  ]);
+  assert.equal(row.total_fee_cny, 70);
+  assert.equal(row.total_fee_mmk, 46900);
+});
+
 test('drops an invoice that only carries this trip number', () => {
   const keys = sampleKeys();
   const plan = planSignedInvoiceClear(

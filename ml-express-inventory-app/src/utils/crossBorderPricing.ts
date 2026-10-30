@@ -304,6 +304,23 @@ export function calculateCrossBorderTotalFee(perKg: number, weightStr: string): 
   return Math.round(perKg * weightKg);
 }
 
+/**
+ * 未签收改重量后的入库报价。优先用定价窗口里写死的人民币/公斤，没有才用缅币单价按汇率折。
+ * 算不出单价时返回 null，调用方保留原来的报价。
+ */
+export function quoteCnyForEditedWeight(input: {
+  cnyPerKg: number | null;
+  perKgMmk: number;
+  mmkPerCny: number | null;
+  weightKg: number;
+}): number | null {
+  const kg = input.weightKg;
+  if (!(kg > 0)) return null;
+  if (input.cnyPerKg != null && input.cnyPerKg >= 0) return input.cnyPerKg * kg;
+  if (!(input.perKgMmk > 0) || input.mmkPerCny == null || input.mmkPerCny <= 0) return null;
+  return mmkToCny(Math.round(input.perKgMmk * kg), input.mmkPerCny);
+}
+
 /** 入库报价只给人民币。路线价仍是 MMK/kg，这里按当天汇率折成人民币，不写出缅币。 */
 export function formatCrossBorderCnyHint(
   originCode: string,

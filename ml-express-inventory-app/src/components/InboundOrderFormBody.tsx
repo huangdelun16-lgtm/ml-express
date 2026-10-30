@@ -43,6 +43,8 @@ type Props = {
   barcodeText: string;
   barcodeCaption?: string;
   inboundDateLabel?: string;
+  weightEditable?: boolean;
+  weightHint?: string;
   inboundDateYmd?: string;
   inboundDate?: Date;
   showDatePicker?: boolean;
@@ -73,6 +75,8 @@ export default function InboundOrderFormBody({
   barcodeText,
   barcodeCaption,
   inboundDateLabel,
+  weightEditable = true,
+  weightHint,
   inboundDateYmd,
   inboundDate,
   showDatePicker,
@@ -130,12 +134,13 @@ export default function InboundOrderFormBody({
           suffix="Kg"
           onChange={onWeightChange}
           placeholder={t.trackExpress.weight}
-          editable={canEdit}
+          editable={canEdit && weightEditable}
           inputRef={fieldChain.propsFor('weight').inputRef}
           returnKeyType={fieldChain.propsFor('weight').returnKeyType}
           onSubmitEditing={fieldChain.propsFor('weight').onSubmitEditing}
           blurOnSubmit={fieldChain.propsFor('weight').blurOnSubmit}
         />
+        {weightHint ? <Text style={styles.weightHint}>{weightHint}</Text> : null}
         {(specStr || weightStr) && canEdit ? (
           <View style={inboundFormStyles.preview}>
             <Text style={inboundFormStyles.previewTitle}>{t.itemForm.specSection}</Text>
@@ -293,6 +298,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   dateDoneText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  weightHint: { color: '#b45309', fontSize: 13, lineHeight: 18, marginBottom: 8 },
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   qtyBtn: {
     width: 44,

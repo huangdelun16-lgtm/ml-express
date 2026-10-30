@@ -534,7 +534,7 @@ export default function PrintPreviewScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#020617' },
+  root: { flex: 1, backgroundColor: '#0f172a' },
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 24 },
   unsavedHint: {
@@ -668,7 +668,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     borderTopWidth: 1,
     borderTopColor: '#1e293b',
-    backgroundColor: '#020617',
+    backgroundColor: '#0f172a',
   },
   printBtn: {
     backgroundColor: '#2563eb',

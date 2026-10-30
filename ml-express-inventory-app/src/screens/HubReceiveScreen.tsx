@@ -7,7 +7,6 @@ import ArrivalNotifySheet from '../components/ArrivalNotifySheet';
 import CustomerSignFlowModal, { type CustomerSignFlowRequest } from '../components/CustomerSignFlowModal';
 import ScanInputBar from '../components/ScanInputBar';
 import HubReceiveOrdersModal from '../components/HubReceiveOrdersModal';
-import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import { HubReceiveScanBasket } from '../components/hubReceive/HubReceiveScanBasket';
 import { HubReceiveStatusPanels } from '../components/hubReceive/HubReceiveStatusPanels';
 import { useHubReceiveFlow } from '../hooks/useHubReceiveFlow';
@@ -82,7 +81,6 @@ export default function HubReceiveScreen({
       onScroll={onScroll}
       scrollEventThrottle={16}
     >
-      <OnlineRequiredBanner />
       <HubReceiveStatusPanels
         t={t}
         fmt={flow.fmt}

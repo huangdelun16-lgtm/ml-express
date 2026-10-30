@@ -17,6 +17,10 @@ import {
 } from '../services/arrivalNotifyService';
 import type { ArrivalNotifyAction, ArrivalNotifyTarget } from '../utils/arrivalNotify';
 import { buildArrivalNotifyMessage, resolveArrivalNotifyAction } from '../utils/arrivalNotify';
+import {
+  fetchArrivalNotifyTemplate,
+  renderArrivalNotifyTemplate,
+} from '../utils/arrivalNotifyTemplate';
 
 function notifyAction(row: ArrivalNotifyTarget) {
   return resolveArrivalNotifyAction({
@@ -41,6 +45,7 @@ export default function ArrivalNotifySheet({ visible, targets, onClose, onNotifi
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [marked, setMarked] = useState<Set<string>>(new Set());
+  const [template, setTemplate] = useState('');
 
   useEffect(() => {
     if (!visible) {
@@ -49,6 +54,7 @@ export default function ArrivalNotifySheet({ visible, targets, onClose, onNotifi
       setError('');
       setNotice('');
       setMarked(new Set());
+      setTemplate('');
       return;
     }
     let cancelled = false;
@@ -57,6 +63,9 @@ export default function ArrivalNotifySheet({ visible, targets, onClose, onNotifi
     setError('');
     setNotice('');
     setMarked(new Set());
+    void fetchArrivalNotifyTemplate().then((saved) => {
+      if (!cancelled && saved) setTemplate(saved);
+    });
     void Promise.all(targets.map((row) => enrichArrivalNotifyTarget(row))).then((enriched) => {
       if (!cancelled) setRows(enriched);
     });
@@ -68,17 +77,30 @@ export default function ArrivalNotifySheet({ visible, targets, onClose, onNotifi
   const hubLabel = store?.storeName?.trim() || store?.hubCode || rows[0]?.hubCode || '';
   const isBatch = rows.length > 1;
 
+  const messageFor = (row: ArrivalNotifyTarget) => {
+    const hub = row.storeName || hubLabel;
+    if (template.trim()) {
+      return renderArrivalNotifyTemplate(template, {
+        name: row.recipientName,
+        hub,
+        barcode: row.barcode,
+        express: row.expressBarcode,
+      });
+    }
+    return buildArrivalNotifyMessage({
+      language,
+      hubLabel: hub,
+      barcode: row.barcode,
+      expressBarcode: row.expressBarcode,
+      recipientName: row.recipientName,
+    });
+  };
+
   const preview = useMemo(() => {
     const first = rows[0];
     if (!first) return '';
-    return buildArrivalNotifyMessage({
-      language,
-      hubLabel: first.storeName || hubLabel,
-      barcode: first.barcode,
-      expressBarcode: first.expressBarcode,
-      recipientName: first.recipientName,
-    });
-  }, [rows, language, hubLabel]);
+    return messageFor(first);
+  }, [rows, template, language, hubLabel]);
 
   const actionLabel = (action: ArrivalNotifyAction) => {
     if (action.kind === 'whatsapp') return t.arrivalNotify.whatsapp;
@@ -103,13 +125,7 @@ export default function ArrivalNotifySheet({ visible, targets, onClose, onNotifi
     setError('');
     setNotice('');
     try {
-      const body = buildArrivalNotifyMessage({
-        language,
-        hubLabel: target.storeName || hubLabel,
-        barcode: target.barcode,
-        expressBarcode: target.expressBarcode,
-        recipientName: target.recipientName,
-      });
+      const body = messageFor(target);
       const result = await openArrivalNotifyAction(action, body);
       if (result === 'called') return;
       if (result === 'failed') {

@@ -44,6 +44,12 @@ export function itemKeywordHaystack(item: ItemKeywordFields): string {
     .toLowerCase();
 }
 
+/** 整段几乎都是数字时，当作入库电话去对流水。快递单号里夹着字母则不走这条。 */
+export function phoneSearchDigits(keyword?: string): string {
+  const compact = String(keyword ?? '').replace(/[\s+\-().]/g, '');
+  return /^\d{6,}$/.test(compact) ? compact : '';
+}
+
 /** 任意单词命中即可；多词时每个词都要出现在包裹字段里 */
 export function itemMatchesKeyword(item: ItemKeywordFields, keyword?: string): boolean {
   const q = keyword?.trim().toLowerCase() ?? '';

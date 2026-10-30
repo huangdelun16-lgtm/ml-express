@@ -72,6 +72,8 @@ export default function CrossBorderFinanceScreen() {
     agencyRemittedTotal: 0,
     manualIncomeTotal: 0,
     manualExpenseTotal: 0,
+    exportCostCnyTotal: 0,
+    exportCostMmkTotal: 0,
   });
   const [periodKind, setPeriodKind] = useState<'all' | 'day' | 'month'>('all');
   const [settlement, setSettlement] = useState<StationSettlementRow | null>(null);
@@ -82,6 +84,7 @@ export default function CrossBorderFinanceScreen() {
   const [exporting, setExporting] = useState(false);
   const [mmkPerCny, setMmkPerCny] = useState<number | null>(null);
   const summarySheet = useFinanceSummarySheet();
+  const currentKey = store ? ownershipKeyFromStoreCode(store.storeCode) : '';
 
   const tabs = useMemo(
     (): { key: FinanceTabKey; label: string }[] => [
@@ -90,11 +93,12 @@ export default function CrossBorderFinanceScreen() {
       { key: 'agency', label: t.crossBorderFinance.tabAgency },
       { key: 'pending', label: t.crossBorderFinance.tabPending },
       { key: 'manual', label: t.crossBorderFinance.tabManual },
+      ...(currentKey === 'RUILI'
+        ? [{ key: 'export' as const, label: t.crossBorderFinance.tabExport }]
+        : []),
     ],
-    [t],
+    [t, currentKey],
   );
-
-  const currentKey = store ? ownershipKeyFromStoreCode(store.storeCode) : '';
 
   useEffect(() => {
     const initial = route.params?.initialTab;
@@ -112,6 +116,8 @@ export default function CrossBorderFinanceScreen() {
       agencyRemittedTotal: result.summary.agencyRemittedTotal ?? 0,
       manualIncomeTotal: result.summary.manualIncomeTotal ?? 0,
       manualExpenseTotal: result.summary.manualExpenseTotal ?? 0,
+      exportCostCnyTotal: result.summary.exportCostCnyTotal ?? 0,
+      exportCostMmkTotal: result.summary.exportCostMmkTotal ?? 0,
     });
   }, []);
 
@@ -309,6 +315,7 @@ export default function CrossBorderFinanceScreen() {
       agency: filterByTab(entries, 'agency', currentKey).length,
       pending: filterByTab(entries, 'pending', currentKey).length,
       manual: filterByTab(entries, 'manual', currentKey).length,
+      export: filterByTab(entries, 'export', currentKey).length,
     }),
     [entries, currentKey],
   );

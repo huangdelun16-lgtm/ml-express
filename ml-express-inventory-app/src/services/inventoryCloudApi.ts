@@ -624,6 +624,24 @@ export async function fetchCloudMovementsForItems(itemIds: string[]): Promise<Cl
   return rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
+/** 入库电话只写在流水上。列表搜索碰到一串数字时，按电话找出对应商品。 */
+export async function findItemIdsByRecipientPhone(digits: string): Promise<string[]> {
+  const phone = digits.trim();
+  if (!isSupabaseConfigured() || phone.length < 6) return [];
+  try {
+    await ensureInventoryCloudAuth();
+    const { data, error } = await supabase
+      .from('inventory_stock_movements')
+      .select('item_id')
+      .ilike('recipient_phone', `%${phone}%`)
+      .limit(80);
+    if (error || !data) return [];
+    return [...new Set(data.map((row) => String((row as { item_id?: string }).item_id ?? '')).filter(Boolean))];
+  } catch {
+    return [];
+  }
+}
+
 /** 今日出入库汇总（首页统计专用，比拉全量流水轻） */
 export async function fetchCloudTodayMovementTotals(): Promise<{ todayIn: number; todayOut: number }> {
   if (!isSupabaseConfigured()) return { todayIn: 0, todayOut: 0 };

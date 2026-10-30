@@ -603,5 +603,7 @@ export function buildFinanceLedgerSummary(
       'manualIncomeTotal' in station ? Number(station.manualIncomeTotal) || 0 : 0,
     manualExpenseTotal:
       'manualExpenseTotal' in station ? Number(station.manualExpenseTotal) || 0 : 0,
+    exportCostCnyTotal: 0,
+    exportCostMmkTotal: 0,
   };
 }

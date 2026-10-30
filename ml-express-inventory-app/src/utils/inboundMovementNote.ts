@@ -1,6 +1,6 @@
 /** 解析入库流水 note（总费用 · 付款方式 · 用户备注）— 支持中/英/缅入库标签 */
 
-import { cnyToMmk } from './crossBorderFx';
+import { cnyToMmk, formatCnyInput } from './crossBorderFx';
 import {
   isFxLockNotePart,
   parseFxLockFromNote,
@@ -67,6 +67,39 @@ export function parseInboundMovementNote(note: string): {
     userNote: userParts.length ? userParts.join(' · ') : undefined,
     fxLock: fxLock ?? undefined,
   };
+}
+
+const SYSTEM_NOTE_PART =
+  /^(?:多个入库|入库包装日期(?:\s.*)?|打包入(?:\s.*)?|到站交付确认.*|到站收货入库.*|到站入库(?:\s.*)?|中转站到站.*)$/;
+
+const QUOTE_NOTE_PART = /^(?:报价|Quote)\s+[\d.]+\s*CNY$/i;
+
+/** 把入库流水里的「报价 X CNY」换成新金额。原来没有报价时补在最前面。 */
+export function replaceInboundQuoteCny(note: string, quoteCny: number): string {
+  const label = `报价 ${formatCnyInput(quoteCny)} CNY`;
+  const parts = String(note || '')
+    .split(' · ')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const index = parts.findIndex((part) => QUOTE_NOTE_PART.test(part));
+  if (index >= 0) {
+    if (parts[index] === label) return parts.join(' · ');
+    parts[index] = label;
+    return parts.join(' · ');
+  }
+  parts.unshift(label);
+  return parts.join(' · ');
+}
+
+/** 订单详情里的备注：只留客户自己写的话，报价、到付、打包标记都不算备注。 */
+export function customerFacingInboundNote(note: string | null | undefined): string {
+  const userNote = parseInboundMovementNote(String(note || '')).userNote?.trim() || '';
+  if (!userNote) return '';
+  return userNote
+    .split(' · ')
+    .map((part) => part.trim())
+    .filter((part) => part && !SYSTEM_NOTE_PART.test(part))
+    .join(' · ');
 }
 
 export function pickNotesFxLock(

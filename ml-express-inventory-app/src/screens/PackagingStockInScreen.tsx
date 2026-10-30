@@ -14,7 +14,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import DestinationPickerField from '../components/DestinationPickerField';
 import InboundDateField from '../components/InboundDateField';
 import { InboundFormField, InboundFormSection } from '../components/InboundFormPrimitives';
-import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import ScanInputBar from '../components/ScanInputBar';
 import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
 import { InboundWizardFooter, InboundWizardHeader, type WizardStep } from '../components/stockIn/InboundWizardChrome';
@@ -507,7 +506,6 @@ export default function PackagingStockInScreen({ navigation }: Props) {
         stepLabels={stepLabels}
         accent="amber"
       />
-        <OnlineRequiredBanner />
 
         {step === 1 ? (
           <InboundFormSection title={t.packagingStockIn.customerSection} accent="#0891b2">

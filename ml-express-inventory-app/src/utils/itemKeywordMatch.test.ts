@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { itemMatchesKeyword } from './itemKeywordMatch';
+import { itemMatchesKeyword, phoneSearchDigits } from './itemKeywordMatch';
 
 const item = {
   barcode: 'YGN2608150001',
@@ -35,6 +35,15 @@ describe('itemMatchesKeyword', () => {
   it('matches multi-word queries when every token is present', () => {
     expect(itemMatchesKeyword(item, 'Ko YGN')).toBe(true);
     expect(itemMatchesKeyword(item, 'unknown xyz')).toBe(false);
+  });
+
+  it('treats a phone-shaped query as digits and leaves tracking numbers alone', () => {
+    expect(phoneSearchDigits('09123456789')).toBe('09123456789');
+    expect(phoneSearchDigits('+95 9 123 456 789')).toBe('959123456789');
+    expect(phoneSearchDigits('09-123-45678')).toBe('0912345678');
+    expect(phoneSearchDigits('SF1234567890')).toBe('');
+    expect(phoneSearchDigits('12345')).toBe('');
+    expect(phoneSearchDigits('Ko Mg')).toBe('');
   });
 
   it('returns true for empty keyword and false for unrelated words', () => {

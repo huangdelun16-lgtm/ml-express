@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  Keyboard,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -10,11 +12,13 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { easedScrollSpan } from '../components/CollapsingHomeHeader';
+import ScrollPositionRail from '../components/ScrollPositionRail';
 import { useAuth } from '../contexts/AuthContext';
 import PkgActionModal from '../components/PkgActionModal';
 import PkgEditModal from '../components/PkgEditModal';
 import PkgOrdersModal from '../components/PkgOrdersModal';
-import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
+import PhoneBarcodeScanModal from '../components/PhoneBarcodeScanModal';
 import { runBarcodeLabelPrintWithAlert } from '../services/labelPrintFlow';
 import { packOrderBarcodeData } from '../utils/orderBarcodeData';
 import {
@@ -23,7 +27,8 @@ import {
 } from '../services/inventoryService';
 import type { PackedShipmentListRow } from '../types/inventory';
 import { fmt, getPackStatusLabel, resolveAppError, useTranslation } from '../i18n';
-import { packStatusStyle, canEditPackedShipment } from '../utils/packDisplayStatus';
+import { packStatusStyle, canEditPackedShipment, type PackDisplayStatus } from '../utils/packDisplayStatus';
+import { normalizeScanCode } from '../utils/barcodeScan';
 import { resolvePackOrderCount, stockUnitLabel } from '../utils/itemFieldFormat';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
 import { regionDisplayLabel } from '../constants/destinationOptions';
@@ -43,21 +48,18 @@ export default function PkgScreen({ navigation }: { navigation: { goBack: () => 
   const { t, fmt, language } = useTranslation();
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
-  const headerBodyHeight = scrollY.interpolate({
-    inputRange: [0, 64],
-    outputRange: [48, 0],
-    extrapolate: 'clamp',
-  });
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [0, 48],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
+  const [listViewport, setListViewport] = useState(0);
+  const [listContent, setListContent] = useState(0);
+  const headerBodyHeight = easedScrollSpan(scrollY, 56, 48, 0);
+  const headerOpacity = easedScrollSpan(scrollY, 56, 1, 0);
+  const headerLift = easedScrollSpan(scrollY, 56, 0, -10);
   const onListScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
     { useNativeDriver: false },
   );
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'' | PackDisplayStatus>('');
+  const [scanVisible, setScanVisible] = useState(false);
   const [packs, setPacks] = useState<PackedShipmentListRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [actionPack, setActionPack] = useState<PackedShipmentListRow | null>(null);
@@ -80,10 +82,33 @@ export default function PkgScreen({ navigation }: { navigation: { goBack: () => 
     void load();
   }, [search]);
 
+  const visiblePacks = statusFilter
+    ? packs.filter((pack) => pack.display_status === statusFilter)
+    : packs;
+  const statusOptions: PackDisplayStatus[] = ['pending_load', 'loaded', 'arrived', 'completed'];
+
+  const applyScannedCode = (raw: string) => {
+    const code = normalizeScanCode(raw);
+    setScanVisible(false);
+    if (!code) return;
+    setStatusFilter('');
+    setSearch(code);
+    const scope = store && hubCode ? { store, hubCode } : undefined;
+    void listPackedShipmentRows(code, scope).then((rows) => {
+      setPacks(rows);
+      if (rows.length === 1) setActionPack(rows[0]);
+    });
+  };
+
   return (
     <View style={styles.root}>
       <View style={{ paddingTop: insets.top, backgroundColor: '#0f172a' }}>
-        <Animated.View style={[styles.navRow, { height: headerBodyHeight, opacity: headerOpacity }]}>
+        <Animated.View
+          style={[
+            styles.navRow,
+            { height: headerBodyHeight, opacity: headerOpacity, transform: [{ translateY: headerLift }] },
+          ]}
+        >
           <Pressable
             style={styles.homeBtn}
             onPress={() => navigation.goBack()}
@@ -95,31 +120,66 @@ export default function PkgScreen({ navigation }: { navigation: { goBack: () => 
           </Pressable>
           <Text style={styles.screenTitle} numberOfLines={1}>{t.nav.pkg}</Text>
         </Animated.View>
-        <TextInput
-          style={styles.search}
-          placeholder={t.pkg.search}
-          placeholderTextColor="#64748b"
-          value={search}
-          onChangeText={setSearch}
-          onSubmitEditing={() => void load()}
-          returnKeyType="search"
-          accessibilityLabel={t.common.search}
-        />
+        <View style={styles.searchRow}>
+          <TextInput
+            style={styles.search}
+            placeholder={t.pkg.search}
+            placeholderTextColor="#64748b"
+            value={search}
+            onChangeText={setSearch}
+            onSubmitEditing={() => void load()}
+            returnKeyType="search"
+            accessibilityLabel={t.common.search}
+          />
+          <Pressable
+            style={styles.scanBtn}
+            onPress={() => {
+              Keyboard.dismiss();
+              setScanVisible(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t.scanInput.scanBtn}
+          >
+            <Text style={styles.scanBtnText}>{t.scanInput.scanBtn}</Text>
+          </Pressable>
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.statusRow}
+        >
+          {statusOptions.map((status) => {
+            const active = statusFilter === status;
+            const tone = packStatusStyle(status);
+            return (
+              <Pressable
+                key={status}
+                style={[styles.statusChip, active && { backgroundColor: tone.badgeBg, borderColor: tone.border }]}
+                onPress={() => setStatusFilter(active ? '' : status)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+              >
+                <Text style={[styles.statusChipText, active && { color: tone.badgeText }]}>
+                  {getPackStatusLabel(language, status)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </View>
 
+      <View style={styles.listView} onLayout={(event) => setListViewport(event.nativeEvent.layout.height)}>
       <Animated.FlatList
-        data={packs}
+        data={visiblePacks}
         keyExtractor={(item) => item.id}
         style={styles.listView}
-        contentContainerStyle={packs.length === 0 ? styles.emptyList : styles.list}
+        contentContainerStyle={visiblePacks.length === 0 ? styles.emptyList : styles.list}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        decelerationRate="normal"
         onScroll={onListScroll}
         scrollEventThrottle={16}
-        ListHeaderComponent={
-          <View style={styles.onlineBannerWrap}>
-            <OnlineRequiredBanner />
-          </View>
-        }
+        onContentSizeChange={(_, height) => setListContent(height)}
         onRefresh={async () => {
           setRefreshing(true);
           try {
@@ -130,7 +190,9 @@ export default function PkgScreen({ navigation }: { navigation: { goBack: () => 
         }}
         refreshing={refreshing}
         ListEmptyComponent={
-          <Text style={styles.empty}>{t.pkg.empty}</Text>
+          <Text style={styles.empty}>
+            {packs.length > 0 && visiblePacks.length === 0 ? t.pkg.noStatus : t.pkg.empty}
+          </Text>
         }
         renderItem={({ item }) => {
           const statusStyle = packStatusStyle(item.display_status);
@@ -213,6 +275,8 @@ export default function PkgScreen({ navigation }: { navigation: { goBack: () => 
           );
         }}
       />
+      <ScrollPositionRail scrollY={scrollY} viewportHeight={listViewport} contentHeight={listContent} />
+      </View>
 
       <PkgActionModal
         visible={!!actionPack}
@@ -324,6 +388,12 @@ export default function PkgScreen({ navigation }: { navigation: { goBack: () => 
         pack={ordersPack}
         onClose={() => setOrdersPack(null)}
       />
+      <PhoneBarcodeScanModal
+        visible={scanVisible}
+        onClose={() => setScanVisible(false)}
+        onScanned={applyScannedCode}
+        title={t.nav.pkg}
+      />
     </View>
   );
 }
@@ -352,10 +422,15 @@ const styles = StyleSheet.create({
   homeLabel: { color: '#f8fafc', fontSize: 16, fontWeight: '700' },
   screenTitle: { color: '#f8fafc', fontSize: 17, fontWeight: '800', flexShrink: 1 },
   onlineBannerWrap: { marginBottom: 8 },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
   search: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 8,
+    flex: 1,
     backgroundColor: '#f8fafc',
     borderRadius: 10,
     paddingHorizontal: 14,
@@ -364,6 +439,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#0f172a',
   },
+  scanBtn: {
+    backgroundColor: '#1e293b',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#475569',
+    paddingHorizontal: 12,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanBtnText: { color: '#f8fafc', fontWeight: '800', fontSize: 14 },
+  statusRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  statusChip: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#475569',
+  },
+  statusChipText: { color: '#e2e8f0', fontSize: 13, fontWeight: '800' },
   list: { paddingHorizontal: 16, paddingBottom: 24 },
   emptyList: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 24 },
   empty: {

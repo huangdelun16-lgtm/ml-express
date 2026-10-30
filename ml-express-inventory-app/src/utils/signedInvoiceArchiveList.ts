@@ -28,10 +28,11 @@ export type SignedInvoiceListItem = {
 
 const STATION_LABELS = new Set(['收货站', 'Receiving station', 'လက်ခံဂိတ်']);
 
-const TOTAL_LABELS: Array<{ kind: 'weight' | 'quote' | 'rate' | 'fee'; labels: string[] }> = [
+const TOTAL_LABELS: Array<{ kind: 'weight' | 'quote' | 'rate' | 'extra' | 'fee'; labels: string[] }> = [
   { kind: 'weight', labels: ['总重量', 'Total weight', 'စုစုပေါင်းအလေးချိန်'] },
   { kind: 'quote', labels: ['入库报价', 'Inbound quote', 'စာရင်းသွင်း ဈေး'] },
   { kind: 'rate', labels: ['汇率', 'Rate', 'ငွေလဲ'] },
+  { kind: 'extra', labels: ['附加费', 'Extra fee', 'ထပ်ဆောင်းခ'] },
   { kind: 'fee', labels: ['总费用', 'Total fee', 'စုစုပေါင်းခ'] },
 ];
 
@@ -124,11 +125,11 @@ export function signedInvoiceMatches(row: SignedInvoiceListItem, query: string):
 
 export function splitSignedInvoiceTotals(
   lines: string[],
-): Array<{ kind: 'weight' | 'quote' | 'rate' | 'fee'; label: string; value: string }> {
+): Array<{ kind: 'weight' | 'quote' | 'rate' | 'extra' | 'fee'; label: string; value: string }> {
   const labels = TOTAL_LABELS.flatMap((group) => group.labels.map((label) => ({ kind: group.kind, label }))).sort(
     (a, b) => b.label.length - a.label.length,
   );
-  const out: Array<{ kind: 'weight' | 'quote' | 'rate' | 'fee'; label: string; value: string }> = [];
+  const out: Array<{ kind: 'weight' | 'quote' | 'rate' | 'extra' | 'fee'; label: string; value: string }> = [];
   for (const line of lines) {
     const textLine = line.trim();
     if (!textLine || /KG\s*=/i.test(textLine)) continue;

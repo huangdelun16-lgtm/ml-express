@@ -369,11 +369,11 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#020617' },
+  root: { flex: 1, backgroundColor: '#0f172a' },
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 40 },
   hero: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#1e293b',
     borderRadius: 20,
     padding: 16,
     marginBottom: 14,
@@ -466,7 +466,7 @@ const styles = StyleSheet.create({
   },
   sectionBadgeText: { fontSize: 11, fontWeight: '900' },
   sectionBody: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#1e293b',
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,

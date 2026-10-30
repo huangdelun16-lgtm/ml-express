@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -11,9 +11,9 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
+import ScrollPositionRail from '../components/ScrollPositionRail';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import DestinationPickerField from '../components/DestinationPickerField';
-import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import PkgPickerField from '../components/PkgPickerField';
 import ScanInputBar from '../components/ScanInputBar';
 import StockOutSuccessModal, { type StockOutSuccessData } from '../components/StockOutSuccessModal';
@@ -38,8 +38,11 @@ import { sanitizeNumberInput, sumPackageWeightsKg } from '../utils/itemFieldForm
 import {
   classifyUnresolvedTruckLoadScan,
   matchPendingTruckLoadScan,
+  packOutboundDestination,
+  truckLoadDestinationConflict,
   type TruckLoadScanReject,
 } from '../utils/matchTruckLoadScan';
+import { destinationCodesMatch } from '../utils/destinationCode';
 import { resolveStoreOriginLabel, listOutboundDestinationOptions, isOwnStationOutboundDestination } from '../utils/storeZone';
 import { fetchTruckRouteFee, formatTruckRouteLabel } from '../utils/truckRouteFee';
 import { peekNextTripNumber } from '../services/tripNumberService';
@@ -49,11 +52,15 @@ type Props = NativeStackScreenProps<RootStackParamList, 'StockOut'>;
 export default function StockOutScreen({ navigation }: Props) {
   const { t, fmt } = useTranslation();
   const { scrollY, onScroll } = useCollapsingHomeScroll();
+  const [listViewport, setListViewport] = useState(0);
+  const [listContent, setListContent] = useState(0);
   const { operatorName, store, hubCode } = useAuth();
   const [packs, setPacks] = useState<PackedShipmentDetail[]>([]);
   const [loadingPacks, setLoadingPacks] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [destination, setDestination] = useState('');
+  const destinationRef = useRef(destination);
+  destinationRef.current = destination;
   const [outboundDate, setOutboundDate] = useState(todayIsoDate());
   const [transportFee, setTransportFee] = useState('');
   const [tripNumberPreview, setTripNumberPreview] = useState('');
@@ -64,6 +71,7 @@ export default function StockOutScreen({ navigation }: Props) {
   const [scanInput, setScanInput] = useState('');
   const [scanBusy, setScanBusy] = useState(false);
   const [successData, setSuccessData] = useState<StockOutSuccessData | null>(null);
+  const [lastScan, setLastScan] = useState<{ tone: 'ok' | 'warn' | 'bad'; text: string } | null>(null);
 
   const originLabel = store ? resolveStoreOriginLabel(store) : '';
   const routeLabel = formatTruckRouteLabel(originLabel, destination);
@@ -157,7 +165,7 @@ export default function StockOutScreen({ navigation }: Props) {
     });
   };
 
-  const addScannedPack = (pack: PackedShipmentDetail) => {
+  const addScannedPack = (pack: PackedShipmentDetail, dest: string) => {
     let duplicate = false;
     setSelectedIds((prev) => {
       if (prev.has(pack.id)) {
@@ -169,10 +177,16 @@ export default function StockOutScreen({ navigation }: Props) {
       return next;
     });
     if (duplicate) {
-      feedbackService.info(t.stockOut.scanLoadDuplicate);
+      const text = t.stockOut.scanLoadDuplicate;
+      setLastScan({ tone: 'warn', text });
+      feedbackService.info(text);
       return;
     }
-    feedbackService.info(fmt(t.stockOut.scanLoadAdded, { code: pack.bundle_barcode }));
+    const text = dest
+      ? fmt(t.stockOut.scanLoadAddedDest, { code: pack.bundle_barcode, dest })
+      : fmt(t.stockOut.scanLoadAdded, { code: pack.bundle_barcode });
+    setLastScan({ tone: 'ok', text });
+    feedbackService.info(text);
   };
 
   const rejectScan = (reason: TruckLoadScanReject) => {
@@ -186,7 +200,35 @@ export default function StockOutScreen({ navigation }: Props) {
             : reason === 'already_loaded'
               ? t.stockOut.scanLoadAlreadyLoaded
               : t.stockOut.scanLoadNotFound;
+    setLastScan({ tone: reason === 'already_selected' ? 'warn' : 'bad', text: message });
     feedbackService.notify(t.common.tip, message);
+  };
+
+  const acceptPackForLoad = (pack: PackedShipmentDetail): string | null => {
+    const dest = packOutboundDestination(pack);
+    if (store && dest && isOwnStationOutboundDestination(dest, store)) {
+      setLastScan({ tone: 'bad', text: t.stockOut.alertOwnStation });
+      feedbackService.notify(t.common.tip, t.stockOut.alertOwnStation);
+      return null;
+    }
+    const gate = truckLoadDestinationConflict(dest, destinationRef.current);
+    if (gate === 'conflict') {
+      const message = fmt(t.stockOut.scanLoadWrongDest, {
+        dest,
+        current: destinationRef.current.trim(),
+      });
+      setLastScan({ tone: 'bad', text: message });
+      feedbackService.notify(t.common.tip, message);
+      return null;
+    }
+    if (gate === 'fill') {
+      const option = outboundDestinationOptions.find((item) => destinationCodesMatch(item, dest));
+      if (option) {
+        destinationRef.current = option;
+        setDestination(option);
+      }
+    }
+    return dest;
   };
 
   const handleScanLoad = async (raw: string) => {
@@ -194,7 +236,9 @@ export default function StockOutScreen({ navigation }: Props) {
     setScanInput('');
     const pending = matchPendingTruckLoadScan(raw, packs, selectedIds);
     if (pending.kind === 'hit') {
-      addScannedPack(pending.pack);
+      const dest = acceptPackForLoad(pending.pack);
+      if (dest == null) return;
+      addScannedPack(pending.pack, dest);
       return;
     }
     if (pending.reason === 'already_selected') {
@@ -220,13 +264,17 @@ export default function StockOutScreen({ navigation }: Props) {
           )
         : undefined;
       if (listed) {
-        addScannedPack(listed);
+        const dest = acceptPackForLoad(listed);
+        if (dest == null) return;
+        addScannedPack(listed, dest);
         return;
       }
       if (pack && store) {
+        const dest = acceptPackForLoad(pack);
+        if (dest == null) return;
         const registered = await ensureCloudPackRegistered(pack, store).catch(() => false);
         if (registered) {
-          addScannedPack(pack);
+          addScannedPack(pack, dest);
           setPacks((prev) => (prev.some((row) => row.id === pack.id) ? prev : [...prev, pack]));
           return;
         }
@@ -247,6 +295,7 @@ export default function StockOutScreen({ navigation }: Props) {
   const resetForm = () => {
     setSelectedIds(new Set());
     setScanInput('');
+    setLastScan(null);
     setDestination('');
     setOutboundDate(todayIsoDate());
     setTransportFee('');
@@ -358,16 +407,16 @@ export default function StockOutScreen({ navigation }: Props) {
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <View style={styles.scroll} onLayout={(event) => setListViewport(event.nativeEvent.layout.height)}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         onScroll={onScroll}
         scrollEventThrottle={16}
+        onContentSizeChange={(_, height) => setListContent(height)}
       >
-        <Text style={styles.title}>{t.stockOut.title}</Text>
         <Text style={styles.subtitle}>{t.stockOut.subtitle}</Text>
-        <OnlineRequiredBanner />
 
         <ScanInputBar
           value={scanInput}
@@ -381,11 +430,33 @@ export default function StockOutScreen({ navigation }: Props) {
           placeholder={t.stockOut.scanLoadPlaceholder}
           cameraScan={{
             title: t.stockOut.scanLoadCameraTitle,
-            subtitle: t.stockOut.scanLoadCameraSubtitle,
+            subtitle: lastScan?.text || t.stockOut.scanLoadCameraSubtitle,
             continuous: true,
             scannedCount: selectedIds.size,
+            scannedList: (
+              <TruckLoadScanList
+                packs={selectedPacks}
+                emptyLabel={t.stockOut.scanLoadListEmpty}
+                removeLabel={t.stockOut.scanLoadRemove}
+                onRemove={togglePack}
+              />
+            ),
           }}
         />
+        {lastScan ? (
+          <View
+            style={[
+              styles.scanBanner,
+              lastScan.tone === 'ok'
+                ? styles.scanBannerOk
+                : lastScan.tone === 'warn'
+                  ? styles.scanBannerWarn
+                  : styles.scanBannerBad,
+            ]}
+          >
+            <Text style={styles.scanBannerText}>{lastScan.text}</Text>
+          </View>
+        ) : null}
 
         <View style={styles.formCard}>
           <PkgPickerField
@@ -513,6 +584,8 @@ export default function StockOutScreen({ navigation }: Props) {
           </Text>
         </Pressable>
       </ScrollView>
+      <ScrollPositionRail scrollY={scrollY} viewportHeight={listViewport} contentHeight={listContent} />
+      </View>
 
       <StockOutSuccessModal
         visible={!!successData}
@@ -524,12 +597,77 @@ export default function StockOutScreen({ navigation }: Props) {
   );
 }
 
+function TruckLoadScanList({
+  packs,
+  emptyLabel,
+  removeLabel,
+  onRemove,
+}: {
+  packs: PackedShipmentDetail[];
+  emptyLabel: string;
+  removeLabel: string;
+  onRemove: (pack: PackedShipmentDetail) => void;
+}) {
+  if (packs.length === 0) {
+    return <Text style={styles.scanListEmpty}>{emptyLabel}</Text>;
+  }
+  return (
+    <View style={styles.scanList}>
+      {packs.map((pack) => {
+        const dest = packOutboundDestination(pack);
+        return (
+          <View key={pack.id} style={styles.scanListRow}>
+            <View style={styles.scanListCopy}>
+              <Text style={styles.scanListCode} numberOfLines={1}>
+                {pack.bundle_barcode}
+              </Text>
+              <Text style={styles.scanListMeta} numberOfLines={1}>
+                {[pack.bundle_name, dest].filter(Boolean).join(' · ')}
+              </Text>
+            </View>
+            <Pressable onPress={() => onRemove(pack)} hitSlop={8} accessibilityRole="button">
+              <Text style={styles.scanListRemove}>{removeLabel}</Text>
+            </Pressable>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0f172a' },
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 40 },
-  title: { color: '#f8fafc', fontSize: 22, fontWeight: '800', marginBottom: 6 },
   subtitle: { color: '#94a3b8', fontSize: 13, lineHeight: 20, marginBottom: 16 },
+  scanBanner: {
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+  },
+  scanBannerOk: { backgroundColor: '#064e3b', borderColor: '#34d399' },
+  scanBannerWarn: { backgroundColor: '#78350f', borderColor: '#fbbf24' },
+  scanBannerBad: { backgroundColor: '#7f1d1d', borderColor: '#fca5a5' },
+  scanBannerText: { color: '#f8fafc', fontSize: 14, fontWeight: '800', lineHeight: 20 },
+  scanList: { gap: 8 },
+  scanListEmpty: { color: '#94a3b8', fontSize: 14, textAlign: 'center', paddingVertical: 16 },
+  scanListRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  scanListCopy: { flex: 1, minWidth: 0 },
+  scanListCode: { color: '#f8fafc', fontSize: 15, fontWeight: '800' },
+  scanListMeta: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
+  scanListRemove: { color: '#fca5a5', fontSize: 13, fontWeight: '800' },
   formCard: {
     backgroundColor: '#1e293b',
     borderRadius: 14,

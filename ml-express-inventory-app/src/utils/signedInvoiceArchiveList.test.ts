@@ -52,6 +52,13 @@ describe('signed invoice archive list', () => {
       { kind: 'rate', label: '汇率', value: '1 CNY = 673 MMK' },
       { kind: 'fee', label: '总费用', value: '1,615,200 MMK' },
     ]);
+    expect(
+      splitSignedInvoiceTotals(['总重量 8 Kg', '附加费 短途送货 ¥20', '总费用 227,460 MMK']),
+    ).toEqual([
+      { kind: 'weight', label: '总重量', value: '8 Kg' },
+      { kind: 'extra', label: '附加费', value: '短途送货 ¥20' },
+      { kind: 'fee', label: '总费用', value: '227,460 MMK' },
+    ]);
   });
 
   it('falls back to MMK when there is no yuan quote', () => {

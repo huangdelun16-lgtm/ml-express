@@ -228,6 +228,11 @@ button.cbl-stat,
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
 }
 
+.cbl-stat--static,
+.cbl-stat--static:hover {
+  cursor: pointer;
+}
+
 .cbl-stat--btn.is-active {
   border-color: #91caff;
   background: var(--admin-primary-soft);
@@ -710,6 +715,58 @@ button.cbl-io-overview-card--in:focus-visible {
   outline: none;
   border-color: var(--admin-primary);
   box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12);
+}
+
+.cbl-export-pending {
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--admin-border, #e5e7eb);
+}
+
+.cbl-export-pending__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.cbl-export-fill {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.cbl-export-fill label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.cbl-export-fill input,
+.cbl-export-fill select {
+  min-height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0 8px;
+  color: #0f172a;
+  background: #fff;
+}
+
+.cbl-export-fill__error {
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cbl-export-pending__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
 }
 
 .cbl-export-cost__empty {
@@ -2279,6 +2336,10 @@ button.cbl-io-overview-card--in:focus-visible {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.42em;
+}
+
+.cbl-invoice-years {
+  margin: 4px 0 2px;
 }
 
 .cbl-invoice-archive-search {
@@ -3855,6 +3916,53 @@ button.cbl-io-overview-card--in:focus-visible {
   outline: none;
   border-color: var(--admin-primary);
   box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12);
+}
+
+.cbl-notify-template {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 8px;
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.cbl-notify-template textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 500;
+  line-height: 1.5;
+  color: #0f172a;
+}
+
+.cbl-notify-preview {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.cbl-notify-preview span {
+  display: block;
+  margin-bottom: 4px;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.cbl-notify-preview p {
+  margin: 0;
+  color: #0f172a;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
 }
 
 .cbl-fx-bar__unit,

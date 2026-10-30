@@ -1,10 +1,10 @@
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
+  Animated,
   Image,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -16,6 +16,8 @@ import ExportCostCard from '../components/ExportCostCard';
 import SignedInvoiceCard from '../components/SignedInvoiceCard';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
+import ScrollPositionRail from '../components/ScrollPositionRail';
 import { useAuth } from '../contexts/AuthContext';
 import { getHomeOverview, listItems, listPackedShipments } from '../services/inventoryService';
 import { fetchHomeTodoCounts } from '../services/homeTodoService';
@@ -56,6 +58,9 @@ type HomeTab = 'overview' | 'outbound' | 'inbound' | 'more';
 
 export default function HomeScreen({ navigation }: HomeProps) {
   const insets = useSafeAreaInsets();
+  const { scrollY, onScroll } = useCollapsingHomeScroll();
+  const [listViewport, setListViewport] = useState(0);
+  const [listContent, setListContent] = useState(0);
   const { operatorName, storeCode, hubCode, store, logout } = useAuth();
   const { t, fmt, language } = useTranslation();
   const [stats, setStats] = useState({
@@ -173,12 +178,12 @@ export default function HomeScreen({ navigation }: HomeProps) {
     navigation.navigate('TrackExpress', { presetCode: q });
   };
 
-  const tabs: { id: HomeTab | 'scan'; label: string; icon: string }[] = [
-    { id: 'overview', label: t.home.tabOverview, icon: '🏠' },
-    { id: 'outbound', label: t.home.tabOutbound, icon: '📤' },
-    { id: 'inbound', label: t.home.tabInbound, icon: '✅' },
-    { id: 'scan', label: t.home.tabScan, icon: '📷' },
-    { id: 'more', label: t.home.tabMore, icon: 'grid' },
+  const tabs: { id: HomeTab | 'scan'; label: string }[] = [
+    { id: 'overview', label: t.home.tabOverview },
+    { id: 'outbound', label: t.home.tabOutbound },
+    { id: 'scan', label: t.home.tabScan },
+    { id: 'inbound', label: t.home.tabInbound },
+    { id: 'more', label: t.home.tabMore },
   ];
 
   const headerMeta = [storeCode, hubCode ? regionDisplayLabel(hubCode) : '']
@@ -187,13 +192,19 @@ export default function HomeScreen({ navigation }: HomeProps) {
 
   return (
     <View style={styles.root}>
-      <ScrollView
+      <View style={styles.scroll} onLayout={(event) => setListViewport(event.nativeEvent.layout.height)}>
+      <Animated.ScrollView
         key={tab}
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
           { paddingTop: insets.top + 6 },
         ]}
+        showsVerticalScrollIndicator={false}
+        decelerationRate="normal"
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        onContentSizeChange={(_, height) => setListContent(height)}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -256,14 +267,9 @@ export default function HomeScreen({ navigation }: HomeProps) {
         {tab === 'overview' ? (
           <>
             <View style={styles.queryCard}>
-              <View style={styles.queryHeader}>
-                <View style={styles.queryIconWrap}>
-                  <Text style={styles.queryIcon}>🔍</Text>
-                </View>
-                <View style={styles.queryHeaderText}>
-                  <Text style={styles.queryTitle}>{t.home.queryExpressTitle}</Text>
-                  <Text style={styles.queryHint}>{t.home.queryExpressHint}</Text>
-                </View>
+              <View style={styles.queryHeaderText}>
+                <Text style={styles.queryTitle}>{t.home.queryExpressTitle}</Text>
+                <Text style={styles.queryHint}>{t.home.queryExpressHint}</Text>
               </View>
               <View style={styles.queryRow}>
                 <TextInput
@@ -331,12 +337,7 @@ export default function HomeScreen({ navigation }: HomeProps) {
               onPress={() => navigation.navigate('Pkg')}
             >
               <View style={styles.pkgCardHeader}>
-                <View style={styles.pkgTitleRow}>
-                  <View style={styles.pkgIconWrap}>
-                    <Text style={styles.pkgIcon}>📦</Text>
-                  </View>
-                  <Text style={styles.pkgCardTitle}>{t.home.packSection}</Text>
-                </View>
+                <Text style={styles.pkgCardTitle}>{t.home.packSection}</Text>
                 <Text style={styles.pkgCardMore}>
                   {stats.packCount > 0
                     ? fmt(t.home.packTotal, { count: stats.packCount })
@@ -446,31 +447,45 @@ export default function HomeScreen({ navigation }: HomeProps) {
             navigation={navigation}
           />
         ) : null}
-      </ScrollView>
+      </Animated.ScrollView>
+      <ScrollPositionRail scrollY={scrollY} viewportHeight={listViewport} contentHeight={listContent} />
+      </View>
 
-      <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+      <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
         {tabs.map((item) => {
           const active = tab === item.id;
+          if (item.id === 'scan') {
+            return (
+              <Pressable
+                key={item.id}
+                style={({ pressed }) => [styles.scanTab, pressed && styles.scanTabPressed]}
+                onPress={() => navigation.navigate('CameraScan')}
+                accessibilityRole="button"
+                accessibilityLabel={t.home.tileScan}
+              >
+                <View style={styles.scanTabMark}>
+                  <View style={styles.scanFrame}>
+                    <View style={[styles.scanCorner, styles.scanCornerTL]} />
+                    <View style={[styles.scanCorner, styles.scanCornerTR]} />
+                    <View style={[styles.scanCorner, styles.scanCornerBL]} />
+                    <View style={[styles.scanCorner, styles.scanCornerBR]} />
+                  </View>
+                </View>
+                <Text style={styles.scanTabLabel} numberOfLines={1}>
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          }
           return (
             <Pressable
               key={item.id}
-              style={styles.tabItem}
-              onPress={() => {
-                if (item.id === 'scan') {
-                  navigation.navigate('CameraScan');
-                  return;
-                }
-                setTab(item.id);
-              }}
+              style={[styles.tabItem, active && styles.tabItemActive]}
+              onPress={() => setTab(item.id)}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
-              accessibilityLabel={item.id === 'scan' ? t.home.tileScan : item.label}
+              accessibilityLabel={item.label}
             >
-              {item.icon === 'grid' ? (
-                <MoreGridIcon active={active} />
-              ) : (
-                <Text style={[styles.tabIcon, active && styles.tabIconActive]}>{item.icon}</Text>
-              )}
               <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1}>
                 {item.label}
               </Text>
@@ -478,17 +493,6 @@ export default function HomeScreen({ navigation }: HomeProps) {
           );
         })}
       </View>
-    </View>
-  );
-}
-
-function MoreGridIcon({ active }: { active: boolean }) {
-  const color = active ? '#7dd3fc' : '#94a3b8';
-  return (
-    <View style={styles.moreGrid} accessibilityElementsHidden>
-      {[0, 1, 2, 3].map((i) => (
-        <View key={i} style={[styles.moreDot, { backgroundColor: color }]} />
-      ))}
     </View>
   );
 }
@@ -560,21 +564,22 @@ function ActionSection({
             <Pressable
               style={({ pressed }) => [
                 styles.actionRow,
-                { borderColor: palette.border },
+                tile.screen === 'Items' && styles.actionRowFeatured,
                 pressed && styles.actionRowPressed,
               ]}
               onPress={() => navigation.navigate(tile.screen)}
               accessibilityRole="button"
               accessibilityLabel={tile.title}
             >
-              <View style={[styles.actionIconWrap, { backgroundColor: palette.wash }]}>
-                <Text style={styles.actionIcon}>{tile.icon}</Text>
-              </View>
               <View style={styles.actionCopy}>
-                <Text style={styles.actionTitle}>{tile.title}</Text>
-                <Text style={styles.actionHint}>{tile.hint}</Text>
+                <Text style={[styles.actionTitle, tile.screen === 'Items' && styles.actionTitleFeatured]}>
+                  {tile.title}
+                </Text>
+                <Text style={[styles.actionHint, tile.screen === 'Items' && styles.actionHintFeatured]}>
+                  {tile.hint}
+                </Text>
               </View>
-              <Text style={[styles.actionChevron, { color: palette.chevron }]}>›</Text>
+              <Text style={[styles.actionChevron, tile.screen === 'Items' && styles.actionChevronFeatured]}>›</Text>
             </Pressable>
           </React.Fragment>
         ))}
@@ -595,46 +600,72 @@ function StatCard({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#0f172a',
   },
   scroll: { flex: 1 },
   content: { paddingHorizontal: 16, paddingBottom: 20 },
   tabBar: {
     flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: '#0b1220',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(56, 189, 248, 0.14)',
-    backgroundColor: '#0f172a',
-    paddingTop: 8,
+    borderTopColor: '#1e293b',
+    paddingTop: 10,
+    paddingHorizontal: 8,
   },
   tabItem: {
     flex: 1,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-    paddingVertical: 4,
+    borderRadius: 14,
+    marginHorizontal: 3,
+    marginBottom: 2,
   },
-  tabIcon: { fontSize: 18, opacity: 0.55 },
-  tabIconActive: { opacity: 1 },
-  moreGrid: {
-    width: 18,
-    height: 18,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignContent: 'space-between',
-  },
-  moreDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 2,
+  tabItemActive: {
+    backgroundColor: '#1e293b',
   },
   tabLabel: {
     color: '#64748b',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
   tabLabelActive: {
+    color: '#f8fafc',
+    fontWeight: '800',
+  },
+  scanTab: {
+    width: 76,
+    alignItems: 'center',
+    marginTop: -22,
+    marginHorizontal: 4,
+  },
+  scanTabPressed: { opacity: 0.86 },
+  scanTabMark: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: '#0284c7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 4,
+    borderColor: '#0b1220',
+  },
+  scanFrame: { width: 22, height: 22 },
+  scanCorner: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    borderColor: '#f8fafc',
+  },
+  scanCornerTL: { top: 0, left: 0, borderTopWidth: 2, borderLeftWidth: 2 },
+  scanCornerTR: { top: 0, right: 0, borderTopWidth: 2, borderRightWidth: 2 },
+  scanCornerBL: { bottom: 0, left: 0, borderBottomWidth: 2, borderLeftWidth: 2 },
+  scanCornerBR: { bottom: 0, right: 0, borderBottomWidth: 2, borderRightWidth: 2 },
+  scanTabLabel: {
+    marginTop: 4,
     color: '#7dd3fc',
+    fontSize: 12,
     fontWeight: '800',
   },
   headerBar: {
@@ -709,11 +740,9 @@ const styles = StyleSheet.create({
   section: { marginBottom: 16 },
   sectionLabel: {
     color: '#e2e8f0',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 0,
-    marginBottom: 4,
-    textTransform: 'none',
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 2,
   },
   sectionHint: {
     color: '#64748b',
@@ -737,38 +766,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    borderRadius: 16,
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
     paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     borderWidth: 1,
+    borderColor: '#334155',
   },
   actionRowPressed: { opacity: 0.82 },
-  actionIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+  actionRowFeatured: {
+    backgroundColor: '#0369a1',
+    borderColor: '#7dd3fc',
+    borderWidth: 1.5,
+    paddingVertical: 16,
   },
-  actionIcon: { fontSize: 22 },
   actionCopy: { flex: 1, minWidth: 0 },
   actionTitle: { color: '#f8fafc', fontSize: 16, fontWeight: '800' },
+  actionTitleFeatured: { fontSize: 18, color: '#f0f9ff' },
   actionHint: { color: '#94a3b8', fontSize: 12, fontWeight: '600', marginTop: 2, lineHeight: 16 },
-  actionChevron: { fontSize: 28, fontWeight: '300', lineHeight: 28 },
+  actionHintFeatured: { color: '#e0f2fe', fontSize: 13 },
+  actionChevron: { color: '#64748b', fontSize: 22, fontWeight: '600' },
+  actionChevronFeatured: { color: '#ffffff', fontSize: 28 },
   statsGrid: {
     flexDirection: 'row',
     gap: 8,
   },
   stat: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    borderRadius: 14,
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 6,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.1)',
+    borderColor: '#334155',
   },
   statValue: {
     color: '#38bdf8',
@@ -786,12 +817,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 8,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    borderRadius: 14,
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: 'rgba(251, 191, 36, 0.2)',
+    borderColor: '#334155',
   },
   todayOutLabel: {
     color: '#e2e8f0',
@@ -819,17 +850,12 @@ const styles = StyleSheet.create({
   },
   alertWarn: { color: '#fbbf24', fontSize: 13, fontWeight: '600' },
   pkgCard: {
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    borderRadius: 20,
-    padding: 16,
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    padding: 14,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.22)',
-    shadowColor: '#a855f7',
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
+    borderColor: '#334155',
   },
   pkgCardHeader: {
     flexDirection: 'row',
@@ -877,47 +903,28 @@ const styles = StyleSheet.create({
   loadBadgeText: { fontSize: 10, fontWeight: '900' },
   pkgQty: { color: '#c4b5fd', fontSize: 12, fontWeight: '800' },
   queryCard: {
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    borderRadius: 20,
-    padding: 16,
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    padding: 14,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.28)',
-    shadowColor: '#0ea5e9',
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
+    borderColor: '#334155',
   },
-  queryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
-  },
-  queryIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: 'rgba(14, 165, 233, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  queryIcon: { fontSize: 18 },
-  queryHeaderText: { flex: 1 },
+  queryHeaderText: { flex: 1, marginBottom: 12 },
   queryTitle: { color: '#f8fafc', fontSize: 17, fontWeight: '900' },
   queryHint: { color: '#64748b', fontSize: 12, marginTop: 2, lineHeight: 17 },
   queryRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
   queryInput: {
     flex: 1,
     backgroundColor: '#0f172a',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 40,
+    fontSize: 14,
     color: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.35)',
+    borderColor: '#334155',
   },
   queryBtn: {
     backgroundColor: '#0ea5e9',

@@ -1,9 +1,12 @@
-import { FC, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, useEffect, useRef, useState } from 'react';
+import CblTablePagination from './CblTablePagination';
 import {
   fetchSignedInvoices,
   type SignedInvoiceListRow,
+  type SignedInvoiceYearCount,
 } from '../services/inventoryConsoleService';
 import { saveElementAsPng } from '../utils/saveElementAsPng';
+import { yangonYmdFromUtc } from '../utils/yangonFinancePeriod';
 
 type Props = {
   isEn: boolean;
@@ -19,28 +22,45 @@ function amountLabel(row: SignedInvoiceListRow): string {
   return '—';
 }
 
-function matches(row: SignedInvoiceListRow, query: string): boolean {
-  if (!query) return true;
-  const haystack = [row.invoice_no, row.customer_name, row.phone, row.trip_label, row.issued_on]
-    .join(' ')
-    .toLowerCase();
-  return haystack.includes(query);
-}
-
 const SignedInvoicesPanel: FC<Props> = ({ isEn }) => {
   const [rows, setRows] = useState<SignedInvoiceListRow[]>([]);
+  const [years, setYears] = useState<SignedInvoiceYearCount[]>([]);
+  const [year, setYear] = useState(() => yangonYmdFromUtc().y);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [searching, setSearching] = useState(false);
   const [open, setOpen] = useState<SignedInvoiceListRow | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const next = query.trim();
+      setDebouncedQuery((current) => (current === next ? current : next));
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError('');
-    void fetchSignedInvoices()
-      .then((list) => {
-        if (!cancelled) setRows(list);
+    void fetchSignedInvoices({
+      year,
+      q: debouncedQuery,
+      page,
+      pageSize,
+    })
+      .then((result) => {
+        if (cancelled) return;
+        setRows(result.invoices);
+        setTotal(result.total);
+        setYears(result.years);
+        setSearching(result.searching);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -59,12 +79,7 @@ const SignedInvoicesPanel: FC<Props> = ({ isEn }) => {
     return () => {
       cancelled = true;
     };
-  }, [isEn]);
-
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return rows.filter((row) => matches(row, q));
-  }, [query, rows]);
+  }, [debouncedQuery, isEn, page, pageSize, year]);
 
   return (
     <section className="cbl-card">
@@ -74,26 +89,55 @@ const SignedInvoicesPanel: FC<Props> = ({ isEn }) => {
       <div className="cbl-card__body">
         <p className="cbl-card-hint">
           {isEn
-            ? 'Each row is the invoice frozen when Inventory App finished signing. The number is the Yangon date plus that day’s sequence.'
-            : '每一行是 Inventory App 签收成功时定死的那张发票。发票号是仰光日期加上当天的顺序，例如 20261008-01。'}
+            ? 'Each row is the invoice frozen when Inventory App finished signing. Invoices are kept by Yangon year. Search looks through every year.'
+            : '每一行是 Inventory App 签收成功时定死的那张发票。按仰光年收藏，这一年的发票可以翻页看完。搜索会找全部年份。'}
         </p>
+        <div className="cbl-chip-row cbl-invoice-years" role="tablist" aria-label={isEn ? 'Invoice years' : '发票年份'}>
+          {(years.length ? years : [{ year, count: 0 }]).map((item) => (
+            <button
+              key={item.year}
+              type="button"
+              role="tab"
+              className={`cbl-chip${!searching && item.year === year ? ' is-active' : ''}`}
+              aria-selected={!searching && item.year === year}
+              onClick={() => {
+                setQuery('');
+                setDebouncedQuery('');
+                setYear(item.year);
+                setPage(1);
+              }}
+            >
+              {item.year}
+              <span className="cbl-chip__count">{item.count}</span>
+            </button>
+          ))}
+        </div>
         <input
           className="cbl-invoice-archive-search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder={isEn ? 'Invoice no., customer, or trip' : '发票号、客户或车次'}
+          placeholder={isEn ? 'Search all years: invoice, customer, phone, trip' : '搜索全部年份：发票号、客户、电话或车次'}
           aria-label={isEn ? 'Find an invoice' : '找发票'}
         />
-        {loading ? <p className="cbl-card-hint">{isEn ? 'Loading…' : '加载中…'}</p> : null}
-        {error ? <p className="cbl-card-hint">{error}</p> : null}
-        {!loading && !error && visible.length === 0 ? (
+        {searching ? (
           <p className="cbl-card-hint">
-            {isEn
-              ? 'No signed invoice is archived yet.'
-              : '还没有签收后定档的发票。'}
+            {isEn ? 'Searching every year.' : '正在全部年份里搜索。'}
           </p>
         ) : null}
-        {visible.length > 0 ? (
+        {loading ? <p className="cbl-card-hint">{isEn ? 'Loading…' : '加载中…'}</p> : null}
+        {error ? <p className="cbl-card-hint">{error}</p> : null}
+        {!loading && !error && rows.length === 0 ? (
+          <p className="cbl-card-hint">
+            {searching
+              ? isEn
+                ? 'No invoice matches.'
+                : '没有符合的发票。'
+              : isEn
+                ? `No signed invoice in ${year}.`
+                : `${year} 年还没有签收发票。`}
+          </p>
+        ) : null}
+        {rows.length > 0 ? (
           <div className="cbl-table-wrap">
             <table className="cbl-table">
               <thead>
@@ -106,7 +150,7 @@ const SignedInvoicesPanel: FC<Props> = ({ isEn }) => {
                 </tr>
               </thead>
               <tbody>
-                {visible.map((row) => (
+                {rows.map((row) => (
                   <tr key={row.id}>
                     <td>
                       <button type="button" className="cbl-btn cbl-btn--ghost cbl-btn--small" data-cbl-tip={isEn ? 'Open this invoice' : '查看这张发票'} onClick={() => setOpen(row)}>
@@ -123,20 +167,34 @@ const SignedInvoicesPanel: FC<Props> = ({ isEn }) => {
             </table>
           </div>
         ) : null}
+        {!error && total > 0 ? (
+          <CblTablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={total}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+            isEn={isEn}
+          />
+        ) : null}
       </div>
       {open ? <FrozenInvoiceSheet row={open} isEn={isEn} onClose={() => setOpen(null)} /> : null}
     </section>
   );
 };
 
-const FROZEN_TOTAL_LABELS: Array<{ kind: 'weight' | 'quote' | 'rate' | 'fee'; labels: string[] }> = [
+const FROZEN_TOTAL_LABELS: Array<{ kind: 'weight' | 'quote' | 'rate' | 'extra' | 'fee'; labels: string[] }> = [
   { kind: 'weight', labels: ['总重量', 'Total weight', 'စုစုပေါင်းအလေးချိန်'] },
   { kind: 'quote', labels: ['入库报价', 'Inbound quote', 'စာရင်းသွင်း ဈေး'] },
   { kind: 'rate', labels: ['汇率', 'Rate', 'ငွေလဲ'] },
+  { kind: 'extra', labels: ['附加费', 'Extra fee', 'ထပ်ဆောင်းခ'] },
   { kind: 'fee', labels: ['总费用', 'Total fee', 'စုစုပေါင်းခ'] },
 ];
 
-function splitFrozenTotal(line: string): { kind: 'weight' | 'quote' | 'rate' | 'fee' | 'skip'; label: string; value: string } {
+function splitFrozenTotal(line: string): { kind: 'weight' | 'quote' | 'rate' | 'extra' | 'fee' | 'skip'; label: string; value: string } {
   const text = line.trim();
   if (!text || /KG\s*=/i.test(text)) return { kind: 'skip', label: '', value: '' };
   const labels = FROZEN_TOTAL_LABELS.flatMap((group) =>

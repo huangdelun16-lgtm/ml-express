@@ -184,6 +184,7 @@ function packFromRow(row: CloudPackRow, items: InventoryItem[]): PackedShipmentD
     owner_store_code: row.owner_store_code, transport_fee: row.transport_fee,
     truck_leg_destination: row.truck_leg_destination, created_at: row.created_at,
     spec: bundle?.spec ?? '', unit: bundle?.unit ?? '1 Pcs', weight: bundle?.weight ?? '',
+    bundle_destination: bundle?.final_destination?.trim().toUpperCase() || '',
     items: lines, bundle_qty_on_hand: bundle?.qty_on_hand ?? (row.loaded_at ? 0 : 1),
     loaded: Boolean(row.loaded_at) || (bundle?.qty_on_hand ?? 1) <= 0,
   };

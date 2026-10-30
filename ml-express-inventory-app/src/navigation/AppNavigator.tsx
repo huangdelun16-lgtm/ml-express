@@ -53,7 +53,7 @@ export default function AppNavigator() {
     ...(language === 'my'
       ? { headerTitle: ({ children }: { children?: React.ReactNode }) => <MyanmarStackTitle>{children}</MyanmarStackTitle> }
       : {}),
-    contentStyle: { backgroundColor: colors.bgDeep },
+    contentStyle: { backgroundColor: colors.bg },
     headerShown: false,
   };
 

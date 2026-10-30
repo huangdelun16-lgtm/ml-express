@@ -185,8 +185,14 @@ export const LEDGER_CATEGORY_STYLE: Record<
     tint: 'rgba(52,211,153,0.12)',
     pillBg: 'rgba(52,211,153,0.18)',
   },
-  manual_expense: {
+  manualExpense: {
     icon: '📉',
+    accent: '#f87171',
+    tint: 'rgba(248,113,113,0.12)',
+    pillBg: 'rgba(248,113,113,0.18)',
+  },
+  export_cost: {
+    icon: '¥',
     accent: '#f87171',
     tint: 'rgba(248,113,113,0.12)',
     pillBg: 'rgba(248,113,113,0.18)',

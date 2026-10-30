@@ -14,6 +14,7 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
+import ScrollPositionRail from '../components/ScrollPositionRail';
 import { useAuth } from '../contexts/AuthContext';
 import {
   formatTimeAgo,
@@ -39,6 +40,8 @@ export default function ExceptionsScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { scrollY, onScroll } = useCollapsingHomeScroll();
+  const [listViewport, setListViewport] = useState(0);
+  const [listContent, setListContent] = useState(0);
   const { operatorName } = useAuth();
   const [tab, setTab] = useState<TabKey>('open');
   const [rows, setRows] = useState<InventoryExceptionRecord[]>([]);
@@ -123,11 +126,13 @@ export default function ExceptionsScreen() {
       {loading ? (
         <ActivityIndicator color="#f59e0b" style={styles.loader} />
       ) : (
+        <View style={{ flex: 1 }} onLayout={(event) => setListViewport(event.nativeEvent.layout.height)}>
         <FlatList
           style={{ flex: 1 }}
           data={rows}
           onScroll={onScroll}
           scrollEventThrottle={16}
+          onContentSizeChange={(_, height) => setListContent(height)}
           keyExtractor={(item) => item.id}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor="#f59e0b" />
@@ -165,6 +170,8 @@ export default function ExceptionsScreen() {
             );
           }}
         />
+        <ScrollPositionRail scrollY={scrollY} viewportHeight={listViewport} contentHeight={listContent} />
+        </View>
       )}
 
       <Modal visible={!!selected} transparent animationType="slide" onRequestClose={() => setSelected(null)}>

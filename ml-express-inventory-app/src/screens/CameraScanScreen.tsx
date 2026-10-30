@@ -32,6 +32,7 @@ import {
   isSameSignCustomer,
   type PackagingArrival,
 } from '../utils/scanPaidSign';
+import { regionDisplayLabel } from '../constants/destinationOptions';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
 type Nav = {
@@ -57,6 +58,17 @@ type ShortagePrompt = {
   note: string;
   qtyActual: string;
 };
+
+function scanPrimaryKind(
+  result: ScanResult,
+  canSign: boolean,
+): 'paidSign' | 'sign' | 'stockIn' | 'hub' | 'track' {
+  if (canSign && result.feePaid) return 'paidSign';
+  if (canSign) return 'sign';
+  if (result.route?.kind === 'stock_in') return 'stockIn';
+  if (result.hubPackBarcode) return 'hub';
+  return 'track';
+}
 
 function asInvoiceRow(item: InventoryItem): InventoryItemListRow {
   const extra = item as Partial<InventoryItemListRow>;
@@ -305,7 +317,6 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
   };
 
   const canSign = Boolean(result?.item && store && canMarkCustomerSigned(store, result.item));
-  const showPaidSign = canSign && Boolean(result?.feePaid) && !multiMode;
 
   const openSign = async (item: InventoryItem) => {
     if (!store) return;
@@ -401,8 +412,8 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
         {multiMode ? (
           <View style={styles.multiBox}>
             <Text style={styles.multiHint}>{fmt(t.cameraScan.multiHint, { count: basket.length })}</Text>
-            {basket.map((item) => (
-              <Text key={item.id} style={styles.multiCode} selectable>
+            {basket.map((item, index) => (
+              <Text key={`${item.id || item.barcode}-${index}`} style={styles.multiCode} selectable>
                 {item.barcode}
               </Text>
             ))}
@@ -437,64 +448,99 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
             <Text style={styles.lookupError}>{lookupError}</Text>
           </>
         ) : result ? (
-          <View style={loading ? styles.resultDimmed : undefined} pointerEvents={loading ? 'none' : 'auto'}>
-            <Text style={styles.code} selectable>
-              {result.code}
-            </Text>
-            <Text style={styles.meta}>
-              {result.item
-                ? `${t.common.localPrefix}${result.item.name} · ${fmt(t.common.stockQty, { qty: result.item.qty_on_hand })}`
-                : t.common.localNotFound}
-            </Text>
-            {result.cloudStatus ? (
-              <Text style={styles.meta}>
-                {t.common.cloudPrefix}
-                {result.cloudStatus}
-                {result.cloudRoute ? ` · ${result.cloudRoute}` : ''}
-              </Text>
-            ) : (
-              <Text style={styles.meta}>{t.common.cloudNoRecord}</Text>
-            )}
-            {result.feePaid ? <Text style={styles.feePaid}>{t.common.feePaid}</Text> : null}
-
-            <View style={styles.actions}>
-              <Pressable style={styles.actionPrimary} onPress={goTrack}>
-                <Text style={styles.actionPrimaryText}>{t.cameraScan.trackDetail}</Text>
-              </Pressable>
-              {showPaidSign ? (
+          <View style={[styles.resultCard, loading ? styles.resultDimmed : undefined]} pointerEvents={loading ? 'none' : 'auto'}>
+            {(() => {
+              const customer = result.item?.customer_name?.trim() || result.item?.recipient_name?.trim() || '';
+              const destination = regionDisplayLabel(result.item?.destination || result.item?.final_destination || '');
+              const who = [customer, destination].filter(Boolean).join(' · ');
+              const express = result.item?.input_barcode?.trim() || '';
+              const showExpress = Boolean(express && express.toUpperCase() !== result.code.toUpperCase());
+              const kind = scanPrimaryKind(result, canSign);
+              const primaryLabel =
+                kind === 'paidSign' || kind === 'sign'
+                  ? signRequest
+                    ? t.common.signInProgress
+                    : t.cameraScan.singleSign
+                  : kind === 'stockIn'
+                    ? t.cameraScan.goStockIn
+                    : kind === 'hub'
+                      ? t.cameraScan.goHubReceive
+                      : t.cameraScan.trackDetail;
+              const runPrimary = () => {
+                if (kind === 'paidSign') beginSingle();
+                else if (kind === 'sign' && result.item) void openSign(result.item);
+                else if (kind === 'stockIn') goStockIn();
+                else if (kind === 'hub') goHubReceive();
+                else goTrack();
+              };
+              return (
                 <>
-                  <Pressable style={styles.actionSign} onPress={beginSingle} disabled={loading}>
-                    <Text style={styles.actionSignText}>{t.cameraScan.singleSign}</Text>
-                  </Pressable>
-                  <Pressable style={styles.actionMulti} onPress={() => void beginMulti()} disabled={loading}>
-                    <Text style={styles.actionSignText}>{t.cameraScan.multiSign}</Text>
-                  </Pressable>
-                </>
-              ) : null}
-              {canSign && !result.feePaid ? (
-                <Pressable
-                  style={[styles.actionSign, signRequest && styles.actionDisabled]}
-                  onPress={() => {
-                    if (result.item) void openSign(result.item);
-                  }}
-                  disabled={signRequest != null}
-                >
-                  <Text style={styles.actionSignText}>
-                    {signRequest ? t.common.signInProgress : t.common.signed}
+                  <View style={styles.summaryTop}>
+                    <Text style={styles.summaryName} numberOfLines={2}>
+                      {result.item?.name || result.code}
+                    </Text>
+                    {result.cloudStatus ? <Text style={styles.statusChip}>{result.cloudStatus}</Text> : null}
+                  </View>
+                  <Text style={styles.summaryFact}>
+                    {result.item
+                      ? `${fmt(t.common.stockQty, { qty: result.item.qty_on_hand })}${result.item.weight ? ` · ${result.item.weight}` : ''}`
+                      : t.common.localNotFound}
                   </Text>
-                </Pressable>
-              ) : null}
-              {result.route?.kind === 'stock_in' ? (
-                <Pressable style={styles.action} onPress={goStockIn}>
-                  <Text style={styles.actionText}>{t.cameraScan.goStockIn}</Text>
-                </Pressable>
-              ) : null}
-              {result.hubPackBarcode ? (
-                <Pressable style={styles.action} onPress={goHubReceive}>
-                  <Text style={styles.actionText}>{t.cameraScan.goHubReceive}</Text>
-                </Pressable>
-              ) : null}
-            </View>
+                  {who ? <Text style={styles.summaryFact}>{who}</Text> : null}
+                  {result.cloudRoute ? (
+                    <Text style={styles.summaryFact}>
+                      {t.common.cloudPrefix}
+                      {result.cloudRoute}
+                    </Text>
+                  ) : (
+                    <Text style={styles.summaryMuted}>{t.common.cloudNoRecord}</Text>
+                  )}
+                  {result.feePaid ? <Text style={styles.feePaid}>{t.common.feePaid}</Text> : null}
+                  <Text style={styles.code} selectable>
+                    {result.code}
+                  </Text>
+                  {showExpress ? (
+                    <Text style={styles.summaryMuted} selectable>
+                      {t.trackExpress.expressNo} {express}
+                    </Text>
+                  ) : null}
+                  {multiMode ? null : (
+                    <>
+                      <Pressable
+                        style={[
+                          styles.primaryBtn,
+                          kind === 'paidSign' || kind === 'sign' ? styles.primarySign : null,
+                          signRequest && (kind === 'sign' || kind === 'paidSign') ? styles.actionDisabled : null,
+                        ]}
+                        onPress={runPrimary}
+                        disabled={loading || (signRequest != null && (kind === 'sign' || kind === 'paidSign'))}
+                      >
+                        <Text style={styles.primaryBtnText}>{primaryLabel}</Text>
+                      </Pressable>
+                      {kind !== 'track' ? (
+                        <View style={styles.secondaryRow}>
+                          {kind === 'paidSign' ? (
+                            <Pressable style={styles.secondaryBtn} onPress={() => void beginMulti()} disabled={loading}>
+                              <Text style={styles.secondaryText}>{t.cameraScan.multiSign}</Text>
+                            </Pressable>
+                          ) : null}
+                          {result.hubPackBarcode && kind !== 'hub' ? (
+                            <Pressable style={styles.secondaryBtn} onPress={goHubReceive}>
+                              <Text style={styles.secondaryText}>{t.cameraScan.goHubReceive}</Text>
+                            </Pressable>
+                          ) : null}
+                          {kind !== 'track' ? (
+                            <Pressable style={styles.secondaryBtn} onPress={goTrack}>
+                              <Text style={styles.secondaryText}>{t.cameraScan.trackDetail}</Text>
+                            </Pressable>
+                          ) : null}
+                        </View>
+                      ) : null}
+                    </>
+                  )}
+                </>
+              );
+            })()}
           </View>
         ) : null}
       </ScrollView>
@@ -556,7 +602,7 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0f172a' },
   scannerArea: { flex: 1, minHeight: 220 },
-  resultScroll: { maxHeight: 320, flexShrink: 1 },
+  resultScroll: { maxHeight: 380, flexShrink: 1 },
   resultPanel: {
     backgroundColor: '#0f172a',
     borderTopWidth: 1,
@@ -568,8 +614,51 @@ const styles = StyleSheet.create({
   placeholder: { color: '#94a3b8', fontSize: 13, textAlign: 'center', lineHeight: 18 },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'center', marginTop: 12 },
   resultDimmed: { opacity: 0.45 },
+  resultCard: {
+    backgroundColor: '#1e293b',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#334155',
+    padding: 12,
+  },
   loadingText: { color: '#94a3b8' },
-  code: { color: '#fde68a', fontSize: 16, fontWeight: '900', fontFamily: 'monospace' },
+  code: { color: '#7dd3fc', fontSize: 15, fontWeight: '900', fontFamily: 'monospace', marginTop: 8 },
+  summaryTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
+  summaryName: { color: '#f8fafc', fontSize: 18, fontWeight: '900', flex: 1 },
+  summaryFact: { color: '#e2e8f0', fontSize: 14, fontWeight: '700', marginTop: 6 },
+  summaryMuted: { color: '#94a3b8', fontSize: 12, marginTop: 4 },
+  statusChip: {
+    color: '#7dd3fc',
+    fontSize: 11,
+    fontWeight: '900',
+    backgroundColor: '#0f172a',
+    borderRadius: 8,
+    overflow: 'hidden',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  primaryBtn: {
+    marginTop: 12,
+    backgroundColor: '#0284c7',
+    borderRadius: 12,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primarySign: { backgroundColor: '#059669' },
+  primaryBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  secondaryRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  secondaryBtn: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#475569',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  secondaryText: { color: '#cbd5e1', fontWeight: '700', fontSize: 13 },
   meta: { color: '#94a3b8', fontSize: 13, marginTop: 6, lineHeight: 18 },
   feePaid: { color: '#86efac', fontSize: 13, fontWeight: '800', marginTop: 6 },
   lookupError: { color: '#fca5a5', fontSize: 14, fontWeight: '700', marginTop: 8, lineHeight: 20 },

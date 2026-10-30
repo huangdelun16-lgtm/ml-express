@@ -1,5 +1,6 @@
 import { fmt } from '../i18n/format';
 import { formatInvoiceUnitPrice, formatInvoiceWeight } from './batchSignInvoice';
+import { formatCnyAmount, cnyToMmk } from './crossBorderFx';
 
 export type FrozenInvoiceLineInput = {
   kind: 'single' | 'packaging';
@@ -30,6 +31,9 @@ export type FrozenSignedInvoiceDocument = {
   totals: string[];
   totalFeeCny: number | null;
   totalFeeMmk: number;
+  extraFeeCny?: number | null;
+  extraFeeReason?: string;
+  extraFeeMmk?: number;
   payNote: string;
   contactLabel: string;
   contactPhoneLabel: string;
@@ -100,6 +104,10 @@ export function buildFrozenSignedInvoiceDocument(input: {
   totalFee: string;
   totalFeeCny: number | null;
   totalFeeMmk: number;
+  extraFeeCny?: number | null;
+  extraFeeReason?: string;
+  extraFeeMmk?: number;
+  extraFeeLabel?: string;
   payNote: string;
   contactLabel: string;
   contactPhoneLabel: string;
@@ -125,8 +133,15 @@ export function buildFrozenSignedInvoiceDocument(input: {
   const totals = [
     `${input.labels.totalWeight} ${input.totalWeight || '—'}`,
     ...[input.totalQuote, ...input.unitRates, input.totalRate].map((line) => line.trim()).filter(Boolean),
-    `${input.labels.totalFee} ${input.totalFee || '—'}`,
   ];
+  const extraCny = input.extraFeeCny != null && input.extraFeeCny > 0 ? input.extraFeeCny : 0;
+  const extraReason = input.extraFeeReason?.trim() || '';
+  if (extraCny > 0 && extraReason) {
+    totals.push(
+      `${input.extraFeeLabel || '附加费'} ${extraReason} ¥${formatCnyAmount(extraCny)}`,
+    );
+  }
+  totals.push(`${input.labels.totalFee} ${input.totalFee || '—'}`);
 
   return {
     customerName: input.customerName.trim(),
@@ -147,11 +162,67 @@ export function buildFrozenSignedInvoiceDocument(input: {
     totals,
     totalFeeCny: input.totalFeeCny != null && input.totalFeeCny > 0 ? input.totalFeeCny : null,
     totalFeeMmk: input.totalFeeMmk > 0 ? input.totalFeeMmk : 0,
+    extraFeeCny: extraCny > 0 ? extraCny : null,
+    extraFeeReason: extraCny > 0 ? extraReason : '',
+    extraFeeMmk: extraCny > 0 ? input.extraFeeMmk || 0 : 0,
     payNote: input.payNote,
     contactLabel: input.contactLabel,
     contactPhoneLabel: input.contactPhoneLabel,
     contactPhones: input.contactPhones,
     contactKpay: input.contactKpay,
     contactSite: input.contactSite,
+  };
+}
+
+export type InvoiceExtraFeeInput = {
+  active: boolean;
+  cny: number;
+  reason: string;
+  invalidAmount: boolean;
+  missingReason: boolean;
+};
+
+/** 没填金额就当没有附加费。填了金额就必须有原因。 */
+export function readInvoiceExtraFee(amountRaw: string, reasonRaw: string): InvoiceExtraFeeInput {
+  const amountText = amountRaw.trim();
+  const reason = reasonRaw.trim();
+  if (!amountText) {
+    return { active: false, cny: 0, reason: '', invalidAmount: false, missingReason: false };
+  }
+  const cny = Number(amountText);
+  if (!Number.isFinite(cny) || cny <= 0) {
+    return { active: false, cny: 0, reason, invalidAmount: true, missingReason: false };
+  }
+  if (!reason) {
+    return { active: false, cny, reason: '', invalidAmount: false, missingReason: true };
+  }
+  return { active: true, cny, reason, invalidAmount: false, missingReason: false };
+}
+
+/** 附加费按发票上的汇率折成缅币，加进总费用。没有汇率时不能开票。 */
+export function invoiceTotalsWithExtra(input: {
+  freightCny: number | null;
+  freightMmk: number;
+  rate: number | null;
+  extraCny: number;
+}): { totalFeeCny: number | null; totalFeeMmk: number; extraMmk: number; missingRate: boolean } {
+  if (!(input.extraCny > 0)) {
+    return {
+      totalFeeCny: input.freightCny,
+      totalFeeMmk: input.freightMmk,
+      extraMmk: 0,
+      missingRate: false,
+    };
+  }
+  if (input.rate == null || input.rate <= 0) {
+    return { totalFeeCny: input.freightCny, totalFeeMmk: input.freightMmk, extraMmk: 0, missingRate: true };
+  }
+  const extraMmk = cnyToMmk(input.extraCny, input.rate) ?? 0;
+  const freightCny = input.freightCny != null && input.freightCny > 0 ? input.freightCny : 0;
+  return {
+    totalFeeCny: freightCny + input.extraCny,
+    totalFeeMmk: input.freightMmk + extraMmk,
+    extraMmk,
+    missingRate: false,
   };
 }

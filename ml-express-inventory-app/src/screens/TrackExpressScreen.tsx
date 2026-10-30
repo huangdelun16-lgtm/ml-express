@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import ScanInputBar from '../components/ScanInputBar';
 import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
+import ScrollPositionRail from '../components/ScrollPositionRail';
 import ItemsListRow from '../components/ItemsListRow';
 import CustomerSignFlowModal, { type CustomerSignFlowRequest } from '../components/CustomerSignFlowModal';
 import { SignaturePreview } from '../components/SignaturePad';
@@ -32,7 +33,7 @@ import { resolvePackagingStockInSignIds } from '../utils/customerBatchSign';
 import { canMarkCustomerSigned, isDestinationHubViewer } from '../utils/customerSign';
 import { formatCnyAmount, formatMmkAmount, fetchCrossBorderFxRate } from '../utils/crossBorderFx';
 import { hasRecordedFee, parseFeeMmk, resolveInvoiceFeeDisplay } from '../utils/crossBorderFxLock';
-import { parseInboundMovementNote, pickNotesFxLock } from '../utils/inboundMovementNote';
+import { customerFacingInboundNote, pickNotesFxLock } from '../utils/inboundMovementNote';
 import { stockUnitLabel } from '../utils/itemFieldFormat';
 import { packStatusStyle, type PackDisplayStatus } from '../utils/packDisplayStatus';
 import {
@@ -93,70 +94,72 @@ function LoadStatusBadge({ status }: { status: PackDisplayStatus }) {
   );
 }
 
-function PackSection({
-  pack,
-  title,
-  cloudPkg,
-}: {
-  pack: PackedShipmentDetail;
-  title: string;
-  cloudPkg?: PkgTrackingDetail | null;
-}) {
-  const { t, fmt } = useTranslation();
-  const displayStatus = resolveTrackPackDisplayStatus(pack, cloudPkg);
-  return (
-    <>
-      <Section title={title}>
-        <View style={styles.packHeader}>
-          <DetailRow label={t.trackExpress.packNo} value={pack.bundle_barcode} />
-          <LoadStatusBadge status={displayStatus} />
-        </View>
-        <DetailRow label={t.trackExpress.packName} value={pack.bundle_name} />
-        <DetailRow label={t.trackExpress.spec} value={pack.spec} />
-        <DetailRow label={t.trackExpress.unit} value={pack.unit} />
-        <DetailRow label={t.trackExpress.weight} value={pack.weight} />
-        <DetailRow label={t.trackExpress.packer} value={pack.operator} />
-        <DetailRow label={t.trackExpress.packTime} value={formatTime(pack.created_at)} />
-      </Section>
+function packLineKey(
+  line: { id?: string; item_barcode?: string; input_barcode?: string },
+  index: number,
+): string {
+  const id = String(line.id || '').trim();
+  if (id) return `${id}-${index}`;
+  const code = String(line.item_barcode || line.input_barcode || 'line').trim();
+  return `${code}-${index}`;
+}
 
-      <Section title={fmt(t.trackExpress.sectionPackItems, { count: pack.items.length })}>
-        {pack.items.map((line) => (
-          <View key={line.id} style={styles.packLine}>
-            <Text style={styles.packLineName}>{line.item_name}</Text>
+function PackSection({ pack, title }: { pack: PackedShipmentDetail; title: string }) {
+  const { t } = useTranslation();
+  const meta = [pack.bundle_barcode, pack.operator, formatTime(pack.created_at)].filter(Boolean).join(' · ');
+  const heading = pack.items.length > 0 ? `${title}（${pack.items.length}）` : title;
+  return (
+    <Section title={heading}>
+      {meta ? (
+        <Text style={styles.packMeta} selectable>
+          {meta}
+        </Text>
+      ) : null}
+      {pack.items.map((line, index) => (
+        <View key={packLineKey(line, index)} style={styles.packLine}>
+          <View style={styles.packLineIndex}>
+            <Text style={styles.packLineIndexText}>{String(index + 1).padStart(2, '0')}</Text>
+          </View>
+          <View style={styles.packLineBody}>
+            <Text style={styles.packLineName}>{line.item_name || '—'}</Text>
             {line.input_barcode ? (
               <Text style={styles.packLineCode} selectable>
                 {t.trackExpress.expressNo} {line.input_barcode}
               </Text>
             ) : null}
             <Text style={styles.packLineCode} selectable>
-              {t.trackExpress.inboundLabel} {line.item_barcode}
+              {t.trackExpress.inboundLabel} {line.item_barcode || '—'}
             </Text>
-            <Text style={styles.packLineQty}>× {line.qty}</Text>
           </View>
-        ))}
-      </Section>
-    </>
+          <Text style={styles.packLineQty}>× {line.qty}</Text>
+        </View>
+      ))}
+    </Section>
   );
 }
 
 function CloudTrackSection({
   pkg,
   order,
+  hideOrders,
+  knownPackBarcode,
 }: {
   pkg: PkgTrackingDetail | null;
   order: OrderTrackingRecord | null;
+  hideOrders?: boolean;
+  knownPackBarcode?: string;
 }) {
   const { t, fmt } = useTranslation();
   if (!pkg) return null;
+  const samePack = Boolean(knownPackBarcode && pkg.pack_barcode.trim() === knownPackBarcode.trim());
   return (
     <Section title={t.trackExpress.sectionCloud}>
-      <DetailRow label={t.trackExpress.cloudPkg} value={pkg.pack_barcode} />
+      {samePack ? null : <DetailRow label={t.trackExpress.cloudPkg} value={pkg.pack_barcode} />}
       <DetailRow
         label={t.trackExpress.transitStatus}
         value={getPkgStatusLabel(t, effectivePkgTrackingStatus(pkg))}
       />
       <DetailRow label={t.trackExpress.origin} value={`${pkg.origin_store_code} ${pkg.origin_store_name}`} />
-      <DetailRow label={t.trackExpress.destination} value={regionDisplayLabel(pkg.destination_code)} />
       <DetailRow
         label={t.trackExpress.orderProgress}
         value={fmt(t.trackExpress.orderProgressValue, {
@@ -170,15 +173,29 @@ function CloudTrackSection({
       {order ? (
         <DetailRow label={t.trackExpress.orderStatus} value={getOrderStatusLabel(t, order.status)} />
       ) : null}
-      {pkg.orders.map((line) => (
-        <View key={line.id} style={styles.packLine}>
-          <Text style={styles.packLineName}>{line.order_name}</Text>
-          <Text style={styles.packLineCode}>
-            {getOrderStatusLabel(t, line.status)}
-            {line.express_barcode ? ` · ${line.express_barcode}` : ''} · {line.order_barcode}
-          </Text>
-        </View>
-      ))}
+      {hideOrders
+        ? null
+        : pkg.orders.map((line, index) => (
+            <View
+              key={packLineKey(
+                { id: line.id, item_barcode: line.order_barcode, input_barcode: line.express_barcode },
+                index,
+              )}
+              style={styles.packLine}
+            >
+              <View style={styles.packLineIndex}>
+                <Text style={styles.packLineIndexText}>{String(index + 1).padStart(2, '0')}</Text>
+              </View>
+              <View style={styles.packLineBody}>
+                <Text style={styles.packLineName}>{line.order_name || '—'}</Text>
+                <Text style={styles.packLineCode} selectable>
+                  {getOrderStatusLabel(t, line.status)}
+                  {line.express_barcode ? ` · ${line.express_barcode}` : ''}
+                  {line.order_barcode ? ` · ${line.order_barcode}` : ''}
+                </Text>
+              </View>
+            </View>
+          ))}
     </Section>
   );
 }
@@ -187,18 +204,12 @@ function TrackResultPanel({
   result,
   cloudPkg,
   cloudOrder,
-  canSignDelivered,
-  signing,
-  onSignDelivered,
   liveRate,
   showCnyQuote,
 }: {
   result: TrackOrderResult;
   cloudPkg: PkgTrackingDetail | null;
   cloudOrder: OrderTrackingRecord | null;
-  canSignDelivered?: boolean;
-  signing?: boolean;
-  onSignDelivered?: () => void;
   liveRate: number | null;
   showCnyQuote: boolean;
 }) {
@@ -206,7 +217,6 @@ function TrackResultPanel({
   const { detail, parentPack, truckLoad } = result;
   const activePack = detail.pack ?? parentPack;
   const displayStatus = activePack ? resolveTrackPackDisplayStatus(activePack, cloudPkg) : null;
-  const showSign = canSignDelivered && onSignDelivered;
   const feeMmk = parseFeeMmk(detail.total_fee);
   const recordedFee = hasRecordedFee(detail.total_fee);
   const isFree = recordedFee && feeMmk <= 0;
@@ -223,9 +233,28 @@ function TrackResultPanel({
         })
       : null;
   const userNote =
-    parseInboundMovementNote(detail.note || '').userNote ||
-    detail.inbound_note?.trim() ||
+    customerFacingInboundNote(detail.note) ||
+    customerFacingInboundNote(detail.inbound_note) ||
     '';
+  const feeText = isFree
+    ? showCnyQuote
+      ? `¥0 · ${t.invoice.freePromo}`
+      : `0 MMK · ${t.invoice.freePromo}`
+    : feeDisplay
+      ? showCnyQuote && feeDisplay.cny != null
+        ? `${feeDisplay.usedLock ? t.invoice.settledCny : t.invoice.quoteCny} ¥${formatCnyAmount(feeDisplay.cny)} · ${fmt(t.invoice.bookedMmk, { amount: formatMmkAmount(feeDisplay.mmk) })}`
+        : `${formatMmkAmount(feeDisplay.mmk)} MMK`
+      : '';
+  const customer = detail.customer_name?.trim() || '';
+  const phone = detail.recipient_phone?.trim() || '';
+  const who = [customer, phone].filter(Boolean).join(' · ');
+  const destination = regionDisplayLabel(detail.destination ?? '');
+  const expressNo = detail.input_barcode?.trim() || '';
+  const inboundNo = detail.barcode?.trim() || '';
+  const primaryCode = expressNo || inboundNo;
+  const extraCode = expressNo && inboundNo && expressNo !== inboundNo ? inboundNo : '';
+  const specLine = [detail.spec, detail.packaging].map((part) => part?.trim()).filter(Boolean).join(' · ');
+  const listedPack = detail.pack ?? parentPack;
 
   const movementTypeLabel = (type: string) => {
     if (type === 'in') return t.common.inbound;
@@ -235,30 +264,51 @@ function TrackResultPanel({
 
   return (
     <View style={styles.result}>
-      <View style={styles.matchBanner}>
-        <Text style={styles.matchLabel}>
-          {fmt(t.trackExpress.matchType, { type: getMatchLabel(t, result.matchType) })}
-        </Text>
-        <Text style={styles.matchQuery} selectable>
-          {result.query}
-        </Text>
-      </View>
-
-      <Text style={styles.heroName}>{detail.name}</Text>
-      <Text style={styles.heroMeta}>
-        {fmt(t.common.stockQty, { qty: detail.qty_on_hand })} {stockUnitLabel()}
-      </Text>
-
-      {activePack && displayStatus ? (
-        <View style={styles.loadRow}>
-          <Text style={styles.loadLabel}>
-            {displayStatus === 'arrived' || displayStatus === 'completed'
-              ? t.trackExpress.transitStatus
-              : t.trackExpress.loadStatus}
-          </Text>
-          <LoadStatusBadge status={displayStatus} />
+      <View style={styles.heroCard}>
+        <View style={styles.heroTop}>
+          <View style={styles.heroNameWrap}>
+            <Text style={styles.matchLabel}>
+              {fmt(t.trackExpress.matchType, { type: getMatchLabel(t, result.matchType) })}
+            </Text>
+            <Text style={styles.heroName}>{detail.name}</Text>
+          </View>
+          {displayStatus ? (
+            <LoadStatusBadge status={displayStatus} />
+          ) : signed ? (
+            <View style={[styles.statusBadge, { backgroundColor: 'rgba(34,197,94,0.15)' }]}>
+              <Text style={[styles.statusText, { color: '#4ade80' }]}>{t.common.signed}</Text>
+            </View>
+          ) : null}
         </View>
-      ) : null}
+        <Text style={styles.heroMeta}>
+          {fmt(t.common.stockQty, { qty: detail.qty_on_hand })} {stockUnitLabel()}
+          {detail.weight ? ` · ${detail.weight}` : ''}
+        </Text>
+        {who ? (
+          <Text style={styles.heroFact} selectable>
+            {who}
+          </Text>
+        ) : null}
+        {destination ? <Text style={styles.heroFact}>{destination}</Text> : null}
+        {feeText ? <Text style={styles.heroFee}>{feeText}</Text> : null}
+        {showCnyQuote && feeDisplay?.legacySignedMmkOnly ? (
+          <Text style={styles.feeHint}>{t.invoice.legacySignedMmkOnly}</Text>
+        ) : null}
+        {specLine ? <Text style={styles.heroHint}>{specLine}</Text> : null}
+        {displayStatus === 'pending_load' ? (
+          <Text style={styles.heroHint}>{t.trackExpress.pendingPackHint}</Text>
+        ) : null}
+        {primaryCode ? (
+          <Text style={styles.heroCode} selectable>
+            {primaryCode}
+          </Text>
+        ) : null}
+        {extraCode ? (
+          <Text style={styles.heroCodeSub} selectable>
+            {t.trackExpress.inboundLabel} {extraCode}
+          </Text>
+        ) : null}
+      </View>
 
       {truckLoad ? (
         <Section title={t.trackExpress.sectionTruckLoad}>
@@ -267,59 +317,7 @@ function TrackResultPanel({
           <DetailRow label={t.trackExpress.operator} value={truckLoad.operator} />
           <DetailRow label={t.trackExpress.recordTime} value={formatTime(truckLoad.created_at)} />
         </Section>
-      ) : displayStatus === 'pending_load' ? (
-        <View style={styles.pendingHint}>
-          <Text style={styles.pendingHintText}>{t.trackExpress.pendingPackHint}</Text>
-        </View>
       ) : null}
-      {displayStatus === 'arrived' || displayStatus === 'completed' ? (
-        <View style={styles.pendingHint}>
-          <Text style={styles.pendingHintText}>{t.trackExpress.arrivedPackHint}</Text>
-        </View>
-      ) : null}
-
-      <Section title={t.trackExpress.sectionShipInfo}>
-        <DetailRow label={t.trackExpress.customerName} value={detail.customer_name} />
-        <DetailRow label={t.trackExpress.phone} value={detail.recipient_phone} />
-        <DetailRow label={t.trackExpress.destination} value={regionDisplayLabel(detail.destination ?? '')} />
-        <DetailRow label={t.trackExpress.packaging} value={detail.packaging} />
-        {isFree ? (
-          showCnyQuote ? (
-            <>
-              <DetailRow label={t.invoice.quoteCny} value={`¥0 · ${t.invoice.freePromo}`} />
-              <DetailRow
-                label={t.invoice.totalFee}
-                value={fmt(t.invoice.bookedMmk, { amount: formatMmkAmount(0) })}
-              />
-            </>
-          ) : (
-            <DetailRow label={t.invoice.totalFee} value={`0 MMK · ${t.invoice.freePromo}`} />
-          )
-        ) : feeDisplay ? (
-          showCnyQuote && feeDisplay.cny != null ? (
-            <>
-              <DetailRow
-                label={feeDisplay.usedLock ? t.invoice.settledCny : t.invoice.quoteCny}
-                value={`¥${formatCnyAmount(feeDisplay.cny)}`}
-              />
-              <DetailRow
-                label={t.invoice.totalFee}
-                value={fmt(t.invoice.bookedMmk, { amount: formatMmkAmount(feeDisplay.mmk) })}
-              />
-            </>
-          ) : (
-            <>
-              <DetailRow
-                label={t.invoice.totalFee}
-                value={`${formatMmkAmount(feeDisplay.mmk)} MMK`}
-              />
-              {showCnyQuote && feeDisplay.legacySignedMmkOnly ? (
-                <Text style={styles.feeHint}>{t.invoice.legacySignedMmkOnly}</Text>
-              ) : null}
-            </>
-          )
-        ) : null}
-      </Section>
 
       {detail.sign_receipt ? (
         <Section title={t.invoice.signTrace}>
@@ -351,18 +349,6 @@ function TrackResultPanel({
         </Section>
       ) : null}
 
-      <Section title={t.trackExpress.sectionItemInfo}>
-        <DetailRow label={t.trackExpress.itemName} value={detail.name} />
-        <DetailRow label={t.trackExpress.spec} value={detail.spec} />
-        <DetailRow label={t.trackExpress.unit} value={detail.unit} />
-        <DetailRow label={t.trackExpress.weight} value={detail.weight} />
-      </Section>
-
-      <Section title={t.trackExpress.sectionBarcode}>
-        <DetailRow label={t.trackExpress.expressNo} value={detail.input_barcode} />
-        <DetailRow label={t.trackExpress.inboundBarcode} value={detail.barcode} />
-      </Section>
-
       {userNote ? (
         <Section title={t.trackExpress.sectionNote}>
           <Text style={styles.noteText} selectable>
@@ -371,19 +357,22 @@ function TrackResultPanel({
         </Section>
       ) : null}
 
-      {detail.pack ? (
-        <PackSection pack={detail.pack} title={t.trackExpress.sectionPack} cloudPkg={cloudPkg} />
-      ) : null}
-      {parentPack ? (
-        <PackSection pack={parentPack} title={t.trackExpress.sectionParentPkg} cloudPkg={cloudPkg} />
+      {detail.pack ? <PackSection pack={detail.pack} title={t.trackExpress.sectionPack} /> : null}
+      {parentPack && parentPack.bundle_barcode !== detail.pack?.bundle_barcode ? (
+        <PackSection pack={parentPack} title={t.trackExpress.sectionParentPkg} />
       ) : null}
 
-      <CloudTrackSection pkg={cloudPkg} order={cloudOrder} />
+      <CloudTrackSection
+        pkg={cloudPkg}
+        order={cloudOrder}
+        hideOrders={Boolean(listedPack && listedPack.items.length > 0)}
+        knownPackBarcode={listedPack?.bundle_barcode}
+      />
 
       {result.recentMovements.length > 0 ? (
         <Section title={t.trackExpress.sectionMovements}>
-          {result.recentMovements.map((m) => (
-            <View key={m.id} style={styles.movementLine}>
+          {result.recentMovements.map((m, index) => (
+            <View key={`${m.id || m.created_at || 'move'}-${index}`} style={styles.movementLine}>
               <Text style={styles.movementType}>
                 {movementTypeLabel(m.type)} · {m.qty}
               </Text>
@@ -399,18 +388,6 @@ function TrackResultPanel({
           ))}
         </Section>
       ) : null}
-
-      {showSign ? (
-        <Pressable
-          style={[styles.signBtn, signing && styles.signBtnDisabled]}
-          onPress={onSignDelivered}
-          disabled={signing}
-        >
-          <Text style={styles.signBtnText}>
-            {signing ? t.common.signInProgress : t.common.signedMark}
-          </Text>
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -422,16 +399,56 @@ function CloudOnlyPanel({
   pkg: PkgTrackingDetail;
   order: OrderTrackingRecord | null;
 }) {
-  const { t } = useTranslation();
+  const { t, fmt } = useTranslation();
+  const routeLabel = [pkg.origin_store_code, regionDisplayLabel(pkg.destination_code)].filter(Boolean).join(' → ');
   return (
     <View style={styles.result}>
-      <View style={styles.matchBanner}>
+      <View style={styles.heroCard}>
         <Text style={styles.matchLabel}>{t.trackExpress.cloudOnly}</Text>
-        <Text style={styles.matchQuery} selectable>
+        <Text style={styles.heroName} selectable>
           {pkg.pack_barcode}
         </Text>
+        <Text style={styles.heroFact}>{getPkgStatusLabel(t, effectivePkgTrackingStatus(pkg))}</Text>
+        {routeLabel ? <Text style={styles.heroFact}>{routeLabel}</Text> : null}
+        <Text style={styles.heroHint}>
+          {fmt(t.trackExpress.orderProgressValue, {
+            done: pkg.received_order_count,
+            total: pkg.item_count,
+          })}
+        </Text>
+        {order ? (
+          <Text style={styles.heroHint}>
+            {order.order_name || getOrderStatusLabel(t, order.status)}
+          </Text>
+        ) : null}
       </View>
-      <CloudTrackSection pkg={pkg} order={order} />
+      {pkg.orders.length > 0 ? (
+        <Section title={fmt(t.trackExpress.sectionPackItems, { count: pkg.orders.length })}>
+          {pkg.orders.map((line, index) => (
+            <View
+              key={packLineKey(
+                { id: line.id, item_barcode: line.order_barcode, input_barcode: line.express_barcode },
+                index,
+              )}
+              style={styles.packLine}
+            >
+              <View style={styles.packLineIndex}>
+                <Text style={styles.packLineIndexText}>{String(index + 1).padStart(2, '0')}</Text>
+              </View>
+              <View style={styles.packLineBody}>
+                <Text style={styles.packLineName}>{line.order_name || '—'}</Text>
+                <Text style={styles.packLineCode} selectable>
+                  {getOrderStatusLabel(t, line.status)}
+                  {line.express_barcode ? ` · ${line.express_barcode}` : ''}
+                  {line.order_barcode ? ` · ${line.order_barcode}` : ''}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </Section>
+      ) : (
+        <CloudTrackSection pkg={pkg} order={order} hideOrders />
+      )}
     </View>
   );
 }
@@ -440,6 +457,8 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
   const { t, fmt } = useTranslation();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { scrollY, onScroll } = useCollapsingHomeScroll();
+  const [listViewport, setListViewport] = useState(0);
+  const [listContent, setListContent] = useState(0);
   const { store, hubCode, operatorName } = useAuth();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -451,6 +470,8 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
   const [keywordTotal, setKeywordTotal] = useState(0);
   const [notFound, setNotFound] = useState(false);
   const [liveRate, setLiveRate] = useState<number | null>(null);
+  const openedWithCode = Boolean(route?.params?.presetCode?.trim());
+  const [finderOpen, setFinderOpen] = useState(!openedWithCode);
 
   useEffect(() => {
     void fetchCrossBorderFxRate().then(setLiveRate);
@@ -528,12 +549,45 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
 
   useEffect(() => {
     const preset = route?.params?.presetCode;
-    if (preset) void search(preset);
+    if (preset) {
+      setFinderOpen(false);
+      void search(preset);
+    }
   }, [route?.params?.presetCode, search]);
 
   const canSign = Boolean(
     result && store && canMarkCustomerSigned(store, result.detail),
   );
+  const hasDetail = Boolean(result || cloudPkg || keywordMatches.length > 0);
+  const showFinder = finderOpen || (!openedWithCode && !hasDetail && !loading);
+  const finderAfterDetail = hasDetail;
+
+  const finder = showFinder ? (
+    <View>
+      {!hasDetail && !openedWithCode && !notFound ? (
+        <Text style={styles.intro}>{t.trackExpress.intro}</Text>
+      ) : null}
+      <ScanInputBar
+        value={code}
+        onChangeText={setCode}
+        onSubmit={search}
+        busy={loading}
+        preserveCase
+        cameraScan={{
+          title: t.trackExpress.cameraTitle,
+          subtitle: t.trackExpress.cameraSubtitle,
+        }}
+        placeholder={t.trackExpress.placeholder}
+      />
+      <Pressable
+        style={[styles.searchBtn, loading && styles.searchBtnDisabled]}
+        onPress={() => void search(code)}
+        disabled={loading}
+      >
+        <Text style={styles.searchBtnText}>{t.common.query}</Text>
+      </Pressable>
+    </View>
+  ) : null;
 
   const handleSign = () => {
     if (!result || !store) return;
@@ -558,35 +612,16 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
   return (
     <View style={styles.root}>
     <CollapsingHomeHeader title={t.nav.trackExpress} onHome={() => navigation.goBack()} scrollY={scrollY} />
+    <View style={styles.scroll} onLayout={(event) => setListViewport(event.nativeEvent.layout.height)}>
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, canSign && result ? styles.contentWithDock : null]}
       keyboardShouldPersistTaps="handled"
       onScroll={onScroll}
       scrollEventThrottle={16}
+      onContentSizeChange={(_, height) => setListContent(height)}
     >
-      <Text style={styles.intro}>{t.trackExpress.intro}</Text>
-
-      <ScanInputBar
-        value={code}
-        onChangeText={setCode}
-        onSubmit={search}
-        busy={loading}
-        preserveCase
-        cameraScan={{
-          title: t.trackExpress.cameraTitle,
-          subtitle: t.trackExpress.cameraSubtitle,
-        }}
-        placeholder={t.trackExpress.placeholder}
-      />
-
-      <Pressable
-        style={[styles.searchBtn, loading && styles.searchBtnDisabled]}
-        onPress={() => void search(code)}
-        disabled={loading}
-      >
-        <Text style={styles.searchBtnText}>{t.common.query}</Text>
-      </Pressable>
+      {!finderAfterDetail ? finder : null}
 
       {loading ? (
         <View style={styles.loadingBox}>
@@ -608,9 +643,12 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
             {fmt(t.trackExpress.keywordResults, { count: keywordTotal })}
           </Text>
           <Text style={styles.keywordHint}>{t.trackExpress.tapForDetail}</Text>
-          {keywordMatches.map((item) => (
+          {keywordMatches.map((item, index) => (
             <ItemsListRow
-              key={item.id}
+              key={packLineKey(
+                { id: item.id, item_barcode: item.barcode, input_barcode: item.input_barcode },
+                index,
+              )}
               item={item}
               hubCode={hubCode ?? undefined}
               selected={false}
@@ -632,15 +670,19 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
           result={result}
           cloudPkg={cloudPkg}
           cloudOrder={cloudOrder}
-          canSignDelivered={canSign}
-          signing={signRequest != null}
-          onSignDelivered={handleSign}
           liveRate={liveRate}
           showCnyQuote={Boolean(store && isDestinationHubViewer(store, result.detail))}
         />
       ) : null}
       {!result && keywordMatches.length === 0 && cloudPkg ? (
         <CloudOnlyPanel pkg={cloudPkg} order={cloudOrder} />
+      ) : null}
+
+      {finderAfterDetail ? finder : null}
+      {!showFinder && !loading ? (
+        <Pressable style={styles.searchAgain} onPress={() => setFinderOpen(true)}>
+          <Text style={styles.searchAgainText}>{t.trackExpress.searchAgain}</Text>
+        </Pressable>
       ) : null}
 
       <CustomerSignFlowModal
@@ -660,6 +702,21 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
         onError={(message) => feedbackService.notify(t.common.signFailed, message)}
       />
     </ScrollView>
+    <ScrollPositionRail scrollY={scrollY} viewportHeight={listViewport} contentHeight={listContent} />
+    </View>
+    {canSign && result ? (
+      <View style={styles.signDock}>
+        <Pressable
+          style={[styles.signBtn, signRequest != null && styles.signBtnDisabled]}
+          onPress={handleSign}
+          disabled={signRequest != null}
+        >
+          <Text style={styles.signBtnText}>
+            {signRequest ? t.common.signInProgress : t.cameraScan.singleSign}
+          </Text>
+        </Pressable>
+      </View>
+    ) : null}
     </View>
   );
 }
@@ -668,6 +725,9 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0f172a' },
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 32 },
+  contentWithDock: { paddingBottom: 24 },
+  searchAgain: { alignSelf: 'flex-start', paddingVertical: 10 },
+  searchAgainText: { color: '#7dd3fc', fontSize: 14, fontWeight: '800' },
   intro: { color: '#94a3b8', fontSize: 13, lineHeight: 20, marginBottom: 16 },
   searchBtn: {
     backgroundColor: '#0ea5e9',
@@ -704,7 +764,22 @@ const styles = StyleSheet.create({
   matchLabel: { color: '#7dd3fc', fontSize: 12, fontWeight: '800' },
   matchQuery: { color: '#e0f2fe', fontSize: 16, fontWeight: '900', fontFamily: 'monospace', marginTop: 4 },
   heroName: { color: '#f8fafc', fontSize: 22, fontWeight: '900' },
-  heroMeta: { color: '#fbbf24', fontSize: 14, fontWeight: '800', marginTop: 6, marginBottom: 12 },
+  heroMeta: { color: '#fbbf24', fontSize: 14, fontWeight: '800', marginTop: 6 },
+  heroCard: {
+    backgroundColor: '#1e293b',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  heroTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
+  heroNameWrap: { flex: 1, minWidth: 0 },
+  heroFact: { color: '#e2e8f0', fontSize: 15, fontWeight: '700', marginTop: 8 },
+  heroFee: { color: '#fde68a', fontSize: 16, fontWeight: '900', marginTop: 8 },
+  heroHint: { color: '#94a3b8', fontSize: 13, marginTop: 8, lineHeight: 18 },
+  heroCode: { color: '#7dd3fc', fontSize: 15, fontWeight: '800', marginTop: 10, fontFamily: 'monospace' },
+  heroCodeSub: { color: '#94a3b8', fontSize: 12, fontWeight: '700', marginTop: 4, fontFamily: 'monospace' },
   loadRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
   loadLabel: { color: '#94a3b8', fontSize: 13, fontWeight: '700' },
   statusBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
@@ -745,14 +820,33 @@ const styles = StyleSheet.create({
   noteText: { color: '#cbd5e1', fontSize: 14, lineHeight: 21 },
   feeHint: { color: '#94a3b8', fontSize: 12, fontWeight: '600', textAlign: 'right' as const, marginTop: 4 },
   packHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
-  packLine: {
-    paddingVertical: 6,
+  packMeta: { color: '#94a3b8', fontSize: 12, fontWeight: '700', marginBottom: 4 },
+  packLineStack: {
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#334155',
   },
+  packLine: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+  },
+  packLineIndex: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#0f172a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  packLineIndexText: { color: '#7dd3fc', fontSize: 11, fontWeight: '900' },
+  packLineBody: { flex: 1, minWidth: 0 },
   packLineName: { color: '#f8fafc', fontSize: 14, fontWeight: '800' },
   packLineCode: { color: '#fde68a', fontSize: 12, marginTop: 2, fontFamily: 'monospace' },
-  packLineQty: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
+  packLineQty: { color: '#94a3b8', fontSize: 13, fontWeight: '800', marginTop: 2 },
   movementLine: {
     paddingVertical: 8,
     borderBottomWidth: 1,
@@ -764,13 +858,20 @@ const styles = StyleSheet.create({
   signBtn: {
     backgroundColor: '#059669',
     borderRadius: 14,
-    paddingVertical: 16,
+    minHeight: 52,
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 8,
+    justifyContent: 'center',
   },
   signBtnDisabled: { opacity: 0.65 },
   signBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  signDock: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 16,
+    backgroundColor: '#0f172a',
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+  },
   signatureBox: { marginTop: 8, gap: 8 },
   signatureLabel: { color: '#94a3b8', fontSize: 12, fontWeight: '800' },
 });

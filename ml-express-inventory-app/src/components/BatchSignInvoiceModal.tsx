@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -34,6 +36,8 @@ import {
 import {
   buildFrozenSignedInvoiceDocument,
   invoiceLineMeasure,
+  invoiceTotalsWithExtra,
+  readInvoiceExtraFee,
   type FrozenInvoiceHandoff,
 } from '../utils/frozenSignedInvoice';
 import { freezeSignedInvoice } from '../services/signedInvoiceArchive';
@@ -202,7 +206,6 @@ export default function BatchSignInvoiceModal({
   const paperHeightRef = useRef(0);
   const [paperHeight, setPaperHeight] = useState(1100);
   const sheetMaxHeight = Math.round(windowHeight * 0.9);
-  const listMaxHeight = Math.max(240, sheetMaxHeight - 88);
   const frameWidth = Math.max(280, windowWidth - 48);
   const paperScale = frameWidth / PAPER_WIDTH;
   const [loading, setLoading] = useState(false);
@@ -213,7 +216,10 @@ export default function BatchSignInvoiceModal({
   const [heading, setHeading] = useState<InvoiceHeading | null>(null);
   const [signedItemIds, setSignedItemIds] = useState<string[]>([]);
   const [invoiceNo, setInvoiceNo] = useState('');
+  const [extraAmount, setExtraAmount] = useState('');
+  const [extraReason, setExtraReason] = useState('');
   const [issuing, setIssuing] = useState(false);
+  const listMaxHeight = Math.max(180, sheetMaxHeight - (invoiceNo ? 88 : 220));
 
   const customerName = useMemo(() => {
     const first = selectedItems[0];
@@ -227,6 +233,8 @@ export default function BatchSignInvoiceModal({
       setHeading(null);
       setSignedItemIds([]);
       setInvoiceNo('');
+      setExtraAmount('');
+      setExtraReason('');
       setIssuing(false);
       setError('');
       setLoading(false);
@@ -341,6 +349,15 @@ export default function BatchSignInvoiceModal({
   };
 
   const pieceCount = model?.lines.reduce((sum, line) => sum + Math.max(line.expressNos.length, 1), 0) ?? 0;
+  const extraFee = readInvoiceExtraFee(extraAmount, extraReason);
+  const priced = model
+    ? invoiceTotalsWithExtra({
+        freightCny: model.totalFeeCny,
+        freightMmk: model.totalFeeMmk,
+        rate: model.rate,
+        extraCny: extraFee.active ? extraFee.cny : 0,
+      })
+    : null;
 
   const issuedDocument = () => {
     if (!model || !heading) return null;
@@ -396,9 +413,13 @@ export default function BatchSignInvoiceModal({
             ? fmt(t.invoice.settlementRate, { rate: formatMmkAmount(model.rate) })
             : '',
         unitRates,
-        totalFee: feeLabel(model.totalFeeMmk, t.invoice.freePromo),
-        totalFeeCny: model.totalFeeCny,
-        totalFeeMmk: model.totalFeeMmk,
+        totalFee: feeLabel(priced?.totalFeeMmk ?? model.totalFeeMmk, t.invoice.freePromo),
+        totalFeeCny: priced?.totalFeeCny ?? model.totalFeeCny,
+        totalFeeMmk: priced?.totalFeeMmk ?? model.totalFeeMmk,
+        extraFeeCny: extraFee.active ? extraFee.cny : null,
+        extraFeeReason: extraFee.active ? extraFee.reason : '',
+        extraFeeMmk: extraFee.active ? priced?.extraMmk || 0 : 0,
+        extraFeeLabel: t.invoice.extraFee,
         payNote: t.invoice.payNote,
         contactLabel: t.invoice.contact,
         contactPhoneLabel: t.invoice.contactPhoneLabel,
@@ -411,6 +432,18 @@ export default function BatchSignInvoiceModal({
 
   const issueInvoice = async () => {
     if (!onContinue || issuing || invoiceNo) return;
+    if (extraFee.invalidAmount) {
+      feedbackService.notify(t.invoice.extraFeeInvalid);
+      return;
+    }
+    if (extraFee.missingReason) {
+      feedbackService.notify(t.invoice.extraFeeNeedReason);
+      return;
+    }
+    if (extraFee.active && priced?.missingRate) {
+      feedbackService.notify(t.invoice.rateRequired);
+      return;
+    }
     const handoff = issuedDocument();
     if (!handoff) return;
     setIssuing(true);
@@ -516,10 +549,16 @@ export default function BatchSignInvoiceModal({
                   <Text style={styles.totalValue}>{rate.value}</Text>
                 </View>
               ) : null}
+              {extraFee.active ? (
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>{t.invoice.extraFee}</Text>
+                  <Text style={styles.totalValue}>{`${extraFee.reason} ¥${formatCnyAmount(extraFee.cny)}`}</Text>
+                </View>
+              ) : null}
               <View style={styles.feeRow}>
                 <Text style={styles.feeLabel}>{t.invoice.batchTotalFee}</Text>
                 <Text style={styles.feeValue} myanmarWeight="bold">
-                  {feeLabel(model.totalFeeMmk, t.invoice.freePromo)}
+                  {feeLabel(priced?.totalFeeMmk ?? model.totalFeeMmk, t.invoice.freePromo)}
                 </Text>
               </View>
             </View>
@@ -549,7 +588,10 @@ export default function BatchSignInvoiceModal({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t.invoice.close} />
-        <View style={[styles.sheet, { maxHeight: sheetMaxHeight }]}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={[styles.sheet, { maxHeight: sheetMaxHeight }]}
+        >
           {loading ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator color="#1c1917" size="large" />
@@ -571,6 +613,27 @@ export default function BatchSignInvoiceModal({
                 </View>
               </View>
             </ScrollView>
+          ) : null}
+
+          {model && heading && !invoiceNo ? (
+            <View style={styles.extraForm}>
+              <Text style={styles.extraTitle}>{t.invoice.extraFee}</Text>
+              <TextInput
+                value={extraReason}
+                onChangeText={setExtraReason}
+                placeholder={t.invoice.extraFeeReason}
+                placeholderTextColor="#a8a29e"
+                style={styles.extraInput}
+              />
+              <TextInput
+                value={extraAmount}
+                onChangeText={setExtraAmount}
+                placeholder={t.invoice.extraFeeAmount}
+                placeholderTextColor="#a8a29e"
+                keyboardType="decimal-pad"
+                style={styles.extraInput}
+              />
+            </View>
           ) : null}
 
           <View style={styles.actions}>
@@ -647,7 +710,7 @@ export default function BatchSignInvoiceModal({
               </>
             )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
         {model && heading ? (
           <View style={styles.captureHost} pointerEvents="none">
             <View
@@ -783,6 +846,24 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   listContent: { paddingBottom: 4, alignItems: 'center' },
+  extraForm: {
+    marginTop: 10,
+    gap: 8,
+    padding: 12,
+    backgroundColor: '#f7f3ea',
+    borderWidth: 1,
+    borderColor: '#1c1917',
+  },
+  extraTitle: { color: '#1c1917', fontSize: 14, fontWeight: '800' },
+  extraInput: {
+    minHeight: 42,
+    borderWidth: 1,
+    borderColor: 'rgba(28, 25, 23, 0.2)',
+    paddingHorizontal: 12,
+    color: '#1c1917',
+    backgroundColor: '#fff',
+    fontSize: 15,
+  },
   actions: {
     marginTop: 12,
     flexDirection: 'row',

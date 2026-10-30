@@ -10,6 +10,7 @@ vi.mock('../services/supabase', () => ({
 import {
   formatCrossBorderCnyHint,
   pickRoutePerKgFromRows,
+  quoteCnyForEditedWeight,
   shouldShowCrossBorderQuote,
 } from './crossBorderPricing';
 
@@ -69,6 +70,30 @@ describe('pickRoutePerKgFromRows', () => {
         'MDY',
       ),
     ).toEqual({ perKg: 0, usedCustomerRate: false });
+  });
+});
+
+describe('quoteCnyForEditedWeight', () => {
+  it('uses the written CNY per kg times the new weight', () => {
+    expect(
+      quoteCnyForEditedWeight({
+        cnyPerKg: 40,
+        perKgMmk: 28120,
+        mmkPerCny: 703,
+        weightKg: 0.5,
+      }),
+    ).toBe(20);
+  });
+
+  it('converts the MMK rate when no CNY price is stored', () => {
+    expect(
+      quoteCnyForEditedWeight({
+        cnyPerKg: null,
+        perKgMmk: 28120,
+        mmkPerCny: 703,
+        weightKg: 0.1,
+      }),
+    ).toBe(4);
   });
 });
 

@@ -8,52 +8,44 @@ import { sumHomeTodoCounts } from '../utils/homeTodoQueue';
 
 const TODO_VISUAL: Record<
   HomeTodoKey,
-  { icon: string; accent: string; bg: string; border: string }
+  { accent: string; bg: string; border: string }
 > = {
   hubArrive: {
-    icon: '🚛',
     accent: '#38bdf8',
     bg: 'rgba(14,165,233,0.12)',
     border: 'rgba(56,189,248,0.28)',
   },
   transportFee: {
-    icon: '💵',
     accent: '#fbbf24',
     bg: 'rgba(245,158,11,0.12)',
     border: 'rgba(251,191,36,0.28)',
   },
   hubInbound: {
-    icon: '📥',
     accent: '#34d399',
     bg: 'rgba(16,185,129,0.12)',
     border: 'rgba(52,211,153,0.28)',
   },
   exceptions: {
-    icon: '⚠️',
     accent: '#f59e0b',
     bg: 'rgba(245,158,11,0.12)',
     border: 'rgba(245,158,11,0.32)',
   },
   notify: {
-    icon: '📲',
     accent: '#4ade80',
     bg: 'rgba(22,163,74,0.12)',
     border: 'rgba(74,222,128,0.28)',
   },
   sign: {
-    icon: '✍️',
     accent: '#34d399',
     bg: 'rgba(5,150,105,0.12)',
     border: 'rgba(52,211,153,0.28)',
   },
   pack: {
-    icon: '📦',
     accent: '#c4b5fd',
     bg: 'rgba(168,85,247,0.12)',
     border: 'rgba(168,85,247,0.28)',
   },
   truckLoad: {
-    icon: '🚚',
     accent: '#f87171',
     bg: 'rgba(239,68,68,0.12)',
     border: 'rgba(248,113,113,0.28)',
@@ -96,9 +88,6 @@ export default function HomeTodoQueue({ t, items, onOpen }: Props) {
     <View style={styles.card}>
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <View style={styles.iconWrap}>
-            <Text style={styles.headerIcon}>🗂️</Text>
-          </View>
           <View style={styles.titleText}>
             <Text style={styles.title}>{t.home.todoTitle}</Text>
             <Text style={styles.hint}>{t.home.todoHint}</Text>
@@ -129,9 +118,6 @@ export default function HomeTodoQueue({ t, items, onOpen }: Props) {
               accessibilityRole="button"
               accessibilityLabel={`${label} ${item.count}`}
             >
-              <View style={[styles.rowIcon, { backgroundColor: visual.bg, borderColor: visual.border }]}>
-                <Text style={styles.rowEmoji}>{visual.icon}</Text>
-              </View>
               <Text style={styles.rowLabel} numberOfLines={1}>
                 {label}
               </Text>
@@ -149,17 +135,12 @@ export default function HomeTodoQueue({ t, items, onOpen }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    borderRadius: 20,
-    padding: 16,
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    padding: 14,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(251, 191, 36, 0.22)',
-    shadowColor: '#f59e0b',
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
+    borderColor: '#334155',
   },
   header: {
     flexDirection: 'row',

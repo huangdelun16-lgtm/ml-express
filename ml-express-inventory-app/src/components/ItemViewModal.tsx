@@ -65,6 +65,7 @@ function mapDetailToInvoice(
       };
     })(),
     totalFee: detail.total_fee,
+    quoteCny: detail.quote_cny,
     paymentLabel: detail.payment_label,
     note: detail.inbound_note,
     storeName: detail.inbound_store_name?.trim() || undefined,
@@ -182,8 +183,8 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
               {exceptions.length > 0 ? (
                 <View style={styles.exceptionBox}>
                   <Text style={styles.exceptionTitle}>{t.exception.existing}</Text>
-                  {exceptions.map((row) => (
-                    <Text key={row.id} style={styles.exceptionLine}>
+                  {exceptions.map((row, index) => (
+                    <Text key={`${row.id || row.created_at || 'ex'}-${index}`} style={styles.exceptionLine}>
                       {getExceptionTypeLabel(t, row.exception_type)}
                       {row.status === 'open' ? ` · ${t.exception.statusOpen}` : ` · ${t.exception.statusResolved}`}
                       {row.qty_expected != null && row.qty_actual != null

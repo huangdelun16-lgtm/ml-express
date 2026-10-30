@@ -181,6 +181,8 @@ export type InventoryCustomerSummary = {
   /** 和明细同一套：报价、签收锁定、未签收单价×重量 */
   totalCny?: number | null;
   totalMmk?: number | null;
+  /** 订单目的地，未建档补登记时用来对上城市 */
+  destinationHub?: string;
   /** 该客户全部已签收、且签收币种不是人民币的缅币。不含未签收。 */
   signedMmkIncome?: number;
   /** 该客户签收时明确选了人民币的金额。不含未签收，也不含缅币签收。 */
@@ -268,6 +270,12 @@ export type InventoryConsoleData = {
   transportFeeTotal?: number;
   openExceptionCount?: number;
   openExceptions?: InventoryExceptionConsoleRow[];
+  /** 全站待打包，口径同库存首页 */
+  pendingPackCount?: number;
+  /** 全站待装车 */
+  pendingTruckLoadCount?: number;
+  /** 全站已到站、还没通知客户 */
+  pendingNotifyCount?: number;
   crossBorderFinance?: CrossBorderFinance;
   warnings?: string[];
 };
@@ -542,6 +550,9 @@ export async function fetchInventoryConsoleOverview(): Promise<{
   transportFeeTotal?: number;
   openExceptionCount?: number;
   openExceptions?: InventoryExceptionConsoleRow[];
+  pendingPackCount?: number;
+  pendingTruckLoadCount?: number;
+  pendingNotifyCount?: number;
   warnings?: string[];
 }> {
   const payload = await fetchInventoryConsoleSection('overview');
@@ -551,6 +562,9 @@ export async function fetchInventoryConsoleOverview(): Promise<{
     transportFeeTotal: payload.transportFeeTotal,
     openExceptionCount: payload.openExceptionCount ?? 0,
     openExceptions: mapConsoleExceptionRows(payload.openExceptions),
+    pendingPackCount: Number(payload.pendingPackCount) || 0,
+    pendingTruckLoadCount: Number(payload.pendingTruckLoadCount) || 0,
+    pendingNotifyCount: Number(payload.pendingNotifyCount) || 0,
     warnings: payload.warnings,
   };
 }
@@ -660,6 +674,39 @@ export async function fetchInventoryConsoleOrdersByPack(packBarcode: string): Pr
     recentOrders: (payload.recentOrders ?? []) as InventoryOrderRow[],
     ordersTruncated: Boolean(payload.ordersTruncated),
     warnings: payload.warnings,
+  };
+}
+
+export type PeriodSignedIncome = {
+  mmk: number;
+  cny: number;
+  freightMmk: number;
+  freightCny: number;
+  extraMmk: number;
+  extraCny: number;
+};
+
+export async function fetchPeriodSignedIncome(
+  period?: FinancePeriodParams | null,
+): Promise<PeriodSignedIncome> {
+  const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
+  url.searchParams.set('section', 'period-income');
+  applyFinancePeriodParams(url, period);
+  const response = await adminAuthenticatedFetch(url.toString(), {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `加载本期收入失败 (${response.status})`);
+  }
+  return {
+    mmk: Number(payload.mmk) || 0,
+    cny: Number(payload.cny) || 0,
+    freightMmk: Number(payload.freightMmk) || 0,
+    freightCny: Number(payload.freightCny) || 0,
+    extraMmk: Number(payload.extraMmk) || 0,
+    extraCny: Number(payload.extraCny) || 0,
   };
 }
 
@@ -1422,9 +1469,100 @@ export type ExportCostRecord = {
   created_at: string;
 };
 
+export type HqQueueKind = 'pack' | 'truck' | 'notify';
+
+export type HqQueueRow = {
+  barcode: string;
+  expressNo?: string;
+  name?: string;
+  customer?: string;
+  destination?: string;
+  weightKg?: number;
+  qty?: number;
+  arrivedAt?: string;
+  storeCode?: string;
+};
+
+export async function fetchHqQueue(
+  queue: HqQueueKind,
+  options?: { storeCode?: string; page?: number; pageSize?: number },
+): Promise<{
+  total: number;
+  page: number;
+  pageSize: number;
+  truncated: boolean;
+  rows: HqQueueRow[];
+}> {
+  const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
+  url.searchParams.set('section', 'hq-queue');
+  url.searchParams.set('queue', queue);
+  if (options?.storeCode) url.searchParams.set('storeCode', options.storeCode);
+  if (options?.page) url.searchParams.set('page', String(options.page));
+  if (options?.pageSize) url.searchParams.set('pageSize', String(options.pageSize));
+  const response = await adminAuthenticatedFetch(url.toString(), { method: 'GET', credentials: 'include' });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `加载失败 (${response.status})`);
+  return {
+    total: Number(payload.total) || 0,
+    page: Number(payload.page) || 1,
+    pageSize: Number(payload.pageSize) || 50,
+    truncated: Boolean(payload.truncated),
+    rows: Array.isArray(payload.rows) ? payload.rows : [],
+  };
+}
+
+export async function saveAdminExportCost(input: {
+  subjectKind: 'single' | 'package';
+  subjectKey: string;
+  displayBarcode: string;
+  customerName: string;
+  finalDestination: string;
+  legDestination: 'MSE' | 'LSO';
+  weightKg: number;
+  unitPriceCny: number;
+  payCurrency: 'CNY' | 'MMK';
+  mmkPerCny?: number | null;
+  tripNumber?: string;
+  storeCode?: string;
+}): Promise<void> {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-export-cost', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `保存失败 (${response.status})`);
+}
+
+export type PendingExportLine = {
+  id?: string;
+  barcode?: string;
+  base?: string;
+  customer: string;
+  destination: string;
+  weightKg: number;
+  tripNumber: string;
+  pieceCount?: number;
+  ownerStoreCode?: string;
+};
+
+export type PendingExportBoard = {
+  singles: PendingExportLine[];
+  packages: PendingExportLine[];
+  singleCount: number;
+  packageCount: number;
+  truncated: boolean;
+};
+
 export async function fetchExportCostRecords(
   period?: FinancePeriodParams | null,
-): Promise<{ rows: ExportCostRecord[]; totalCny: number; totalMmk: number }> {
+): Promise<{
+  rows: ExportCostRecord[];
+  totalCny: number;
+  totalMmk: number;
+  pending: PendingExportBoard | null;
+}> {
   const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
   url.searchParams.set('section', 'export-costs');
   applyFinancePeriodParams(url, period);
@@ -1439,16 +1577,51 @@ export async function fetchExportCostRecords(
   if (!Array.isArray(payload.exportCosts)) {
     throw new Error('MISSING_EXPORT_COST_API');
   }
+  const pending = payload.pendingExport;
   return {
     rows: payload.exportCosts as ExportCostRecord[],
     totalCny: Number(payload.totalCny) || 0,
     totalMmk: Number(payload.totalMmk) || 0,
+    pending:
+      pending && Array.isArray(pending.singles) && Array.isArray(pending.packages)
+        ? {
+            singles: pending.singles,
+            packages: pending.packages,
+            singleCount: Number(pending.singleCount) || pending.singles.length,
+            packageCount: Number(pending.packageCount) || pending.packages.length,
+            truncated: Boolean(pending.truncated),
+          }
+        : null,
   };
 }
 
-export async function fetchSignedInvoices(): Promise<SignedInvoiceListRow[]> {
+export type SignedInvoiceYearCount = {
+  year: number;
+  count: number;
+};
+
+export type SignedInvoicePage = {
+  invoices: SignedInvoiceListRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  year: number | null;
+  years: SignedInvoiceYearCount[];
+  searching: boolean;
+};
+
+export async function fetchSignedInvoices(params?: {
+  year?: number;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<SignedInvoicePage> {
   const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
   url.searchParams.set('section', 'invoices');
+  if (params?.year) url.searchParams.set('year', String(params.year));
+  if (params?.q) url.searchParams.set('q', params.q);
+  if (params?.page) url.searchParams.set('page', String(params.page));
+  if (params?.pageSize) url.searchParams.set('pageSize', String(params.pageSize));
   const response = await adminAuthenticatedFetch(url.toString(), {
     method: 'GET',
     credentials: 'include',
@@ -1460,6 +1633,23 @@ export async function fetchSignedInvoices(): Promise<SignedInvoiceListRow[]> {
   if (!Array.isArray(payload.invoices)) {
     throw new Error('MISSING_INVOICE_API');
   }
-  return payload.invoices as SignedInvoiceListRow[];
+  const years = Array.isArray(payload.years)
+    ? payload.years.flatMap((row: { year?: unknown; count?: unknown }) => {
+        const year = Number(row?.year);
+        const count = Number(row?.count);
+        if (!Number.isFinite(year)) return [];
+        return [{ year, count: Number.isFinite(count) && count > 0 ? Math.round(count) : 0 }];
+      })
+    : [];
+  const total = Number(payload.total);
+  return {
+    invoices: payload.invoices as SignedInvoiceListRow[],
+    total: Number.isFinite(total) && total >= 0 ? total : payload.invoices.length,
+    page: Number(payload.page) || params?.page || 1,
+    pageSize: Number(payload.pageSize) || params?.pageSize || 10,
+    year: payload.year == null || payload.year === '' ? null : Number(payload.year),
+    years,
+    searching: Boolean(payload.searching),
+  };
 }
 

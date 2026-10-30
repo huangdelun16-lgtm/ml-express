@@ -15,6 +15,8 @@ import {
 import { normalizeDestinationCode } from '../utils/destinationCode';
 import { ownershipKeyFromStoreCode } from '../utils/storeOwnership';
 import { listCrossBorderManualEntries } from './crossBorderManualEntryService';
+import { listExportCostLedgerSources } from './exportCostService';
+import { exportCostLedgerEntry, sumExportCostTotals } from '../utils/exportCostLedger';
 import { supabase } from './supabase';
 import {
   filterEntriesForFinancePeriod,
@@ -311,9 +313,23 @@ export async function listCrossBorderFinance(
   period?: FinancePeriodRange | null,
 ): Promise<FinanceLedgerResult> {
   const result = await listFinanceLedger(store, hubCode, period);
-  const entries = filterCrossBorderFinanceEntries(result.entries);
+  let entries = filterCrossBorderFinanceEntries(result.entries);
+  if (ownershipKeyFromStoreCode(store.storeCode) === 'RUILI') {
+    const sources = await listExportCostLedgerSources();
+    let costEntries = sources.map(exportCostLedgerEntry);
+    if (period) costEntries = filterEntriesForFinancePeriod(costEntries, period);
+    entries = [...costEntries, ...entries].sort(
+      (a, b) => new Date(b.occurredAt || 0).getTime() - new Date(a.occurredAt || 0).getTime(),
+    );
+  }
+  const totals = sumExportCostTotals(entries);
+  const summary = buildFinanceLedgerSummary(entries, store.storeCode, hubCode, true);
   return {
     entries,
-    summary: buildFinanceLedgerSummary(entries, store.storeCode, hubCode, true),
+    summary: {
+      ...summary,
+      exportCostCnyTotal: totals.cny,
+      exportCostMmkTotal: totals.mmk,
+    },
   };
 }

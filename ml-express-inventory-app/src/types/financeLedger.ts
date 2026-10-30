@@ -5,6 +5,7 @@ export type FinanceLedgerCategory =
   | 'transport_cost'
   | 'manual_income'
   | 'manual_expense'
+  | 'export_cost'
   | 'agency_remit'
   | 'stock_op';
 
@@ -53,6 +54,9 @@ export interface FinanceLedgerSummary {
   agencyRemittedTotal: number;
   manualIncomeTotal: number;
   manualExpenseTotal: number;
+  /** 瑞丽应付的出口成本。人民币与缅币分开，不按活汇率互折。 */
+  exportCostCnyTotal: number;
+  exportCostMmkTotal: number;
 }
 
 export interface FinanceLedgerResult {

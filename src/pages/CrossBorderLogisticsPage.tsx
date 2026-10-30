@@ -18,10 +18,11 @@ import {
   fetchInventoryConsoleOverview,
   fetchInventoryConsoleOrders,
   fetchInventoryConsolePacks,
-  fetchInventoryCustomerItems,
   fetchInventoryCustomerSummaries,
+  fetchPeriodSignedIncome,
   fetchCrossBorderRegisteredCustomers,
   fetchCrossBorderSalespersons,
+  createCrossBorderRegisteredCustomer,
   setCrossBorderRegisteredCustomerStatus,
   type CreateCrossBorderAccountResult,
   type CrossBorderSalesperson,
@@ -39,7 +40,10 @@ import {
   type StoreFinanceDetailMode,
   type CrossBorderExpenseCategory,
   type FinancePeriodParams,
+  type HqQueueKind,
+  type HqQueueRow,
   fetchExportCostRecords,
+  fetchHqQueue,
   INVENTORY_CONSOLE_LIST_LIMIT,
 } from '../services/inventoryConsoleService';
 import {
@@ -53,15 +57,11 @@ import {
   type ConsoleCustomerKindFilter,
 } from '../utils/crossBorderConsoleCustomers';
 import {
-  mergeSignedIncomeItems,
-  readSignedCurrencyIncome,
-} from '../utils/signedCurrencyIncome';
-import {
   orderTouchesStation,
   packTouchesStation,
   stationFilterKeys,
 } from '../utils/crossBorderStationFilter';
-import { CROSS_BORDER_HUBS } from '../utils/crossBorderHubs';
+import { CROSS_BORDER_HUBS, type CrossBorderHub } from '../utils/crossBorderHubs';
 import DualMoney from '../components/DualMoney';
 import {
   CROSS_BORDER_FX_HISTORY_SETTINGS_KEY,
@@ -80,6 +80,12 @@ import {
   pickMmkPerCnyRate,
   type CrossBorderFxHistoryEntry,
 } from '../utils/crossBorderFx';
+import {
+  ARRIVAL_NOTIFY_TEMPLATE_KEY,
+  DEFAULT_ARRIVAL_NOTIFY_TEMPLATE,
+  parseArrivalNotifyTemplate,
+  renderArrivalNotifyTemplate,
+} from '../utils/arrivalNotifyTemplate';
 import {
   buildFxMmkRepricePayload,
   collectPricingCustomerOptions,
@@ -425,7 +431,8 @@ const CBL_TAB_ITEMS: { id: CblPageTab; zh: string; en: string; tipZh: string; ti
 type StatCardAction =
   | { kind: 'exceptions' }
   | { kind: 'orders'; filter: OrderStatusFilter }
-  | { kind: 'finance' };
+  | { kind: 'finance' }
+  | { kind: 'static'; queue: HqQueueKind };
 
 type StatCard = {
   id: string;
@@ -633,9 +640,20 @@ const CrossBorderLogisticsPage: FC = () => {
     [],
   );
   const [customersLoading, setCustomersLoading] = useState(false);
-  const [signedIncome, setSignedIncome] = useState<{ mmk: number; cny: number } | null>(null);
+  const [signedIncome, setSignedIncome] = useState<{
+    mmk: number;
+    cny: number;
+    freightMmk: number;
+    freightCny: number;
+    extraMmk: number;
+    extraCny: number;
+  } | null>(null);
   const [signedIncomeFailed, setSignedIncomeFailed] = useState(false);
-  const signedIncomeLoadRef = useRef<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [hqPage, setHqPage] = useState(1);
+  const [hqStoreCode, setHqStoreCode] = useState('');
+  const [selectedUnfiled, setSelectedUnfiled] = useState<Set<string>>(new Set());
+  const [batchSalesperson, setBatchSalesperson] = useState('');
+  const [batchRegistering, setBatchRegistering] = useState(false);
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<CrossBorderRegisteredCustomer | null>(
     null,
@@ -656,12 +674,20 @@ const CrossBorderLogisticsPage: FC = () => {
   const [periodDate, setPeriodDate] = useState(() => yangonTodayYmd());
   const [financeStoreCode, setFinanceStoreCode] = useState('');
   const [exportCostCny, setExportCostCny] = useState<number | null>(null);
+  const [hqQueue, setHqQueue] = useState<HqQueueKind | ''>('');
+  const [hqRows, setHqRows] = useState<HqQueueRow[]>([]);
+  const [hqQueueTotal, setHqQueueTotal] = useState(0);
+  const [hqQueueLoading, setHqQueueLoading] = useState(false);
+  const [hqQueueError, setHqQueueError] = useState('');
   const [exportCostMmk, setExportCostMmk] = useState<number | null>(null);
   const [exportingCsv, setExportingCsv] = useState(false);
   const [fxRate, setFxRate] = useState<number | null>(null);
   const [fxDraft, setFxDraft] = useState('');
   const [fxSaving, setFxSaving] = useState(false);
   const [fxHistory, setFxHistory] = useState<CrossBorderFxHistoryEntry[]>([]);
+  const [notifyTemplate, setNotifyTemplate] = useState(DEFAULT_ARRIVAL_NOTIFY_TEMPLATE);
+  const [notifyTemplateSaved, setNotifyTemplateSaved] = useState('');
+  const [notifyTemplateSaving, setNotifyTemplateSaving] = useState(false);
   const [fxUpdatedAt, setFxUpdatedAt] = useState<string | null>(null);
   const [salespersons, setSalespersons] = useState<CrossBorderSalesperson[]>([]);
   const [salespersonsReady, setSalespersonsReady] = useState(false);
@@ -887,15 +913,73 @@ const CrossBorderLogisticsPage: FC = () => {
     }
   }, [applyFxRate, fxDraft, fxHistory, fxRate, isEn]);
 
+  const saveNotifyTemplate = useCallback(async () => {
+    const text = notifyTemplate.trim();
+    if (!text) {
+      feedbackService.notify(isEn ? 'Write the message first.' : '请先写通知内容。');
+      return;
+    }
+    if (!text.includes('{barcode}')) {
+      feedbackService.notify(
+        isEn ? 'Keep {barcode} so each order number is filled in.' : '请保留 {barcode}，这样每张单会带上自己的单号。',
+      );
+      return;
+    }
+    if (text === notifyTemplateSaved) {
+      feedbackService.success(isEn ? 'Message unchanged' : '通知内容未变化');
+      return;
+    }
+    const actor = readCblAdminActor();
+    setNotifyTemplateSaving(true);
+    try {
+      const ok = await systemSettingsService.upsertSetting({
+        category: 'pricing',
+        settings_key: ARRIVAL_NOTIFY_TEMPLATE_KEY,
+        settings_value: text,
+        description: 'Inventory arrival pickup notice. Placeholders: {name} {hub} {barcode} {express}',
+        updated_by: actor.name,
+      });
+      if (!ok) {
+        feedbackService.notify(isEn ? 'Could not save the message.' : '通知内容保存失败。');
+        return;
+      }
+      setNotifyTemplate(text);
+      setNotifyTemplateSaved(text);
+      void auditLogService.log({
+        user_id: actor.id,
+        user_name: actor.name,
+        action_type: 'update',
+        module: 'settings',
+        target_id: ARRIVAL_NOTIFY_TEMPLATE_KEY,
+        target_name: isEn ? 'Arrival notice' : '到货通知',
+        action_description: isEn ? 'Updated the pickup notice template' : '更新了到货通知文案',
+        old_value: notifyTemplateSaved,
+        new_value: text,
+      });
+      feedbackService.success(isEn ? 'Pickup notice saved' : '到货通知已保存');
+    } catch (err) {
+      feedbackService.notify(err instanceof Error ? err.message : isEn ? 'Save failed' : '保存失败');
+    } finally {
+      setNotifyTemplateSaving(false);
+    }
+  }, [isEn, notifyTemplate, notifyTemplateSaved]);
+
   const loadSettingsExtras = useCallback(async () => {
     try {
-      const [salespersonRows, pricingRows] = await Promise.all([
+      const [salespersonRows, pricingRows, templateRows] = await Promise.all([
         fetchCrossBorderSalespersons().catch(() => [] as CrossBorderSalesperson[]),
         systemSettingsService.getSettingsByKeyPrefix('pricing.cross_border.'),
+        systemSettingsService.getSettingsByKeys([ARRIVAL_NOTIFY_TEMPLATE_KEY]).catch(() => []),
       ]);
       setSalespersons(salespersonRows);
       setSalespersonsReady(true);
       setPricingSummary(summarizeRoutePricing(pricingRows));
+      const savedTemplate = parseArrivalNotifyTemplate(
+        templateRows.find((row) => row.settings_key === ARRIVAL_NOTIFY_TEMPLATE_KEY)?.settings_value,
+      );
+      const nextTemplate = savedTemplate || DEFAULT_ARRIVAL_NOTIFY_TEMPLATE;
+      setNotifyTemplate(nextTemplate);
+      setNotifyTemplateSaved(savedTemplate);
     } catch {
       setSalespersons([]);
       setSalespersonsReady(true);
@@ -930,42 +1014,23 @@ const CrossBorderLogisticsPage: FC = () => {
 
   useEffect(() => {
     if (activeTab !== 'overview') return;
-    if (signedIncomeLoadRef.current === 'loading' || signedIncomeLoadRef.current === 'ready') return;
-    signedIncomeLoadRef.current = 'loading';
     let cancelled = false;
-    void (async () => {
-      try {
-        const { summaries } = await fetchInventoryCustomerSummaries();
+    setSignedIncome(null);
+    setSignedIncomeFailed(false);
+    void fetchPeriodSignedIncome(financePeriodParams)
+      .then((income) => {
         if (cancelled) return;
-        const direct = readSignedCurrencyIncome(summaries);
-        const next = direct
-          ? direct
-          : mergeSignedIncomeItems(
-              await Promise.all(
-                summaries.map((summary) =>
-                  fetchInventoryCustomerItems(
-                    summary.customerName,
-                    summary.customerPhone,
-                    summary.customerCode,
-                  ).then((result) => result.items),
-                ),
-              ),
-            );
-        if (cancelled) return;
-        signedIncomeLoadRef.current = 'ready';
-        setSignedIncome(next);
+        setSignedIncome(income);
         setSignedIncomeFailed(false);
-      } catch {
+      })
+      .catch(() => {
         if (cancelled) return;
-        signedIncomeLoadRef.current = 'error';
         setSignedIncomeFailed(true);
-      }
-    })();
+      });
     return () => {
       cancelled = true;
-      if (signedIncomeLoadRef.current === 'loading') signedIncomeLoadRef.current = 'idle';
     };
-  }, [activeTab]);
+  }, [activeTab, financePeriodParams]);
 
   const loadFinanceEntries = useCallback(async (page: number, pageSize: number) => {
     const reqId = ++financeReqIdRef.current;
@@ -1100,6 +1165,9 @@ const CrossBorderLogisticsPage: FC = () => {
         transportFeeTotal: overview.transportFeeTotal,
         openExceptionCount: overview.openExceptionCount ?? 0,
         openExceptions: overview.openExceptions ?? [],
+        pendingPackCount: overview.pendingPackCount ?? 0,
+        pendingTruckLoadCount: overview.pendingTruckLoadCount ?? 0,
+        pendingNotifyCount: overview.pendingNotifyCount ?? 0,
         recentPacks: packsResult && packsFresh ? packsResult.recentPacks : (prev?.recentPacks ?? []),
         recentOrders: ordersResult && ordersFresh
           ? ordersResult.recentOrders
@@ -1176,6 +1244,24 @@ const CrossBorderLogisticsPage: FC = () => {
   useEffect(() => {
     if (activeTab === 'customers') scheduleCustomersLoad();
   }, [activeTab, scheduleCustomersLoad]);
+
+  useEffect(() => {
+    if (activeTab !== 'customers' || salespersonsReady) return;
+    let cancelled = false;
+    void fetchCrossBorderSalespersons()
+      .then((rows) => {
+        if (!cancelled) setSalespersons(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setSalespersons([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSalespersonsReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, salespersonsReady]);
 
   useEffect(() => {
     if (!initialLoadDoneRef.current) return;
@@ -1341,24 +1427,36 @@ const CrossBorderLogisticsPage: FC = () => {
     const signedReady = signedIncome != null || signedIncomeFailed;
     const signedMmk = signedIncomeFailed ? null : signedIncome?.mmk ?? null;
     const signedCny = signedIncomeFailed ? null : signedIncome?.cny ?? null;
+    const freightMmk = signedIncomeFailed ? null : signedIncome?.freightMmk ?? null;
+    const freightCny = signedIncomeFailed ? null : signedIncome?.freightCny ?? null;
+    const extraMmk = signedIncomeFailed ? null : signedIncome?.extraMmk ?? null;
+    const extraCny = signedIncomeFailed ? null : signedIncome?.extraCny ?? null;
     return {
       mmk: signedMmk,
       cny: signedCny,
       signedLoading: !signedReady,
       rows: [
         {
-          id: 'collected',
-          zh: '已收',
-          en: 'Collected',
-          mmk: signedMmk,
-          cny: signedCny,
+          id: 'freight',
+          zh: '运费已收',
+          en: 'Freight collected',
+          mmk: freightMmk,
+          cny: freightCny,
+          loading: !signedReady,
+        },
+        {
+          id: 'extra',
+          zh: '附加费',
+          en: 'Extra fee',
+          mmk: extraMmk,
+          cny: extraCny,
           loading: !signedReady,
         },
         {
           id: 'pending',
           zh: '待入账',
           en: 'Pending',
-          mmk: financeReady ? 0 : null,
+          mmk: financeReady ? pendingMmk : null,
           cny: pendingCny,
           loading: !financeReady,
         },
@@ -1520,6 +1618,72 @@ const CrossBorderLogisticsPage: FC = () => {
     [isEn],
   );
 
+  const hubForDestination = (dest: string): CrossBorderHub | null => {
+    const token = dest.trim().toUpperCase();
+    if (!token || token === '—') return null;
+    return (
+      CROSS_BORDER_HUBS.find((hub) => hub.hubCode === token || hub.prefix === token) ?? null
+    );
+  };
+
+  const registerSelectedUnfiled = async () => {
+    const salesperson = salespersons.find((row) => row.employee_code === batchSalesperson);
+    if (!salesperson) {
+      feedbackService.notify(isEn ? 'Choose a salesperson first' : '请先选推销员');
+      return;
+    }
+    const chosen = filteredUnifiedCustomers.filter(
+      (row) => row.kind === 'express' && selectedUnfiled.has(row.key),
+    );
+    if (!chosen.length) return;
+    setBatchRegistering(true);
+    const applicationDate = yangonTodayYmd();
+    let created = 0;
+    const skipped: string[] = [];
+    try {
+      for (const row of chosen) {
+        const name = row.summary?.customerName?.trim() || '';
+        const phone = row.summary?.customerPhone?.trim() || '';
+        const hub = hubForDestination(row.summary?.destinationHub || '');
+        if (!name || !hub) {
+          skipped.push(name || row.key);
+          continue;
+        }
+        await createCrossBorderRegisteredCustomer({
+          customer_name: name,
+          phone,
+          delivery_region_id: hub.regionId,
+          delivery_area_code: hub.prefix,
+          address_notes: '',
+          salesperson_employee_code: salesperson.employee_code,
+          application_date: applicationDate,
+          customer_code: '',
+          notify_method: 'phone',
+          notify_account: phone,
+        });
+        created += 1;
+      }
+      const freshCustomers = await fetchCrossBorderRegisteredCustomers();
+      const freshSummaries = await fetchInventoryCustomerSummaries();
+      setRegisteredCustomers(freshCustomers);
+      setCustomerSummaries(freshSummaries.summaries);
+      setSelectedUnfiled(new Set());
+      feedbackService.success(
+        skipped.length
+          ? isEn
+            ? `Registered ${created}. Skipped ${skipped.length} without a city.`
+            : `已登记 ${created} 个。${skipped.length} 个没有目的地，跳过了。`
+          : isEn
+            ? `Registered ${created}`
+            : `已登记 ${created} 个`,
+      );
+    } catch (err) {
+      feedbackService.notify(err instanceof Error ? err.message : isEn ? 'Register failed' : '补登记失败');
+    } finally {
+      setBatchRegistering(false);
+    }
+  };
+
   const pricingCustomers = useMemo(
     () => collectPricingCustomerOptions(registeredCustomers, customerSummaries),
     [registeredCustomers, customerSummaries],
@@ -1620,6 +1784,33 @@ const CrossBorderLogisticsPage: FC = () => {
         tone: s.ordersHubReceived > 0 ? 'due' : undefined,
       },
       {
+        id: 'pending-pack',
+        label: isEn ? 'To pack' : '待打包',
+        value: String(data.pendingPackCount ?? 0),
+        hint: isEn ? 'Stocked in, not packed' : '已入库、还没打包',
+        tip: isEn ? 'Same count as the inventory home, all stations. Open the list.' : '和库存首页同一口径，全站合计。点开看名单',
+        action: { kind: 'static', queue: 'pack' },
+        tone: (data.pendingPackCount ?? 0) > 0 ? 'warn' : undefined,
+      },
+      {
+        id: 'pending-truck',
+        label: isEn ? 'To load' : '待装车',
+        value: String(data.pendingTruckLoadCount ?? 0),
+        hint: isEn ? 'Packed, not on a truck' : '已打包、还没装车',
+        tip: isEn ? 'Same count as the inventory home, all stations. Open the list.' : '和库存首页同一口径，全站合计。点开看名单',
+        action: { kind: 'static', queue: 'truck' },
+        tone: (data.pendingTruckLoadCount ?? 0) > 0 ? 'warn' : undefined,
+      },
+      {
+        id: 'pending-notify',
+        label: isEn ? 'To notify' : '待通知客户',
+        value: String(data.pendingNotifyCount ?? 0),
+        hint: isEn ? 'Arrived, customer not told' : '已到站、还没通知',
+        tip: isEn ? 'Same count as the inventory home, all stations. Open the list.' : '和库存首页同一口径，全站合计。点开看名单',
+        action: { kind: 'static', queue: 'notify' },
+        tone: (data.pendingNotifyCount ?? 0) > 0 ? 'due' : undefined,
+      },
+      {
         id: 'pending-inflow',
         label: isEn ? 'Pending inflow' : '待入账',
         value: formatMmK(pendingIn),
@@ -1641,12 +1832,22 @@ const CrossBorderLogisticsPage: FC = () => {
   }, [data, expenseSummary, isEn]);
 
   const isStatCardActive = (action: StatCardAction) => {
+    if (action.kind === 'static') return hqQueue === action.queue;
     if (activeTab !== 'transport') return false;
     if (action.kind === 'orders') return transportView === 'orders' && orderFilter === action.filter;
     return false;
   };
 
   const handleStatClick = (action: StatCardAction) => {
+    if (action.kind === 'static') {
+      if (hqQueue === action.queue) {
+        setHqQueue('');
+        return;
+      }
+      setHqPage(1);
+      setHqQueue(action.queue);
+      return;
+    }
     if (action.kind === 'exceptions') {
       setActiveTab('overview');
       if ((data?.openExceptionCount ?? 0) > 0) {
@@ -1665,6 +1866,51 @@ const CrossBorderLogisticsPage: FC = () => {
     }
     setTransportView('orders');
     setOrderFilter(action.filter);
+    setActiveTab('transport');
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'overview' || !hqQueue) return;
+    let cancelled = false;
+    setHqQueueLoading(true);
+    setHqQueueError('');
+    void fetchHqQueue(hqQueue, {
+      page: hqPage,
+      pageSize: tablePageSize,
+      storeCode: hqStoreCode || undefined,
+    })
+      .then((result) => {
+        if (cancelled) return;
+        setHqRows(result.rows);
+        setHqQueueTotal(result.total);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setHqRows([]);
+        setHqQueueTotal(0);
+        setHqQueueError(err instanceof Error ? err.message : isEn ? 'Could not load the list' : '名单加载失败');
+      })
+      .finally(() => {
+        if (!cancelled) setHqQueueLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, hqQueue, hqPage, hqStoreCode, tablePageSize, isEn]);
+
+  const openQueueRow = (row: HqQueueRow) => {
+    setTransportSearch(row.barcode);
+    setDebouncedTransportSearch(row.barcode);
+    if (row.storeCode) setTransportStoreCode(row.storeCode);
+    if (hqQueue === 'truck') {
+      setTransportView('packs');
+      setPackFilter('all');
+    } else {
+      setTransportView('orders');
+      setOrderFilter(hqQueue === 'notify' ? 'awaiting_pickup' : 'all');
+    }
+    setOrdersPage(1);
+    setPacksPage(1);
     setActiveTab('transport');
   };
 
@@ -1876,9 +2122,9 @@ const CrossBorderLogisticsPage: FC = () => {
                 <button
                   key={card.id}
                   type="button"
-                  className={`cbl-stat cbl-stat--btn${isStatCardActive(card.action) ? ' is-active' : ''}${
+                  className={`cbl-stat cbl-stat--btn${card.action.kind === 'static' ? ' cbl-stat--static' : ''}${isStatCardActive(card.action) ? ' is-active' : ''}${
                     card.tone ? ` cbl-stat--${card.tone}` : ''
-                  }${card.value.replace(/,/g, '') === '0' && !card.tone ? ' is-idle' : ''}`}
+                  }${String(card.value ?? '').replace(/,/g, '') === '0' && !card.tone ? ' is-idle' : ''}`}
                   data-cbl-tip={card.tip}
                   onClick={() => handleStatClick(card.action)}
                 >
@@ -1933,6 +2179,104 @@ const CrossBorderLogisticsPage: FC = () => {
           )}
         </div>
 
+        {hqQueue ? (
+          <section className="cbl-card" id="cbl-hq-queue">
+            <div className="cbl-card__head">
+              <h2 className="cbl-card__title">
+                {hqQueue === 'pack'
+                  ? isEn ? 'To pack' : '待打包'
+                  : hqQueue === 'truck'
+                    ? isEn ? 'To load' : '待装车'
+                    : isEn ? 'To notify' : '待通知客户'}
+              </h2>
+              <div className="cbl-card__head-actions">
+                <label className="cbl-dim" htmlFor="cbl-hq-station">
+                  {isEn ? 'Station' : '站点'}
+                </label>
+                <select
+                  id="cbl-hq-station"
+                  className="cbl-fx-bar__input"
+                  value={hqStoreCode}
+                  onChange={(event) => {
+                    setHqPage(1);
+                    setHqStoreCode(event.target.value);
+                  }}
+                >
+                  <option value="">{isEn ? 'All stations' : '全部站点'}</option>
+                  {transitStores.map((store) => (
+                    <option key={store.store_code} value={store.store_code}>
+                      {store.store_code}
+                    </option>
+                  ))}
+                </select>
+                <span className="cbl-dim">
+                  {hqQueueLoading ? (isEn ? 'Loading…' : '加载中…') : isEn ? `${hqQueueTotal} rows` : `共 ${hqQueueTotal} 条`}
+                </span>
+              </div>
+            </div>
+            <div className="cbl-card__body">
+              {hqQueueError ? (
+                <p className="cbl-export-cost__empty">{hqQueueError}</p>
+              ) : hqQueueLoading ? (
+                <p className="cbl-export-cost__empty">{isEn ? 'Loading…' : '加载中…'}</p>
+              ) : hqRows.length === 0 ? (
+                <p className="cbl-export-cost__empty">{isEn ? 'Nothing in this queue.' : '这一项现在是空的。'}</p>
+              ) : (
+                <div className="cbl-table-wrap">
+                  <table className="cbl-table">
+                    <thead>
+                      <tr>
+                        <th>{hqQueue === 'truck' ? (isEn ? 'Package' : '包装号') : (isEn ? 'Order' : '单号')}</th>
+                        <th>{isEn ? 'Customer' : '客户'}</th>
+                        <th>{isEn ? 'Destination' : '目的地'}</th>
+                        <th>{isEn ? 'Station' : '站点'}</th>
+                        <th>{isEn ? 'Open' : '处理'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {hqRows.map((row) => (
+                        <tr key={`${hqQueue}-${row.barcode}`}>
+                          <td className="cbl-code">
+                            {row.barcode}
+                            {row.expressNo ? <span className="cbl-dim"> · {row.expressNo}</span> : null}
+                            {row.name ? <span className="cbl-dim"> · {row.name}</span> : null}
+                          </td>
+                          <td>{row.customer || '—'}</td>
+                          <td>{row.destination || '—'}</td>
+                          <td className="cbl-code">{row.storeCode || '—'}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="cbl-btn cbl-btn--primary cbl-btn--sm"
+                              data-cbl-tip={isEn ? 'Open this barcode in Transport' : '到运输页打开这一单'}
+                              onClick={() => openQueueRow(row)}
+                            >
+                              {isEn ? 'Open' : '查看'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {hqQueue && hqQueueTotal > 0 ? (
+                <CblTablePagination
+                  page={hqPage}
+                  pageSize={tablePageSize}
+                  totalItems={hqQueueTotal}
+                  onPageChange={setHqPage}
+                  onPageSizeChange={(size) => {
+                    setHqPage(1);
+                    setTablePageSize(size);
+                  }}
+                  isEn={isEn}
+                />
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
         <h2 className="cbl-section-label">
           {isEn ? 'Period totals' : '本期合计'}
           <span className="cbl-section-label__meta">
@@ -1951,7 +2295,7 @@ const CrossBorderLogisticsPage: FC = () => {
               <h3 className="cbl-io-overview-card__title">
                 {isEn ? 'Total income' : '总收入'}
               </h3>
-              <span className="cbl-io-overview-card__scope">{isEn ? 'All signed' : '全部已签收'}</span>
+              <span className="cbl-io-overview-card__scope">{isEn ? 'This period' : '本期'}</span>
             </div>
             <div className="cbl-io-ledger">
               <span />
@@ -2552,7 +2896,7 @@ const CrossBorderLogisticsPage: FC = () => {
                 <p className="cbl-card-hint cbl-card-hint--in-head">
                   {isEn
                     ? 'Two lists. Unfiled = inbound names not in HQ yet. Registered = HQ records the App can auto-fill. Use Register on an unfiled row.'
-                    : '两套名单：未建档是库存扫到、还没登记的客户；已登记是总部建档、App 可带出电话的。未建档请点「补登记」。'}
+                    : '两套名单：未建档是库存扫到、还没登记的客户；已登记是总部建档、App 可带出电话的。未建档可以勾选后一批补登记。'}
                 </p>
               </div>
               <div className="cbl-card__head-actions">
@@ -2622,14 +2966,81 @@ const CrossBorderLogisticsPage: FC = () => {
                   isEn={isEn}
                 />
               ) : null}
+              {customerKindFilter === 'unfiled' && filteredUnifiedCustomers.length ? (
+                <div className="cbl-list-toolbar">
+                  <label className="cbl-dim" htmlFor="cbl-batch-salesperson">
+                    {isEn ? 'Salesperson' : '推销员'}
+                  </label>
+                  <select
+                    id="cbl-batch-salesperson"
+                    className="cbl-fx-bar__input"
+                    value={batchSalesperson}
+                    onChange={(event) => setBatchSalesperson(event.target.value)}
+                    disabled={batchRegistering}
+                  >
+                    <option value="">{isEn ? 'Choose' : '请选择'}</option>
+                    {salespersons
+                      .filter((row) => row.status === 'active')
+                      .map((row) => (
+                        <option key={row.id} value={row.employee_code}>
+                          {formatSalespersonEmployeeCodeDisplay(row.employee_code)} {row.name}
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="cbl-btn cbl-btn--primary cbl-btn--sm"
+                    disabled={batchRegistering || selectedUnfiled.size === 0 || !batchSalesperson}
+                    data-cbl-tip={
+                      isEn
+                        ? 'Register the checked customers. Each uses the city on their orders.'
+                        : '把勾选的客户登记进总部。城市用他们订单上的目的地。'
+                    }
+                    onClick={() => void registerSelectedUnfiled()}
+                  >
+                    {batchRegistering
+                      ? isEn
+                        ? 'Registering…'
+                        : '登记中…'
+                      : isEn
+                        ? `Register ${selectedUnfiled.size}`
+                        : `补登记 ${selectedUnfiled.size} 个`}
+                  </button>
+                </div>
+              ) : null}
               {customersLoading ? (
-                <CblTableSkeleton rows={6} cols={7} />
+                <CblTableSkeleton rows={6} cols={customerKindFilter === 'unfiled' ? 8 : 7} />
               ) : filteredUnifiedCustomers.length ? (
                 <>
                   <div className="cbl-table-wrap">
                     <table className="cbl-table cbl-table--customers">
                       <thead>
                         <tr>
+                          {customerKindFilter === 'unfiled' ? (
+                            <th>
+                              <input
+                                type="checkbox"
+                                aria-label={isEn ? 'Select this page' : '选中本页'}
+                                checked={
+                                  pagedUnifiedCustomers.some((row) => row.kind === 'express') &&
+                                  pagedUnifiedCustomers
+                                    .filter((row) => row.kind === 'express')
+                                    .every((row) => selectedUnfiled.has(row.key))
+                                }
+                                onChange={(event) => {
+                                  const keys = pagedUnifiedCustomers
+                                    .filter((row) => row.kind === 'express')
+                                    .map((row) => row.key);
+                                  setSelectedUnfiled((current) => {
+                                    const next = new Set(current);
+                                    if (event.target.checked) keys.forEach((key) => next.add(key));
+                                    else keys.forEach((key) => next.delete(key));
+                                    return next;
+                                  });
+                                }}
+                              />
+                            </th>
+                          ) : null}
                           <th>{isEn ? 'Customer code' : '客户编码'}</th>
                           <th>{isEn ? 'Name' : '客户姓名'}</th>
                           <th>{isEn ? 'Phone' : '电话'}</th>
@@ -2656,6 +3067,23 @@ const CrossBorderLogisticsPage: FC = () => {
                               key={row.key}
                               className={paused ? 'cbl-table-row--paused' : undefined}
                             >
+                              {customerKindFilter === 'unfiled' && row.kind === 'express' ? (
+                                <td>
+                                  <input
+                                    type="checkbox"
+                                    aria-label={isEn ? `Select ${name}` : `选择${name}`}
+                                    checked={selectedUnfiled.has(row.key)}
+                                    onChange={(event) => {
+                                      setSelectedUnfiled((current) => {
+                                        const next = new Set(current);
+                                        if (event.target.checked) next.add(row.key);
+                                        else next.delete(row.key);
+                                        return next;
+                                      });
+                                    }}
+                                  />
+                                </td>
+                              ) : null}
                               <td>
                                 {code ? (
                                   <button
@@ -3302,6 +3730,71 @@ const CrossBorderLogisticsPage: FC = () => {
                     {isEn ? 'Account management' : '跨境账号管理'}
                   </button>
                 </div>
+              </div>
+            </section>
+
+            <section className="cbl-card">
+              <div className="cbl-card__head">
+                <h2 className="cbl-card__title">{isEn ? 'Pickup notice' : '到货通知'}</h2>
+              </div>
+              <div className="cbl-card__body">
+                <p className="cbl-card-hint">
+                  {isEn
+                    ? 'Inventory App uses this text in Notify customer. WeChat still copies it for staff to paste. It does not send by itself.'
+                    : '库存 App「通知客户取件」用这段文字。点微信会复制全文，店员再贴到个人微信。不会自动发出去。'}
+                </p>
+                <label className="cbl-notify-template" htmlFor="cbl-arrival-notice">
+                  <span>{isEn ? 'Message' : '通知内容'}</span>
+                  <textarea
+                    id="cbl-arrival-notice"
+                    value={notifyTemplate}
+                    onChange={(event) => setNotifyTemplate(event.target.value)}
+                    rows={5}
+                    disabled={notifyTemplateSaving}
+                    spellCheck={false}
+                  />
+                </label>
+                <p className="cbl-card-hint cbl-card-hint--tight">
+                  {isEn
+                    ? 'Placeholders: {name} customer, {hub} station, {barcode} inbound no., {express} courier no. Leave {barcode} in the text.'
+                    : '可用 {name} 客户姓名、{hub} 到达站点、{barcode} 入库单号、{express} 快递单号。请保留 {barcode}。'}
+                </p>
+                <div className="cbl-notify-preview">
+                  <span>{isEn ? 'Example' : '示例'}</span>
+                  <p>
+                    {renderArrivalNotifyTemplate(notifyTemplate || DEFAULT_ARRIVAL_NOTIFY_TEMPLATE, {
+                      name: 'AMT',
+                      hub: 'MDY',
+                      barcode: 'MDY244215271026',
+                      express: '79140646374250',
+                    })}
+                  </p>
+                </div>
+                <div className="cbl-settings-actions">
+                  <button
+                    type="button"
+                    className="cbl-btn cbl-btn--primary"
+                    onClick={() => void saveNotifyTemplate()}
+                    disabled={notifyTemplateSaving}
+                  >
+                    {notifyTemplateSaving ? (isEn ? 'Saving…' : '保存中…') : isEn ? 'Save message' : '保存通知'}
+                  </button>
+                  <button
+                    type="button"
+                    className="cbl-btn"
+                    onClick={() => setNotifyTemplate(DEFAULT_ARRIVAL_NOTIFY_TEMPLATE)}
+                    disabled={notifyTemplateSaving}
+                  >
+                    {isEn ? 'Restore default' : '恢复默认'}
+                  </button>
+                </div>
+                {!notifyTemplateSaved ? (
+                  <p className="cbl-card-hint cbl-card-hint--tight">
+                    {isEn
+                      ? 'Not saved yet. The app keeps its built-in Chinese, English, and Myanmar text until you save.'
+                      : '还没保存。保存前，App 仍用内置的中文、英文和缅文。'}
+                  </p>
+                ) : null}
               </div>
             </section>
 

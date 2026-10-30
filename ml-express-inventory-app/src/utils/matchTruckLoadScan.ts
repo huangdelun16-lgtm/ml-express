@@ -1,6 +1,8 @@
 import type { PackedShipmentDetail } from '../types/inventory';
 import type { PkgTrackingStatus } from '../types/tracking';
 import { canSelectPackedShipmentForTruckLoad } from './packDisplayStatus';
+import { packDestinationFromBarcode } from './packageNumber';
+import { destinationCodesMatch } from './destinationCode';
 
 function normalizeScanCode(raw: string): string {
   const cleaned = raw.replace(/[\x00-\x1F\x7F]/g, '').trim();
@@ -35,6 +37,33 @@ export function isOrderInboundReady(item: {
   if (item.packed_bundle_barcode?.trim()) return true;
   if (item.hub_arrived_at?.trim()) return true;
   return false;
+}
+
+/** 装车和包裹编辑看到的目的地：改过的包裹目的地优先，否则用包内订单，再否则用包装号。 */
+export function packOutboundDestination(pack: {
+  bundle_barcode: string;
+  bundle_destination?: string | null;
+  items: Array<{ destination?: string | null }>;
+}): string {
+  const explicit = (pack.bundle_destination || '').trim().toUpperCase();
+  if (explicit) return explicit;
+  const fromLines: string[] = [];
+  for (const line of pack.items) {
+    const dest = (line.destination || '').trim().toUpperCase();
+    if (dest && !fromLines.includes(dest)) fromLines.push(dest);
+  }
+  if (fromLines.length === 1) return fromLines[0];
+  return packDestinationFromBarcode(pack.bundle_barcode);
+}
+
+/** 空目的地可以带出；已选目的地不一致则拒绝，避免一车混装。 */
+export function truckLoadDestinationConflict(
+  packDest: string,
+  currentDest: string,
+): 'ok' | 'fill' | 'conflict' {
+  if (!packDest.trim()) return 'ok';
+  if (!currentDest.trim()) return 'fill';
+  return destinationCodesMatch(packDest, currentDest) ? 'ok' : 'conflict';
 }
 
 export function findPendingPackByScan(

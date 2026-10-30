@@ -339,8 +339,8 @@ export default function CustomerSignFlowModal({
                     </Text>
                   ) : packagingBatch ? (
                     <>
-                      {details.map((row) => (
-                        <Text key={row.id} style={styles.siblingLine}>
+                      {details.map((row, index) => (
+                        <Text key={`${row.id || row.barcode}-${index}`} style={styles.siblingLine}>
                           {row.barcode}
                         </Text>
                       ))}

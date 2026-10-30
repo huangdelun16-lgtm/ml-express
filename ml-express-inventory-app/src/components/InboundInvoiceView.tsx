@@ -29,6 +29,7 @@ export type InboundInvoiceData = {
   /** 多个入库显示整包总重量，单个入库显示这一件的重量 */
   weightKind?: 'single' | 'package';
   totalFee?: string;
+  quoteCny?: string;
   paymentLabel?: string;
   note?: string;
   storeName?: string;
@@ -100,7 +101,7 @@ export function InboundInvoiceContent({
         <Text style={styles.invoiceBrand}>ML EXPRESS</Text>
         <Text style={styles.invoiceTitle}>{t.invoice.title}</Text>
         {data.storeName ? <Text style={styles.invoiceStore}>{data.storeName}</Text> : null}
-        <Text style={styles.invoiceDate}>{data.inboundDateLabel}</Text>
+        <Text style={styles.invoiceDate}>{formatSignTime(data.inboundDateLabel)}</Text>
         {data.packItemLabel && !isPackagingStockInLineBarcode(data.barcode) ? (
           <View style={styles.packSeqBadge}>
             <Text style={styles.packSeqLabel}>{packItemSeqLabel ?? t.invoice.packItemSeq}</Text>
@@ -108,6 +109,28 @@ export function InboundInvoiceContent({
           </View>
         ) : null}
       </View>
+
+      {copyLabels ? (
+        <View style={styles.barcodeBlock}>
+          <Text style={styles.barcodeBlockTitle}>{t.invoice.barcodeInfo}</Text>
+          <View style={styles.copyBlock}>
+            <CopyableCodeRow
+              label={copyLabels.expressNo}
+              value={data.inputBarcode ?? ''}
+              copiedLabel={copyLabels.copied}
+              tapHint={copyLabels.tapToCopy}
+              variant="light"
+            />
+            <CopyableCodeRow
+              label={copyLabels.inbound}
+              value={data.barcode}
+              copiedLabel={copyLabels.copied}
+              tapHint={copyLabels.tapToCopy}
+              variant="light"
+            />
+          </View>
+        </View>
+      ) : null}
 
       <View style={styles.divider} />
 
@@ -165,6 +188,13 @@ export function InboundInvoiceContent({
           </View>
         )
       ) : null}
+      {!recordedFee && data.quoteCny?.trim() ? (
+        <InvoiceRow
+          label={t.invoice.quoteCny}
+          value={`¥${formatCnyAmount(Number(data.quoteCny))}`}
+          highlight
+        />
+      ) : null}
       {data.paymentLabel ? (
         <InvoiceRow label={t.invoice.payment} value={getPaymentLabelDisplay(t, data.paymentLabel)} />
       ) : null}
@@ -204,28 +234,6 @@ export function InboundInvoiceContent({
           ) : null}
         </View>
       ) : null}
-
-      <View style={styles.barcodeBlock}>
-        <Text style={styles.barcodeBlockTitle}>{t.invoice.barcodeInfo}</Text>
-        {copyLabels ? (
-          <View style={styles.copyBlock}>
-            <CopyableCodeRow
-              label={copyLabels.expressNo}
-              value={data.inputBarcode ?? ''}
-              copiedLabel={copyLabels.copied}
-              tapHint={copyLabels.tapToCopy}
-              variant="light"
-            />
-            <CopyableCodeRow
-              label={copyLabels.inbound}
-              value={data.barcode}
-              copiedLabel={copyLabels.copied}
-              tapHint={copyLabels.tapToCopy}
-              variant="light"
-            />
-          </View>
-        ) : null}
-      </View>
     </>
   );
 }

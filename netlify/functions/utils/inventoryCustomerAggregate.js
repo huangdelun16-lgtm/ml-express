@@ -10,6 +10,7 @@ const {
   normalizeCustomerPhone,
 } = require('./crossBorderCustomerRegistry');
 const { sumSignedCurrencyIncome } = require('./signedCurrencyIncome');
+const { sumPeriodFreight, sumInvoiceExtraFees, combinePeriodIncome } = require('./periodSignedIncome');
 const {
   selectStaleUnregisteredOrders,
   deleteUnregisteredOrderGraph,
@@ -411,6 +412,7 @@ function buildExpressItemRow(item, inbound, trackingNote) {
     paidCny: fxLock?.paidCny,
     ownerStoreCode: String(item.owner_store_code || '').trim(),
     inboundAt: inbound?.created_at || '',
+    signedAt: String(item.customer_signed_at || '').trim(),
     updatedAt: item.updated_at || inbound?.created_at || '',
   };
 }
@@ -740,6 +742,7 @@ function aggregateCustomerSummaries(rows, registry, pricing) {
         signedRows: [],
         orderCount: 0,
         oldestInboundAt: '',
+        destinationHub: '',
       };
     }
     return map[key];
@@ -751,6 +754,10 @@ function aggregateCustomerSummaries(rows, registry, pricing) {
     const inboundAt = String(row.inboundAt || '').trim();
     if (inboundAt && (!g.oldestInboundAt || inboundAt < g.oldestInboundAt)) {
       g.oldestInboundAt = inboundAt;
+    }
+    const destinationHub = String(row.destination || '').trim().toUpperCase();
+    if (destinationHub && destinationHub !== '—' && !g.destinationHub) {
+      g.destinationHub = destinationHub;
     }
     g.totalPieces += row.qty;
     g.totalWeightKg += row.weightKg;
@@ -894,6 +901,37 @@ async function fetchCustomerItems(supabase, customerName, customerPhone, custome
   };
 }
 
+async function fetchSignedInvoicePages(supabase) {
+  const pageSize = 500;
+  const rows = [];
+  for (let page = 0; page < 20; page += 1) {
+    const from = page * pageSize;
+    const { data, error } = await supabase
+      .from('inventory_signed_invoices')
+      .select('issued_on, signed_at, store_code, document')
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const batch = data || [];
+    rows.push(...batch);
+    if (batch.length < pageSize) return rows;
+  }
+  return rows;
+}
+
+async function fetchPeriodSignedIncome(supabase, financeScope) {
+  const scope = financeScope || {};
+  const { rows, warnings } = await loadExpressItemsDataset(supabase);
+  const freight = sumPeriodFreight(rows, scope.range, scope.storeCode);
+  let extra = { mmk: 0, cny: 0 };
+  try {
+    const invoices = await fetchSignedInvoicePages(supabase);
+    extra = sumInvoiceExtraFees(invoices, scope.range, scope.storeCode);
+  } catch (error) {
+    warnings.push(`签收发票附加费读取失败：${error?.message || error}`);
+  }
+  return { ...combinePeriodIncome(freight, extra), warnings };
+}
+
 async function purgeStaleUnregisteredCustomers(supabase) {
   const warnings = [];
   const { registry } = await loadCrossBorderCustomerRegistry(supabase);
@@ -905,6 +943,7 @@ async function purgeStaleUnregisteredCustomers(supabase) {
 module.exports = {
   fetchCustomerSummaries,
   fetchCustomerItems,
+  fetchPeriodSignedIncome,
   purgeStaleUnregisteredCustomers,
   customerKey,
   aggregateCustomerSummaries,

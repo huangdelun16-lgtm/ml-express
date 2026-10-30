@@ -1,11 +1,14 @@
-import { FC, useEffect, useMemo, useState } from 'react';
+import { FC, Fragment, useEffect, useMemo, useState } from 'react';
 import DualMoney, { formatMmK } from './DualMoney';
 import { formatCnyAmount } from '../utils/crossBorderFx';
 import {
   fetchExportCostRecords,
+  saveAdminExportCost,
   type ExportCostRecord,
   type FinancePeriodParams,
   type InventoryTransitStore,
+  type PendingExportBoard,
+  type PendingExportLine,
 } from '../services/inventoryConsoleService';
 
 type Props = {
@@ -69,14 +72,22 @@ function whenLabel(iso: string): string {
   return date.toLocaleString('zh-CN', { hour12: false });
 }
 
-const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, onTotal }) => {
+const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal }) => {
   const [rows, setRows] = useState<ExportCostRecord[]>([]);
+  const [pending, setPending] = useState<PendingExportBoard | null>(null);
   const [totalCny, setTotalCny] = useState(0);
   const [totalMmk, setTotalMmk] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [retryTick, setRetryTick] = useState(0);
+  const [openKey, setOpenKey] = useState('');
+  const [leg, setLeg] = useState<'MSE' | 'LSO' | ''>('');
+  const [price, setPrice] = useState('');
+  const [currency, setCurrency] = useState<'CNY' | 'MMK' | ''>('');
+  const [fx, setFx] = useState('');
+  const [savingKey, setSavingKey] = useState('');
+  const [formError, setFormError] = useState('');
   const storeName = useMemo(() => {
     const map = new Map(
       stores.map((store) => [store.store_code.trim().toUpperCase(), store.store_name]),
@@ -92,6 +103,7 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, onTotal }) => 
       .then((result) => {
         if (cancelled) return;
         setRows(result.rows);
+        setPending(result.pending);
         setTotalCny(result.totalCny);
         setTotalMmk(result.totalMmk);
         onTotal?.(result.totalCny);
@@ -100,6 +112,7 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, onTotal }) => 
         if (cancelled) return;
         const message = err instanceof Error ? err.message : '';
         setRows([]);
+        setPending(null);
         setTotalCny(0);
         setTotalMmk(0);
         onTotal?.(null);
@@ -132,6 +145,22 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, onTotal }) => 
     );
   }, [query, rows]);
 
+  const pendingRows = useMemo(() => {
+    if (!pending) return [];
+    const q = query.trim().toLowerCase();
+    const lines: Array<PendingExportLine & { kind: 'single' | 'package'; key: string }> = [
+      ...pending.singles.map((row) => ({ ...row, kind: 'single' as const, key: `s:${row.id || row.barcode}` })),
+      ...pending.packages.map((row) => ({ ...row, kind: 'package' as const, key: `p:${row.base}` })),
+    ];
+    if (!q) return lines;
+    return lines.filter((row) =>
+      [row.barcode, row.base, row.customer, row.destination, row.tripNumber]
+        .join(' ')
+        .toLowerCase()
+        .includes(q),
+    );
+  }, [pending, query]);
+
   return (
     <section className="cbl-card cbl-export-cost">
       <div className="cbl-card__head">
@@ -139,12 +168,177 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, onTotal }) => 
           <h2 className="cbl-card__title">{isEn ? 'Export cost' : '出口成本'}</h2>
           <p className="cbl-card-hint cbl-card-hint--in-head">
             {isEn
-              ? 'Orders added in Inventory App. Yuan per kilogram. A row cannot be changed after it is added.'
-              : '库存 App 里添加过的订单。单价是每公斤人民币，添加之后不能改。'}
+              ? 'Fill missing costs in the Inventory App. Saved rows stay here and cannot be edited.'
+              : '还没填的单在上面。库存 App 填好之后，会出现在下面已保存的记录里，添加之后不能改。'}
           </p>
         </div>
       </div>
       <div className="cbl-card__body">
+        <div className="cbl-export-pending">
+          <div className="cbl-export-pending__head">
+            <h3 className="cbl-export-pending__title">{isEn ? 'Still to fill' : '待填出口成本'}</h3>
+            <span className="cbl-dim">
+              {pending
+                ? isEn
+                  ? `${pending.singleCount} orders · ${pending.packageCount} packs`
+                  : `单个 ${pending.singleCount} · 包裹 ${pending.packageCount}`
+                : isEn
+                  ? 'Shows after the admin site is deployed'
+                  : '部署后台之后，这里会列出还没填的订单和包裹'}
+            </span>
+          </div>
+          {pending && pendingRows.length > 0 ? (
+            <div className="cbl-table-wrap">
+              <table className="cbl-table cbl-table--expense">
+                <thead>
+                  <tr>
+                    <th>{isEn ? 'Type' : '类型'}</th>
+                    <th>{isEn ? 'Order' : '单号'}</th>
+                    <th>{isEn ? 'Customer' : '客户'}</th>
+                    <th>{isEn ? 'Destination' : '目的地'}</th>
+                    <th>{isEn ? 'Weight' : '重量'}</th>
+                    <th>{isEn ? 'Trip' : '车次'}</th>
+                    <th>{isEn ? 'Fill' : '填写'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingRows.map((row) => {
+                    const missingWeight = !(Number(row.weightKg) > 0);
+                    const subjectKey = row.kind === 'package' ? row.base || '' : row.id || '';
+                    const open = openKey === row.key;
+                    return (
+                      <Fragment key={row.key}>
+                        <tr>
+                          <td>{kindLabel(row.kind, isEn)}</td>
+                          <td className="cbl-code">{row.kind === 'package' ? row.base : row.barcode || '—'}</td>
+                          <td>{row.customer || '—'}</td>
+                          <td>{row.destination || '—'}</td>
+                          <td>
+                            {money(row.weightKg)} Kg
+                            {row.kind === 'package' && row.pieceCount ? (
+                              <span className="cbl-dim"> · {row.pieceCount}</span>
+                            ) : null}
+                          </td>
+                          <td>{row.tripNumber?.trim() || '—'}</td>
+                          <td>
+                            {missingWeight ? (
+                              <span className="cbl-dim">{isEn ? 'No weight' : '缺重量'}</span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="cbl-btn cbl-btn--primary cbl-btn--sm"
+                                onClick={() => {
+                                  setFormError('');
+                                  if (open) {
+                                    setOpenKey('');
+                                    return;
+                                  }
+                                  setOpenKey(row.key);
+                                  setLeg('');
+                                  setPrice('');
+                                  setCurrency('');
+                                  setFx(rate && rate > 0 ? String(rate) : '');
+                                }}
+                              >
+                                {open ? (isEn ? 'Close' : '收起') : (isEn ? 'Fill' : '填写')}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                        {open ? (
+                          <tr>
+                            <td colSpan={7}>
+                              <div className="cbl-export-fill">
+                                <label>
+                                  {isEn ? 'Leg' : '运达'}
+                                  <select value={leg} onChange={(event) => setLeg(event.target.value as 'MSE' | 'LSO' | '')}>
+                                    <option value="">{isEn ? 'Choose' : '请选择'}</option>
+                                    <option value="MSE">{isEn ? 'Muse' : '木姐'}</option>
+                                    <option value="LSO">{isEn ? 'Lashio' : '腊戌'}</option>
+                                  </select>
+                                </label>
+                                <label>
+                                  {isEn ? 'CNY / Kg' : '¥/Kg'}
+                                  <input value={price} inputMode="decimal" onChange={(event) => setPrice(event.target.value)} />
+                                </label>
+                                <label>
+                                  {isEn ? 'Pay in' : '实付'}
+                                  <select value={currency} onChange={(event) => setCurrency(event.target.value as 'CNY' | 'MMK' | '')}>
+                                    <option value="">{isEn ? 'Choose' : '请选择'}</option>
+                                    <option value="CNY">{isEn ? 'CNY' : '人民币'}</option>
+                                    <option value="MMK">{isEn ? 'MMK' : '缅币'}</option>
+                                  </select>
+                                </label>
+                                {currency === 'MMK' ? (
+                                  <label>
+                                    {isEn ? 'MMK per CNY' : '汇率'}
+                                    <input value={fx} inputMode="decimal" onChange={(event) => setFx(event.target.value)} />
+                                  </label>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  className="cbl-btn cbl-btn--primary cbl-btn--sm"
+                                  disabled={savingKey === row.key}
+                                  onClick={() => {
+                                    if (!leg || !currency || savingKey) return;
+                                    setSavingKey(row.key);
+                                    setFormError('');
+                                    void saveAdminExportCost({
+                                      subjectKind: row.kind,
+                                      subjectKey,
+                                      displayBarcode: row.kind === 'package' ? row.base || '' : row.barcode || '',
+                                      customerName: row.customer,
+                                      finalDestination: row.destination,
+                                      legDestination: leg,
+                                      weightKg: Number(row.weightKg),
+                                      unitPriceCny: Number(price),
+                                      payCurrency: currency,
+                                      mmkPerCny: currency === 'MMK' ? Number(fx) : null,
+                                      tripNumber: row.tripNumber,
+                                      storeCode: row.ownerStoreCode,
+                                    })
+                                      .then(() => {
+                                        setOpenKey('');
+                                        setRetryTick((n) => n + 1);
+                                      })
+                                      .catch((err: unknown) => {
+                                        setFormError(err instanceof Error ? err.message : (isEn ? 'Save failed' : '保存失败'));
+                                      })
+                                      .finally(() => setSavingKey(''));
+                                  }}
+                                >
+                                  {savingKey === row.key ? (isEn ? 'Saving…' : '保存中…') : (isEn ? 'Save' : '保存')}
+                                </button>
+                                {formError && open ? <span className="cbl-export-fill__error">{formError}</span> : null}
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : pending ? (
+            <p className="cbl-export-cost__empty">
+              {query.trim()
+                ? isEn
+                  ? 'No matching orders still need a cost.'
+                  : '没有符合搜索的待填订单。'
+                : isEn
+                  ? 'Every stocked order already has an export cost.'
+                  : '已入库的订单和包裹都填过出口成本了。'}
+            </p>
+          ) : null}
+          {pending?.truncated ? (
+            <p className="cbl-dim">
+              {isEn
+                ? 'Only the first 400 of each list are shown.'
+                : '单个和包裹各自只列出前 400 条。'}
+            </p>
+          ) : null}
+        </div>
         <div className="cbl-export-cost__stats">
           <div className="cbl-export-cost__stat">
             <span className="cbl-export-cost__label">{isEn ? 'Orders' : '单数'}</span>

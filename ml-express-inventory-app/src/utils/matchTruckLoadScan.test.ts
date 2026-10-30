@@ -5,6 +5,8 @@ import {
   findPendingPackByScan,
   isOrderInboundReady,
   matchPendingTruckLoadScan,
+  packOutboundDestination,
+  truckLoadDestinationConflict,
 } from './matchTruckLoadScan';
 
 function pack(overrides: Partial<PackedShipmentDetail> = {}): PackedShipmentDetail {
@@ -88,5 +90,18 @@ describe('matchTruckLoadScan', () => {
         pack: { loaded: false, cloud_status: 'in_transit' },
       }),
     ).toBe('already_loaded');
+  });
+
+  it('同一车只接受同一个目的地', () => {
+    expect(packOutboundDestination(pack())).toBe('YGN');
+    expect(packOutboundDestination(pack({
+      bundle_barcode: 'RUI26YGN40001',
+      bundle_destination: 'TGI',
+      items: [{ ...pack().items[0], destination: 'MDY' }],
+    }))).toBe('TGI');
+    expect(truckLoadDestinationConflict('YGN', '')).toBe('fill');
+    expect(truckLoadDestinationConflict('YGN', 'YGN')).toBe('ok');
+    expect(truckLoadDestinationConflict('MSE', 'YGN')).toBe('conflict');
+    expect(truckLoadDestinationConflict('', 'YGN')).toBe('ok');
   });
 });

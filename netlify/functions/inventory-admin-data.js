@@ -16,7 +16,17 @@ const { getAdminTokenFromEvent } = require('./utils/adminToken');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 const { aggregateFinanceForTransitStores } = require('./utils/inventoryFinanceAggregate');
 const { selectExportCostRows } = require('./utils/exportCostFinance');
+const { loadHqTodoCounts, loadPendingExportCosts, loadHqQueue } = require('./utils/inventoryHqMirror');
+const { fetchPeriodSignedIncome } = require('./utils/inventoryCustomerAggregate');
 const { parseFinancePeriodQuery } = require('./utils/yangonFinancePeriod');
+const {
+  collectInvoiceYears,
+  invoiceSearchOr,
+  invoiceYearRange,
+  invoiceYearsToScan,
+  parseSignedInvoiceListQuery,
+  yangonYear,
+} = require('./utils/signedInvoiceList');
 const { buildTripFeeGroupMap } = require('./utils/tripTransportFee');
 const {
   PACK_DISPLAY_LABEL,
@@ -978,10 +988,11 @@ async function scanSignedOrderPage(supabase, warnings, stationKeys, list) {
 }
 
 async function handleOverview(supabase, warnings) {
-  const [storesList, snapshot, exceptions] = await Promise.all([
+  const [storesList, snapshot, exceptions, hqTodos] = await Promise.all([
     loadTransitStores(supabase),
     loadOverviewSnapshot(supabase),
     loadOpenExceptions(supabase, warnings),
+    loadHqTodoCounts(supabase),
   ]);
   return {
     ok: true,
@@ -992,6 +1003,9 @@ async function handleOverview(supabase, warnings) {
     transportFeeTotal: snapshot.transportFeeTotal,
     openExceptionCount: exceptions.openExceptionCount,
     openExceptions: exceptions.openExceptions,
+    pendingPackCount: hqTodos.pendingPack,
+    pendingTruckLoadCount: hqTodos.pendingTruckLoad,
+    pendingNotifyCount: hqTodos.pendingNotify,
     warnings,
   };
 }
@@ -1133,23 +1147,76 @@ async function handleAll(supabase, packStatus, warnings, financePagination, fina
   };
 }
 
-async function handleSignedInvoices(supabase, warnings) {
-  const { data, error } = await supabase
+const SIGNED_INVOICE_COLUMNS =
+  'id, invoice_no, issued_on, customer_name, phone, trip_label, piece_count, total_fee_cny, total_fee_mmk, document, signed_at, store_code';
+
+function missingInvoiceTable(error) {
+  return /does not exist|schema cache/i.test(String(error?.message || ''));
+}
+
+async function countInvoiceYear(supabase, year) {
+  const bounds = invoiceYearRange(year);
+  const { count, error } = await supabase
     .from('inventory_signed_invoices')
-    .select(
-      'id, invoice_no, issued_on, customer_name, phone, trip_label, piece_count, total_fee_cny, total_fee_mmk, document, signed_at, store_code',
-    )
-    .order('signed_at', { ascending: false })
-    .limit(200);
-  if (error) {
-    const missing = /does not exist|schema cache/i.test(error.message || '');
-    if (missing) {
+    .select('id', { count: 'exact', head: true })
+    .gte('issued_on', bounds.from)
+    .lte('issued_on', bounds.to);
+  if (error) throw error;
+  return count || 0;
+}
+
+async function handleSignedInvoices(supabase, warnings, params) {
+  const now = new Date();
+  const query = parseSignedInvoiceListQuery(params, now);
+  const currentYear = yangonYear(now);
+  try {
+    const yearCounts = await Promise.all(
+      invoiceYearsToScan(currentYear).map(async (year) => ({
+        year,
+        count: await countInvoiceYear(supabase, year),
+      })),
+    );
+    let request = supabase
+      .from('inventory_signed_invoices')
+      .select(SIGNED_INVOICE_COLUMNS, { count: 'exact' });
+    if (!query.searching) {
+      const bounds = invoiceYearRange(query.year);
+      request = request.gte('issued_on', bounds.from).lte('issued_on', bounds.to);
+    }
+    const search = invoiceSearchOr(query.q);
+    if (search) request = request.or(search);
+    const range = listRange(query.page, query.pageSize);
+    const { data, error, count } = await request
+      .order('issued_on', { ascending: false })
+      .order('invoice_no', { ascending: false })
+      .range(range.from, range.to);
+    if (error) throw error;
+    return {
+      invoices: data || [],
+      total: count || 0,
+      page: query.page,
+      pageSize: query.pageSize,
+      year: query.searching ? null : query.year,
+      years: collectInvoiceYears(currentYear, yearCounts),
+      searching: query.searching,
+      warnings,
+    };
+  } catch (error) {
+    if (missingInvoiceTable(error)) {
       warnings.push(error.message);
-      return { invoices: [], warnings };
+      return {
+        invoices: [],
+        total: 0,
+        page: query.page,
+        pageSize: query.pageSize,
+        year: query.year,
+        years: collectInvoiceYears(currentYear, []),
+        searching: query.searching,
+        warnings,
+      };
     }
     throw error;
   }
-  return { invoices: data || [], warnings };
 }
 
 async function handleExportCosts(supabase, warnings, financeScope) {
@@ -1160,15 +1227,29 @@ async function handleExportCosts(supabase, warnings, financeScope) {
     )
     .order('created_at', { ascending: false })
     .limit(500);
+  let saved = { exportCosts: [], totalCny: 0, totalMmk: 0 };
   if (error) {
     const missing = /does not exist|schema cache/i.test(error.message || '');
-    if (missing) {
-      warnings.push(error.message);
-      return { exportCosts: [], totalCny: 0, warnings };
-    }
-    throw error;
+    if (!missing) throw error;
+    warnings.push(error.message);
+  } else {
+    saved = selectExportCostRows(data || [], financeScope);
   }
-  return { ...selectExportCostRows(data || [], financeScope), warnings };
+
+  let pendingExport = {
+    singles: [],
+    packages: [],
+    singleCount: 0,
+    packageCount: 0,
+    truncated: false,
+  };
+  try {
+    pendingExport = await loadPendingExportCosts(supabase);
+  } catch (pendingError) {
+    warnings.push(pendingError?.message || '待填出口成本加载失败');
+  }
+
+  return { ...saved, pendingExport, warnings };
 }
 
 exports.handler = async (event) => {
@@ -1238,7 +1319,13 @@ exports.handler = async (event) => {
   try {
     let body;
     if (section === 'invoices') {
-      body = await handleSignedInvoices(supabase, warnings);
+      const listed = await handleSignedInvoices(supabase, warnings, event.queryStringParameters || {});
+      body = {
+        ok: true,
+        at: new Date().toISOString(),
+        section: 'invoices',
+        ...listed,
+      };
     } else if (section === 'export-costs') {
       const listed = await handleExportCosts(supabase, warnings, financeScope);
       body = {
@@ -1255,6 +1342,24 @@ exports.handler = async (event) => {
       body = await handleOrders(supabase, orderStatus, warnings, packBarcode, stationKeys, list);
     } else if (section === 'all') {
       body = await handleAll(supabase, packStatus, warnings, financePagination, financeScope);
+    } else if (section === 'hq-queue') {
+      const queue = await loadHqQueue(supabase, event.queryStringParameters || {});
+      body = { ok: true, at: new Date().toISOString(), section: 'hq-queue', ...queue, warnings };
+    } else if (section === 'period-income') {
+      const income = await fetchPeriodSignedIncome(supabase, financeScope);
+      warnings.push(...(income.warnings || []));
+      body = {
+        ok: true,
+        at: new Date().toISOString(),
+        section: 'period-income',
+        mmk: income.mmk,
+        cny: income.cny,
+        freightMmk: income.freightMmk,
+        freightCny: income.freightCny,
+        extraMmk: income.extraMmk,
+        extraCny: income.extraCny,
+        warnings,
+      };
     } else {
       body = await handleOverview(supabase, warnings);
     }

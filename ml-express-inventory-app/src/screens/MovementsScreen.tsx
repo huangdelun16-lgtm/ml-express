@@ -12,6 +12,7 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
+import ScrollPositionRail from '../components/ScrollPositionRail';
 import { useAuth } from '../contexts/AuthContext';
 import {
   formatTimeAgo,
@@ -113,6 +114,8 @@ export default function MovementsScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { scrollY, onScroll } = useCollapsingHomeScroll();
+  const [listViewport, setListViewport] = useState(0);
+  const [listContent, setListContent] = useState(0);
   const { store, hubCode } = useAuth();
   const [tab, setTab] = useState<TabKey>('all');
   const [loading, setLoading] = useState(true);
@@ -234,11 +237,13 @@ export default function MovementsScreen() {
           <Text style={styles.loadingText}>{t.movements.loading}</Text>
         </View>
       ) : (
+        <View style={styles.listView} onLayout={(event) => setListViewport(event.nativeEvent.layout.height)}>
         <FlatList
           style={styles.listView}
           data={displayed}
           onScroll={onScroll}
           scrollEventThrottle={16}
+          onContentSizeChange={(_, height) => setListContent(height)}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           ListHeaderComponent={listHeader}
@@ -253,6 +258,8 @@ export default function MovementsScreen() {
           }
           renderItem={({ item }) => <LedgerRow item={item} />}
         />
+        <ScrollPositionRail scrollY={scrollY} viewportHeight={listViewport} contentHeight={listContent} />
+        </View>
       )}
     </View>
   );

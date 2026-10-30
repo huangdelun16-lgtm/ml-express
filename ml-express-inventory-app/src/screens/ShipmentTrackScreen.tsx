@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
+import ScrollPositionRail from '../components/ScrollPositionRail';
 import TripPackagesModal from '../components/TripPackagesModal';
 import { useAuth } from '../contexts/AuthContext';
 import { getPkgStatusLabel, useTranslation } from '../i18n';
@@ -107,6 +108,8 @@ function TripTrackCard({ trip, onPress }: { trip: TruckTripSummary; onPress: () 
 export default function ShipmentTrackScreen({ navigation }: { navigation: Nav }) {
   const { t, fmt } = useTranslation();
   const { scrollY, onScroll } = useCollapsingHomeScroll();
+  const [listViewport, setListViewport] = useState(0);
+  const [listContent, setListContent] = useState(0);
   const { store } = useAuth();
   const hubCode = store ? resolveStoreHubCode(store) : '';
   const [tab, setTab] = useState<Tab>('inbound');
@@ -179,10 +182,12 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
         </Pressable>
       </View>
 
+      <View style={styles.listView} onLayout={(event) => setListViewport(event.nativeEvent.layout.height)}>
       <FlatList<OutboundListItem | PkgTrackingDetail>
         style={styles.listView}
         onScroll={onScroll}
         scrollEventThrottle={16}
+        onContentSizeChange={(_, height) => setListContent(height)}
         data={(tab === 'inbound' ? inbound : outboundItems) as Array<OutboundListItem | PkgTrackingDetail>}
         keyExtractor={(item) =>
           tab === 'inbound'
@@ -240,6 +245,8 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
           );
         }}
       />
+      <ScrollPositionRail scrollY={scrollY} viewportHeight={listViewport} contentHeight={listContent} />
+      </View>
 
       <TripPackagesModal
         visible={!!selectedTrip}

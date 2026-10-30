@@ -1,6 +1,6 @@
 import type { FinanceLedgerEntry } from '../types/financeLedger';
 
-export type FinanceTabKey = 'all' | 'transport' | 'agency' | 'pending' | 'manual';
+export type FinanceTabKey = 'all' | 'transport' | 'agency' | 'pending' | 'manual' | 'export';
 
 export function formatMmk(n: number): string {
   if (n <= 0) return '0';
@@ -39,7 +39,10 @@ export function filterByTab(
   if (tab === 'pending') {
     return entries.filter((e) => isCrossStationCodPending(e, currentKey));
   }
-  return entries.filter(
-    (e) => e.category === 'manual_income' || e.category === 'manual_expense',
-  );
+  if (tab === 'manual') {
+    return entries.filter(
+      (e) => e.category === 'manual_income' || e.category === 'manual_expense',
+    );
+  }
+  return entries.filter((e) => e.category === 'export_cost');
 }

@@ -15,6 +15,7 @@ import InboundOrderFormBody from '../components/InboundOrderFormBody';
 import { useItemFormState } from '../hooks/useItemFormState';
 import { useAuth } from '../contexts/AuthContext';
 import { normalizePackDestination } from '../constants/destinationOptions';
+import { isPackagingStockInLineBarcode } from '../utils/inboundBarcode';
 import {
   cancelInventoryItem,
   canEditItemCustomerProfileForStore,
@@ -230,7 +231,11 @@ export default function ItemFormScreen({
 
   return (
     <View style={styles.root}>
-    <CollapsingHomeHeader title={t.nav.itemForm} onHome={() => navigation.goBack()} scrollY={scrollY} />
+    <CollapsingHomeHeader
+      title={isEdit ? t.itemForm.editTitle : t.itemForm.newTitle}
+      onHome={() => navigation.goBack()}
+      scrollY={scrollY}
+    />
     <KeyboardAvoidingView
       style={styles.form}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -242,12 +247,9 @@ export default function ItemFormScreen({
         onScroll={onScroll}
         scrollEventThrottle={16}
       >
-        <View style={styles.hero}>
-          <Text style={styles.title}>{isEdit ? t.itemForm.editTitle : t.itemForm.newTitle}</Text>
-          <Text style={styles.subtitle}>
-            {isEdit ? t.itemForm.specSection : t.itemForm.basicInfo}
-          </Text>
-        </View>
+        <Text style={styles.subtitle}>
+          {isEdit ? t.itemForm.specSection : t.itemForm.basicInfo}
+        </Text>
 
         {isEdit && !editable ? (
           <View style={styles.readonlyBanner}>
@@ -291,6 +293,10 @@ export default function ItemFormScreen({
             onDestinationChange={setDestination}
             onNoteChange={setNote}
             barcodeText={inboundBarcode || '—'}
+            weightEditable={!isPackagingStockInLineBarcode(inboundBarcode)}
+            weightHint={
+              isPackagingStockInLineBarcode(inboundBarcode) ? t.itemForm.packagingLineHint : undefined
+            }
             inboundDateLabel={inboundDateLabel || undefined}
             inboundDateYmd={inboundDateYmd || undefined}
             qtyOnHand={qtyOnHand}
@@ -331,7 +337,7 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 48 },
   hero: { marginBottom: 18 },
   title: { color: '#f8fafc', fontSize: 24, fontWeight: '900' },
-  subtitle: { color: '#94a3b8', marginTop: 8, fontSize: 14, lineHeight: 20 },
+  subtitle: { color: '#94a3b8', marginBottom: 14, fontSize: 14, lineHeight: 20 },
   readonlyBanner: {
     backgroundColor: '#1e293b',
     borderRadius: 12,

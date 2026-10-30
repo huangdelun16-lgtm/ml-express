@@ -22,6 +22,8 @@ export type FinanceHeroSummary = {
   pendingInflowTotal: number;
   manualIncomeTotal: number;
   manualExpenseTotal: number;
+  exportCostCnyTotal?: number;
+  exportCostMmkTotal?: number;
 };
 
 export type DualAmount = {
@@ -71,7 +73,10 @@ export function buildFinanceHeroView(
   const customerLedgerMmk =
     summary.collectedTotal + summary.pendingInflowTotal + summary.manualIncomeTotal;
   const myanmarLedgerMmk =
-    summary.transportUnpaidTotal + summary.transportPaidTotal + summary.manualExpenseTotal;
+    summary.transportUnpaidTotal +
+    summary.transportPaidTotal +
+    summary.manualExpenseTotal +
+    (summary.exportCostMmkTotal ?? 0);
   const pendingCny = mmkToCny(summary.pendingInflowTotal, rate);
   const manualCny = mmkToCny(summary.manualIncomeTotal, rate);
   const collectedReady = summary.collectedTotal <= 0 || settledCny != null;

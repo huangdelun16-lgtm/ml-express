@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
 import { InboundWizardFooter, InboundWizardHeader, type WizardStep } from '../components/stockIn/InboundWizardChrome';
 import StockInStepCustomer from '../components/stockIn/StockInStepCustomer';
@@ -417,7 +416,6 @@ export default function StockInScreen({ route, navigation }: Props) {
         scrollEventThrottle={16}
       >
       <InboundWizardHeader step={step} stepLabels={stepLabels} />
-        <OnlineRequiredBanner />
         {step === 1 ? (
           <StockInStepScan
             scan={scan}

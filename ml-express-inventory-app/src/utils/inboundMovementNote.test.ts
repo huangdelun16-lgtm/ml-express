@@ -13,6 +13,8 @@ import {
   pickInboundFeeFields,
   pickNotesFxLock,
   pickPrimaryInboundMovement,
+  customerFacingInboundNote,
+  replaceInboundQuoteCny,
 } from './inboundMovementNote';
 
 describe('parseInboundMovementNote', () => {
@@ -72,5 +74,17 @@ describe('parseInboundMovementNote', () => {
       totalFee: '125000',
       paymentLabel: '到付',
     });
+  });
+
+  it('hides quote and payment from the customer-facing remark', () => {
+    expect(customerFacingInboundNote('报价 4 CNY · 到付')).toBe('');
+    expect(customerFacingInboundNote('报价 4 CNY · 到付 · 易碎')).toBe('易碎');
+    expect(
+      customerFacingInboundNote(
+        '总费用 125000 MMK · 到付 · 入库包装日期 Mon Sep 07 2026 · 打包入 RUI26MDY30002',
+      ),
+    ).toBe('');
+    expect(replaceInboundQuoteCny('报价 4 CNY · 到付', 20)).toBe('报价 20 CNY · 到付');
+    expect(replaceInboundQuoteCny('到付 · 易碎', 20)).toBe('报价 20 CNY · 到付 · 易碎');
   });
 });

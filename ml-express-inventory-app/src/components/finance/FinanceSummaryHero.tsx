@@ -5,6 +5,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
   type GestureResponderHandlers,
 } from 'react-native';
@@ -203,17 +204,18 @@ export default function FinanceSummaryHero({
   panHandlers: GestureResponderHandlers;
 }) {
   const { t, fmt } = useTranslation();
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetMax = Math.max(220, Math.round(windowHeight * 0.58));
   const rate = mmkPerCny ?? null;
   const settledCny = sumSettledCustomerCny(entries ?? []);
   const view = buildFinanceHeroView(summary, settledCny, rate);
   const capsule = buildFinanceCapsuleLine(view, netBalance);
   const { collected, pending, manualIncome } = view;
   const positive = netBalance >= 0;
-  const panelMax = Math.max(panelHeight, 1);
+  const openHeight = Math.min(Math.max(panelHeight, 1), sheetMax);
 
   return (
     <Animated.View
-      {...panHandlers}
       style={[
         styles.heroShell,
         {
@@ -229,6 +231,7 @@ export default function FinanceSummaryHero({
       ]}
     >
       <Pressable
+        {...panHandlers}
         onPress={onToggleExpanded}
         accessibilityRole="button"
         accessibilityState={{ expanded }}
@@ -285,17 +288,23 @@ export default function FinanceSummaryHero({
           {
             height: progress.interpolate({
               inputRange: [0, 1],
-              outputRange: [0, panelMax],
+              outputRange: [0, openHeight],
             }),
             opacity: progress,
           },
         ]}
       >
-        <View
-          style={[styles.panelBody, styles.panelMeasure]}
-          collapsable={false}
-          onLayout={(event) => onPanelHeight(event.nativeEvent.layout.height)}
+        <ScrollView
+          style={{ height: openHeight }}
+          nestedScrollEnabled
+          showsVerticalScrollIndicator
+          keyboardShouldPersistTaps="handled"
+          bounces
         >
+          <View
+            style={styles.panelBody}
+            onLayout={(event) => onPanelHeight(event.nativeEvent.layout.height)}
+          >
           <AppText style={styles.heroEyebrow} myanmarWeight="semibold">
             {fmt(t.crossBorderFinance.heroHub, {
               name: operatorName,
@@ -419,6 +428,23 @@ export default function FinanceSummaryHero({
               prefix="−"
               tone="out"
             />
+            {(summary.exportCostCnyTotal ?? 0) > 0 || (summary.exportCostMmkTotal ?? 0) > 0 ? (
+              <MetricTile
+                label={t.crossBorderFinance.exportCost}
+                value={
+                  (summary.exportCostCnyTotal ?? 0) > 0
+                    ? `¥${formatCnyAmount(summary.exportCostCnyTotal ?? 0)}`
+                    : `${formatMmk(summary.exportCostMmkTotal ?? 0)} MMK`
+                }
+                subValue={
+                  (summary.exportCostCnyTotal ?? 0) > 0 && (summary.exportCostMmkTotal ?? 0) > 0
+                    ? `${formatMmk(summary.exportCostMmkTotal ?? 0)} MMK`
+                    : null
+                }
+                prefix="−"
+                tone="out"
+              />
+            ) : null}
           </View>
 
           {summary.agencyPayableTotal > 0 ? (
@@ -437,7 +463,8 @@ export default function FinanceSummaryHero({
           <View style={styles.closeHandleHit} accessibilityElementsHidden>
             <View style={styles.closeHandle} />
           </View>
-        </View>
+          </View>
+        </ScrollView>
       </Animated.View>
     </Animated.View>
   );
@@ -452,11 +479,6 @@ const styles = StyleSheet.create({
   },
   panelClip: {
     overflow: 'hidden',
-  },
-  panelMeasure: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
   },
   capsuleRow: {
     flexDirection: 'row',

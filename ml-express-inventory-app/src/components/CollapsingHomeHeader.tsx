@@ -15,6 +15,22 @@ export function useCollapsingHomeScroll() {
   return { scrollY, onScroll };
 }
 
+/** 前半段跟手，后半段放慢，避免顶栏和筛选被直线压扁。 */
+export function easedScrollSpan(
+  scrollY: Animated.Value,
+  distance: number,
+  from: number,
+  to: number,
+) {
+  const span = Math.max(distance, 1);
+  const delta = to - from;
+  return scrollY.interpolate({
+    inputRange: [0, span * 0.45, span],
+    outputRange: [from, from + delta * 0.72, to],
+    extrapolate: 'clamp',
+  });
+}
+
 type Props = {
   title: string;
   onHome: () => void;
@@ -22,23 +38,32 @@ type Props = {
   children?: React.ReactNode;
 };
 
-/** 与快递明细相同：下滑时 Home 收起，回到顶部时再展开。 */
+const HEADER_TRAVEL = 56;
+
+/** 下滑时 Home 跟着手指收起，回到顶部再展开。 */
 export default function CollapsingHomeHeader({ title, onHome, scrollY, children }: Props) {
   const insets = useSafeAreaInsets();
-  const headerBodyHeight = scrollY.interpolate({
-    inputRange: [0, 64],
-    outputRange: [48, 0],
-    extrapolate: 'clamp',
-  });
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [0, 48],
-    outputRange: [1, 0],
+  const headerBodyHeight = easedScrollSpan(scrollY, HEADER_TRAVEL, 48, 0);
+  const headerOpacity = easedScrollSpan(scrollY, HEADER_TRAVEL, 1, 0);
+  const headerLift = easedScrollSpan(scrollY, HEADER_TRAVEL, 0, -10);
+  const edgeOpacity = scrollY.interpolate({
+    inputRange: [12, HEADER_TRAVEL],
+    outputRange: [0, 1],
     extrapolate: 'clamp',
   });
 
   return (
     <View style={[styles.wrap, { paddingTop: insets.top }]}>
-      <Animated.View style={[styles.navRow, { height: headerBodyHeight, opacity: headerOpacity }]}>
+      <Animated.View
+        style={[
+          styles.navRow,
+          {
+            height: headerBodyHeight,
+            opacity: headerOpacity,
+            transform: [{ translateY: headerLift }],
+          },
+        ]}
+      >
         <Pressable
           style={styles.homeBtn}
           onPress={onHome}
@@ -53,6 +78,7 @@ export default function CollapsingHomeHeader({ title, onHome, scrollY, children 
         </Text>
       </Animated.View>
       {children}
+      <Animated.View style={[styles.edge, { opacity: edgeOpacity }]} />
     </View>
   );
 }
@@ -65,6 +91,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingHorizontal: 16,
     gap: 10,
+  },
+  edge: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(148, 163, 184, 0.45)',
   },
   homeBtn: {
     flexDirection: 'row',

@@ -7,15 +7,20 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import ItemFormFields from './ItemFormFields';
+import DestinationPickerField from './DestinationPickerField';
 import { useItemFormState } from '../hooks/useItemFormState';
 import { useAuth } from '../contexts/AuthContext';
 import { resolveAppError, useTranslation } from '../i18n';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 import { updatePackedShipment } from '../services/inventoryService';
 import { feedbackService } from '../services/FeedbackService';
+import { packOutboundDestination } from '../utils/matchTruckLoadScan';
+import { isPackagingStockInPack } from '../utils/packItemSequence';
+import { parseInboundMovementNote } from '../utils/inboundMovementNote';
 import type { PackedShipmentListRow } from '../types/inventory';
 import {
   isPackContentLockedForStore,
@@ -34,6 +39,10 @@ export default function PkgEditModal({ visible, pack, onClose, onSaved }: Props)
   const { t } = useTranslation();
   const form = useItemFormState();
   const [saving, setSaving] = React.useState(false);
+  const [destination, setDestination] = React.useState('');
+  const [quoteText, setQuoteText] = React.useState('');
+  const [quoteTouched, setQuoteTouched] = React.useState(false);
+  const packagingPack = !!pack && isPackagingStockInPack(pack);
 
   useEffect(() => {
     if (!visible || !pack) return;
@@ -45,6 +54,9 @@ export default function PkgEditModal({ visible, pack, onClose, onSaved }: Props)
       weight: pack.weight,
       note: pack.note,
     });
+    setDestination(packOutboundDestination(pack));
+    setQuoteText(parseInboundMovementNote(pack.note || '').quoteCny ?? '');
+    setQuoteTouched(false);
   }, [visible, pack?.id]);
 
   const packItems = pack?.items ?? [];
@@ -64,6 +76,10 @@ export default function PkgEditModal({ visible, pack, onClose, onSaved }: Props)
       feedbackService.notify(t.common.tip, t.itemForm.alertName);
       return;
     }
+    if (!destination.trim()) {
+      feedbackService.notify(t.common.tip, t.itemForm.alertDestination);
+      return;
+    }
     setSaving(true);
     try {
       if (!store) throw new Error(t.common.notLoggedIn);
@@ -74,6 +90,9 @@ export default function PkgEditModal({ visible, pack, onClose, onSaved }: Props)
           spec: form.payload.spec,
           unit: form.payload.unit,
           weight: form.payload.weight,
+          destination: destination.trim(),
+          quoteCny: packagingPack ? Number(quoteText) : null,
+          quoteManual: packagingPack && quoteTouched,
         },
         store,
       );
@@ -117,6 +136,30 @@ export default function PkgEditModal({ visible, pack, onClose, onSaved }: Props)
             weightHint={contentLockHint}
             showPreview
           />
+          <DestinationPickerField
+            label={t.stockIn.finalDest}
+            hint={t.stockOut.destinationHint}
+            value={destination}
+            onChange={setDestination}
+            disabled={pack.loaded}
+          />
+          {packagingPack ? (
+            <View style={styles.quoteBox}>
+              <Text style={styles.quoteLabel}>{t.invoice.quoteCny}</Text>
+              <Text style={styles.quoteHint}>{t.itemForm.packagingLineHint}</Text>
+              <TextInput
+                value={quoteText}
+                onChangeText={(value) => {
+                  setQuoteTouched(true);
+                  setQuoteText(value.replace(/[^\d.]/g, ''));
+                }}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor="#64748b"
+                style={styles.quoteInput}
+              />
+            </View>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
@@ -141,4 +184,18 @@ const styles = StyleSheet.create({
   saveDisabled: { opacity: 0.5 },
   body: { padding: 16, paddingBottom: 40 },
   hint: { color: '#64748b', fontSize: 13, lineHeight: 20, marginBottom: 16 },
+  quoteBox: { marginTop: 16 },
+  quoteLabel: { color: '#e2e8f0', fontSize: 14, fontWeight: '800', marginBottom: 6 },
+  quoteHint: { color: '#94a3b8', fontSize: 12, lineHeight: 18, marginBottom: 8 },
+  quoteInput: {
+    backgroundColor: '#1e293b',
+    color: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 18,
+    fontWeight: '800',
+  },
 });

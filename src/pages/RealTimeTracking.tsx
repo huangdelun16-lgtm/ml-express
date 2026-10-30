@@ -35,8 +35,16 @@ import {
   type RouteJob,
 } from '../utils/routePrediction';
 import { fetchDrivingRoute, type DrivingRouteResult } from '../utils/googleDrivingDirections';
+import { storeMatchesTrackingCity } from '../utils/trackingStoreCity';
+import { merchantStoreTypeLabelZh } from '../constants/merchantStoreTypes';
 
 type PredictedRoute = RouteJob & DrivingRouteResult;
+
+function storeStatusLabel(status: string): string {
+  if (status === 'active') return '营业中';
+  if (status === 'maintenance') return '维护中';
+  return '已停用';
+}
 
 function PredictedEtaLine({ route }: { route?: PredictedRoute }) {
   if (!route) return null;
@@ -194,6 +202,7 @@ const RealTimeTracking: React.FC = () => {
   // 选项卡和快递店相关状态
   const [sidebarTab, setSidebarTab] = useState<'pending' | 'assigned'>('pending');
   const [stores, setStores] = useState<DeliveryStore[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [loadingStores, setLoadingStores] = useState(false);
   
   // 包裹位置点显示状态
@@ -995,6 +1004,7 @@ const RealTimeTracking: React.FC = () => {
     const validCityKey = cityKey as CityKey;
     if (validCityKey in myanmarCities) {
       setSelectedCity(validCityKey);
+      setSelectedStoreId(null);
       const city = myanmarCities[validCityKey];
       setMapCenter({ lat: city.lat, lng: city.lng });
       // 切换城市后立即重新加载该区域的快递员数据
@@ -1037,6 +1047,10 @@ const RealTimeTracking: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- filterPackagesByCity 依赖 selectedCity / 领区
     [packages, selectedCity, isRegionalUser, currentRegionPrefix],
   );
+
+  const visibleStores = isRegionalUser
+    ? stores
+    : stores.filter((store) => storeMatchesTrackingCity(store, selectedCity, myanmarCities));
 
   const pendingPackages = useMemo(
     () => cityFilteredPackages.filter((p) => p.status === '待取件' || p.status === '待收款'),
@@ -1464,39 +1478,108 @@ const RealTimeTracking: React.FC = () => {
                     );
                   })}
 
-                  {/* 显示快递店位置及围栏 */}
-                  {stores
+                  {/* 当前城市的快递店。1 公里圈只在点中这家店时出现。 */}
+                  {visibleStores
                     .filter(store => store.latitude && store.longitude)
-                    .map(store => (
-                      <React.Fragment key={`store-group-${store.id}`}>
+                    .map(store => {
+                      const storeKey = store.id || store.store_code;
+                      const fenceOpen = selectedStoreId === storeKey;
+                      return (
+                      <React.Fragment key={`store-group-${storeKey}`}>
                         <Marker
-                          key={`store-${store.id}`}
+                          key={`store-${storeKey}`}
                           position={{ lat: store.latitude!, lng: store.longitude! }}
+                          title={store.store_name}
                           icon={{
                             url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
                               <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="20" cy="20" r="18" fill="${store.status === 'active' ? '#10b981' : '#f59e0b'}" stroke="white" stroke-width="3"/>
+                                <circle cx="20" cy="20" r="18" fill="${store.status === 'active' ? '#10b981' : '#f59e0b'}" stroke="${fenceOpen ? '#065f46' : 'white'}" stroke-width="3"/>
                                 <text x="20" y="26" text-anchor="middle" fill="white" font-size="20" font-weight="bold">🏪</text>
                               </svg>
                             `)}`,
                             scaledSize: new window.google.maps.Size(40, 40),
                             anchor: new window.google.maps.Point(20, 20)
                           }}
-                        />
-                        <Circle
-                          center={{ lat: store.latitude!, lng: store.longitude! }}
-                          radius={1000} // 1公里围栏
-                          options={{
-                            fillColor: store.status === 'active' ? '#10b981' : '#f59e0b',
-                            fillOpacity: 0.1,
-                            strokeColor: store.status === 'active' ? '#10b981' : '#f59e0b',
-                            strokeOpacity: 0.3,
-                            strokeWeight: 1,
-                            clickable: false
+                          onClick={() => {
+                            setSelectedStoreId((current) => (current === storeKey ? null : storeKey));
                           }}
                         />
+                        {fenceOpen ? (
+                          <Circle
+                            center={{ lat: store.latitude!, lng: store.longitude! }}
+                            radius={1000}
+                            options={{
+                              fillColor: store.status === 'active' ? '#10b981' : '#f59e0b',
+                              fillOpacity: 0.12,
+                              strokeColor: store.status === 'active' ? '#10b981' : '#f59e0b',
+                              strokeOpacity: 0.8,
+                              strokeWeight: 2,
+                              clickable: false
+                            }}
+                          />
+                        ) : null}
+                        {fenceOpen ? (
+                          <InfoWindow
+                            position={{ lat: store.latitude!, lng: store.longitude! }}
+                            options={{ pixelOffset: new window.google.maps.Size(0, -28) }}
+                            onCloseClick={() => setSelectedStoreId(null)}
+                          >
+                            <div style={{ padding: '0.2rem 0.1rem 0', minWidth: '200px', maxWidth: '260px', maxHeight: '220px', overflowY: 'auto' }}>
+                              <h3 style={{ margin: '0 0 0.3rem 0', color: '#1f2937', fontSize: '1rem' }}>
+                                {store.store_name || '未命名店铺'}
+                              </h3>
+                              <p style={{ margin: '0.2rem 0', fontSize: '0.82rem', color: '#374151' }}>
+                                <strong>编码:</strong> {store.store_code || '—'}
+                                {' · '}
+                                {merchantStoreTypeLabelZh(store.store_type)}
+                              </p>
+                              <p style={{ margin: '0.2rem 0', fontSize: '0.82rem', color: store.status === 'active' ? '#047857' : '#b45309', fontWeight: 700 }}>
+                                {store.is_closed_today ? '今日休息' : storeStatusLabel(store.status)}
+                              </p>
+                              {store.phone ? (
+                                <p style={{ margin: '0.2rem 0', fontSize: '0.82rem', color: '#374151' }}>
+                                  <strong>电话:</strong> {store.phone}
+                                </p>
+                              ) : null}
+                              {store.address ? (
+                                <p style={{ margin: '0.2rem 0', fontSize: '0.82rem', color: '#374151' }}>
+                                  <strong>地址:</strong> {store.address}
+                                </p>
+                              ) : null}
+                              {store.operating_hours ? (
+                                <p style={{ margin: '0.2rem 0', fontSize: '0.82rem', color: '#374151' }}>
+                                  <strong>营业:</strong> {store.operating_hours}
+                                </p>
+                              ) : null}
+                              {store.manager_name || store.manager_phone ? (
+                                <p style={{ margin: '0.2rem 0', fontSize: '0.82rem', color: '#374151' }}>
+                                  <strong>店长:</strong> {[store.manager_name, store.manager_phone].filter(Boolean).join(' · ')}
+                                </p>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/admin/delivery-stores?q=${encodeURIComponent(store.store_code || store.store_name || '')}`)}
+                                style={{
+                                  marginTop: '0.45rem',
+                                  width: '100%',
+                                  padding: '0.4rem',
+                                  borderRadius: '6px',
+                                  background: '#0f766e',
+                                  color: 'white',
+                                  border: 'none',
+                                  fontWeight: 'bold',
+                                  cursor: 'pointer',
+                                  fontSize: '0.82rem'
+                                }}
+                              >
+                                在商家管理打开
+                              </button>
+                            </div>
+                          </InfoWindow>
+                        ) : null}
                       </React.Fragment>
-                    ))}
+                      );
+                    })}
 
                   {/* 显示未分配包裹的取件点(P)和配送点(D) */}
                   {getUnassignedPackages().map(pkg => {

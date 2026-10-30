@@ -10,6 +10,7 @@ type Props = {
   onChange: (v: string) => void;
   /** 可选目的地列表；默认全部 PACK_DESTINATION_OPTIONS */
   options?: readonly string[];
+  disabled?: boolean;
 };
 
 export default function DestinationPickerField({
@@ -18,6 +19,7 @@ export default function DestinationPickerField({
   value,
   onChange,
   options,
+  disabled = false,
 }: Props) {
   const { t } = useTranslation();
   const resolvedLabel = label ?? t.forms.destination;
@@ -27,7 +29,13 @@ export default function DestinationPickerField({
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{resolvedLabel} *</Text>
-      <Pressable style={styles.trigger} onPress={() => setOpen((v) => !v)}>
+      <Pressable
+        style={[styles.trigger, disabled && styles.triggerDisabled]}
+        onPress={() => {
+          if (!disabled) setOpen((v) => !v);
+        }}
+        disabled={disabled}
+      >
         <Text style={[styles.triggerText, !value && styles.placeholder]}>
           {value ? regionDisplayLabel(value) : t.forms.selectDestination}
         </Text>
@@ -73,6 +81,7 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
   },
   triggerText: { color: '#0f172a', fontSize: 16, fontWeight: '600', flex: 1 },
+  triggerDisabled: { backgroundColor: '#e2e8f0' },
   placeholder: { color: '#94a3b8', fontWeight: '500' },
   chevron: { color: '#64748b', fontSize: 12, marginLeft: 8 },
   panel: {

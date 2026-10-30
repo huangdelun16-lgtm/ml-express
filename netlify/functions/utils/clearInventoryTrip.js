@@ -371,21 +371,30 @@ function sumLineMoney(lines) {
 function repriceKeptInvoice(originalLines, nextLines, doc) {
   const original = sumLineMoney(originalLines);
   const remaining = sumLineMoney(nextLines);
+  const extraCnyRaw = Number(doc?.extraFeeCny);
+  const extraMmkRaw = Number(doc?.extraFeeMmk);
+  const extraCny = Number.isFinite(extraCnyRaw) && extraCnyRaw > 0 ? extraCnyRaw : 0;
+  const extraMmk = Number.isFinite(extraMmkRaw) && extraMmkRaw > 0 ? extraMmkRaw : 0;
+  const storedCny = Number(doc?.totalFeeCny);
+  const freightStoredCny = Number.isFinite(storedCny) ? Math.max(0, storedCny - extraCny) : null;
   let cny =
     remaining.cny != null
       ? remaining.cny
-      : doc?.totalFeeCny != null && original.kg > 0
-        ? Math.round((Number(doc.totalFeeCny) * remaining.kg) / original.kg * 100) / 100
-        : doc?.totalFeeCny != null
-          ? Number(doc.totalFeeCny)
-          : null;
-  let mmk = Number(doc?.totalFeeMmk) || 0;
+      : freightStoredCny != null && original.kg > 0
+        ? Math.round((freightStoredCny * remaining.kg) / original.kg * 100) / 100
+        : freightStoredCny;
+  let mmk = Math.max(0, (Number(doc?.totalFeeMmk) || 0) - extraMmk);
   if (original.cny != null && original.cny > 0 && remaining.cny != null && mmk > 0) {
     mmk = Math.round((mmk * remaining.cny) / original.cny);
   } else if (original.kg > 0 && mmk > 0) {
     mmk = Math.round((mmk * remaining.kg) / original.kg);
-  } else if (cny != null && original.cny != null && original.cny > 0 && Number(doc?.totalFeeCny) > 0 && mmk <= 0) {
+  } else if (cny != null && original.cny != null && original.cny > 0 && freightStoredCny != null && freightStoredCny > 0 && mmk <= 0) {
     cny = remaining.cny != null ? remaining.cny : cny;
+  }
+  const freightCny = cny;
+  if (extraCny > 0) {
+    cny = Math.round(((cny != null ? cny : 0) + extraCny) * 100) / 100;
+    mmk += extraMmk;
   }
   const feeLine = (doc?.totals || []).find((line) => /总费用|Total fee|ပို့ဆောင်ခ/.test(String(line)));
   const feeIsMmk = /MMK/i.test(String(feeLine || '')) || (mmk > 0 && !/¥/.test(String(feeLine || '')));
@@ -394,18 +403,19 @@ function repriceKeptInvoice(originalLines, nextLines, doc) {
     if (/总重量|Total weight|စုစုပေါင်းအလေး/.test(text)) {
       return text.replace(/([\d,.]+)\s*Kg/i, `${formatKgAmount(remaining.kg)} Kg`);
     }
-    if (/入库报价|Quote/.test(text) && cny != null) {
-      return text.replace(/¥\s*([\d,.]+)/, `¥${formatCnyAmount(cny)}`);
+    if (/入库报价|Inbound quote|စာရင်းသွင်း ဈေး/.test(text) && freightCny != null) {
+      return text.replace(/¥\s*([\d,.]+)/, `¥${formatCnyAmount(freightCny)}`);
     }
-    if (/总费用|Total fee|ပို့ဆောင်ခ/.test(text)) {
+    if (/总费用|Total fee|ပို့ဆောင်ခ/.test(text) && !/附加费|Extra fee|ထပ်ဆောင်းခ/.test(text)) {
       if (feeIsMmk && mmk > 0) {
         return text.replace(/([\d,.]+)(\s*MMK)/i, `${Math.round(mmk).toLocaleString('en-US')}$2`);
       }
       const parsedFee = parseKgAndCny(text);
       if (parsedFee.cny != null && original.kg > 0) {
-        const nextCny = Math.round(((parsedFee.cny * remaining.kg) / original.kg) * 100) / 100;
-        cny = nextCny;
-        return text.replace(/¥\s*([\d,.]+)/, `¥${formatCnyAmount(nextCny)}`);
+        const freightOnLine = Math.max(0, Math.round((parsedFee.cny - extraCny) * 100) / 100);
+        const nextCny = Math.round(((freightOnLine * remaining.kg) / original.kg) * 100) / 100;
+        cny = nextCny + extraCny;
+        return text.replace(/¥\s*([\d,.]+)/, `¥${formatCnyAmount(nextCny + extraCny)}`);
       }
       if (cny != null && /¥/.test(text)) {
         return text.replace(/¥\s*([\d,.]+)/, `¥${formatCnyAmount(cny)}`);

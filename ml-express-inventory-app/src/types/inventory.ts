@@ -135,6 +135,8 @@ export interface PackedShipmentDetail extends PackedShipment {
   spec: string;
   unit: string;
   weight: string;
+  /** 快递包本体上登记的目的地。改包裹目的地只写这里，不改包内入库单。 */
+  bundle_destination?: string;
   items: PackedShipmentItem[];
   /** 包裹库存（通常为 1）；0 表示已装车出库 */
   bundle_qty_on_hand: number;

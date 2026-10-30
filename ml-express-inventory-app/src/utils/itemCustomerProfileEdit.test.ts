@@ -28,13 +28,13 @@ const ygnStore: InventoryStoreSession = {
 };
 
 describe('isItemCustomerProfileLocked', () => {
-  it('locks after destination hub receive marker', () => {
+  it('allows edit after hub arrival until the customer signs', () => {
     expect(
       isItemCustomerProfileLocked({
         barcode: 'YGN260001',
         hub_arrived_at: '2026-06-21T00:00:00.000Z',
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('locks after customer signed', () => {
@@ -85,12 +85,12 @@ describe('canEditItemCustomerProfile', () => {
     ).toBe(false);
   });
 
-  it('denies origin after destination hub receive', () => {
+  it('allows origin after destination hub receive until customer sign', () => {
     expect(
       canEditItemCustomerProfile(museStore, {
         ...inTransitYgnOrder,
         hub_arrived_at: '2026-06-21T00:00:00.000Z',
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 });

@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   },
   pairBtn: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 46,
     alignItems: 'center',
     justifyContent: 'center',
   },

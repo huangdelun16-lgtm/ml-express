@@ -1,11 +1,9 @@
 import type { InventoryStoreSession } from '../services/authService';
 import type { InventoryItem } from '../types/inventory';
-import type { PkgTrackingStatus } from '../types/tracking';
 import { resolveItemDestinationCode } from './itemDestination';
 import {
   canEditOwnedRecord,
   isAdminStore,
-  ownershipKeyFromStoreCode,
   resolveOwnerKeyForListItem,
 } from './storeOwnership';
 
@@ -22,59 +20,18 @@ export type ItemCustomerProfileEditRef = {
   parent_pack_barcode?: string | null;
 };
 
-const DESTINATION_PACK_LOCKED_STATUSES: PkgTrackingStatus[] = [
-  'hub_received',
-  'completed',
-  'split_at_hub',
-];
-
-/** 客户信息是否已锁定（目的站已签收快递包或客户已签收） */
+/** 客户已签收后不可再改。已到站、尚未签收的仍可改重量和报价。 */
 export function isItemCustomerProfileLocked(item: ItemCustomerProfileEditRef): boolean {
-  if (item.customer_signed_at?.trim() || item.customer_signed) return true;
-  if (item.hub_arrived_at?.trim() || item.hub_arrived) return true;
-  return false;
-}
-
-/** 云端：目的地区域账号是否已对所属快递包执行到站签收 */
-export async function isDestinationPackSignedForOrder(item: InventoryItem): Promise<boolean> {
-  const orderDest = resolveItemDestinationCode(item);
-  if (!orderDest) return false;
-
-  const { isSupabaseConfigured } = await import('../services/supabase');
-  if (!isSupabaseConfigured()) return false;
-
-  try {
-    const { getOrderTrackingByBarcode, getPkgTrackingDetail } = await import(
-      '../services/trackingService'
-    );
-    const order = await getOrderTrackingByBarcode(item.barcode);
-    const packBarcode =
-      order?.pack_barcode?.trim() ||
-      item.packed_bundle_barcode?.trim() ||
-      '';
-    if (!packBarcode) return false;
-
-    const pkg = await getPkgTrackingDetail(packBarcode);
-    if (!pkg?.status || !DESTINATION_PACK_LOCKED_STATUSES.includes(pkg.status)) return false;
-
-    const receivedCode = pkg.hub_received_by_store_code?.trim();
-    if (!receivedCode) return false;
-
-    return ownershipKeyFromStoreCode(receivedCode) === orderDest;
-  } catch {
-    return false;
-  }
+  return Boolean(item.customer_signed_at?.trim() || item.customer_signed);
 }
 
 export async function isItemCustomerProfileLockedAsync(item: InventoryItem): Promise<boolean> {
-  if (isItemCustomerProfileLocked(item)) return true;
-  return isDestinationPackSignedForOrder(item);
+  return isItemCustomerProfileLocked(item);
 }
 
 /**
- * 是否可编辑订单客户资料：
- * - 目的站签收快递包前：入库区域或最终目的地区域账号可改
- * - 签收后锁定（Admin 除外）
+ * 是否可编辑订单：客户签收前，入库区域或最终目的地区域账号可改。
+ * 已签收后锁定（Admin 除外）。已到站但未签收仍可改重量和报价。
  */
 export function canEditItemCustomerProfile(
   store: InventoryStoreSession,

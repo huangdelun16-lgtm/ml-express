@@ -12,6 +12,7 @@ type Props = {
   onStatusChange: (status: '' | 'unpacked' | 'signed') => void;
   unpackedLabel: string;
   signedLabel: string;
+  resultCount?: number;
 };
 
 export default function RegionFilterBar({
@@ -21,11 +22,17 @@ export default function RegionFilterBar({
   onStatusChange,
   unpackedLabel,
   signedLabel,
+  resultCount,
 }: Props) {
-  const { t } = useTranslation();
+  const { t, fmt } = useTranslation();
   const options: { code: string; label: string }[] = [
     { code: '', label: t.common.all },
     ...PACK_DESTINATION_OPTIONS.map((code) => ({ code, label: regionDisplayLabel(code) })),
+  ];
+  const statusOptions: { id: '' | 'unpacked' | 'signed'; label: string }[] = [
+    { id: '', label: t.common.all },
+    { id: 'unpacked', label: unpackedLabel },
+    { id: 'signed', label: signedLabel },
   ];
 
   return (
@@ -36,7 +43,7 @@ export default function RegionFilterBar({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.row}
+        contentContainerStyle={styles.regionRow}
       >
         {options.map((opt) => {
           const active = value === opt.code;
@@ -45,6 +52,8 @@ export default function RegionFilterBar({
               key={opt.code || 'all'}
               style={[styles.chip, active && styles.chipOn]}
               onPress={() => onChange(opt.code)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
             >
               <Text style={[styles.chipText, active && styles.chipTextOn]} myanmarWeight="bold">
                 {opt.label}
@@ -52,42 +61,57 @@ export default function RegionFilterBar({
             </Pressable>
           );
         })}
-        <View style={styles.divider} />
-        {([
-          { id: 'unpacked' as const, label: unpackedLabel },
-          { id: 'signed' as const, label: signedLabel },
-        ]).map((opt) => {
+      </ScrollView>
+
+      <View style={styles.statusHead}>
+        <Text style={styles.title} myanmarWeight="bold">
+          {t.forms.filterStatus}
+        </Text>
+        {typeof resultCount === 'number' ? (
+          <Text style={styles.count} myanmarWeight="bold">
+            {fmt(t.forms.matchCount, { count: resultCount })}
+          </Text>
+        ) : null}
+      </View>
+      <View style={styles.statusRow}>
+        {statusOptions.map((opt) => {
           const active = status === opt.id;
           return (
             <Pressable
-              key={opt.id}
-              style={[styles.chip, active && styles.chipStatusOn]}
-              onPress={() => onStatusChange(active ? '' : opt.id)}
+              key={opt.id || 'all-status'}
+              style={[styles.statusChip, active && styles.statusChipOn]}
+              onPress={() => onStatusChange(active && opt.id !== '' ? '' : opt.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
             >
-              <Text style={[styles.chipText, active && styles.chipStatusTextOn]} myanmarWeight="bold">
+              <Text
+                style={[styles.statusText, active && styles.statusTextOn]}
+                myanmarWeight="bold"
+                numberOfLines={2}
+              >
                 {opt.label}
               </Text>
             </Pressable>
           );
         })}
-      </ScrollView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingBottom: 10 },
+  wrap: { paddingBottom: 8 },
   title: {
     color: colors.muted,
     fontSize: 12,
     fontWeight: '700',
-    marginBottom: 8,
   },
-  row: { flexDirection: 'row', gap: 8, paddingRight: 4 },
+  regionRow: { flexDirection: 'row', gap: 8, paddingRight: 4, paddingTop: 8 },
   chip: {
     borderRadius: 999,
     paddingHorizontal: 14,
-    paddingVertical: 6,
+    minHeight: 36,
+    justifyContent: 'center',
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.borderMuted,
@@ -98,15 +122,30 @@ const styles = StyleSheet.create({
   },
   chipText: { color: colors.textSecondary, fontSize: 13, fontWeight: '700' },
   chipTextOn: { color: colors.accentSkyBright, fontWeight: '900' },
-  chipStatusOn: {
-    backgroundColor: 'rgba(251,191,36,0.18)',
+  statusHead: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  count: { color: colors.accentSkyBright, fontSize: 12, fontWeight: '800' },
+  statusRow: { flexDirection: 'row', gap: 8, paddingTop: 8 },
+  statusChip: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  statusChipOn: {
+    backgroundColor: 'rgba(251,191,36,0.16)',
     borderColor: colors.warning,
   },
-  chipStatusTextOn: { color: colors.warning, fontWeight: '900' },
-  divider: {
-    width: 1,
-    alignSelf: 'stretch',
-    marginVertical: 4,
-    backgroundColor: colors.borderMuted,
-  },
+  statusText: { color: colors.textSecondary, fontSize: 13, fontWeight: '800', textAlign: 'center' },
+  statusTextOn: { color: colors.warning, fontWeight: '900' },
 });

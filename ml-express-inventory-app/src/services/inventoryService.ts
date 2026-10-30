@@ -24,6 +24,7 @@ import {
   fetchCloudPackByBarcode,
   fetchCloudRecentPackedShipments,
   fetchCloudTodayMovementTotals,
+  findItemIdsByRecipientPhone,
   getCloudItemIdByBarcode,
   packagingStockInBatchAtomic,
 } from './inventoryCloudApi';
@@ -36,21 +37,25 @@ import {
   canEditPackedShipment,
   canSelectPackedShipmentForTruckLoad,
 } from '../utils/packDisplayStatus';
+import { packMatchesKeyword } from '../utils/packSearch';
 import { isVisibleInExpressDetailsList, isVisibleInPackedList } from '../utils/expressDetailsVisibility';
-import { itemMatchesKeyword } from '../utils/itemKeywordMatch';
+import { itemMatchesKeyword, phoneSearchDigits } from '../utils/itemKeywordMatch';
 import {
   assertPackagingExpressMatch,
   filterItemsByExpressCodes,
   packagingExpressKey,
 } from '../utils/packagingExpressMatch';
 import { canEditItemCustomerProfileAsync } from '../utils/itemCustomerProfileEdit';
+import { parseWeight } from '../utils/itemFieldFormat';
+import { fetchCrossBorderRoutePerKg, quoteCnyForEditedWeight } from '../utils/crossBorderPricing';
+import { replaceInboundQuoteCny } from '../utils/inboundMovementNote';
 import { todayIsoDate } from '../utils/dateFormat';
 import { resolveTripNumberPrefix } from '../utils/tripNumber';
 import { inventoryOperationId } from '../utils/inventoryReliability';
 import { verifyOutboundPacksForLoad } from '../utils/verifyOutboundPacks';
 import { parseTransportFeeFromLoadNote } from '../utils/truckRouteFee';
 import {
-  parseInboundMovementNote,
+  customerFacingInboundNote,
   pickInboundFeeFields,
   pickPrimaryInboundMovement,
 } from '../utils/inboundMovementNote';
@@ -58,7 +63,7 @@ import { applyFxLockToNote, type CrossBorderFxLock } from '../utils/crossBorderF
 import { settleQuoteNoteAtRate } from '../utils/inboundMovementNote';
 import { isSupabaseConfigured, supabase } from './supabase';
 import { preferConfirmedHubReceivePack } from '../utils/hubReceivePack';
-import { findParentPackForItem, resolvePackagingStockInItemLabel } from '../utils/packItemSequence';
+import { findParentPackForItem, isPackagingStockInPack, resolvePackagingStockInItemLabel } from '../utils/packItemSequence';
 import { isPackagingStockInLineBarcode } from '../utils/inboundBarcode';
 import type { CustomerSignPickupType, CustomerSignReceiptInput } from '../types/customerSignReceipt';
 import {
@@ -148,6 +153,10 @@ export async function listItems(
   options?: { force?: boolean },
 ): Promise<InventoryItemListRow[]> {
   const { items, packs } = await all(scope, false, options);
+  const phoneDigits = phoneSearchDigits(search);
+  const phoneIds = phoneDigits
+    ? new Set(await findItemIdsByRecipientPhone(phoneDigits))
+    : new Set<string>();
 
   const packByBarcode = new Map(packs.map((p) => [p.bundle_barcode.trim().toUpperCase(), p]));
   const hydratedPacks = [...packs];
@@ -173,7 +182,7 @@ export async function listItems(
   const rows = items
     .filter((item) => !isPackageBarcode(item.barcode))
     .map((i) => listRowLight(i, hydratedPacks, items))
-    .filter((i) => itemMatchesKeyword(i, search));
+    .filter((i) => itemMatchesKeyword(i, search) || phoneIds.has(i.id));
   if (!scope) return rows;
   return rows.filter((item) => isVisibleInExpressDetailsList(item, scope.store, scope.hubCode));
 }
@@ -463,9 +472,8 @@ export async function listPackedShipments(
   scope?: { store: InventoryStoreSession; hubCode: string },
 ): Promise<PackedShipmentDetail[]> {
   const packs = await listPacks(scope?.store, scope?.hubCode);
-  const q = search?.trim().toLowerCase();
   return packs
-    .filter((pack) => !q || [pack.bundle_barcode, pack.bundle_name, pack.operator, pack.note].join(' ').toLowerCase().includes(q))
+    .filter((pack) => packMatchesKeyword(pack, search))
     .filter((pack) => !scope || isVisibleInPackedList(pack, scope.store, scope.hubCode));
 }
 
@@ -501,13 +509,52 @@ export async function getPackedShipmentContainingItem(id: string): Promise<Packe
   return (await listPacks()).find((p) => p.items.some((line) => line.item_id === id)) ?? null;
 }
 
-export async function updatePackedShipment(packId: string, params: { bundle_name: string; spec: string; unit: string; weight: string }, actingStore?: InventoryStoreSession): Promise<void> {
+export async function updatePackedShipment(
+  packId: string,
+  params: { bundle_name: string; spec: string; unit: string; weight: string; destination?: string; quoteCny?: number | null; quoteManual?: boolean },
+  actingStore?: InventoryStoreSession,
+): Promise<void> {
   const pack = await getPackedShipmentById(packId);
   if (!pack) throw svc('packNotFoundGeneric');
   const bundle = await getItemById(pack.bundle_item_id);
   if (!bundle) throw svc('bundleItemNotFound');
-  const saved = await cloudUpsertItem({ ...bundle, name: params.bundle_name, spec: params.spec, unit: params.unit, weight: params.weight, updated_at: nowIso() }, actingStore);
-  await createPack({ ...pack, bundle_name: saved.name }, pack.items, pack.loaded ? nowIso() : null, actingStore);
+  const nextDest = (params.destination ?? '').trim().toUpperCase();
+  const saved = await cloudUpsertItem({
+    ...bundle,
+    name: params.bundle_name,
+    spec: params.spec,
+    unit: params.unit,
+    weight: params.weight,
+    ...(nextDest ? { final_destination: nextDest, destination: nextDest } : {}),
+    updated_at: nowIso(),
+  }, actingStore);
+  let note = pack.note;
+  if (isPackagingStockInPack(pack)) {
+    const oldKg = Number(parseWeight(pack.weight).n);
+    const newKg = Number(parseWeight(params.weight).n);
+    const weightChanged = oldKg !== newKg;
+    let quote: number | null = null;
+    if (params.quoteManual && params.quoteCny != null && Number.isFinite(params.quoteCny) && params.quoteCny >= 0) {
+      quote = params.quoteCny;
+    } else if (weightChanged) {
+      quote = await quoteForPackTotalWeight(pack, params.weight);
+    }
+    if (quote != null) {
+      note = replaceInboundQuoteCny(pack.note || '', quote);
+      for (const line of pack.items) {
+        if (!line.item_id || line.item_id === bundle.id) continue;
+        const lineItem = await getItemById(line.item_id);
+        if (lineItem?.customer_signed_at?.trim()) continue;
+        await writeInboundQuote(line.item_id, line.item_barcode, quote);
+      }
+    }
+  }
+  await createPack(
+    { ...pack, bundle_name: saved.name, note, weight: params.weight },
+    pack.items,
+    pack.loaded ? nowIso() : null,
+    actingStore,
+  );
 }
 
 export async function applyTruckLoadOutbound(params: {
@@ -699,7 +746,6 @@ function buildItemDetail(
 ): InventoryItemDetail {
   const inboundMoves = moves.filter((m) => m.type === 'in');
   const inbound = pickPrimaryInboundMovement(inboundMoves);
-  const parsedNote = parseInboundMovementNote(inbound?.note ?? '');
   const feeFields = pickInboundFeeFields(
     ...inboundMoves.map((row) => row.note),
     pack?.note,
@@ -730,7 +776,7 @@ function buildItemDetail(
     inbound_qty: inbound?.qty ?? 0,
     inbound_date_label: inbound?.created_at ?? '',
     inbound_store_name: inbound?.origin_store_name ?? '',
-    inbound_note: parsedNote.userNote ?? inbound?.note ?? '',
+    inbound_note: customerFacingInboundNote(inbound?.note),
     inbound_movement_note: inbound?.note ?? '',
     total_fee: feeFields.totalFee,
     quote_cny: feeFields.quoteCny,
@@ -831,6 +877,80 @@ function noteWithSignSettlement(note: string, lock: CrossBorderFxLock): string {
   return applyFxLockToNote(settleQuoteNoteAtRate(note, lock.mmkPerCny), lock);
 }
 
+/** 未签收改重量后，按定价窗口的人民币/公斤重写入库报价。到站签收读的就是这条。 */
+async function repriceUnsignedInboundQuote(
+  item: InventoryItem,
+  weight: string,
+  destination: string,
+): Promise<void> {
+  const weightKg = Number(parseWeight(weight).n);
+  if (!(weightKg > 0) || !isSupabaseConfigured()) return;
+  const moves = await cloudListMovementsForItem(item.id);
+  const inbound = pickPrimaryInboundMovement(moves.filter((row) => row.type === 'in'));
+  if (!inbound?.id) return;
+  const origin = inbound.origin_store_code?.trim() || item.owner_store_code?.trim() || '';
+  const priced = await fetchCrossBorderRoutePerKg(origin, destination, inbound.customer_code);
+  const quote = quoteCnyForEditedWeight({
+    cnyPerKg: priced.cnyPerKg,
+    perKgMmk: priced.perKg,
+    mmkPerCny: priced.mmkPerCny,
+    weightKg,
+  });
+  if (quote == null) return;
+  await writeInboundQuote(item.id, item.barcode, quote);
+}
+
+async function quoteForPackTotalWeight(pack: PackedShipmentDetail, weight: string): Promise<number | null> {
+  const weightKg = Number(parseWeight(weight).n);
+  if (!(weightKg > 0) || !isSupabaseConfigured()) return null;
+  const line = pack.items.find((row) => row.item_id);
+  if (!line?.item_id) return null;
+  const item = await getItemById(line.item_id);
+  const moves = item ? await cloudListMovementsForItem(item.id) : [];
+  const inbound = pickPrimaryInboundMovement(moves.filter((row) => row.type === 'in'));
+  const origin = inbound?.origin_store_code?.trim() || pack.owner_store_code?.trim() || '';
+  const destination = (line.destination || item?.final_destination || '').trim();
+  const priced = await fetchCrossBorderRoutePerKg(origin, destination, inbound?.customer_code);
+  return quoteCnyForEditedWeight({
+    cnyPerKg: priced.cnyPerKg,
+    perKgMmk: priced.perKg,
+    mmkPerCny: priced.mmkPerCny,
+    weightKg,
+  });
+}
+
+async function writeInboundQuote(itemId: string, barcode: string, quote: number): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const moves = await cloudListMovementsForItem(itemId);
+  const inbound = pickPrimaryInboundMovement(moves.filter((row) => row.type === 'in'));
+  if (inbound?.id) {
+    const nextNote = replaceInboundQuoteCny(inbound.note || '', quote);
+    if (nextNote !== (inbound.note || '')) {
+      const { error } = await supabase
+        .from('inventory_stock_movements')
+        .update({ note: nextNote })
+        .eq('id', inbound.id);
+      if (error) throw error;
+    }
+  }
+  const code = barcode.trim();
+  if (!code) return;
+  try {
+    const { data } = await supabase
+      .from('inventory_order_tracking')
+      .select('id, inbound_note')
+      .eq('order_barcode', code);
+    for (const row of (data ?? []) as Array<{ id: string; inbound_note?: string | null }>) {
+      const current = String(row.inbound_note || '');
+      const updated = replaceInboundQuoteCny(current, quote);
+      if (updated === current) continue;
+      await supabase.from('inventory_order_tracking').update({ inbound_note: updated }).eq('id', row.id);
+    }
+  } catch {
+    // 追踪备注写失败不影响已经改好的入库报价
+  }
+}
+
 async function persistFxLockBestEffort(item: InventoryItem, lock: CrossBorderFxLock): Promise<void> {
   if (!isSupabaseConfigured()) return;
   try {
@@ -927,6 +1047,13 @@ export async function updateItemInboundProfile(
     final_destination: params.destination,
     updated_at: nowIso(),
   }, actingStore);
+  if (!item.customer_signed_at?.trim()) {
+    const oldKg = Number(parseWeight(item.weight).n);
+    const newKg = Number(parseWeight(params.weight).n);
+    if (oldKg !== newKg && !isPackagingStockInLineBarcode(item.barcode)) {
+      await repriceUnsignedInboundQuote(item, params.weight, params.destination);
+    }
+  }
 }
 
 export async function cancelInventoryItem(
