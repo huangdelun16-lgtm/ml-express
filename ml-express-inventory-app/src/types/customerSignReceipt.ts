@@ -12,6 +12,8 @@ export type CustomerSignReceiptInput = {
   signatureStrokes: SignatureStroke[];
   /** 签收时锁定的汇率与实收币种；没有总部汇率时可以不传 */
   fxLock?: CrossBorderFxLock;
+  /** 跟发票一样的这一件人民币。传入后按签收汇率写成缅币，盖过入库时的旧报价。 */
+  settlementQuoteCny?: number;
 };
 
 export type CustomerSignReceipt = CustomerSignReceiptInput & {

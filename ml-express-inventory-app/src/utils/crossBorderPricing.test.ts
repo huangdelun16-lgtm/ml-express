@@ -111,4 +111,9 @@ describe('formatCrossBorderCnyHint', () => {
     expect(hint).toBe('MDY260824001 · RUI → MDY ¥4.7/kg × 8 kg');
     expect(hint.includes('MMK')).toBe(false);
   });
+
+  it('uses the written CNY per kg and does not convert through the exchange rate', () => {
+    const hint = formatCrossBorderCnyHint('RUI', 'MDY', 99999, 17.8, '', 714, 40);
+    expect(hint).toBe('RUI → MDY ¥40/kg × 17.8 kg');
+  });
 });

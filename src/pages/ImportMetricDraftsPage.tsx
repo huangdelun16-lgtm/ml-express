@@ -2777,7 +2777,7 @@ const ImportMetricDraftsPage: React.FC = () => {
     language === 'en'
       ? {
           kicker: 'ML Express · Admin',
-          hubTitle: 'Metric management',
+            hubTitle: 'Merchandise',
           draftsTabBtn: '📑 Import metric drafts',
           pricesTabBtn: '💲 Product prices',
           personalTabBtn: '🧾 Personal expenses',
@@ -2810,7 +2810,7 @@ const ImportMetricDraftsPage: React.FC = () => {
       : language === 'my'
         ? {
             kicker: 'ML Express · Admin',
-            hubTitle: 'မီတြခစီမံခန့်ခွဲမှု',
+            hubTitle: 'ကုန်ပစ္စည်း',
             draftsTabBtn: '📑 သွင်းကုန် မီတြိ မူကြမ်း',
             pricesTabBtn: '💲 ကုန်စျေးနှုန်း',
             personalTabBtn: '🧾 ကိုယ်ပိုင်ကုန်ကျစရိတ်',
@@ -2841,7 +2841,7 @@ const ImportMetricDraftsPage: React.FC = () => {
           }
         : {
             kicker: 'ML Express · Admin',
-            hubTitle: '指标管理',
+            hubTitle: '商品明细',
             draftsTabBtn: '📑 进口指标草稿',
             pricesTabBtn: '💲 商品价格',
             personalTabBtn: '🧾 个人开销',
@@ -2906,7 +2906,6 @@ const ImportMetricDraftsPage: React.FC = () => {
   const draftsTabSelected = hubPanelOpen === null;
   const pricesTabSelected = hubPanelOpen === 'prices';
   const personalTabSelected = hubPanelOpen === 'personal';
-
   return (
     <div
       style={{
@@ -2957,7 +2956,11 @@ const ImportMetricDraftsPage: React.FC = () => {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label={hubPanelOpen === 'prices' ? t.pricesTabBtn : t.personalTabBtn}
+            aria-label={
+              hubPanelOpen === 'prices'
+                ? t.pricesTabBtn
+                : t.personalTabBtn
+            }
             style={{
               maxWidth: hubPanelOpen === 'personal' ? 1180 : 1340,
               margin: '0 auto',

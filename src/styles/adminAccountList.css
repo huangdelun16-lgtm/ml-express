@@ -313,48 +313,58 @@
 }
 
 .acct-list__actions {
-  display: flex;
-  gap: 0.35rem;
-  justify-content: center;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+  min-width: 132px;
 }
 
 .acct-list__action {
-  width: 30px;
-  height: 30px;
   border-radius: 8px;
   border: 1px solid transparent;
   background: #f8fafc;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0.38rem 0.35rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   transition: background 0.12s, transform 0.1s;
 }
 
-.acct-list__action:hover {
+.acct-list__action:hover:not(:disabled) {
   transform: translateY(-1px);
+}
+
+.acct-list__action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .acct-list__action--view {
   border-color: #bfdbfe;
   background: #eff6ff;
+  color: #1d4ed8;
 }
 
 .acct-list__action--edit {
   border-color: #a7f3d0;
   background: #ecfdf5;
+  color: #047857;
 }
 
 .acct-list__action--perm {
   border-color: #ddd6fe;
   background: #f5f3ff;
+  color: #6d28d9;
 }
 
 .acct-list__action--delete {
   border-color: #fecaca;
   background: #fef2f2;
+  color: #b91c1c;
 }
 
 @media (max-width: 640px) {

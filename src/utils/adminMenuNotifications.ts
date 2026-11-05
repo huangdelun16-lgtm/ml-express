@@ -19,6 +19,7 @@ export const ADMIN_MODULE_PATHS: Record<string, string> = {
   merchant_reconciliation: '/admin/merchant-reconciliation',
   metric_management: '/admin/metric-management',
   cross_border_logistics: '/admin/cross-border-logistics',
+  goods_management: '/admin/goods-management',
 };
 
 export function moduleIdFromAdminPath(pathname: string): string | null {

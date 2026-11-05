@@ -567,7 +567,7 @@ const ProxyQuotePage: React.FC = () => {
       language === 'en'
         ? {
             kicker: 'ML Express · Admin',
-            hubTitle: 'Metric management',
+            hubTitle: 'Merchandise',
             draftsTabBtn: '📑 Import metric drafts',
             pricesTabBtn: '💲 Product prices',
             personalTabBtn: '🧾 Personal expenses',
@@ -608,7 +608,7 @@ const ProxyQuotePage: React.FC = () => {
         : language === 'my'
           ? {
               kicker: 'ML Express · Admin',
-              hubTitle: 'မီတြခစီမံခန့်ခွဲမှု',
+              hubTitle: 'ကုန်ပစ္စည်း',
               draftsTabBtn: '📑 သွင်းကုန် မီတြိ မူကြမ်း',
               pricesTabBtn: '💲 ကုန်စျေးနှုန်း',
               personalTabBtn: '🧾 ကိုယ်ပိုင်ကုန်ကျစရိတ်',
@@ -648,7 +648,7 @@ const ProxyQuotePage: React.FC = () => {
             }
           : {
               kicker: 'ML Express · Admin',
-              hubTitle: '指标管理',
+              hubTitle: '商品明细',
               draftsTabBtn: '📑 进口指标草稿',
               pricesTabBtn: '💲 商品价格',
               personalTabBtn: '🧾 个人开销',

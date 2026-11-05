@@ -91,7 +91,7 @@ function parsedToFlatRows(parsed: ParsedLicenceLine[]): FlatRow[] {
 }
 
 export type ImportPriceListPageProps = {
-  /** page：独立路由全屏；embedded：在指标管理弹层内展示 */
+  /** page：独立路由全屏；embedded：在商品明细弹层内展示 */
   variant?: 'page' | 'embedded';
   onCloseEmbedded?: () => void;
 };

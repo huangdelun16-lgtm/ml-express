@@ -19,18 +19,6 @@ function isBrowser(): boolean {
   return typeof window !== 'undefined' && typeof window.location !== 'undefined';
 }
 
-/** Local `npm start` — images still use the production Admin /__sb host. */
-function isLocalDevHost(): boolean {
-  if (!isBrowser()) return false;
-  const { hostname } = window.location;
-  return (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname.endsWith('.local') ||
-    hostname.endsWith('.localhost')
-  );
-}
-
 function allowDirectSupabase(): boolean {
   return process.env.REACT_APP_SUPABASE_DIRECT === '1';
 }
@@ -84,13 +72,11 @@ export function applyNetlifyRealtimeFallback(client: SupabaseClient): void {
   realtime.connect = () => undefined;
 }
 
-/** Production Admin Storage proxy; local preview also uses this so Myanmar can load images. */
+/** Production Admin Storage proxy. Browsers use the page's own /__sb instead. */
 export const ADMIN_PUBLIC_SB_PROXY = 'https://admin-market-link-express.com/__sb';
 
 function storageProxyBase(): string {
-  if (isBrowser() && !isLocalDevHost()) {
-    return `${window.location.origin}/__sb`;
-  }
+  if (isBrowser()) return `${window.location.origin}/__sb`;
   return ADMIN_PUBLIC_SB_PROXY;
 }
 

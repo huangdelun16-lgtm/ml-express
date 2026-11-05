@@ -14,6 +14,7 @@ import {
   pickNotesFxLock,
   pickPrimaryInboundMovement,
   customerFacingInboundNote,
+  applySignedQuoteSettlement,
   replaceInboundQuoteCny,
 } from './inboundMovementNote';
 
@@ -86,5 +87,11 @@ describe('parseInboundMovementNote', () => {
     ).toBe('');
     expect(replaceInboundQuoteCny('报价 4 CNY · 到付', 20)).toBe('报价 20 CNY · 到付');
     expect(replaceInboundQuoteCny('到付 · 易碎', 20)).toBe('报价 20 CNY · 到付 · 易碎');
+  });
+
+  it('replaces the old quote and MMK fee with the invoice amount at the sign rate', () => {
+    expect(applySignedQuoteSettlement('报价 680 CNY · 总费用 485520 MMK · 到付', 712, 714)).toBe(
+      '报价 712 CNY · 总费用 508368 MMK · 到付',
+    );
   });
 });

@@ -1045,7 +1045,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     language === 'en'
       ? {
           kicker: 'ML Express · Admin',
-          hubTitle: 'Metric management',
+            hubTitle: 'Merchandise',
           draftsTabBtn: '📑 Import drafts',
           pricesTabBtn: '💲 Product prices',
           personalTabBtn: '🧾 Personal expenses',
@@ -1054,7 +1054,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           title: 'Proxy purchase',
           subtitle: 'Record orders, tweak fee & rate live, export a polished Excel for your customer.',
           close: 'Close',
-          back: 'Metric management',
+          back: 'Inventory',
           backMetric: 'Back to dashboard',
           proxyFee: 'Proxy fee',
           exchangeRate: 'Exchange rate',
@@ -1173,7 +1173,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
       : language === 'my'
         ? {
             kicker: 'ML Express · Admin',
-            hubTitle: 'မီတြခစီမံခန့်ခွဲမှု',
+            hubTitle: 'ကုန်ပစ္စည်း',
             draftsTabBtn: '📑 Drafts',
             pricesTabBtn: '💲 Prices',
             personalTabBtn: '🧾 Expenses',
@@ -1182,7 +1182,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             title: 'ကြားခံဝယ်ယူမှု',
             subtitle: 'မှတ်တမ်းတင်ပြီး Excel တင်ပါ။',
             close: 'ပိတ်မည်',
-            back: 'Metric hub',
+            back: 'ကုန်လက်ကျန်',
             backMetric: 'Back to dashboard',
             proxyFee: 'ကြားခံကြေး',
             exchangeRate: 'ငွေလဲနှုန်း',
@@ -1301,7 +1301,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           }
         : {
             kicker: 'ML Express · Admin',
-            hubTitle: '指标管理',
+            hubTitle: '商品明细',
             draftsTabBtn: '📑 进口指标草稿',
             pricesTabBtn: '💲 商品价格',
             personalTabBtn: '🧾 个人开销',
@@ -1310,7 +1310,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             title: '代购清单',
             subtitle: '登记客户订单，代购费与汇率可随时调整，一键导出 Excel 发给客户。',
             close: '关闭',
-            back: '指标管理',
+            back: '商品明细',
             backMetric: '返回控制台',
             proxyFee: '代购费',
             exchangeRate: '汇率',

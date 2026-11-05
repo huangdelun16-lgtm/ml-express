@@ -1,5 +1,4 @@
 import {
-  ADMIN_PUBLIC_SB_PROXY,
   applyNetlifyRealtimeFallback,
   isBrowserRealtimeAvailable,
   publicStorageUrl,
@@ -83,21 +82,23 @@ describe('rewritePublicStorageUrl', () => {
     });
   });
 
-  it('rewrites supabase.co storage onto the admin /__sb proxy in local jsdom', () => {
+  it('rewrites supabase.co storage onto this page /__sb', () => {
+    const proxy = `${window.location.origin}/__sb`;
     expect(
       rewritePublicStorageUrl(
         'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/banners/app-banners/x.jpg',
       ),
-    ).toBe(`${ADMIN_PUBLIC_SB_PROXY}/storage/v1/object/public/banners/app-banners/x.jpg`);
+    ).toBe(`${proxy}/storage/v1/object/public/banners/app-banners/x.jpg`);
   });
 
-  it('rewrites merchant license storage onto the admin /__sb proxy in local jsdom', () => {
+  it('rewrites merchant license storage onto this page /__sb', () => {
+    const proxy = `${window.location.origin}/__sb`;
     expect(
       rewritePublicStorageUrl(
         'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/merchant-application-docs/applications/1788415991618_iqm4vo5.jpg',
       ),
     ).toBe(
-      `${ADMIN_PUBLIC_SB_PROXY}/storage/v1/object/public/merchant-application-docs/applications/1788415991618_iqm4vo5.jpg`,
+      `${proxy}/storage/v1/object/public/merchant-application-docs/applications/1788415991618_iqm4vo5.jpg`,
     );
   });
 
@@ -135,17 +136,19 @@ describe('rewritePublicStorageUrl', () => {
 });
 
 describe('publicStorageUrl', () => {
-  it('rewrites supabase.co product images onto the admin /__sb proxy', () => {
+  it('rewrites supabase.co product images onto this page /__sb', () => {
+    const proxy = `${window.location.origin}/__sb`;
     expect(
       publicStorageUrl(
         `${UPSTREAM}/storage/v1/object/public/product_images/84e7/a.jpg`,
       ),
-    ).toBe(`${ADMIN_PUBLIC_SB_PROXY}/storage/v1/object/public/product_images/84e7/a.jpg`);
+    ).toBe(`${proxy}/storage/v1/object/public/product_images/84e7/a.jpg`);
   });
 
   it('builds a proxy URL from a storage object path', () => {
+    const proxy = `${window.location.origin}/__sb`;
     expect(publicStorageUrl('84e7/a.jpg')).toBe(
-      `${ADMIN_PUBLIC_SB_PROXY}/storage/v1/object/public/product_images/84e7/a.jpg`,
+      `${proxy}/storage/v1/object/public/product_images/84e7/a.jpg`,
     );
   });
 
@@ -165,12 +168,13 @@ describe('withPublicProductImages', () => {
         image_url: `${UPSTREAM}/storage/v1/object/public/product_images/c.jpg`,
       },
     });
-    expect(mapped.image_url).toBe(`${ADMIN_PUBLIC_SB_PROXY}/storage/v1/object/public/product_images/a.jpg`);
+    const proxy = `${window.location.origin}/__sb`;
+    expect(mapped.image_url).toBe(`${proxy}/storage/v1/object/public/product_images/a.jpg`);
     expect(mapped.detail_image_urls).toEqual([
-      `${ADMIN_PUBLIC_SB_PROXY}/storage/v1/object/public/product_images/b.jpg`,
+      `${proxy}/storage/v1/object/public/product_images/b.jpg`,
     ]);
     expect(mapped.pending_update?.image_url).toBe(
-      `${ADMIN_PUBLIC_SB_PROXY}/storage/v1/object/public/product_images/c.jpg`,
+      `${proxy}/storage/v1/object/public/product_images/c.jpg`,
     );
   });
 });

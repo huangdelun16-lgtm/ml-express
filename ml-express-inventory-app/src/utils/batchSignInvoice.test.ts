@@ -8,6 +8,7 @@ vi.mock('../services/supabase', () => ({
 }));
 
 import {
+  allocateSignQuoteCny,
   buildBatchSignInvoice,
   formatInvoiceDocumentNo,
   formatInvoiceExpressNos,
@@ -250,6 +251,29 @@ describe('buildBatchSignInvoice', () => {
       },
     ]);
     expect(model.totalWeightKg).toBe(5);
+  });
+
+  it('signs with the invoice price times current weight, not the old locked quote', () => {
+    const allocated = allocateSignQuoteCny(
+      [
+        {
+          id: 'heavy',
+          barcode: 'JDV1',
+          weight: '17.8 Kg',
+          quote_cny: '680',
+        },
+        {
+          id: 'light',
+          barcode: 'BOX1',
+          weight: '0.5 Kg',
+          quote_cny: '20',
+        },
+      ],
+      [40, 40],
+    );
+    expect(allocated.byItemId.heavy).toBeCloseTo(712);
+    expect(allocated.byItemId.light).toBe(20);
+    expect(allocated.totalCny).toBeCloseTo(732);
   });
 });
 

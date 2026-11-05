@@ -48,7 +48,7 @@ import {
 import { canEditItemCustomerProfileAsync } from '../utils/itemCustomerProfileEdit';
 import { parseWeight } from '../utils/itemFieldFormat';
 import { fetchCrossBorderRoutePerKg, quoteCnyForEditedWeight } from '../utils/crossBorderPricing';
-import { replaceInboundQuoteCny } from '../utils/inboundMovementNote';
+import { applySignedQuoteSettlement, replaceInboundQuoteCny } from '../utils/inboundMovementNote';
 import { todayIsoDate } from '../utils/dateFormat';
 import { resolveTripNumberPrefix } from '../utils/tripNumber';
 import { inventoryOperationId } from '../utils/inventoryReliability';
@@ -873,8 +873,12 @@ export async function getItemFirstInboundDate(id: string): Promise<Date | null> 
   return m ? new Date(m.created_at) : null;
 }
 
-function noteWithSignSettlement(note: string, lock: CrossBorderFxLock): string {
-  return applyFxLockToNote(settleQuoteNoteAtRate(note, lock.mmkPerCny), lock);
+function noteWithSignSettlement(note: string, lock: CrossBorderFxLock, quoteCny?: number): string {
+  const settled =
+    quoteCny != null
+      ? applySignedQuoteSettlement(note, quoteCny, lock.mmkPerCny)
+      : settleQuoteNoteAtRate(note, lock.mmkPerCny);
+  return applyFxLockToNote(settled, lock);
 }
 
 /** 未签收改重量后，按定价窗口的人民币/公斤重写入库报价。到站签收读的就是这条。 */
@@ -951,13 +955,17 @@ async function writeInboundQuote(itemId: string, barcode: string, quote: number)
   }
 }
 
-async function persistFxLockBestEffort(item: InventoryItem, lock: CrossBorderFxLock): Promise<void> {
+async function persistFxLockBestEffort(
+  item: InventoryItem,
+  lock: CrossBorderFxLock,
+  quoteCny?: number,
+): Promise<void> {
   if (!isSupabaseConfigured()) return;
   try {
     const moves = await cloudListMovementsForItem(item.id);
     const inbound = pickPrimaryInboundMovement(moves.filter((row) => row.type === 'in'));
     if (inbound?.id) {
-      const nextNote = noteWithSignSettlement(inbound.note || '', lock);
+      const nextNote = noteWithSignSettlement(inbound.note || '', lock, quoteCny);
       if (nextNote !== (inbound.note || '')) {
         await supabase.from('inventory_stock_movements').update({ note: nextNote }).eq('id', inbound.id);
       }
@@ -975,7 +983,7 @@ async function persistFxLockBestEffort(item: InventoryItem, lock: CrossBorderFxL
     if (error || !data?.length) return;
     for (const row of data as Array<{ id: string; inbound_note?: string | null }>) {
       const current = String(row.inbound_note || '');
-      const nextNote = noteWithSignSettlement(current, lock);
+      const nextNote = noteWithSignSettlement(current, lock, quoteCny);
       if (nextNote === current) continue;
       await supabase.from('inventory_order_tracking').update({ inbound_note: nextNote }).eq('id', row.id);
     }
@@ -997,9 +1005,10 @@ export async function markCustomerSigned(
   if (validationError) throw svc(validationError);
 
   const fxLock = receipt.fxLock;
+  const settlementQuoteCny = receipt.settlementQuoteCny;
   await cloudUpsertItem({
     ...item,
-    note: fxLock ? noteWithSignSettlement(item.note || '', fxLock) : item.note,
+    note: fxLock ? noteWithSignSettlement(item.note || '', fxLock, settlementQuoteCny) : item.note,
     customer_signed_at: nowIso(),
     qty_on_hand: 0,
     packed_at: '',
@@ -1012,7 +1021,7 @@ export async function markCustomerSigned(
     updated_at: nowIso(),
   }, actingStore);
   if (fxLock) {
-    await persistFxLockBestEffort(item, fxLock);
+    await persistFxLockBestEffort(item, fxLock, settlementQuoteCny);
   }
 }
 

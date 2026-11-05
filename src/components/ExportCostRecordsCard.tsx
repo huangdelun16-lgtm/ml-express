@@ -126,6 +126,11 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
     };
   }, [period, isEn, onTotal, retryTick]);
 
+  const paidWeightKg = useMemo(
+    () => rows.reduce((sum, row) => sum + (Number(row.weight_kg) || 0), 0),
+    [rows],
+  );
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return rows;
@@ -172,6 +177,13 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
               : '还没填的单在上面。库存 App 填好之后，会出现在下面已保存的记录里，添加之后不能改。'}
           </p>
         </div>
+        <input
+          className="cbl-export-cost__search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={isEn ? 'Search barcode, customer, trip' : '搜单号、客户、车次'}
+          aria-label={isEn ? 'Search export costs' : '搜索出口成本'}
+        />
       </div>
       <div className="cbl-card__body">
         <div className="cbl-export-pending">
@@ -346,6 +358,13 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
           </div>
           <div className="cbl-export-cost__stat">
             <span className="cbl-export-cost__label">
+              {isEn ? 'Weight' : '重量'}
+              <span className="cbl-export-cost__ccy">Kg</span>
+            </span>
+            <strong className="cbl-export-cost__figure">{loading ? '—' : money(paidWeightKg)}</strong>
+          </div>
+          <div className="cbl-export-cost__stat">
+            <span className="cbl-export-cost__label">
               {isEn ? 'CNY' : '人民币'}
               {isEn ? null : <span className="cbl-export-cost__ccy">CNY</span>}
             </span>
@@ -359,13 +378,6 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
             <strong className="cbl-export-cost__figure">{loading ? '—' : exportCostBarAmount(totalMmk, 'mmk')}</strong>
           </div>
         </div>
-        <input
-          className="cbl-export-cost__search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={isEn ? 'Search barcode, customer, trip' : '搜单号、客户、车次'}
-          aria-label={isEn ? 'Search export costs' : '搜索出口成本'}
-        />
         {loading ? (
           <div className="cbl-export-cost__empty">{isEn ? 'Loading…' : '加载中…'}</div>
         ) : error ? (

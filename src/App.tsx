@@ -33,10 +33,11 @@ import { GlobalToast } from './components/GlobalToast';
 
 const FinanceManagement = lazy(() => import('./pages/FinanceManagement'));
 const CrossBorderLogisticsPage = lazy(() => import('./pages/CrossBorderLogisticsPage'));
+const GoodsManagementPage = lazy(() => import('./pages/GoodsManagementPage'));
 
 const standaloneImportPaths = STANDALONE_IMPORT_ADMIN_PATHS as readonly string[];
 
-/** 全屏独立模块（指标管理、跨境物流）：不叠放全局搜索与底部待办条 */
+/** 全屏独立模块（商品明细、跨境物流）：不叠放全局搜索与底部待办条 */
 const AdminFloatingChrome: React.FC = () => {
   const { pathname } = useLocation();
   if (standaloneImportPaths.includes(pathname)) return null;
@@ -322,6 +323,19 @@ function App() {
                     >
                       <Suspense fallback={<div style={{ color: 'white', padding: 40, textAlign: 'center' }}>加载中...</div>}>
                         <CrossBorderLogisticsPage />
+                      </Suspense>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="goods-management"
+                  element={
+                    <ProtectedRoute
+                      requiredRoles={['admin', 'manager', 'operator', 'finance']}
+                      permissionId={['goods_management', 'cross_border_logistics', 'metric_management']}
+                    >
+                      <Suspense fallback={<div style={{ color: 'white', padding: 40, textAlign: 'center' }}>加载中...</div>}>
+                        <GoodsManagementPage />
                       </Suspense>
                     </ProtectedRoute>
                   }

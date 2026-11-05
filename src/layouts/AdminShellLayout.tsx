@@ -16,6 +16,7 @@ export const STANDALONE_ADMIN_MODULE_PATHS = [
   '/admin/proxy-purchase',
   '/admin/proxy-quote',
   '/admin/cross-border-logistics',
+  '/admin/goods-management',
 ] as const;
 
 /** @deprecated 使用 STANDALONE_ADMIN_MODULE_PATHS */
@@ -323,10 +324,10 @@ const AdminShellLayout: React.FC = () => {
         id: 'metric_management',
         title:
           language === 'zh'
-            ? '指标管理'
+            ? '商品明细'
             : language === 'en'
-              ? 'Metric management'
-              : 'မီတྲိစီမံခန့်ခွဲမှု',
+              ? 'Merchandise'
+              : 'ကုန်ပစ္စည်း',
         roles: ['admin', 'manager', 'finance'],
       },
       {
@@ -337,6 +338,11 @@ const AdminShellLayout: React.FC = () => {
             : language === 'en'
               ? 'Cross-border logistics'
               : 'နိုင်ငံရပ်ခြားပို့ဆောင်ရေး',
+        roles: ['admin', 'manager', 'operator', 'finance'],
+      },
+      {
+        id: 'goods_management',
+        title: language === 'zh' ? '货物管理' : language === 'en' ? 'Goods' : 'ကုန်စီမံ',
         roles: ['admin', 'manager', 'operator', 'finance'],
       },
     ],
@@ -359,6 +365,17 @@ const AdminShellLayout: React.FC = () => {
         if (currentUserRole === 'admin') return true;
         if (hasPermissionOverride && Array.isArray(currentUserPermissions)) {
           return currentUserPermissions.includes('merchant_stores');
+        }
+        return card.roles.includes(currentUserRole as 'admin' | 'manager' | 'operator' | 'finance');
+      }
+      if (card.id === 'goods_management') {
+        if (currentUserRole === 'admin') return true;
+        if (hasPermissionOverride && Array.isArray(currentUserPermissions)) {
+          return (
+            currentUserPermissions.includes('goods_management') ||
+            currentUserPermissions.includes('cross_border_logistics') ||
+            currentUserPermissions.includes('metric_management')
+          );
         }
         return card.roles.includes(currentUserRole as 'admin' | 'manager' | 'operator' | 'finance');
       }

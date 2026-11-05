@@ -322,6 +322,54 @@ export function applyLockedUnitTotals(
   };
 }
 
+/**
+ * 签收记下的人民币跟发票同一套：有每公斤定价就用单价 × 现在的重量。
+ * 同一包只记在序号最小的那一件上，其余记 0，避免加总时重复。
+ */
+export function allocateSignQuoteCny(
+  details: BatchSignInvoiceSource[],
+  lineUnitCny: Array<number | null>,
+): { totalCny: number | null; byItemId: Record<string, number> } {
+  const seen = new Set<string>();
+  const byItemId: Record<string, number> = {};
+  let total = 0;
+  let saw = false;
+  let lineIndex = 0;
+
+  for (const row of details) {
+    const base = parsePackagingStockInLineBarcode(row.barcode)?.base ?? null;
+    const groupKey = base ?? `single:${row.id}`;
+    if (seen.has(groupKey)) continue;
+    seen.add(groupKey);
+
+    const group = base
+      ? details.filter((item) => parsePackagingStockInLineBarcode(item.barcode)?.base === base)
+      : [row];
+    const unit = lineUnitCny[lineIndex] ?? null;
+    lineIndex += 1;
+    const weightKg = base ? packagingWeightKg(group) : parseWeightKg(row.weight ?? '');
+    const priced = unit != null && unit > 0 && weightKg > 0;
+    const lineCny = priced ? unit * weightKg : null;
+    const primary = [...group].sort((a, b) => {
+      const ia = parsePackagingStockInLineBarcode(a.barcode)?.index ?? 0;
+      const ib = parsePackagingStockInLineBarcode(b.barcode)?.index ?? 0;
+      return ia - ib;
+    })[0];
+
+    if (lineCny == null) {
+      for (const item of group) byItemId[item.id] = 0;
+      continue;
+    }
+    saw = true;
+    total += lineCny;
+    for (const item of group) {
+      byItemId[item.id] = item.id === primary.id ? lineCny : 0;
+    }
+  }
+
+  return { totalCny: saw ? total : null, byItemId };
+}
+
 function invoiceToken(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
 }

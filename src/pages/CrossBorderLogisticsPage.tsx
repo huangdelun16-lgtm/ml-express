@@ -39,6 +39,7 @@ import {
   type PackStatusFilter,
   type StoreFinanceDetailMode,
   type CrossBorderExpenseCategory,
+  type CrossBorderFinanceSummary,
   type FinancePeriodParams,
   type HqQueueKind,
   type HqQueueRow,
@@ -68,7 +69,6 @@ import {
   CROSS_BORDER_FX_SETTINGS_KEY,
   buildCrossBorderFxHistorySetting,
   buildCrossBorderFxSetting,
-  cnyToMmk,
   customerListCny,
   displayRateForCustomerCategory,
   formatCnyAmount,
@@ -110,15 +110,12 @@ import CblSearchCombobox, { type CblSearchOption } from '../components/CblSearch
 import CblContactActions from '../components/CblContactActions';
 import type { PackOrdersTarget } from '../components/PackOrdersModal';
 import { downloadHqFinanceExcel } from '../utils/crossBorderFinanceExport';
-import {
-  type FinancePeriodKind,
-  resolveFinancePeriod,
-  yangonTodayYmd,
-} from '../utils/yangonFinancePeriod';
+import { type FinancePeriodKind, yangonTodayYmd } from '../utils/yangonFinancePeriod';
 import { parseCblPageTab, withCblPageTab, type CblPageTab } from '../utils/cblPageTabs';
 import { CblRowMenu, CblTableSkeleton } from '../components/CblOpsUi';
 import SignedInvoicesPanel from '../components/SignedInvoicesPanel';
 import ExportCostRecordsCard from '../components/ExportCostRecordsCard';
+import CrossBorderInboundPanel from '../components/CrossBorderInboundPanel';
 
 const CrossBorderAccountManagementModal = lazy(
   () => import('../components/CrossBorderAccountManagementModal'),
@@ -244,16 +241,6 @@ function unfiledWaitDays(value?: string | null): number {
 function formatMmK(n?: number | null): string {
   if (n == null || !Number.isFinite(n)) return '—';
   return Math.round(n).toLocaleString('en-US');
-}
-
-function formatCblPeriodHeading(kind: FinancePeriodKind, date: string, isEn: boolean): string {
-  const range = resolveFinancePeriod(kind, date);
-  if (kind === 'year') return isEn ? range.label : `${range.label}年`;
-  if (kind === 'month') {
-    const [y, m] = range.label.split('-');
-    return isEn ? range.label : `${y}年${Number(m)}月`;
-  }
-  return range.label;
 }
 
 function formatPackTransportFee(fee?: number | null): string {
@@ -419,10 +406,11 @@ function packTransportStatusBadgeClass(pack: InventoryPackRow): string {
 type TransportView = 'packs' | 'orders';
 
 const CBL_TAB_ITEMS: { id: CblPageTab; zh: string; en: string; tipZh: string; tipEn: string }[] = [
-  { id: 'overview', zh: '总览', en: 'Overview', tipZh: '待办，以及本期收入和支出', tipEn: 'What needs attention, plus this period' },
+  { id: 'overview', zh: '总览', en: 'Overview', tipZh: '待办，以及从开始到现在的收入和支出', tipEn: 'What needs attention, plus all-time income and expense' },
   { id: 'finance', zh: '财务', en: 'Finance', tipZh: '本期收支，按站点拆开', tipEn: 'This period, split by station' },
   { id: 'export-cost', zh: '出口成本', en: 'Export cost', tipZh: '瑞丽发出的成本，不进总支出', tipEn: 'Ruili dispatch cost, outside total expense' },
   { id: 'customers', zh: '客户', en: 'Customers', tipZh: '客户名单和费用', tipEn: 'Customer list and fees' },
+  { id: 'inbound', zh: '入库', en: 'Inbound', tipZh: '单个入库和多个入库', tipEn: 'Single and multiple inbound' },
   { id: 'transport', zh: '运输', en: 'Transport', tipZh: '包裹和订单走到哪了', tipEn: 'Packs and orders in motion' },
   { id: 'invoices', zh: 'Invoice', en: 'Invoice', tipZh: '已经签收的发票', tipEn: 'Invoices already signed' },
   { id: 'settings', zh: '设置', en: 'Settings', tipZh: '汇率、账号和计费', tipEn: 'Rate, accounts, and pricing' },
@@ -552,7 +540,7 @@ function CblHoverTipLayer({ rootRef }: { rootRef: { current: HTMLDivElement | nu
 }
 
 function tabNeedsFinance(tab: string): boolean {
-  return tab === 'overview' || tab === 'finance';
+  return tab === 'finance';
 }
 
 function keepStoreFinance(
@@ -649,6 +637,8 @@ const CrossBorderLogisticsPage: FC = () => {
     extraCny: number;
   } | null>(null);
   const [signedIncomeFailed, setSignedIncomeFailed] = useState(false);
+  const [lifetimeSummary, setLifetimeSummary] = useState<CrossBorderFinanceSummary | null>(null);
+  const [lifetimeFailed, setLifetimeFailed] = useState(false);
   const [hqPage, setHqPage] = useState(1);
   const [hqStoreCode, setHqStoreCode] = useState('');
   const [selectedUnfiled, setSelectedUnfiled] = useState<Set<string>>(new Set());
@@ -760,8 +750,9 @@ const CrossBorderLogisticsPage: FC = () => {
 
   useEffect(() => {
     if (activeTab !== 'overview' && activeTab !== 'finance' && activeTab !== 'export-cost') return;
+    const period = activeTab === 'overview' ? null : financePeriodParams;
     let cancelled = false;
-    void fetchExportCostRecords(financePeriodParams)
+    void fetchExportCostRecords(period)
       .then((result) => {
         if (cancelled) return;
         setExportCostCny(result.totalCny);
@@ -1015,9 +1006,27 @@ const CrossBorderLogisticsPage: FC = () => {
   useEffect(() => {
     if (activeTab !== 'overview') return;
     let cancelled = false;
+    setLifetimeFailed(false);
+    void fetchInventoryConsoleFinance(1, 1)
+      .then((result) => {
+        if (cancelled) return;
+        setLifetimeSummary(result.crossBorderFinance?.summary ?? null);
+        setLifetimeFailed(false);
+      })
+      .catch(() => {
+        if (!cancelled) setLifetimeFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'overview') return;
+    let cancelled = false;
     setSignedIncome(null);
     setSignedIncomeFailed(false);
-    void fetchPeriodSignedIncome(financePeriodParams)
+    void fetchPeriodSignedIncome(null)
       .then((income) => {
         if (cancelled) return;
         setSignedIncome(income);
@@ -1030,25 +1039,34 @@ const CrossBorderLogisticsPage: FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, financePeriodParams]);
+  }, [activeTab]);
 
   const loadFinanceEntries = useCallback(async (page: number, pageSize: number) => {
+    const lifetime = activeTabRef.current === 'overview';
     const reqId = ++financeReqIdRef.current;
-    const scopeKey = [
-      periodKindRef.current,
-      periodDateRef.current,
-      financeStoreCodeRef.current,
-      String(page),
-      String(pageSize),
-    ].join('|');
+    const scopeKey = lifetime
+      ? ['lifetime', String(page), String(pageSize)].join('|')
+      : [
+          periodKindRef.current,
+          periodDateRef.current,
+          financeStoreCodeRef.current,
+          String(page),
+          String(pageSize),
+        ].join('|');
     setFinanceLoading(true);
     setFinanceFailed(false);
     try {
-      const result = await fetchInventoryConsoleFinance(page, pageSize, {
-        period: periodKindRef.current,
-        date: periodDateRef.current,
-        storeCode: financeStoreCodeRef.current || undefined,
-      });
+      const result = await fetchInventoryConsoleFinance(
+        page,
+        pageSize,
+        lifetime
+          ? undefined
+          : {
+              period: periodKindRef.current,
+              date: periodDateRef.current,
+              storeCode: financeStoreCodeRef.current || undefined,
+            },
+      );
       if (reqId !== financeReqIdRef.current) return;
       financeLoadedKeyRef.current = scopeKey;
       setData((prev) => {
@@ -1266,7 +1284,10 @@ const CrossBorderLogisticsPage: FC = () => {
   useEffect(() => {
     if (!initialLoadDoneRef.current) return;
     if (!tabNeedsFinance(activeTab)) return;
-    const key = [periodKind, periodDate, financeStoreCode, financePage, tablePageSize].join('|');
+    const key =
+      activeTab === 'overview'
+        ? ['lifetime', financePage, tablePageSize].join('|')
+        : [periodKind, periodDate, financeStoreCode, financePage, tablePageSize].join('|');
     if (financeLoadedKeyRef.current === key) return;
     void loadFinanceEntries(financePage, tablePageSize);
   }, [activeTab, financePage, tablePageSize, loadFinanceEntries, periodKind, periodDate, financeStoreCode]);
@@ -1420,9 +1441,9 @@ const CrossBorderLogisticsPage: FC = () => {
   }, [periodKind, periodDate, financeStoreCode, isEn, fxRate, data?.transitStores]);
 
   const incomeBooks = useMemo(() => {
-    const pendingMmk = expenseSummary?.pendingInflowTotal ?? 0;
-    const otherMmk = expenseSummary?.manualIncomeTotal ?? 0;
-    const financeReady = Boolean(expenseSummary) || financeFailed;
+    const pendingMmk = lifetimeSummary?.pendingInflowTotal ?? 0;
+    const otherMmk = lifetimeSummary?.manualIncomeTotal ?? 0;
+    const financeReady = Boolean(lifetimeSummary) || lifetimeFailed;
     const pendingCny = !financeReady ? null : pendingMmk <= 0 ? 0 : mmkToCny(pendingMmk, fxRate);
     const signedReady = signedIncome != null || signedIncomeFailed;
     const signedMmk = signedIncomeFailed ? null : signedIncome?.mmk ?? null;
@@ -1464,22 +1485,22 @@ const CrossBorderLogisticsPage: FC = () => {
           id: 'other',
           zh: '其它收入',
           en: 'Other income',
-          mmk: financeReady ? expenseSummary?.manualIncomeMmkTotal ?? otherMmk : null,
-          cny: financeReady ? expenseSummary?.manualIncomeCnyTotal ?? 0 : null,
+          mmk: financeReady ? lifetimeSummary?.manualIncomeMmkTotal ?? otherMmk : null,
+          cny: financeReady ? lifetimeSummary?.manualIncomeCnyTotal ?? 0 : null,
           loading: !financeReady,
         },
       ],
     };
-  }, [expenseSummary, financeFailed, fxRate, signedIncome, signedIncomeFailed]);
+  }, [lifetimeFailed, lifetimeSummary, fxRate, signedIncome, signedIncomeFailed]);
 
   const totalExpenseAllStations = useMemo(() => {
-    if (!expenseSummary) return null;
+    if (!lifetimeSummary) return null;
     return (
-      (expenseSummary.transportUnpaidTotal ?? 0) +
-      (expenseSummary.transportPaidTotal ?? 0) +
-      (expenseSummary.manualExpenseTotal ?? 0)
+      (lifetimeSummary.transportUnpaidTotal ?? 0) +
+      (lifetimeSummary.transportPaidTotal ?? 0) +
+      (lifetimeSummary.manualExpenseTotal ?? 0)
     );
-  }, [expenseSummary]);
+  }, [lifetimeSummary]);
 
   const transitStores = data?.transitStores ?? [];
   const transportStationKeys = useMemo(
@@ -1754,8 +1775,8 @@ const CrossBorderLogisticsPage: FC = () => {
     if (!data?.stats) return [];
     const s = data.stats;
     const exceptions = data.openExceptionCount ?? 0;
-    const pendingIn = expenseSummary?.pendingInflowTotal ?? 0;
-    const unpaidTruck = expenseSummary?.transportUnpaidTotal ?? 0;
+    const pendingIn = lifetimeSummary?.pendingInflowTotal ?? 0;
+    const unpaidTruck = lifetimeSummary?.transportUnpaidTotal ?? 0;
     return [
       {
         id: 'exceptions',
@@ -1829,7 +1850,7 @@ const CrossBorderLogisticsPage: FC = () => {
         tone: unpaidTruck > 0 ? 'warn' : undefined,
       },
     ];
-  }, [data, expenseSummary, isEn]);
+  }, [data, lifetimeSummary, isEn]);
 
   const isStatCardActive = (action: StatCardAction) => {
     if (action.kind === 'static') return hqQueue === action.queue;
@@ -2138,8 +2159,8 @@ const CrossBorderLogisticsPage: FC = () => {
             <button
               type="button"
               className={`cbl-stat cbl-stat--btn cbl-stat--cost${
-                (exportCostCny ?? expenseSummary?.exportCostCnyTotal ?? 0) > 0 ||
-                (exportCostMmk ?? expenseSummary?.exportCostMmkTotal ?? 0) > 0
+                (exportCostCny ?? lifetimeSummary?.exportCostCnyTotal ?? 0) > 0 ||
+                (exportCostMmk ?? lifetimeSummary?.exportCostMmkTotal ?? 0) > 0
                   ? ''
                   : ' is-idle'
               }`}
@@ -2148,16 +2169,16 @@ const CrossBorderLogisticsPage: FC = () => {
             >
               <div className="cbl-stat__label">{isEn ? 'Export cost' : '出口成本'}</div>
               <div className="cbl-stat__value">
-                {!financeFailed && !expenseSummary ? (
+                {!lifetimeFailed && !lifetimeSummary && exportCostCny == null ? (
                   '\u00a0'
                 ) : (
                   <DualMoney
-                    cny={exportCostCny ?? expenseSummary?.exportCostCnyTotal ?? 0}
-                    mmk={exportCostMmk ?? expenseSummary?.exportCostMmkTotal ?? 0}
+                    cny={exportCostCny ?? lifetimeSummary?.exportCostCnyTotal ?? 0}
+                    mmk={exportCostMmk ?? lifetimeSummary?.exportCostMmkTotal ?? 0}
                     rate={null}
                     prefix={
-                      (exportCostCny ?? expenseSummary?.exportCostCnyTotal ?? 0) > 0 ||
-                      (exportCostMmk ?? expenseSummary?.exportCostMmkTotal ?? 0) > 0
+                      (exportCostCny ?? lifetimeSummary?.exportCostCnyTotal ?? 0) > 0 ||
+                      (exportCostMmk ?? lifetimeSummary?.exportCostMmkTotal ?? 0) > 0
                         ? '−'
                         : ''
                     }
@@ -2278,10 +2299,9 @@ const CrossBorderLogisticsPage: FC = () => {
         ) : null}
 
         <h2 className="cbl-section-label">
-          {isEn ? 'Period totals' : '本期合计'}
+          {isEn ? 'All-time totals' : '累计合计'}
           <span className="cbl-section-label__meta">
-            {formatCblPeriodHeading(periodKind, periodDate, isEn)}
-            {financeStoreCode ? ` · ${financeStoreCode}` : ''}
+            {isEn ? 'From the start until now' : '从开始到现在'}
           </span>
         </h2>
         <div className="cbl-io-overview">
@@ -2295,7 +2315,7 @@ const CrossBorderLogisticsPage: FC = () => {
               <h3 className="cbl-io-overview-card__title">
                 {isEn ? 'Total income' : '总收入'}
               </h3>
-              <span className="cbl-io-overview-card__scope">{isEn ? 'This period' : '本期'}</span>
+              <span className="cbl-io-overview-card__scope">{isEn ? 'To date' : '至今'}</span>
             </div>
             <div className="cbl-io-ledger">
               <span />
@@ -2324,7 +2344,7 @@ const CrossBorderLogisticsPage: FC = () => {
               <h3 className="cbl-io-overview-card__title">
                 {isEn ? 'Total expense' : '总支出'}
               </h3>
-              <span className="cbl-io-overview-card__scope">{isEn ? 'This period' : '本期'}</span>
+              <span className="cbl-io-overview-card__scope">{isEn ? 'To date' : '至今'}</span>
             </div>
             <div className="cbl-io-ledger">
               <span />
@@ -2334,15 +2354,15 @@ const CrossBorderLogisticsPage: FC = () => {
               <IncomeLedgerAmount
                 amount={totalExpenseAllStations}
                 kind="mmk"
-                loading={!financeFailed && totalExpenseAllStations == null}
+                loading={!lifetimeFailed && totalExpenseAllStations == null}
                 hero
               />
               <IncomeLedgerAmount
                 amount={
-                  exportCostCny ?? (expenseSummary ? expenseSummary.exportCostCnyTotal ?? 0 : null)
+                  exportCostCny ?? (lifetimeSummary ? lifetimeSummary.exportCostCnyTotal ?? 0 : null)
                 }
                 kind="cny"
-                loading={!financeFailed && !expenseSummary && exportCostCny == null}
+                loading={!lifetimeFailed && !lifetimeSummary && exportCostCny == null}
                 hero
               />
               <span className="cbl-io-ledger__rule" />
@@ -2352,29 +2372,29 @@ const CrossBorderLogisticsPage: FC = () => {
                     id: 'unpaid',
                     zh: '待付车费',
                     en: 'Truck unpaid',
-                    mmk: expenseSummary?.transportUnpaidTotal ?? 0,
-                    cny: expenseSummary ? 0 : null,
+                    mmk: lifetimeSummary?.transportUnpaidTotal ?? 0,
+                    cny: lifetimeSummary ? 0 : null,
                   },
                   {
                     id: 'paid',
                     zh: '已付车费',
                     en: 'Truck paid',
-                    mmk: expenseSummary?.transportPaidTotal ?? 0,
-                    cny: expenseSummary ? 0 : null,
+                    mmk: lifetimeSummary?.transportPaidTotal ?? 0,
+                    cny: lifetimeSummary ? 0 : null,
                   },
                   {
                     id: 'other',
                     zh: '其它支出',
                     en: 'Other expense',
-                    mmk: expenseSummary?.manualExpenseTotal ?? 0,
-                    cny: expenseSummary ? 0 : null,
+                    mmk: lifetimeSummary?.manualExpenseTotal ?? 0,
+                    cny: lifetimeSummary ? 0 : null,
                   },
                   {
                     id: 'export',
                     zh: '出口成本',
                     en: 'Export cost',
-                    mmk: exportCostMmk ?? expenseSummary?.exportCostMmkTotal ?? 0,
-                    cny: exportCostCny ?? (expenseSummary ? expenseSummary.exportCostCnyTotal ?? 0 : null),
+                    mmk: exportCostMmk ?? lifetimeSummary?.exportCostMmkTotal ?? 0,
+                    cny: exportCostCny ?? (lifetimeSummary ? lifetimeSummary.exportCostCnyTotal ?? 0 : null),
                   },
                 ] as const
               ).map((row) => (
@@ -2383,13 +2403,13 @@ const CrossBorderLogisticsPage: FC = () => {
                   <IncomeLedgerAmount
                     amount={row.mmk}
                     kind="mmk"
-                    loading={!financeFailed && !expenseSummary}
+                    loading={!lifetimeFailed && !lifetimeSummary}
                     prefix={row.id === 'export' && (row.mmk ?? 0) > 0 ? '−' : ''}
                   />
                   <IncomeLedgerAmount
                     amount={row.cny}
                     kind="cny"
-                    loading={!financeFailed && !expenseSummary}
+                    loading={!lifetimeFailed && !lifetimeSummary}
                     prefix={row.id === 'export' && (row.cny ?? 0) > 0 ? '−' : ''}
                   />
                 </div>
@@ -2473,8 +2493,8 @@ const CrossBorderLogisticsPage: FC = () => {
             <div className="cbl-finance-intro">
               <p className="cbl-card-hint cbl-finance-intro__hint">
                 {isEn
-                  ? 'Breakdown for this period. Grand totals are on Overview.'
-                  : '本期分项。合计在「总览」。'}
+                  ? 'This period only. Choose a day, month, or year here. All-time totals stay on Overview.'
+                  : '这里只看选定的一天、一个月或一年。从开始到现在的合计在「总览」。'}
               </p>
               <button
                 type="button"
@@ -2635,12 +2655,15 @@ const CrossBorderLogisticsPage: FC = () => {
                             }
                           >
                             {row.category === 'export_cost' ? (
-                              <DualMoney
-                                cny={row.paidCny ?? row.amount}
-                                mmk={cnyToMmk(row.paidCny ?? row.amount, fxRate)}
-                                rate={fxRate}
-                                prefix="−"
-                              />
+                              row.paidCurrency === 'MMK' ? (
+                                <DualMoney mmk={row.amount} rate={null} prefix="−" />
+                              ) : (
+                                <DualMoney
+                                  cny={row.paidCny != null && row.paidCny > 0 ? row.paidCny : row.amount}
+                                  rate={null}
+                                  prefix="−"
+                                />
+                              )
                             ) : isCustomerLedgerCategory(row.category) ? (
                               <DualMoney
                                 mmk={row.amount}
@@ -3296,6 +3319,12 @@ const CrossBorderLogisticsPage: FC = () => {
             </div>
           </section>
         </div>
+        )}
+
+        {activeTab === 'inbound' && (
+          <div id="cbl-panel-inbound" role="tabpanel" aria-labelledby="cbl-tab-inbound">
+            <CrossBorderInboundPanel stores={transitStores} isEn={isEn} />
+          </div>
         )}
 
         {activeTab === 'transport' && (

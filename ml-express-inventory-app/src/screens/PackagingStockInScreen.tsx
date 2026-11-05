@@ -43,12 +43,12 @@ import { useInboundLeaveGuard } from '../hooks/useInboundLeaveGuard';
 import { destinationFromCustomerCode, normalizePackDestination } from '../constants/destinationOptions';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import {
-  calculateCrossBorderTotalFee,
   fetchCrossBorderRoutePerKg,
   formatCrossBorderCnyHint,
+  quoteCnyForEditedWeight,
   shouldShowCrossBorderQuote,
 } from '../utils/crossBorderPricing';
-import { formatCnyInput, mmkToCny } from '../utils/crossBorderFx';
+import { formatCnyInput } from '../utils/crossBorderFx';
 import { loadStockInContactDraft, saveStockInContactDraft } from '../utils/stockInDraft';
 import { normalizePackageOriginPrefix } from '../utils/packageNumber';
 import { resolveAppError, useTranslation } from '../i18n';
@@ -196,11 +196,15 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     const dest = normalizePackDestination(batchDestination);
     const weightKg = Number(batchWeightN.trim()) || 0;
     void (async () => {
-      const { perKg, originCode, destinationCode, mmkPerCny: rate } =
+      const { perKg, originCode, destinationCode, mmkPerCny: rate, cnyPerKg } =
         await fetchCrossBorderRoutePerKg(originHub, dest, customerCode);
       if (cancelled) return;
-      const mmk = calculateCrossBorderTotalFee(perKg, batchWeightStr);
-      const cny = mmkToCny(mmk, rate);
+      const cny = quoteCnyForEditedWeight({
+        cnyPerKg,
+        perKgMmk: perKg,
+        mmkPerCny: rate,
+        weightKg,
+      });
       setFeeFormulaHint(
         formatCrossBorderCnyHint(
           originCode,
@@ -209,6 +213,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
           weightKg,
           customerCode.trim().toUpperCase(),
           rate,
+          cnyPerKg,
         ),
       );
       setTotalFee(cny == null ? '' : formatCnyInput(cny));

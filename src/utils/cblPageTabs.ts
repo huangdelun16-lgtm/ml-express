@@ -3,6 +3,7 @@ export const CBL_PAGE_TABS = [
   'finance',
   'export-cost',
   'customers',
+  'inbound',
   'transport',
   'invoices',
   'settings',

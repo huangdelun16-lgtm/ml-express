@@ -1201,6 +1201,50 @@ export async function fetchCrossBorderRegisteredCustomers(): Promise<
   return (payload.customers ?? []) as CrossBorderRegisteredCustomer[];
 }
 
+export type CrossBorderStockInLine = {
+  expressCode: string;
+  name?: string;
+  qty: number;
+};
+
+export type CrossBorderStockInResult = {
+  mode: 'single' | 'batch';
+  barcode: string;
+  lineBarcodes: string[];
+};
+
+export async function submitCrossBorderStockIn(body: {
+  mode: 'single' | 'batch';
+  storeId: string;
+  destination: string;
+  recipientName: string;
+  recipientPhone: string;
+  customerCode?: string;
+  inboundDate: string;
+  quoteCny?: string;
+  pay: 'cod' | 'prepaid';
+  note?: string;
+  detailAddress?: string;
+  weightKg?: string;
+  spec?: string;
+  qty?: number;
+  expressCode?: string;
+  itemName?: string;
+  lines?: CrossBorderStockInLine[];
+}): Promise<CrossBorderStockInResult> {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-stock-in', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `入库失败 (${response.status})`);
+  }
+  return payload as CrossBorderStockInResult;
+}
+
 export async function createCrossBorderRegisteredCustomer(
   draft: CrossBorderRegisteredCustomerDraft,
 ): Promise<CrossBorderRegisteredCustomer> {

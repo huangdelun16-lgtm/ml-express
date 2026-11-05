@@ -362,12 +362,65 @@ function localExportCostList(req, res, next) {
   });
 }
 
+function readJsonBody(req) {
+  if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+    return Promise.resolve(req.body);
+  }
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
+      try {
+        const raw = Buffer.concat(chunks).toString('utf8');
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch (error) {
+        reject(error);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+function localStockIn(req, res, next) {
+  if (req.method !== 'POST') {
+    next();
+    return;
+  }
+  const supabaseUrl = String(process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || '').trim();
+  const serviceRole = readServiceRole();
+  if (!supabaseUrl || !serviceRole) {
+    next();
+    return;
+  }
+  verifyAdminOnProduction(req.headers).then(async (valid) => {
+    if (res.headersSent || res.writableEnded) return;
+    if (!valid) {
+      res.status(401).json({ error: '未授权' });
+      return;
+    }
+    try {
+      const { createClient } = require('@supabase/supabase-js');
+      const { executeStockIn } = require('../netlify/functions/inventory-admin-stock-in');
+      const body = await readJsonBody(req);
+      const supabase = createClient(supabaseUrl, serviceRole, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const data = await executeStockIn(supabase, body, 'admin-web');
+      res.json(data);
+    } catch (error) {
+      const status = error && error.statusCode ? error.statusCode : 400;
+      res.status(status).json({ error: error instanceof Error ? error.message : '入库失败' });
+    }
+  });
+}
+
 module.exports = function setupAdminFunctionsProxy(app) {
   if (process.env.ADMIN_FUNCTIONS_PROXY === 'off') {
     return;
   }
 
   app.use('/.netlify/functions/inventory-admin-data', localExportCostList);
+  app.use('/.netlify/functions/inventory-admin-stock-in', localStockIn);
   app.use('/.netlify/functions', adminProxy());
 
   // Browser supabase-js → http://localhost:<port>/__sb/… → 线上 Admin Edge BFF

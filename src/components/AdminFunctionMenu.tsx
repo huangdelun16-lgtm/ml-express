@@ -22,8 +22,9 @@ export const MODULE_ICONS: Record<string, string> = {
   courier_performance: '🛵',
   merchant_reconciliation: '🧾',
   settings: '⚙️',
-  metric_management: '📑',
+  metric_management: '📦',
   cross_border_logistics: '🚚',
+  goods_management: '🧺',
 };
 
 export const MODULE_ROUTES: Record<string, string> = {
@@ -45,6 +46,7 @@ export const MODULE_ROUTES: Record<string, string> = {
   merchant_reconciliation: '/admin/merchant-reconciliation',
   metric_management: '/admin/metric-management',
   cross_border_logistics: '/admin/cross-border-logistics',
+  goods_management: '/admin/goods-management',
 };
 
 const SEARCH_ALIASES: Record<string, string[]> = {
@@ -64,8 +66,9 @@ const SEARCH_ALIASES: Record<string, string[]> = {
   courier_performance: ['骑手', '绩效', 'kpi', 'courier'],
   merchant_reconciliation: ['对账', 'reconciliation'],
   settings: ['设置', '账号', '权限', 'settings'],
-  metric_management: ['指标', '代购', '开销', '价格', 'metric'],
+  metric_management: ['商品', '库存', '代购', '开销', '价格', 'metric'],
   cross_border_logistics: ['跨境', '中转', 'inventory', '物流'],
+  goods_management: ['货物', '商品', '供应商', '进货', '销售', '缅币', 'goods'],
 };
 
 const GROUPS: Array<{
@@ -101,7 +104,7 @@ const GROUPS: Array<{
     zh: '系统',
     en: 'System',
     my: 'စနစ်',
-    ids: ['supervision', 'settings', 'metric_management', 'cross_border_logistics'],
+    ids: ['supervision', 'settings', 'metric_management', 'cross_border_logistics', 'goods_management'],
   },
 ];
 
@@ -249,7 +252,8 @@ const AdminFunctionMenu: React.FC<Props> = ({
     const notice = getAdminMenuNotice(card.id, badges);
     const active = isModulePathActive(pathname, card.id);
     const pinned = pins.includes(card.id);
-    const outline = card.id === 'metric_management' || card.id === 'cross_border_logistics';
+    const outline =
+      card.id === 'metric_management' || card.id === 'cross_border_logistics' || card.id === 'goods_management';
     const itemClass = [
       'admin-fn__item',
       active ? 'is-active' : '',

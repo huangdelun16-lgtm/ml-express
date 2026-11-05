@@ -100,6 +100,9 @@ const StationSettlementQueue: React.FC<Props> = ({ isEn, stores, year, storeCode
   const overdueCount = monthCards.filter((item) => item.tone === 'missing').length;
   const upcomingCount = monthCards.filter((item) => item.tone === 'upcoming').length;
   const confirmedCount = monthCards.filter((item) => item.tone === 'confirmed').length;
+  const currentCount = monthCards.filter((item) => item.tone === 'current').length;
+  const openedMonth = monthCards.find((item) => item.month === openMonth) || null;
+  const queueClear = rows.length === 0;
 
   const load = async () => {
     setLoading(true);
@@ -220,8 +223,8 @@ const StationSettlementQueue: React.FC<Props> = ({ isEn, stores, year, storeCode
           <div className="cbl-pricing-modal__alert cbl-pricing-modal__alert--error">{error}</div>
         ) : null}
 
-        <div className="cbl-settle-grid">
-          <article className={`cbl-settle-panel${rows.length ? ' is-attention' : ''}`}>
+        <div className={`cbl-settle-grid${queueClear ? ' is-queue-clear' : ''}`}>
+          <article className={`cbl-settle-panel${rows.length ? ' is-attention' : ' is-slim'}`}>
             <header className="cbl-settle-panel__head">
               <h3 className="cbl-settle-panel__title">{isEn ? 'Pending review' : '待签认'}</h3>
               <p className="cbl-settle-panel__sub">
@@ -232,14 +235,11 @@ const StationSettlementQueue: React.FC<Props> = ({ isEn, stores, year, storeCode
             </header>
 
             {rows.length === 0 ? (
-              <div className="cbl-settle-empty">
-                <strong>{isEn ? 'Nothing waiting' : '目前没有待签认'}</strong>
-                <span>
-                  {isEn
-                    ? 'Submitted day and month closes will land here for HQ to compare and confirm.'
-                    : '站点提交后会出现在这里，总部可先对比再确认或驳回。'}
-                </span>
-              </div>
+              <p className="cbl-settle-panel__hint">
+                {isEn
+                  ? 'Nothing waiting. A station close will show up here to compare, confirm, or reject.'
+                  : '目前没有待签认。站点提交后会出现在这里，可先对比再确认或驳回。'}
+              </p>
             ) : (
               <ul className="cbl-settle-queue">
                 {rows.map((row) => {
@@ -413,91 +413,80 @@ const StationSettlementQueue: React.FC<Props> = ({ isEn, stores, year, storeCode
                 <div className="cbl-settle-kpis">
                   <div className="cbl-settle-kpi">
                     <span>{isEn ? 'Collected' : '已收'}</span>
-                    <strong>{formatMmK(annual.totals.collectedTotal)}</strong>
+                    <strong>{formatMmK(annual.totals.collectedTotal)} <small>MMK</small></strong>
                   </div>
                   <div className="cbl-settle-kpi">
                     <span>{isEn ? 'Paid truck' : '已付车费'}</span>
-                    <strong>{formatMmK(annual.totals.transportPaidTotal)}</strong>
+                    <strong>{formatMmK(annual.totals.transportPaidTotal)} <small>MMK</small></strong>
                   </div>
                   <div className="cbl-settle-kpi">
                     <span>{isEn ? 'Remitted' : '已汇发站'}</span>
-                    <strong>{formatMmK(annual.totals.agencyRemittedTotal)}</strong>
+                    <strong>{formatMmK(annual.totals.agencyRemittedTotal)} <small>MMK</small></strong>
                   </div>
                   <div className="cbl-settle-kpi">
                     <span>{isEn ? 'Net' : '结余'}</span>
-                    <strong>{formatMmK(annual.totals.netBalance)}</strong>
-                  </div>
-                  <div className={`cbl-settle-kpi${overdueCount ? ' is-warn' : ''}`}>
-                    <span>{isEn ? 'Overdue months' : '过期缺月'}</span>
-                    <strong>{overdueCount}</strong>
-                    <em>
-                      {isEn
-                        ? `${confirmedCount} confirmed · ${upcomingCount} not due`
-                        : `已确认 ${confirmedCount} · 未到 ${upcomingCount}`}
-                    </em>
+                    <strong>{formatMmK(annual.totals.netBalance)} <small>MMK</small></strong>
                   </div>
                 </div>
+                <div className="cbl-settle-status">
+                  <span className="is-confirmed">{isEn ? `${confirmedCount} confirmed` : `已确认 ${confirmedCount}`}</span>
+                  <span className={overdueCount ? 'is-missing' : ''}>{isEn ? `${overdueCount} overdue` : `过期 ${overdueCount}`}</span>
+                  <span className="is-current">{isEn ? `${currentCount} this month` : `本月 ${currentCount}`}</span>
+                  <span>{isEn ? `${upcomingCount} not due` : `未到 ${upcomingCount}`}</span>
+                </div>
 
-                <div className={`cbl-settle-months${openMonth ? ' has-open' : ''}`}>
+                <div className="cbl-settle-months">
                   {monthCards.map((month) => {
                     const opened = openMonth === month.month;
                     return (
-                      <div
+                      <button
                         key={month.month}
+                        type="button"
                         className={`cbl-settle-month is-${month.tone}${opened ? ' is-open' : ''}`}
+                        aria-pressed={opened}
+                        onClick={() =>
+                          setOpenMonth((prev) => (prev === month.month ? null : month.month))
+                        }
                       >
-                        <button
-                          type="button"
-                          className="cbl-settle-month__hit"
-                          aria-expanded={opened}
-                          onClick={() =>
-                            setOpenMonth((prev) => (prev === month.month ? null : month.month))
-                          }
-                        >
-                          <b>{monthTitle(month.month, isEn)}</b>
-                          <small>{toneLabel(month.tone, isEn)}</small>
-                        </button>
-                        {opened ? (
-                          <div className="cbl-settle-month__body">
-                            {month.tone === 'confirmed' && month.snapshot ? (
-                              <dl className="cbl-settle-month-detail__grid">
-                                {SNAPSHOT_FIELDS.slice(0, 4).map((field) => (
-                                  <div key={field.key}>
-                                    <dt>{isEn ? field.en : field.zh}</dt>
-                                    <dd>{formatMmK(month.snapshot?.[field.key] as number)}</dd>
-                                  </div>
-                                ))}
-                                <div>
-                                  <dt>{isEn ? 'Stations' : '站点数'}</dt>
-                                  <dd>{month.storeCount || 0}</dd>
-                                </div>
-                              </dl>
-                            ) : (
-                              <p>
-                                {month.tone === 'upcoming'
-                                  ? isEn
-                                    ? 'This month is not due yet, so it is not counted as missing.'
-                                    : '这个月还没到，不计入过期缺月。'
-                                  : month.tone === 'current'
-                                    ? isEn
-                                      ? 'This month has no confirmed close yet.'
-                                      : '本月还没有已确认的月结。'
-                                    : isEn
-                                      ? 'No confirmed monthly close for this month.'
-                                      : '该月尚无已确认月结。'}
-                              </p>
-                            )}
-                          </div>
-                        ) : null}
-                      </div>
+                        <b>{monthTitle(month.month, isEn)}</b>
+                        <small>{toneLabel(month.tone, isEn)}</small>
+                      </button>
                     );
                   })}
                 </div>
-                <p className="cbl-settle-panel__hint">
-                  {isEn
-                    ? 'Months stay small until you open one. Tap again to shrink it. Red = overdue, amber = this month, muted = not due.'
-                    : '没点开时月份都是小卡。再点一次就收回。红=过期未结，黄=本月，灰=未到。'}
-                </p>
+                {openedMonth ? (
+                  <div className="cbl-settle-month__body">
+                    <strong>{monthTitle(openedMonth.month, isEn)} · {toneLabel(openedMonth.tone, isEn)}</strong>
+                    {openedMonth.tone === 'confirmed' && openedMonth.snapshot ? (
+                      <dl className="cbl-settle-month-detail__grid">
+                        {SNAPSHOT_FIELDS.slice(0, 4).map((field) => (
+                          <div key={field.key}>
+                            <dt>{isEn ? field.en : field.zh}</dt>
+                            <dd>{formatMmK(openedMonth.snapshot?.[field.key] as number)} MMK</dd>
+                          </div>
+                        ))}
+                        <div>
+                          <dt>{isEn ? 'Stations' : '站点数'}</dt>
+                          <dd>{openedMonth.storeCount || 0}</dd>
+                        </div>
+                      </dl>
+                    ) : (
+                      <p>
+                        {openedMonth.tone === 'upcoming'
+                          ? isEn
+                            ? 'This month has not started, so it is not overdue.'
+                            : '这个月还没到，不算过期。'
+                          : storeCode
+                            ? isEn
+                              ? `${storeName(storeCode)} has no confirmed close for this month.`
+                              : `${storeName(storeCode)} 这个月还没有已确认月结。`
+                            : isEn
+                              ? `None of the ${stores.length} stations have a confirmed close for this month.`
+                              : `${stores.length} 个站点这个月都还没有已确认月结。`}
+                      </p>
+                    )}
+                  </div>
+                ) : null}
               </>
             ) : (
               <div className="cbl-settle-empty">

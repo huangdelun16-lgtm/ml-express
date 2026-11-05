@@ -14,9 +14,35 @@ import SignaturePad from './SignaturePad';
 import type { InventoryStoreSession } from '../services/authService';
 import { feedbackService } from '../services/FeedbackService';
 import { getItemDetail, getItemDetails, markCustomerSigned } from '../services/inventoryService';
+import { getPkgTrackingDetail } from '../services/trackingService';
 import { freezeSignedInvoice } from '../services/signedInvoiceArchive';
 import type { FrozenSignedInvoiceDocument } from '../utils/frozenSignedInvoice';
 import type { InventoryItemDetail } from '../types/inventory';
+
+async function attachTrackedPackWeights(details: InventoryItemDetail[]): Promise<InventoryItemDetail[]> {
+  const missing = new Set<string>();
+  for (const row of details) {
+    const code = row.packed_bundle_barcode?.trim().toUpperCase() || '';
+    if (!code) continue;
+    if (parseWeightKg(row.pack?.weight || row.weight || '') > 0) continue;
+    missing.add(code);
+  }
+  const weights = new Map<string, string>();
+  await Promise.all(
+    [...missing].map(async (code) => {
+      const pkg = await getPkgTrackingDetail(code).catch(() => null);
+      const weight = pkg?.total_weight?.trim() || '';
+      if (parseWeightKg(weight) > 0) weights.set(code, weight);
+    }),
+  );
+  if (weights.size === 0) return details;
+  return details.map((row) => {
+    const code = row.packed_bundle_barcode?.trim().toUpperCase() || '';
+    const tracked = code ? weights.get(code) : '';
+    if (!tracked) return row;
+    return { ...row, tracked_pack_weight: tracked };
+  });
+}
 import type {
   CustomerSignPickupType,
   CustomerSignReceiptInput,
@@ -27,6 +53,13 @@ import { svc } from '../errors/serviceError';
 import { fmt, formatServiceError, useTranslation } from '../i18n';
 import type { TranslationDict } from '../i18n/translations';
 import { cnyToMmk, fetchCrossBorderFxRate, formatCnyAmount, formatMmkAmount, mmkToCny } from '../utils/crossBorderFx';
+import { fetchCrossBorderRoutePerKg } from '../utils/crossBorderPricing';
+import { parseWeightKg } from '../utils/itemFieldFormat';
+import {
+  allocateSignQuoteCny,
+  buildBatchSignInvoice,
+  resolveInvoiceLineUnitCny,
+} from '../utils/batchSignInvoice';
 import {
   buildCodAlertFeeGroups,
   fxLockFeeMmkForItem,
@@ -111,6 +144,10 @@ export default function CustomerSignFlowModal({
   const [signatureStrokes, setSignatureStrokes] = useState<SignatureStroke[]>([]);
   const [payCurrency, setPayCurrency] = useState<CrossBorderPaidCurrency>('MMK');
   const [mmkPerCny, setMmkPerCny] = useState<number | null>(null);
+  const [signQuotes, setSignQuotes] = useState<{
+    totalCny: number | null;
+    byItemId: Record<string, number>;
+  } | null>(null);
 
   useEffect(() => {
     if (!visible || !request || itemIds.length === 0) {
@@ -123,6 +160,7 @@ export default function CustomerSignFlowModal({
       setSignatureStrokes([]);
       setPayCurrency('MMK');
       setMmkPerCny(null);
+      setSignQuotes(null);
       setLoading(false);
       setSubmitting(false);
       return;
@@ -146,9 +184,42 @@ export default function CustomerSignFlowModal({
         const resolvedRate = rate ?? request.liveRate ?? null;
         setMmkPerCny(resolvedRate);
         setPayCurrency('MMK');
+        const weighted = await attachTrackedPackWeights(loadedDetails);
+        const built = buildBatchSignInvoice(weighted, resolvedRate);
+        const lineCny = await resolveInvoiceLineUnitCny(built.lines, built.rate, async (route) => {
+          const found = await fetchCrossBorderRoutePerKg(
+            route.originCode,
+            route.destinationCode,
+            route.customerCode,
+          );
+          return {
+            perKgMmk: found.perKg,
+            mmkPerCny: found.mmkPerCny,
+            fromRouteMatrix: found.fromCloud && !found.usedLegacyFallback,
+            cnyPerKg: found.cnyPerKg,
+          };
+        }).catch(() => built.lines.map(() => null));
+        const allocated = allocateSignQuoteCny(weighted, lineCny);
+        if (!cancelled) setSignQuotes(allocated.totalCny != null ? allocated : null);
 
         const codGroups = buildCodAlertFeeGroups(loadedDetails);
-        if (codGroups.length > 0) {
+        const invoiceCny = allocated.totalCny;
+        const extraCny = request.frozenInvoice?.extraFeeCny ?? 0;
+        const alertCny = invoiceCny != null ? invoiceCny + (extraCny > 0 ? extraCny : 0) : null;
+        if (codGroups.length > 0 && alertCny != null && resolvedRate != null && resolvedRate > 0) {
+          Alert.alert(
+            t.sign.codAlertTitle,
+            fmt(t.sign.codAlertBody, {
+              feeLines: fmt(t.sign.totalFeeLine, {
+                fee: settlementLines(alertCny, resolvedRate, t),
+              }),
+            }),
+            [
+              { text: t.common.cancel, style: 'cancel', onPress: onClose },
+              { text: t.sign.codPaidContinue, onPress: () => setFormReady(true) },
+            ],
+          );
+        } else if (codGroups.length > 0) {
           const feeLines = codGroups
             .flatMap((group, index) => {
               const feeLine =
@@ -211,7 +282,13 @@ export default function CustomerSignFlowModal({
   const hasCod = details.some((row) => row.payment_label === '到付');
   const hasPrepaid = details.some((row) => row.payment_label === '预付');
   const packagingBatch = useMemo(() => packagingStockInSignBatch(details), [details]);
-  const quoteCny = useMemo(() => uniqueQuoteCny(details), [details]);
+  const quoteCny = useMemo(() => {
+    const extra = request?.frozenInvoice?.extraFeeCny ?? 0;
+    if (signQuotes?.totalCny != null) {
+      return signQuotes.totalCny + (extra > 0 ? extra : 0);
+    }
+    return uniqueQuoteCny(details);
+  }, [details, request?.frozenInvoice?.extraFeeCny, signQuotes]);
   const recordedMmk = useMemo(() => uniqueSignFeeMmk(details), [details]);
   const collect = useMemo(
     () =>
@@ -255,9 +332,12 @@ export default function CustomerSignFlowModal({
     setSubmitting(true);
     try {
       const signIds = details.map((row) => row.id);
+      const extraCny = request.frozenInvoice?.extraFeeCny ?? 0;
       for (const id of signIds) {
         const row = details.find((item) => item.id === id) ?? detail;
-        const quote = fxLockQuoteCnyForItem(row, details);
+        const priced = signQuotes?.byItemId[id];
+        let quote = priced != null ? priced : fxLockQuoteCnyForItem(row, details);
+        if (extraCny > 0 && id === signIds[0]) quote += extraCny;
         const settledMmk =
           quote > 0 && mmkPerCny != null && mmkPerCny > 0
             ? (cnyToMmk(quote, mmkPerCny) ?? 0)
@@ -273,6 +353,7 @@ export default function CustomerSignFlowModal({
         await markCustomerSigned(id, request.operator, request.store, {
           ...payload,
           fxLock: lock ?? undefined,
+          settlementQuoteCny: signQuotes?.totalCny != null ? quote : undefined,
         });
       }
       if (request.frozenInvoice && !request.frozenInvoice.invoiceNo) {

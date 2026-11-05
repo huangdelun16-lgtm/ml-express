@@ -113,6 +113,27 @@ export function inboundNoteHasFeeOrPayment(note: string): boolean {
   return Boolean(parsed.totalFee?.trim() || parsed.quoteCny?.trim() || parsed.paymentLabel?.trim());
 }
 
+const TOTAL_FEE_PART = /^(?:总费用|Total fee|ပို့ဆောင်ခ)\s+[\d.]+\s*MMK$/i;
+
+/** 签收按发票人民币改写报价，并用签收时的汇率写成缅币。旧的总费用一并换成这个数。 */
+export function applySignedQuoteSettlement(note: string, quoteCny: number, rate: number | null): string {
+  const withQuote = replaceInboundQuoteCny(note, quoteCny);
+  if (rate == null || rate <= 0) return withQuote;
+  const mmk = cnyToMmk(quoteCny, rate) ?? 0;
+  const feePart = `总费用 ${mmk} MMK`;
+  const parts = withQuote
+    .split(' · ')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const feeIndex = parts.findIndex((part) => TOTAL_FEE_PART.test(part));
+  if (feeIndex >= 0) parts[feeIndex] = feePart;
+  else {
+    const quoteIndex = parts.findIndex((part) => QUOTE_NOTE_PART.test(part));
+    parts.splice(quoteIndex >= 0 ? quoteIndex + 1 : 0, 0, feePart);
+  }
+  return parts.join(' · ');
+}
+
 /** 签收时把入库人民币按当天汇率写成缅币。已有总费用 MMK 的不再重算。 */
 export function settleQuoteNoteAtRate(note: string, rate: number | null): string {
   const parsed = parseInboundMovementNote(note);

@@ -321,7 +321,7 @@ export function quoteCnyForEditedWeight(input: {
   return mmkToCny(Math.round(input.perKgMmk * kg), input.mmkPerCny);
 }
 
-/** 入库报价只给人民币。路线价仍是 MMK/kg，这里按当天汇率折成人民币，不写出缅币。 */
+/** 入库报价只给人民币。有定价窗口的人民币/公斤就直接乘重量，报价时不乘汇率。 */
 export function formatCrossBorderCnyHint(
   originCode: string,
   destinationCode: string,
@@ -329,12 +329,17 @@ export function formatCrossBorderCnyHint(
   weightKg: number,
   customerCode = '',
   mmkPerCny: number | null = null,
+  cnyPerKg: number | null = null,
 ): string {
   const origin = originCode || '—';
   const dest = destinationCode || '—';
   const customerPrefix = customerCode ? `${customerCode} · ` : '';
+  if (cnyPerKg != null && cnyPerKg >= 0) {
+    if (cnyPerKg === 0) return `${customerPrefix}${origin} → ${dest} 免费优惠 · ¥0`;
+    return `${customerPrefix}${origin} → ${dest} ¥${formatCnyInput(cnyPerKg)}/kg × ${weightKg} kg`;
+  }
   if (perKg <= 0) return `${customerPrefix}${origin} → ${dest} 免费优惠 · ¥0`;
-  const cnyPerKg = mmkToCny(perKg, mmkPerCny);
-  if (cnyPerKg == null) return `${customerPrefix}${origin} → ${dest} 未设置汇率，无法生成人民币报价`;
-  return `${customerPrefix}${origin} → ${dest} ¥${formatCnyInput(cnyPerKg)}/kg × ${weightKg} kg`;
+  const converted = mmkToCny(perKg, mmkPerCny);
+  if (converted == null) return `${customerPrefix}${origin} → ${dest} 未设置汇率，无法生成人民币报价`;
+  return `${customerPrefix}${origin} → ${dest} ¥${formatCnyInput(converted)}/kg × ${weightKg} kg`;
 }

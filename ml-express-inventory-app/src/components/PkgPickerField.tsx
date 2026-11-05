@@ -2,7 +2,14 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { fmt, useTranslation } from '../i18n';
 import type { PackedShipmentDetail } from '../types/inventory';
+import { resolvePackOrderCount } from '../utils/itemFieldFormat';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
+
+function packWeightLabel(raw: string): string {
+  const text = raw.trim();
+  if (!text) return '';
+  return /kg/i.test(text) ? text : `${text} Kg`;
+}
 
 type Props = {
   label?: string;
@@ -81,6 +88,11 @@ export default function PkgPickerField({
               packs.map((pack) => {
                 const packDest = packDestinationFromBarcode(pack.bundle_barcode);
                 const active = selectedIds.has(pack.id);
+                const pieceCount = resolvePackOrderCount(pack);
+                const weight = packWeightLabel(pack.weight || '');
+                const summary = weight
+                  ? fmt(t.stockOut.packRowMeta, { count: pieceCount, weight })
+                  : fmt(t.stockOut.packRowPieces, { count: pieceCount });
                 return (
                   <Pressable
                     key={pack.id}
@@ -96,8 +108,7 @@ export default function PkgPickerField({
                       </Text>
                       <Text style={styles.optionMeta} numberOfLines={1}>
                         {packDest ? `[${packDest}] ` : ''}
-                        {pack.bundle_name}
-                        {pack.weight ? ` · ${pack.weight}` : ''}
+                        {summary}
                       </Text>
                     </View>
                   </Pressable>

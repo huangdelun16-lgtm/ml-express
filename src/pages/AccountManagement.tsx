@@ -21,12 +21,127 @@ const REGIONS = [
   { id: 'muse', name: '木姐', prefix: 'MUSE' }
 ];
 
+const DEPARTMENTS = ['运营部', '配送部', '客服部', '财务部', '技术部', '人事部', '市场部'];
+
+const POSITIONS_BY_DEPARTMENT: Record<string, string[]> = {
+  运营部: ['总经理', '部门经理', '主管', '操作员'],
+  配送部: ['部门经理', '主管', '骑手队长', '骑手'],
+  客服部: ['部门经理', '主管', '客服专员'],
+  财务部: ['部门经理', '主管', '财务专员'],
+  技术部: ['部门经理', '主管', '技术专员'],
+  人事部: ['部门经理', '主管'],
+  市场部: ['部门经理', '主管'],
+};
+
+type AccountRole = 'admin' | 'manager' | 'operator' | 'finance';
+
+const ROLE_FOR_POSITION: Record<string, AccountRole> = {
+  总经理: 'manager',
+  部门经理: 'manager',
+  主管: 'manager',
+  骑手队长: 'operator',
+  骑手: 'operator',
+  客服专员: 'operator',
+  财务专员: 'finance',
+  技术专员: 'operator',
+  操作员: 'operator',
+};
+
+const ROLE_CHOICES: { id: AccountRole; name: string; detail: string }[] = [
+  { id: 'operator', name: '操作员', detail: '订单、跟踪、跨境、货物' },
+  { id: 'manager', name: '经理', detail: '再加用户、商家、财务、报表' },
+  { id: 'finance', name: '财务', detail: '财务、充值、对账、报表' },
+  { id: 'admin', name: '管理员', detail: '全部功能，含系统设置' },
+];
+
+const ACCOUNT_PERMISSIONS = [
+  { id: 'city_packages', name: '同城订单', group: '日常' },
+  { id: 'tracking', name: '实时跟踪', group: '日常' },
+  { id: 'delivery_alerts', name: '配送警报', group: '日常' },
+  { id: 'courier_performance', name: '骑手绩效', group: '日常' },
+  { id: 'after_sales', name: '售后跟单', group: '日常' },
+  { id: 'users', name: '用户管理', group: '商家' },
+  { id: 'merchant_stores', name: '商家管理', group: '商家' },
+  { id: 'product_reviews', name: '商品审核', group: '商家' },
+  { id: 'banners', name: '页面管理', group: '商家' },
+  { id: 'finance', name: '财务管理', group: '财务' },
+  { id: 'recharges', name: '充值管理', group: '财务' },
+  { id: 'merchant_reconciliation', name: '商家对账', group: '财务' },
+  { id: 'reports', name: '报表导出', group: '财务' },
+  { id: 'supervision', name: '操作审计', group: '财务' },
+  { id: 'cross_border_logistics', name: '跨境物流', group: '货物' },
+  { id: 'goods_management', name: '货物管理', group: '货物' },
+  { id: 'metric_management', name: '商品明细', group: '货物' },
+  { id: 'product_price', name: '商品价格', group: '货物' },
+  { id: 'personal_expenses', name: '个人开销', group: '货物' },
+  { id: 'settings', name: '系统设置', group: '系统' },
+];
+
+const ROLE_MENU_IDS: Record<AccountRole, string[]> = {
+  operator: ['city_packages', 'tracking', 'courier_performance', 'cross_border_logistics', 'goods_management'],
+  manager: ACCOUNT_PERMISSIONS.map((item) => item.id).filter((id) => id !== 'settings' && id !== 'recharges'),
+  finance: [
+    'city_packages', 'tracking', 'delivery_alerts', 'courier_performance', 'after_sales',
+    'finance', 'recharges', 'merchant_reconciliation', 'reports', 'supervision',
+    'cross_border_logistics', 'goods_management', 'metric_management', 'product_price', 'personal_expenses',
+  ],
+  admin: ACCOUNT_PERMISSIONS.map((item) => item.id),
+};
+
+function samePermissionSet(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  const rightSet = new Set(right);
+  return left.every((id) => rightSet.has(id));
+}
+
+function employeeIdKind(position: string, role: string): { code: string; reason: string } {
+  if (position.includes('骑手')) {
+    return { code: 'RIDER', reason: '职位是骑手，编号按骑手记，不跟登录角色改' };
+  }
+  if (role === 'finance' || position.includes('财务')) {
+    return {
+      code: 'ACCOUNT',
+      reason: position.includes('财务') && role !== 'finance' ? '职位含财务，编号按财务记' : '按财务记',
+    };
+  }
+  if (role === 'manager' || position.includes('经理')) {
+    return { code: 'MANAGER', reason: '按经理记' };
+  }
+  if (role === 'admin' || position.includes('管理员')) {
+    return { code: 'ADMIN', reason: '按管理员记' };
+  }
+  return { code: 'STAFF', reason: '按普通员工记' };
+}
+
+function formatHireDateLabel(value: string): string {
+  const [year, month, day] = value.split('-');
+  if (!year || !month || !day) return '';
+  return `${year}年${Number(month)}月${Number(day)}日`;
+}
+
+function formatAccountDate(value?: string | null): string {
+  if (!value) return '';
+  const day = String(value).slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) return formatHireDateLabel(day);
+  return String(value);
+}
+
+function formatAccountDateTime(value?: string | null): string {
+  if (!value) return '从未登录';
+  const date = formatAccountDate(value);
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return date || String(value);
+  const hm = parsed.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  return `${date} ${hm}`;
+}
+
 const AccountManagement: React.FC = () => {
   const navigate = useNavigate();
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [editingAccount, setEditingAccount] = useState<AdminAccount | null>(null);
@@ -75,7 +190,7 @@ const AccountManagement: React.FC = () => {
     department: '',
     position: '',
     salary: '',
-    role: 'operator' as 'admin' | 'manager' | 'operator' | 'finance',
+    role: 'operator' as AccountRole,
     hire_date: new Date().toISOString().split('T')[0],
     id_number: '',
     emergency_contact: '',
@@ -88,8 +203,13 @@ const AccountManagement: React.FC = () => {
   const [editFormData, setEditFormData] = useState({
     username: '',
     password: '',
-    employee_name: ''
+    employee_name: '',
+    phone: '',
+    department: '',
+    position: '',
+    role: 'operator' as AccountRole,
   });
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   useEffect(() => {
     loadAccounts();
@@ -104,7 +224,10 @@ const AccountManagement: React.FC = () => {
     };
   }, [showForm]);
 
-  const closeCreateForm = () => setShowForm(false);
+  const closeCreateForm = () => {
+    setShowCreatePassword(false);
+    setShowForm(false);
+  };
 
   const loadAccounts = async () => {
     setLoading(true);
@@ -132,24 +255,32 @@ const AccountManagement: React.FC = () => {
     }
   };
 
+  const applyOrgFields = (patch: Partial<Pick<typeof formData, 'department' | 'position' | 'role'>>) => {
+    setFormData(prev => {
+      const next = { ...prev, ...patch };
+      if (patch.department !== undefined && next.position) {
+        const allowed = POSITIONS_BY_DEPARTMENT[next.department] || [];
+        if (!allowed.includes(next.position)) {
+          next.position = '';
+        }
+      }
+      if (patch.position && ROLE_FOR_POSITION[patch.position]) {
+        next.role = ROLE_FOR_POSITION[patch.position];
+      }
+      if (next.region && next.position && next.role) {
+        next.employee_id = generateEmployeeId(next.region, next.position, next.role);
+      } else if (!next.position) {
+        next.employee_id = '';
+      }
+      return next;
+    });
+  };
+
   // 自动生成员工编号
   const generateEmployeeId = (regionId: string, position: string, role: string): string => {
     const region = REGIONS.find(r => r.id === regionId);
     const regionPrefix = region ? region.prefix : 'MDY';
-    
-    // 根据角色确定职位类型
-    let positionType = '';
-    if (position.includes('骑手') || position === '骑手') {
-      positionType = 'RIDER';
-    } else if (role === 'finance' || position.includes('财务')) {
-      positionType = 'ACCOUNT';
-    } else if (role === 'manager' || position.includes('经理')) {
-      positionType = 'MANAGER';
-    } else if (role === 'admin' || position.includes('管理员')) {
-      positionType = 'ADMIN';
-    } else {
-      positionType = 'STAFF';
-    }
+    const positionType = employeeIdKind(position, role).code;
     
     // 获取该区域该类型的现有账号数量
     const filteredAccounts = accounts.filter(acc => {
@@ -251,12 +382,32 @@ const AccountManagement: React.FC = () => {
 
   const handleEditAccount = (account: AdminAccount) => {
     setEditingAccount(account);
+    setShowEditPassword(false);
     setEditFormData({
       username: account.username,
-      password: '', // 不显示原密码
-      employee_name: account.employee_name
+      password: '',
+      employee_name: account.employee_name,
+      phone: account.phone || '',
+      department: account.department || '',
+      position: account.position || '',
+      role: (account.role || 'operator') as AccountRole,
     });
     setShowEditModal(true);
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setShowEditPassword(false);
+    setEditingAccount(null);
+    setEditFormData({
+      username: '',
+      password: '',
+      employee_name: '',
+      phone: '',
+      department: '',
+      position: '',
+      role: 'operator',
+    });
   };
 
   const normalizePermissionIds = (permissions: string[]) => {
@@ -266,7 +417,9 @@ const AccountManagement: React.FC = () => {
 
   const handleEditPermissions = (account: AdminAccount) => {
     setEditingAccount(account);
-    setPermissionsPermissionsFormData(normalizePermissionIds(account.permissions || []));
+    const defaults = ROLE_MENU_IDS[(account.role || 'operator') as AccountRole] || ROLE_MENU_IDS.operator;
+    const stored = Array.isArray(account.permissions) ? normalizePermissionIds(account.permissions) : [];
+    setPermissionsPermissionsFormData(stored.length ? stored : defaults);
     setShowPermissionsModal(true);
   };
 
@@ -274,9 +427,12 @@ const AccountManagement: React.FC = () => {
     if (!editingAccount || !editingAccount.id) return;
 
     try {
+      const defaults = ROLE_MENU_IDS[(editingAccount.role || 'operator') as AccountRole] || ROLE_MENU_IDS.operator;
+      const nextPermissions = normalizePermissionIds(permissionsFormData);
+      const followRole = nextPermissions.length === 0 || samePermissionSet(nextPermissions, defaults);
       const success = await adminAccountService.updateAccount(editingAccount.id, {
-        permissions: normalizePermissionIds(permissionsFormData)
-      });
+        permissions: followRole ? null : nextPermissions,
+      } as Partial<AdminAccount>);
 
       if (success) {
         showNotification('权限更新成功！', 'success');
@@ -290,28 +446,6 @@ const AccountManagement: React.FC = () => {
       showNotification('操作出错', 'error');
     }
   };
-
-  const AVAILABLE_PERMISSIONS = [
-    { id: 'city_packages', name: '同城订单', icon: '📦' },
-    { id: 'users', name: '用户管理', icon: '👥' },
-    { id: 'merchant_stores', name: '商家管理', icon: '🏪' },
-    { id: 'product_reviews', name: '商品审核', icon: '🛍️' },
-    { id: 'after_sales', name: '售后跟单', icon: '🎧' },
-    { id: 'finance', name: '财务管理', icon: '💰' },
-    { id: 'tracking', name: '实时跟踪', icon: '📍' },
-    { id: 'settings', name: '系统设置', icon: '⚙️' },
-    { id: 'delivery_alerts', name: '配送警报', icon: '🚨' },
-    { id: 'banners', name: '页面管理', icon: '🖼️' },
-    { id: 'recharges', name: '充值管理', icon: '💳' },
-    { id: 'supervision', name: '操作审计', icon: '📜' },
-    { id: 'reports', name: '报表导出', icon: '📈' },
-    { id: 'courier_performance', name: '骑手绩效', icon: '🚴' },
-    { id: 'merchant_reconciliation', name: '商家对账', icon: '📋' },
-    { id: 'metric_management', name: '指标管理', icon: '📑' },
-    { id: 'cross_border_logistics', name: '跨境物流', icon: '🚚' },
-    { id: 'product_price', name: '商品价格', icon: '💲' },
-    { id: 'personal_expenses', name: '个人开销', icon: '🧾' },
-  ];
 
   const togglePermission = (permId: string) => {
     setPermissionsPermissionsFormData(prev => 
@@ -327,20 +461,25 @@ const AccountManagement: React.FC = () => {
 
     try {
       const updateData: Partial<AdminAccount> = {
-        username: editFormData.username,
-        employee_name: editFormData.employee_name
+        username: editFormData.username.trim(),
+        employee_name: editFormData.employee_name.trim(),
+        phone: editFormData.phone.trim(),
+        department: editFormData.department,
+        position: editFormData.position,
+        role: editFormData.role,
       };
 
-      // 只有在输入了新密码时才更新密码
       if (editFormData.password.trim()) {
         updateData.password = editFormData.password;
       }
 
-      await adminAccountService.updateAccount(editingAccount.id!, updateData);
+      const success = await adminAccountService.updateAccount(editingAccount.id!, updateData);
+      if (!success) {
+        showNotification('更新账号失败，请重试', 'error');
+        return;
+      }
       await loadAccounts();
-      setShowEditModal(false);
-      setEditingAccount(null);
-      setEditFormData({ username: '', password: '', employee_name: '' });
+      closeEditModal();
       showNotification('账号信息更新成功！', 'success');
     } catch (error) {
       console.error('更新账号失败:', error);
@@ -348,8 +487,14 @@ const AccountManagement: React.FC = () => {
     }
   };
 
+  const currentUsername = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
+
   const handleDeleteAccount = async (account: AdminAccount) => {
     if (!account.id) return;
+    if (account.username === currentUsername) {
+      showNotification('不能删除当前登录的账号', 'warning');
+      return;
+    }
     
     const confirm = await showConfirmDialog(`确定要永久删除账号 "${account.employee_name} (@${account.username})" 吗？此操作不可恢复！`);
     if (!confirm) return;
@@ -700,7 +845,7 @@ const AccountManagement: React.FC = () => {
               <div className="acct-create-modal__head">
                 <div className="acct-create-modal__title-wrap">
                   <h2 id="acct-create-title" className="acct-create-modal__title">创建新员工账号</h2>
-                  <p className="acct-create-modal__sub">填写基本信息与组织归属，员工编号将根据区域、职位和角色自动生成。</p>
+                  <p className="acct-create-modal__sub">先填这个人，再填登录。右上角的工作区域、职位和角色会一起生成员工编号。</p>
                 </div>
                 <div className="acct-create-modal__head-actions">
                   <div className="acct-create-modal__region">
@@ -732,32 +877,6 @@ const AccountManagement: React.FC = () => {
               <form onSubmit={handleSubmit} className="acct-create-modal__form">
                 <div className="acct-create-modal__body">
                   <section className="acct-create-section">
-                    <h3 className="acct-create-section__title">登录凭证</h3>
-                    <div className="acct-create-grid">
-                      <div className="acct-create-field">
-                        <label>用户名 <span>*</span></label>
-                        <input
-                          type="text"
-                          name="username"
-                          value={formData.username}
-                          onChange={handleInputChange}
-                          required
-                        />
-                      </div>
-                      <div className="acct-create-field">
-                        <label>密码 <span>*</span></label>
-                        <input
-                          type="password"
-                          name="password"
-                          value={formData.password}
-                          onChange={handleInputChange}
-                          required
-                        />
-                      </div>
-                    </div>
-                  </section>
-
-                  <section className="acct-create-section">
                     <h3 className="acct-create-section__title">员工信息</h3>
                     <div className="acct-create-grid">
                       <div className="acct-create-field">
@@ -767,41 +886,37 @@ const AccountManagement: React.FC = () => {
                           name="employee_name"
                           value={formData.employee_name}
                           onChange={handleInputChange}
+                          placeholder="真实姓名"
+                          autoComplete="name"
                           required
                         />
                       </div>
-                      <div className="acct-create-field acct-create-field--readonly">
-                        <label>员工编号 <span>*</span>（自动生成）</label>
+                      <div className="acct-create-field">
+                        <label>入职日期 <span>*</span></label>
                         <input
-                          type="text"
-                          name="employee_id"
-                          value={formData.employee_id}
-                          readOnly
-                          placeholder="请先选择区域、职位和角色"
+                          type="date"
+                          name="hire_date"
+                          lang="zh-CN"
+                          value={formData.hire_date}
+                          onChange={handleInputChange}
+                          required
                         />
+                        {formData.hire_date ? (
+                          <span className="acct-create-field__hint">{formatHireDateLabel(formData.hire_date)}</span>
+                        ) : null}
                       </div>
-                    </div>
-                  </section>
-
-                  <section className="acct-create-section">
-                    <h3 className="acct-create-section__title">组织与权限</h3>
-                    <div className="acct-create-grid">
                       <div className="acct-create-field">
                         <label>部门 <span>*</span></label>
                         <select
                           name="department"
                           value={formData.department}
-                          onChange={handleInputChange}
+                          onChange={(e) => applyOrgFields({ department: e.target.value })}
                           required
                         >
                           <option value="">请选择部门</option>
-                          <option value="运营部">运营部</option>
-                          <option value="配送部">配送部</option>
-                          <option value="客服部">客服部</option>
-                          <option value="财务部">财务部</option>
-                          <option value="技术部">技术部</option>
-                          <option value="人事部">人事部</option>
-                          <option value="市场部">市场部</option>
+                          {DEPARTMENTS.map((name) => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
                         </select>
                       </div>
                       <div className="acct-create-field">
@@ -809,46 +924,93 @@ const AccountManagement: React.FC = () => {
                         <select
                           name="position"
                           value={formData.position}
-                          onChange={handleInputChange}
+                          onChange={(e) => applyOrgFields({ position: e.target.value })}
+                          disabled={!formData.department}
                           required
                         >
-                          <option value="">请选择职位</option>
-                          <option value="总经理">总经理</option>
-                          <option value="部门经理">部门经理</option>
-                          <option value="主管">主管</option>
-                          <option value="骑手队长">骑手队长</option>
-                          <option value="骑手">骑手</option>
-                          <option value="客服专员">客服专员</option>
-                          <option value="财务专员">财务专员</option>
-                          <option value="技术专员">技术专员</option>
-                          <option value="操作员">操作员</option>
+                          <option value="">{formData.department ? '请选择职位' : '请先选择部门'}</option>
+                          {(POSITIONS_BY_DEPARTMENT[formData.department] || []).map((name) => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
                         </select>
+                        {formData.position === '骑手' || formData.position === '骑手队长' ? (
+                          <span className="acct-create-field__hint">会同时开通骑手登录。</span>
+                        ) : null}
                       </div>
+                    </div>
+                  </section>
+
+                  <section className="acct-create-section">
+                    <h3 className="acct-create-section__title">登录凭证</h3>
+                    <div className="acct-create-grid">
                       <div className="acct-create-field">
-                        <label>角色 <span>*</span></label>
-                        <select
-                          name="role"
-                          value={formData.role}
-                          onChange={handleInputChange}
-                          required
-                        >
-                          <option value="operator">操作员</option>
-                          <option value="manager">经理</option>
-                          <option value="admin">管理员</option>
-                          <option value="finance">财务</option>
-                        </select>
-                      </div>
-                      <div className="acct-create-field">
-                        <label>入职日期 <span>*</span></label>
+                        <label>用户名 <span>*</span></label>
                         <input
-                          type="date"
-                          name="hire_date"
-                          value={formData.hire_date}
+                          type="text"
+                          name="username"
+                          value={formData.username}
                           onChange={handleInputChange}
+                          placeholder="例如 ML-Grok"
+                          autoComplete="off"
                           required
                         />
                       </div>
+                      <div className="acct-create-field">
+                        <label>密码 <span>*</span></label>
+                        <div className="acct-create-password">
+                          <input
+                            type={showCreatePassword ? 'text' : 'password'}
+                            name="password"
+                            value={formData.password}
+                            onChange={handleInputChange}
+                            placeholder="交给员工登录用"
+                            autoComplete="new-password"
+                            required
+                          />
+                          <button
+                            type="button"
+                            className="acct-create-password__toggle"
+                            onClick={() => setShowCreatePassword((open) => !open)}
+                          >
+                            {showCreatePassword ? '隐藏' : '显示'}
+                          </button>
+                        </div>
+                      </div>
                     </div>
+                    <div className="acct-create-roles">
+                      <span className="acct-create-roles__label">登录角色</span>
+                      {ROLE_CHOICES.map((choice) => (
+                        <button
+                          key={choice.id}
+                          type="button"
+                          className={`acct-create-role${formData.role === choice.id ? ' is-on' : ''}`}
+                          aria-pressed={formData.role === choice.id}
+                          onClick={() => applyOrgFields({ role: choice.id })}
+                        >
+                          <strong>{choice.name}</strong>
+                          <span>{choice.detail}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="acct-create-section">
+                    <h3 className="acct-create-section__title">员工编号</h3>
+                    <div className="acct-create-field acct-create-field--readonly">
+                      <label>根据工作区域、职位和角色生成 <em>自动生成</em></label>
+                      <input
+                        type="text"
+                        name="employee_id"
+                        value={formData.employee_id}
+                        readOnly
+                        placeholder="请先选择区域、职位和角色"
+                      />
+                    </div>
+                    {formData.employee_id ? (
+                      <p className="acct-create-id-note">
+                        {REGIONS.find((item) => item.id === formData.region)?.name} · {formData.employee_id} · {employeeIdKind(formData.position, formData.role).reason}
+                      </p>
+                    ) : null}
                   </section>
 
                   <section className="acct-create-section">
@@ -861,6 +1023,8 @@ const AccountManagement: React.FC = () => {
                           name="phone"
                           value={formData.phone}
                           onChange={handleInputChange}
+                          placeholder="09…"
+                          autoComplete="tel"
                         />
                       </div>
                       <div className="acct-create-field">
@@ -870,17 +1034,23 @@ const AccountManagement: React.FC = () => {
                           name="email"
                           value={formData.email}
                           onChange={handleInputChange}
+                          placeholder="name@market-link-express.com"
+                          autoComplete="email"
                         />
                       </div>
                       <div className="acct-create-field">
-                        <label>基本工资 (MMK)</label>
-                        <input
-                          type="number"
-                          name="salary"
-                          value={formData.salary}
-                          onChange={handleInputChange}
-                          placeholder="例如: 300000"
-                        />
+                        <label>基本工资</label>
+                        <div className="acct-create-money">
+                          <span>MMK</span>
+                          <input
+                            type="number"
+                            name="salary"
+                            value={formData.salary}
+                            onChange={handleInputChange}
+                            placeholder="300000"
+                            min="0"
+                          />
+                        </div>
                       </div>
                     </div>
                   </section>
@@ -1034,33 +1204,31 @@ const AccountManagement: React.FC = () => {
                             type="button"
                             className="acct-list__action acct-list__action--view"
                             onClick={() => handleViewAccount(account)}
-                            title="查看详情"
                           >
-                            👁️
+                            查看
                           </button>
                           <button
                             type="button"
                             className="acct-list__action acct-list__action--edit"
                             onClick={() => handleEditAccount(account)}
-                            title="编辑账号"
                           >
-                            ✏️
+                            编辑
                           </button>
                           <button
                             type="button"
                             className="acct-list__action acct-list__action--perm"
                             onClick={() => handleEditPermissions(account)}
-                            title="管理权限"
                           >
-                            🔑
+                            权限
                           </button>
                           <button
                             type="button"
                             className="acct-list__action acct-list__action--delete"
                             onClick={() => handleDeleteAccount(account)}
-                            title="删除账号"
+                            disabled={account.username === currentUsername}
+                            title={account.username === currentUsername ? '不能删除当前登录的账号' : '删除账号'}
                           >
-                            🗑️
+                            删除
                           </button>
                         </div>
                       </td>
@@ -1072,441 +1240,319 @@ const AccountManagement: React.FC = () => {
           )}
         </div>
 
-        {/* 编辑账号模态框 */}
-        {showEditModal && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 1000
-          }}>
-            <div style={{
-              background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-              borderRadius: '16px',
-              padding: '32px',
-              border: '1px solid rgba(255,255,255,0.2)',
-              color: 'white',
-              width: '90%',
-              maxWidth: '500px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
-            }}>
-              <h2 style={{ marginBottom: '24px', textAlign: 'center' }}>编辑账号信息</h2>
-              <form onSubmit={handleUpdateAccount}>
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    用户名 *
-                  </label>
-                  <input
-                    type="text"
-                    value={editFormData.username}
-                    onChange={(e) => setEditFormData({...editFormData, username: e.target.value})}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      background: 'rgba(15, 32, 60, 0.55)',
-                      color: 'white',
-                      fontSize: '1rem',
-                      outline: 'none'
-                    }}
-                    required
-                  />
+        {showEditModal && editingAccount && createPortal(
+          <div
+            className="acct-create-overlay"
+            role="presentation"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) closeEditModal();
+            }}
+          >
+            <div className="acct-create-modal acct-create-modal--fit" role="dialog" aria-modal="true" aria-labelledby="acct-edit-title">
+              <div className="acct-create-modal__head">
+                <div className="acct-create-modal__title-wrap">
+                  <h2 id="acct-edit-title" className="acct-create-modal__title">编辑账号</h2>
+                  <p className="acct-create-modal__sub">
+                    {editingAccount.employee_id} · 编号不改。密码留空就保持原密码。
+                  </p>
                 </div>
-                
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    员工姓名 *
-                  </label>
-                  <input
-                    type="text"
-                    value={editFormData.employee_name}
-                    onChange={(e) => setEditFormData({...editFormData, employee_name: e.target.value})}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      background: 'rgba(15, 32, 60, 0.55)',
-                      color: 'white',
-                      fontSize: '1rem',
-                      outline: 'none'
-                    }}
-                    required
-                  />
+                <button type="button" className="acct-create-modal__close" aria-label="关闭" onClick={closeEditModal}>×</button>
+              </div>
+              <form onSubmit={handleUpdateAccount} className="acct-create-modal__form">
+                <div className="acct-create-modal__body">
+                  <section className="acct-create-section">
+                    <div className="acct-create-grid">
+                      <div className="acct-create-field">
+                        <label>员工姓名 <span>*</span></label>
+                        <input
+                          type="text"
+                          value={editFormData.employee_name}
+                          onChange={(e) => setEditFormData({ ...editFormData, employee_name: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="acct-create-field">
+                        <label>用户名 <span>*</span></label>
+                        <input
+                          type="text"
+                          value={editFormData.username}
+                          onChange={(e) => setEditFormData({ ...editFormData, username: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="acct-create-field">
+                        <label>手机号码</label>
+                        <input
+                          type="tel"
+                          value={editFormData.phone}
+                          onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                          placeholder="09…"
+                        />
+                      </div>
+                      <div className="acct-create-field">
+                        <label>新密码</label>
+                        <div className="acct-create-password">
+                          <input
+                            type={showEditPassword ? 'text' : 'password'}
+                            value={editFormData.password}
+                            onChange={(e) => setEditFormData({ ...editFormData, password: e.target.value })}
+                            placeholder="留空则不修改"
+                            autoComplete="new-password"
+                          />
+                          <button
+                            type="button"
+                            className="acct-create-password__toggle"
+                            onClick={() => setShowEditPassword((open) => !open)}
+                          >
+                            {showEditPassword ? '隐藏' : '显示'}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="acct-create-field">
+                        <label>部门</label>
+                        <select
+                          value={editFormData.department}
+                          onChange={(e) => {
+                            const department = e.target.value;
+                            const allowed = POSITIONS_BY_DEPARTMENT[department] || [];
+                            setEditFormData((prev) => ({
+                              ...prev,
+                              department,
+                              position: !department || allowed.includes(prev.position) ? prev.position : '',
+                            }));
+                          }}
+                        >
+                          <option value="">未分配</option>
+                          {DEPARTMENTS.map((name) => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="acct-create-field">
+                        <label>职位</label>
+                        <select
+                          value={editFormData.position}
+                          onChange={(e) => setEditFormData({ ...editFormData, position: e.target.value })}
+                          disabled={!editFormData.department}
+                        >
+                          <option value="">{editFormData.department ? '请选择职位' : '请先选择部门'}</option>
+                          {(editFormData.position && !(POSITIONS_BY_DEPARTMENT[editFormData.department] || []).includes(editFormData.position)
+                            ? [editFormData.position]
+                            : []
+                          ).concat(POSITIONS_BY_DEPARTMENT[editFormData.department] || []).map((name) => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="acct-create-roles">
+                      <span className="acct-create-roles__label">登录角色</span>
+                      {ROLE_CHOICES.map((choice) => (
+                        <button
+                          key={choice.id}
+                          type="button"
+                          className={`acct-create-role${editFormData.role === choice.id ? ' is-on' : ''}`}
+                          aria-pressed={editFormData.role === choice.id}
+                          onClick={() => setEditFormData({ ...editFormData, role: choice.id })}
+                        >
+                          <strong>{choice.name}</strong>
+                          <span>{choice.detail}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
                 </div>
-
-                <div style={{ marginBottom: '24px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    新密码 (留空则不修改)
-                  </label>
-                  <input
-                    type="password"
-                    value={editFormData.password}
-                    onChange={(e) => setEditFormData({...editFormData, password: e.target.value})}
-                    placeholder="输入新密码或留空保持不变"
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      background: 'rgba(15, 32, 60, 0.55)',
-                      color: 'white',
-                      fontSize: '1rem',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                  <button
-                    type="submit"
-                    style={{
-                      background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
-                      color: 'white',
-                      border: 'none',
-                      padding: '12px 24px',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '1rem',
-                      fontWeight: 600
-                    }}
-                  >
-                    保存修改
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowEditModal(false);
-                      setEditingAccount(null);
-                      setEditFormData({ username: '', password: '', employee_name: '' });
-                    }}
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      color: 'white',
-                      border: '1px solid rgba(255,255,255,0.3)',
-                      padding: '12px 24px',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '1rem'
-                    }}
-                  >
-                    取消
-                  </button>
+                <div className="acct-create-modal__foot">
+                  <button type="button" className="acct-create-btn acct-create-btn--ghost" onClick={closeEditModal}>取消</button>
+                  <button type="submit" className="acct-create-btn acct-create-btn--primary">保存修改</button>
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
-        {/* 查看员工详情模态框 */}
-        {showViewModal && viewingAccount && (
+        {showViewModal && viewingAccount && createPortal(
           <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0, 0, 0, 0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000,
-              backdropFilter: 'blur(5px)'
+            className="acct-create-overlay"
+            role="presentation"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowViewModal(false);
             }}
           >
-            <div
-              style={{
-                background: 'rgba(15, 32, 60, 0.85)',
-                borderRadius: '16px',
-                padding: '32px',
-                width: '90%',
-                maxWidth: '700px',
-                maxHeight: '85vh',
-                overflowY: 'auto',
-                border: '1px solid rgba(255,255,255,0.2)',
-                color: 'white',
-                boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-                backdropFilter: 'blur(10px)'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>员工详细信息</h2>
-                <button
-                  onClick={() => setShowViewModal(false)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'white',
-                    fontSize: '28px',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    borderRadius: '4px',
-                    transition: 'background 0.2s'
-                  }}
-                  onMouseEnter={(e) => (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'}
-                  onMouseLeave={(e) => (e.target as HTMLButtonElement).style.background = 'transparent'}
-                >
-                  ×
-                </button>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                {/* 基本信息 */}
-                <div style={{ 
-                  background: 'rgba(255,255,255,0.05)', 
-                  padding: isMobile ? '12px' : '20px', 
-                  borderRadius: '12px',
-                  border: '1px solid rgba(255,255,255,0.1)'
-                }}>
-                  <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', color: '#60a5fa' }}>基本信息</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>员工姓名：</span>
-                      <span style={{ fontSize: '1rem', fontWeight: 500 }}>{viewingAccount.employee_name}</span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>所属区域：</span>
-                      <span style={{ fontSize: '1rem', fontWeight: 500 }}>
-                        {REGIONS.find(r => r.id === viewingAccount.region)?.name || viewingAccount.region || '未填写'}
-                      </span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>员工编号：</span>
-                      <span style={{ fontSize: '1rem', fontWeight: 500 }}>{viewingAccount.employee_id}</span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>用户名：</span>
-                      <span style={{ fontSize: '1rem', fontWeight: 500 }}>{viewingAccount.username}</span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>身份证号：</span>
-                      <span style={{ fontSize: '1rem', fontWeight: 500 }}>{viewingAccount.id_number || '未填写'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 职位信息 */}
-                <div style={{ 
-                  background: 'rgba(255,255,255,0.05)', 
-                  padding: isMobile ? '12px' : '20px', 
-                  borderRadius: '12px',
-                  border: '1px solid rgba(255,255,255,0.1)'
-                }}>
-                  <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', color: '#34d399' }}>职位信息</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>部门：</span>
-                      <span style={{ fontSize: '1rem', fontWeight: 500 }}>{viewingAccount.department || '未分配'}</span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>职位：</span>
-                      <span style={{ fontSize: '1rem', fontWeight: 500 }}>{viewingAccount.position || '未分配'}</span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>角色：</span>
-                      <span style={{ 
-                        fontSize: '1rem', 
-                        fontWeight: 500,
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        background: viewingAccount.role === 'admin' ? 'rgba(239, 68, 68, 0.2)' : 
-                                   viewingAccount.role === 'manager' ? 'rgba(245, 158, 11, 0.2)' :
-                                   viewingAccount.role === 'finance' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(59, 130, 246, 0.2)',
-                        color: viewingAccount.role === 'admin' ? '#fca5a5' : 
-                               viewingAccount.role === 'manager' ? '#fbbf24' :
-                               viewingAccount.role === 'finance' ? '#86efac' : '#93c5fd'
-                      }}>
-                        {viewingAccount.role === 'admin' ? '系统管理员' : 
-                         viewingAccount.role === 'manager' ? '经理' :
-                         viewingAccount.role === 'finance' ? '财务' : '操作员'}
-                      </span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>入职日期：</span>
-                      <span style={{ fontSize: '1rem', fontWeight: 500 }}>
-                        {viewingAccount.hire_date ? new Date(viewingAccount.hire_date).toLocaleDateString('zh-CN') : '未填写'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 联系信息 */}
-                <div style={{ 
-                  background: 'rgba(255,255,255,0.05)', 
-                  padding: isMobile ? '12px' : '20px', 
-                  borderRadius: '12px',
-                  border: '1px solid rgba(255,255,255,0.1)'
-                }}>
-                  <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', color: '#f59e0b' }}>联系信息</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>手机号码：</span>
-                      <span style={{ fontSize: '1rem', fontWeight: 500 }}>{viewingAccount.phone || '未填写'}</span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>邮箱地址：</span>
-                      <span style={{ fontSize: '1rem', fontWeight: 500 }}>{viewingAccount.email || '未填写'}</span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>家庭地址：</span>
-                      <span style={{ fontSize: '1rem', fontWeight: 500, wordBreak: 'break-all' }}>
-                        {viewingAccount.address || '未填写'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 薪资与紧急联系人 */}
-                <div style={{ 
-                  background: 'rgba(255,255,255,0.05)', 
-                  padding: isMobile ? '12px' : '20px', 
-                  borderRadius: '12px',
-                  border: '1px solid rgba(255,255,255,0.1)'
-                }}>
-                  <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', color: '#ec4899' }}>薪资与紧急联系</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>薪资：</span>
-                      <span style={{ 
-                        fontSize: '1.1rem', 
-                        fontWeight: 600,
-                        color: '#10b981'
-                      }}>
-                        {viewingAccount.salary ? `¥${viewingAccount.salary.toLocaleString()}` : '未设置'}
-                      </span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>紧急联系人：</span>
-                      <span style={{ fontSize: '1rem', fontWeight: 500 }}>{viewingAccount.emergency_contact || '未填写'}</span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>紧急联系电话：</span>
-                      <span style={{ fontSize: '1rem', fontWeight: 500 }}>{viewingAccount.emergency_phone || '未填写'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 账号状态与备注 */}
-              <div style={{ 
-                marginTop: '24px',
-                background: 'rgba(255,255,255,0.05)', 
-                padding: isMobile ? '12px' : '20px', 
-                borderRadius: '12px',
-                border: '1px solid rgba(255,255,255,0.1)'
-              }}>
-                <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', color: '#8b5cf6' }}>账号状态与备注</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: isMobile ? '12px' : '16px', marginBottom: '16px' }}>
-                  <div>
-                    <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>账号状态：</span>
-                    <span style={{ 
-                      fontSize: '1rem', 
-                      fontWeight: 500,
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      background: viewingAccount.status === 'active' ? 'rgba(34, 197, 94, 0.2)' : 
-                                 viewingAccount.status === 'inactive' ? 'rgba(156, 163, 175, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                      color: viewingAccount.status === 'active' ? '#86efac' : 
-                             viewingAccount.status === 'inactive' ? '#d1d5db' : '#fca5a5'
-                    }}>
-                      {viewingAccount.status === 'active' ? '正常' : 
-                       viewingAccount.status === 'inactive' ? '停用' : '暂停'}
+            <div className="acct-create-modal acct-create-modal--fit" role="dialog" aria-modal="true" aria-labelledby="acct-view-title">
+              <div className="acct-create-modal__head">
+                <div className="acct-create-modal__title-wrap">
+                  <h2 id="acct-view-title" className="acct-create-modal__title">{viewingAccount.employee_name}</h2>
+                  <p className="acct-create-modal__sub">{viewingAccount.employee_id} · @{viewingAccount.username}</p>
+                  <div className="acct-view-tags">
+                    <span className="acct-view-tag">
+                      {viewingAccount.role === 'admin'
+                        ? '万能'
+                        : (REGIONS.find((item) => item.id === viewingAccount.region)?.name || viewingAccount.region || '未填区域')}
                     </span>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>创建时间：</span>
-                    <span style={{ fontSize: '1rem', fontWeight: 500 }}>
-                      {viewingAccount.created_at ? new Date(viewingAccount.created_at).toLocaleDateString('zh-CN') : '未知'}
+                    <span className="acct-view-tag">{getRoleLabel(viewingAccount.role)}</span>
+                    <span className={`acct-view-tag ${viewingAccount.status === 'inactive' ? 'is-off' : viewingAccount.status === 'suspended' ? 'is-stop' : 'is-ok'}`}>
+                      {viewingAccount.status === 'inactive' ? '停用' : viewingAccount.status === 'suspended' ? '暂停' : '正常'}
                     </span>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>最后登录：</span>
-                    <span style={{ fontSize: '1rem', fontWeight: 500 }}>
-                      {viewingAccount.last_login ? new Date(viewingAccount.last_login).toLocaleString('zh-CN') : '从未登录'}
-                    </span>
+                    <span className="acct-view-tag is-off">最后登录 {formatAccountDateTime(viewingAccount.last_login)}</span>
                   </div>
                 </div>
-                {viewingAccount.notes && (
-                  <div>
-                    <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>备注信息：</span>
-                    <div style={{ 
-                      marginTop: '8px',
-                      padding: '12px',
-                      background: 'rgba(255,255,255,0.05)',
-                      borderRadius: '8px',
-                      fontSize: '1rem',
-                      lineHeight: '1.5',
-                      wordBreak: 'break-all'
-                    }}>
-                      {viewingAccount.notes}
-                    </div>
-                  </div>
-                )}
+                <button type="button" className="acct-create-modal__close" aria-label="关闭" onClick={() => setShowViewModal(false)}>×</button>
               </div>
-
-              <div style={{ marginTop: '24px', textAlign: 'center', display: 'flex', gap: isMobile ? '12px' : '16px', justifyContent: 'center' }}>
-                <button
-                  onClick={() => {
-                    setCvImages((viewingAccount.cv_images || []).map(rewritePublicStorageUrl));
-                    setShowCvViewModal(true);
-                  }}
-                  style={{
-                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '12px 24px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '1rem',
-                    fontWeight: 500,
-                    transition: 'transform 0.2s, box-shadow 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.target as HTMLButtonElement).style.transform = 'translateY(-2px)';
-                    (e.target as HTMLButtonElement).style.boxShadow = '0 8px 20px rgba(245, 158, 11, 0.3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.target as HTMLButtonElement).style.transform = 'translateY(0)';
-                    (e.target as HTMLButtonElement).style.boxShadow = 'none';
-                  }}
-                >
-                  📄 查看CV Form
-                </button>
-                <button
-                  onClick={() => setShowViewModal(false)}
-                  style={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '12px 32px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '1rem',
-                    fontWeight: 500,
-                    transition: 'transform 0.2s, box-shadow 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.target as HTMLButtonElement).style.transform = 'translateY(-2px)';
-                    (e.target as HTMLButtonElement).style.boxShadow = '0 8px 20px rgba(102, 126, 234, 0.3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.target as HTMLButtonElement).style.transform = 'translateY(0)';
-                    (e.target as HTMLButtonElement).style.boxShadow = 'none';
-                  }}
-                >
-                  关闭
-                </button>
+              <div className="acct-create-modal__form">
+                <div className="acct-create-modal__body">
+                  <section className="acct-create-section">
+                    <h3 className="acct-create-section__title">在职</h3>
+                    <dl className="acct-view-facts">
+                      <div>
+                        <dt>部门</dt>
+                        <dd>{viewingAccount.department || '未分配'}</dd>
+                      </div>
+                      <div>
+                        <dt>职位</dt>
+                        <dd>{viewingAccount.position || '未分配'}</dd>
+                      </div>
+                      <div>
+                        <dt>入职日期</dt>
+                        <dd>{viewingAccount.hire_date ? formatAccountDate(viewingAccount.hire_date) : '未填写'}</dd>
+                      </div>
+                      <div>
+                        <dt>员工编号</dt>
+                        <dd>{viewingAccount.employee_id}</dd>
+                      </div>
+                    </dl>
+                  </section>
+                  <section className="acct-create-section">
+                    <h3 className="acct-create-section__title">登录</h3>
+                    <dl className="acct-view-facts">
+                      <div>
+                        <dt>用户名</dt>
+                        <dd>{viewingAccount.username}</dd>
+                      </div>
+                      <div>
+                        <dt>登录角色</dt>
+                        <dd>
+                          {getRoleLabel(viewingAccount.role)}
+                          {ROLE_CHOICES.find((choice) => choice.id === viewingAccount.role)
+                            ? ` · ${ROLE_CHOICES.find((choice) => choice.id === viewingAccount.role)?.detail}`
+                            : ''}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>创建时间</dt>
+                        <dd>{viewingAccount.created_at ? formatAccountDate(viewingAccount.created_at) : '未知'}</dd>
+                      </div>
+                      <div>
+                        <dt>最后登录</dt>
+                        <dd>{formatAccountDateTime(viewingAccount.last_login)}</dd>
+                      </div>
+                    </dl>
+                  </section>
+                  <section className="acct-create-section">
+                    <h3 className="acct-create-section__title">联系与薪资</h3>
+                    <dl className="acct-view-facts">
+                      {viewingAccount.phone ? (
+                        <div>
+                          <dt>手机号码</dt>
+                          <dd><a href={`tel:${viewingAccount.phone}`}>{viewingAccount.phone}</a></dd>
+                        </div>
+                      ) : null}
+                      {viewingAccount.email ? (
+                        <div>
+                          <dt>邮箱</dt>
+                          <dd><a href={`mailto:${viewingAccount.email}`}>{viewingAccount.email}</a></dd>
+                        </div>
+                      ) : null}
+                      {viewingAccount.salary ? (
+                        <div>
+                          <dt>基本工资</dt>
+                          <dd>{viewingAccount.salary.toLocaleString()} MMK</dd>
+                        </div>
+                      ) : null}
+                      {viewingAccount.id_number ? (
+                        <div>
+                          <dt>身份证号</dt>
+                          <dd>{viewingAccount.id_number}</dd>
+                        </div>
+                      ) : null}
+                      {viewingAccount.address ? (
+                        <div>
+                          <dt>地址</dt>
+                          <dd>{viewingAccount.address}</dd>
+                        </div>
+                      ) : null}
+                      {viewingAccount.emergency_contact ? (
+                        <div>
+                          <dt>紧急联系人</dt>
+                          <dd>{viewingAccount.emergency_contact}</dd>
+                        </div>
+                      ) : null}
+                      {viewingAccount.emergency_phone ? (
+                        <div>
+                          <dt>紧急电话</dt>
+                          <dd><a href={`tel:${viewingAccount.emergency_phone}`}>{viewingAccount.emergency_phone}</a></dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                    {(() => {
+                      const missing = [
+                        !viewingAccount.phone && '手机',
+                        !viewingAccount.email && '邮箱',
+                        !viewingAccount.salary && '工资',
+                        !viewingAccount.id_number && '身份证',
+                        !viewingAccount.address && '地址',
+                        !viewingAccount.emergency_contact && '紧急联系人',
+                        !viewingAccount.emergency_phone && '紧急电话',
+                      ].filter(Boolean);
+                      return missing.length ? <p className="acct-view-missing">未填写：{missing.join('、')}</p> : null;
+                    })()}
+                    {viewingAccount.notes ? <p className="acct-view-note">{viewingAccount.notes}</p> : null}
+                  </section>
+                </div>
+                <div className="acct-create-modal__foot">
+                  <button
+                    type="button"
+                    className="acct-create-btn"
+                    onClick={() => {
+                      const account = viewingAccount;
+                      setShowViewModal(false);
+                      handleEditAccount(account);
+                    }}
+                  >
+                    编辑
+                  </button>
+                  <button
+                    type="button"
+                    className="acct-create-btn acct-create-btn--secondary"
+                    onClick={() => {
+                      const account = viewingAccount;
+                      setShowViewModal(false);
+                      handleEditPermissions(account);
+                    }}
+                  >
+                    权限
+                  </button>
+                  <button
+                    type="button"
+                    className="acct-create-btn"
+                    disabled={!viewingAccount.cv_images?.length}
+                    title={viewingAccount.cv_images?.length ? '查看 CV' : '还没有 CV'}
+                    onClick={() => {
+                      setCvImages((viewingAccount.cv_images || []).map(rewritePublicStorageUrl));
+                      setShowCvViewModal(true);
+                    }}
+                  >
+                    {viewingAccount.cv_images?.length ? `查看 CV (${viewingAccount.cv_images.length})` : '暂无 CV'}
+                  </button>
+                  <button type="button" className="acct-create-btn acct-create-btn--ghost" onClick={() => setShowViewModal(false)}>
+                    关闭
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* CV Form 上传模态框 */}
@@ -1901,127 +1947,93 @@ const AccountManagement: React.FC = () => {
         }
       `}</style>
 
-        {/* 权限管理模态框 */}
-        {showPermissionsModal && editingAccount && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 1000,
-            backdropFilter: 'blur(10px)'
-          }}>
-            <div style={{
-              background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-              borderRadius: '24px',
-              padding: '32px',
-              border: '1px solid rgba(255,255,255,0.1)',
-              color: 'white',
-              width: '90%',
-              maxWidth: '600px',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.5)'
-            }}>
-              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🔑</div>
-                <h2 style={{ margin: '0 0 8px 0', fontSize: '1.5rem' }}>管理账号权限</h2>
-                <p style={{ margin: 0, opacity: 0.6 }}>
-                  为 <span style={{ color: '#63b3ed', fontWeight: 'bold' }}>{editingAccount.employee_name}</span> 配置专属功能访问权限
-                </p>
-              </div>
-
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', 
-                gap: '12px',
-                marginBottom: '32px',
-                maxHeight: '400px',
-                overflowY: 'auto',
-                padding: '4px'
-              }}>
-                {AVAILABLE_PERMISSIONS.map(perm => (
-                  <div 
-                    key={perm.id}
-                    onClick={() => togglePermission(perm.id)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      padding: '16px',
-                      background: permissionsFormData.includes(perm.id) 
-                        ? 'rgba(66, 153, 225, 0.15)' 
-                        : 'rgba(255, 255, 255, 0.03)',
-                      borderRadius: '16px',
-                      border: `1px solid ${permissionsFormData.includes(perm.id) ? '#4299e1' : 'rgba(255,255,255,0.08)'}`,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                    }}
-                  >
-                    <div style={{ fontSize: '1.5rem' }}>{perm.icon}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{perm.name}</div>
-                      <div style={{ fontSize: '0.75rem', opacity: 0.5 }}>{perm.id}</div>
-                    </div>
-                    <div style={{
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '6px',
-                      border: '2px solid rgba(255,255,255,0.2)',
-                      background: permissionsFormData.includes(perm.id) ? '#4299e1' : 'transparent',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '12px',
-                      color: 'white'
-                    }}>
-                      {permissionsFormData.includes(perm.id) && '✓'}
-                    </div>
+        {showPermissionsModal && editingAccount && (() => {
+          const roleDefaults = ROLE_MENU_IDS[(editingAccount.role || 'operator') as AccountRole] || ROLE_MENU_IDS.operator;
+          const followsRole = permissionsFormData.length === 0 || samePermissionSet(permissionsFormData, roleDefaults);
+          const groups = ['日常', '商家', '财务', '货物', '系统'];
+          return createPortal(
+            <div
+              className="acct-create-overlay"
+              role="presentation"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setShowPermissionsModal(false);
+              }}
+            >
+              <div className="acct-create-modal" role="dialog" aria-modal="true" aria-labelledby="acct-perm-title">
+                <div className="acct-create-modal__head">
+                  <div className="acct-create-modal__title-wrap">
+                    <h2 id="acct-perm-title" className="acct-create-modal__title">权限</h2>
+                    <p className="acct-create-modal__sub">
+                      {editingAccount.employee_name} · {getRoleLabel(editingAccount.role)} · 已勾 {permissionsFormData.length} 项
+                    </p>
                   </div>
-                ))}
+                  <button type="button" className="acct-create-modal__close" aria-label="关闭" onClick={() => setShowPermissionsModal(false)}>×</button>
+                </div>
+                <div className="acct-create-modal__form">
+                  <div className="acct-create-modal__body">
+                    <p className={`acct-perm-note${followsRole ? '' : ' is-warn'}`}>
+                      {editingAccount.role === 'admin'
+                        ? '管理员首页始终是全部功能。这里的勾选不会收窄他的菜单。'
+                        : followsRole
+                          ? '现在和这个角色一致。保存后仍按角色打开功能。'
+                          : '保存后首页只留下勾中的功能，没勾的会从菜单拿掉。清空再保存，会回到角色自带。'}
+                    </p>
+                    <div className="acct-perm-tools">
+                      <button type="button" className="acct-create-btn" onClick={() => setPermissionsPermissionsFormData(roleDefaults)}>
+                        按角色恢复
+                      </button>
+                      <button
+                        type="button"
+                        className="acct-create-btn"
+                        onClick={() => setPermissionsPermissionsFormData(ACCOUNT_PERMISSIONS.map((item) => item.id))}
+                      >
+                        全选
+                      </button>
+                      <button type="button" className="acct-create-btn acct-create-btn--ghost" onClick={() => setPermissionsPermissionsFormData([])}>
+                        清空
+                      </button>
+                    </div>
+                    {groups.map((group) => (
+                      <div className="acct-perm-group" key={group}>
+                        <h4>{group}</h4>
+                        <div className="acct-perm-grid">
+                          {ACCOUNT_PERMISSIONS.filter((item) => item.group === group).map((item) => {
+                            const on = permissionsFormData.includes(item.id);
+                            const builtin = roleDefaults.includes(item.id);
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                className={`acct-perm-item${on ? ' is-on' : ''}`}
+                                aria-pressed={on}
+                                onClick={() => togglePermission(item.id)}
+                              >
+                                <span>
+                                  <strong>{item.name}</strong>
+                                  {builtin ? <em>角色自带</em> : <em>额外</em>}
+                                </span>
+                                <i />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="acct-create-modal__foot">
+                    <button type="button" className="acct-create-btn acct-create-btn--ghost" onClick={() => setShowPermissionsModal(false)}>
+                      取消
+                    </button>
+                    <button type="button" className="acct-create-btn acct-create-btn--primary" onClick={handleUpdatePermissions}>
+                      保存
+                    </button>
+                  </div>
+                </div>
               </div>
-
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                <button
-                  onClick={handleUpdatePermissions}
-                  style={{
-                    background: 'linear-gradient(135deg, #3182ce 0%, #2c5282 100%)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '12px 40px',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    boxShadow: '0 10px 20px rgba(49, 130, 206, 0.3)',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                  onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                >
-                  保存权限设置
-                </button>
-                <button
-                  onClick={() => setShowPermissionsModal(false)}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    color: 'white',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    padding: '12px 32px',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    fontSize: '1rem'
-                  }}
-                >
-                  取消
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+            </div>,
+            document.body
+          );
+        })()}
       </div>
   );
 };
