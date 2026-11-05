@@ -781,6 +781,7 @@ function buildItemDetail(
     total_fee: feeFields.totalFee,
     quote_cny: feeFields.quoteCny,
     payment_label: feeFields.paymentLabel,
+    charge_basis: feeFields.chargeBasis,
     sign_receipt: signReceipt,
     pack,
   };

@@ -19,6 +19,7 @@ import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBar
 import { InboundWizardFooter, InboundWizardHeader, type WizardStep } from '../components/stockIn/InboundWizardChrome';
 import CrossBorderQuotePreview from '../components/stockIn/CrossBorderQuotePreview';
 import { DimensionSpecField, LockedSuffixField } from '../components/StructuredItemFields';
+import { ChargeBasisField, VolumetricWeightLine } from '../components/stockIn/VolumetricChargeFields';
 import { useAuth } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import {
@@ -49,6 +50,8 @@ import {
   shouldShowCrossBorderQuote,
 } from '../utils/crossBorderPricing';
 import { formatCnyInput } from '../utils/crossBorderFx';
+import { chargeBasisNote } from '../utils/inboundMovementNote';
+import { volumetricWeightKg } from '../utils/volumetricWeight';
 import { loadStockInContactDraft, saveStockInContactDraft } from '../utils/stockInDraft';
 import { normalizePackageOriginPrefix } from '../utils/packageNumber';
 import { resolveAppError, useTranslation } from '../i18n';
@@ -112,6 +115,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
   const [batchWeightN, setBatchWeightN] = useState('');
   const [totalFee, setTotalFee] = useState('');
   const [totalFeeManual, setTotalFeeManual] = useState(false);
+  const [chargeBasis, setChargeBasis] = useState<'volume' | 'weight'>('weight');
   const [payCod, setPayCod] = useState(false);
   const [payPrepaid, setPayPrepaid] = useState(false);
   const [batchNote, setBatchNote] = useState('');
@@ -148,7 +152,12 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     const n = Number(trimmed);
     return Number.isFinite(n) && n > 0;
   }, [batchWeightN]);
-  const canAutoTotalFee = batchDestination.trim() && batchWeightFilled && paymentSelected;
+  const volumetricKg = useMemo(
+    () => volumetricWeightKg(specL, specW, specH),
+    [specL, specW, specH],
+  );
+  const chargeKg = chargeBasis === 'volume' ? volumetricKg ?? 0 : Number(batchWeightN.trim()) || 0;
+  const canAutoTotalFee = batchDestination.trim() && chargeKg > 0 && paymentSelected;
   const grandTotalFee = useMemo(() => {
     const fee = Number(totalFee);
     return Number.isFinite(fee) && fee > 0 ? Math.round(fee * 100) / 100 : 0;
@@ -190,11 +199,16 @@ export default function PackagingStockInScreen({ navigation }: Props) {
   }, [customerCode]);
 
   useEffect(() => {
-    if (step !== 3 || totalFeeManual || !canAutoTotalFee) return;
+    if (step !== 3 || totalFeeManual) return;
+    if (!canAutoTotalFee) {
+      setTotalFee('');
+      setFeeFormulaHint('');
+      return;
+    }
     let cancelled = false;
     const originHub = hubCode ?? (store ? resolveStoreHubCode(store) : '');
     const dest = normalizePackDestination(batchDestination);
-    const weightKg = Number(batchWeightN.trim()) || 0;
+    const weightKg = chargeKg;
     void (async () => {
       const { perKg, originCode, destinationCode, mmkPerCny: rate, cnyPerKg } =
         await fetchCrossBorderRoutePerKg(originHub, dest, customerCode);
@@ -225,6 +239,8 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     step,
     batchDestination,
     batchWeightN,
+    chargeKg,
+    chargeBasis,
     batchWeightStr,
     canAutoTotalFee,
     totalFeeManual,
@@ -320,6 +336,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     setBatchWeightN('');
     setTotalFee('');
     setTotalFeeManual(false);
+    setChargeBasis('weight');
     setPayCod(false);
     setPayPrepaid(false);
     setBatchNote('');
@@ -371,6 +388,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
   const buildLineNote = () => {
     const parts: string[] = [];
     if (totalFee.trim()) parts.push(`报价 ${totalFee.trim()} CNY`);
+    parts.push(chargeBasisNote(chargeBasis));
     if (payCod) parts.push('到付');
     if (payPrepaid) parts.push('预付');
     if (batchNote.trim()) parts.push(batchNote.trim());
@@ -390,6 +408,10 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     }
     if (!batchWeightFilled) {
       feedbackService.notify(t.common.tip, t.packagingStockIn.alertBatchWeight);
+      return;
+    }
+    if (chargeBasis === 'volume' && !(volumetricKg && volumetricKg > 0)) {
+      feedbackService.notify(t.common.tip, t.stockIn.alertSpec);
       return;
     }
 
@@ -632,6 +654,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
                   setSpecH(h);
                 }}
               />
+              <VolumetricWeightLine l={specL} w={specW} h={specH} />
               <LockedSuffixField
                 label={t.packagingStockIn.batchWeightLabel}
                 value={batchWeightN}
@@ -641,6 +664,13 @@ export default function PackagingStockInScreen({ navigation }: Props) {
                   setTotalFeeManual(false);
                 }}
                 placeholder="0"
+              />
+              <ChargeBasisField
+                basis={chargeBasis}
+                onChange={(basis) => {
+                  setChargeBasis(basis);
+                  setTotalFeeManual(false);
+                }}
               />
               <View style={styles.payRow}>
                 <Text style={styles.payLabel}>{t.stockIn.paymentRequired}</Text>

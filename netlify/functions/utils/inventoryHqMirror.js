@@ -124,7 +124,9 @@ function buildPendingExportBoard(items, options = {}) {
   for (const [base, rows] of groups) {
     const parsed = parsePackagingLine(rows[0]?.barcode || '');
     const pieceWeight = rows.reduce((sum, row) => sum + parseWeightKg(row.weight), 0);
-    const packWeight = Number(lookupMap([base, parsed?.base], options.packageWeightKg)) || 0;
+    const shellCode = rows.map((row) => text(row.packed_bundle_barcode).toUpperCase()).find(Boolean) || '';
+    const packWeight =
+      Number(lookupMap([base, parsed?.base, shellCode], options.packageWeightKg)) || 0;
     packages.push({
       base: parsed?.base || base,
       customer: rows.map((row) => text(row.recipient_name)).find(Boolean) || '',
@@ -142,6 +144,28 @@ function buildPendingExportBoard(items, options = {}) {
   singles.sort((a, b) => a.barcode.localeCompare(b.barcode));
   packages.sort((a, b) => a.base.localeCompare(b.base));
   return { singles, packages };
+}
+
+function pendingExportHaystack(row) {
+  return [row.barcode, row.base, row.customer, row.destination, row.tripNumber, row.id]
+    .map((part) => text(part).toLowerCase())
+    .filter(Boolean)
+    .join(' ');
+}
+
+/** 没搜索时只回前 400 条，避免页面一次画出全部库存。有搜索时先在全部待填里找，再截断。 */
+function limitPendingExportBoard(board, queryText) {
+  const q = text(queryText).toLowerCase();
+  const singles = q ? board.singles.filter((row) => pendingExportHaystack(row).includes(q)) : board.singles;
+  const packages = q ? board.packages.filter((row) => pendingExportHaystack(row).includes(q)) : board.packages;
+  const limit = 400;
+  return {
+    singles: singles.slice(0, limit),
+    packages: packages.slice(0, limit),
+    singleCount: q ? singles.length : board.singles.length,
+    packageCount: q ? packages.length : board.packages.length,
+    truncated: singles.length > limit || packages.length > limit,
+  };
 }
 
 function withoutSavedExportCosts(board, saved) {
@@ -247,20 +271,7 @@ async function loadHqTodoCounts(supabase) {
   return counts;
 }
 
-async function loadPendingExportCosts(supabase) {
-  const itemSelect =
-    'id, barcode, input_barcode, recipient_name, final_destination, weight, qty_on_hand, packed_at, packed_bundle_barcode, hub_arrived_at, customer_signed_at, hub_transit_released_at, owner_store_code';
-  const items = await fetchPages(supabase, 'inventory_store_items', itemSelect);
-  const trips = await fetchPages(
-    supabase,
-    'inventory_pkg_tracking',
-    'pack_barcode, trip_number, total_weight',
-    (query) => query.not('truck_loaded_at', 'is', null),
-  );
-  let saved = [];
-  const savedResult = await supabase.from('inventory_export_costs').select('subject_kind, subject_key');
-  if (!savedResult.error) saved = savedResult.data || [];
-
+function assemblePendingExportCosts(items, trips, saved, queryText) {
   const tripByBarcode = new Map();
   const packageWeightKg = new Map();
   for (const row of trips) {
@@ -280,14 +291,23 @@ async function loadPendingExportCosts(supabase) {
     buildPendingExportBoard(items, { tripByBarcode, packageWeightKg }),
     saved,
   );
-  const limit = 400;
-  return {
-    singles: board.singles.slice(0, limit),
-    packages: board.packages.slice(0, limit),
-    singleCount: board.singles.length,
-    packageCount: board.packages.length,
-    truncated: board.singles.length > limit || board.packages.length > limit,
-  };
+  return limitPendingExportBoard(board, queryText);
+}
+
+async function loadPendingExportCosts(supabase, queryText) {
+  const itemSelect =
+    'id, barcode, input_barcode, recipient_name, final_destination, weight, qty_on_hand, packed_at, packed_bundle_barcode, hub_arrived_at, customer_signed_at, hub_transit_released_at, owner_store_code';
+  const items = await fetchPages(supabase, 'inventory_store_items', itemSelect);
+  const trips = await fetchPages(
+    supabase,
+    'inventory_pkg_tracking',
+    'pack_barcode, trip_number, total_weight',
+    (query) => query.not('truck_loaded_at', 'is', null),
+  );
+  let saved = [];
+  const savedResult = await supabase.from('inventory_export_costs').select('subject_kind, subject_key');
+  if (!savedResult.error) saved = savedResult.data || [];
+  return assemblePendingExportCosts(items, trips || [], saved, queryText);
 }
 
 const QUEUE_PAGE_SIZE = 50;
@@ -458,6 +478,8 @@ module.exports = {
   countPendingNotify,
   loadHqTodoCounts,
   loadPendingExportCosts,
+  assemblePendingExportCosts,
+  limitPendingExportBoard,
   loadHqQueue,
   settleAdminExportCost,
 };

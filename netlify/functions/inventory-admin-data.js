@@ -1219,7 +1219,7 @@ async function handleSignedInvoices(supabase, warnings, params) {
   }
 }
 
-async function handleExportCosts(supabase, warnings, financeScope) {
+async function handleExportCosts(supabase, warnings, financeScope, queryText) {
   const { data, error } = await supabase
     .from('inventory_export_costs')
     .select(
@@ -1244,7 +1244,7 @@ async function handleExportCosts(supabase, warnings, financeScope) {
     truncated: false,
   };
   try {
-    pendingExport = await loadPendingExportCosts(supabase);
+    pendingExport = await loadPendingExportCosts(supabase, queryText);
   } catch (pendingError) {
     warnings.push(pendingError?.message || '待填出口成本加载失败');
   }
@@ -1327,7 +1327,12 @@ exports.handler = async (event) => {
         ...listed,
       };
     } else if (section === 'export-costs') {
-      const listed = await handleExportCosts(supabase, warnings, financeScope);
+      const listed = await handleExportCosts(
+        supabase,
+        warnings,
+        financeScope,
+        event.queryStringParameters?.q || '',
+      );
       body = {
         ok: true,
         at: new Date().toISOString(),

@@ -10,6 +10,8 @@ import { colors, radius, space } from '../../theme';
 import { shouldShowCrossBorderQuote } from '../../utils/crossBorderPricing';
 import ScanRefBanner from './ScanRefBanner';
 import CrossBorderQuotePreview from './CrossBorderQuotePreview';
+import { ChargeBasisField, VolumetricWeightLine } from './VolumetricChargeFields';
+import type { ChargeBasis } from '../../utils/inboundMovementNote';
 
 /** 入库向导暂不展示；自动计费与写入流水仍保留，订单详情继续显示 */
 const SHOW_TOTAL_FEE_FIELD = false;
@@ -25,6 +27,7 @@ export default function StockInStepFee({
   specH,
   weightN,
   qty,
+  chargeBasis,
   payCod,
   payPrepaid,
   totalFee,
@@ -38,6 +41,7 @@ export default function StockInStepFee({
   onSpecChange,
   onWeightChange,
   onQtyChange,
+  onChargeBasis,
   onToggleCod,
   onTogglePrepaid,
   onTotalFeeChange,
@@ -51,6 +55,7 @@ export default function StockInStepFee({
   specH: string;
   weightN: string;
   qty: string;
+  chargeBasis: ChargeBasis;
   payCod: boolean;
   payPrepaid: boolean;
   totalFee: string;
@@ -73,6 +78,7 @@ export default function StockInStepFee({
   onSpecChange: (next: { l: string; w: string; h: string }) => void;
   onWeightChange: (v: string) => void;
   onQtyChange: (v: string) => void;
+  onChargeBasis: (basis: ChargeBasis) => void;
   onToggleCod: () => void;
   onTogglePrepaid: () => void;
   onTotalFeeChange: (v: string) => void;
@@ -112,6 +118,7 @@ export default function StockInStepFee({
           wInput={chain.specW}
           hInput={chain.specH}
         />
+        <VolumetricWeightLine l={specL} w={specW} h={specH} />
         <LockedSuffixField
           label={t.stockIn.weightRequired}
           value={weightN}
@@ -156,6 +163,7 @@ export default function StockInStepFee({
             <Text style={styles.qtyUnit}>{stockUnitLabel()}</Text>
           </View>
         </View>
+        <ChargeBasisField basis={chargeBasis} onChange={onChargeBasis} />
         <View style={styles.payRow}>
           <Text style={styles.payLabel}>{t.stockIn.paymentRequired}</Text>
           <View style={styles.payChecks}>

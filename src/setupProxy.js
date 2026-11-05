@@ -16,6 +16,7 @@ const { execSync } = require('child_process');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const { parseFinancePeriodQuery } = require('../netlify/functions/utils/yangonFinancePeriod');
 const { selectExportCostRows } = require('../netlify/functions/utils/exportCostFinance');
+const { assemblePendingExportCosts } = require('../netlify/functions/utils/inventoryHqMirror');
 
 const FUNCTIONS_ORIGIN = String(
   process.env.ADMIN_FUNCTIONS_PROXY ||
@@ -302,6 +303,30 @@ function proxyGetJson(urlPath, headers, attempt = 0) {
   });
 }
 
+function serviceHeaders(serviceRole) {
+  return {
+    apikey: serviceRole,
+    authorization: `Bearer ${serviceRole}`,
+    accept: 'application/json',
+  };
+}
+
+async function proxyGetPages(table, select, extraQuery, headers) {
+  const pageSize = 500;
+  const rows = [];
+  for (let page = 0; page < 30; page += 1) {
+    const offset = page * pageSize;
+    const batch = await proxyGetJson(
+      `/__sb/rest/v1/${table}?select=${select}${extraQuery || ''}&limit=${pageSize}&offset=${offset}`,
+      headers,
+    );
+    const list = Array.isArray(batch) ? batch : [];
+    rows.push(...list);
+    if (list.length < pageSize) return rows;
+  }
+  return rows;
+}
+
 function localExportCostList(req, res, next) {
   const section = String((req.query && req.query.section) || '').toLowerCase();
   if (req.method !== 'GET' || section !== 'export-costs') {
@@ -349,11 +374,48 @@ function localExportCostList(req, res, next) {
         },
       );
       const scope = parseFinancePeriodQuery(req.query || {});
+      const headers = serviceHeaders(serviceRole);
+      const warnings = [];
+      let pendingExport = null;
+      const includePending = String((req.query && req.query.pending) || '') !== '0';
+      if (includePending) try {
+        const itemSelect = [
+          'id',
+          'barcode',
+          'input_barcode',
+          'recipient_name',
+          'final_destination',
+          'weight',
+          'qty_on_hand',
+          'packed_at',
+          'packed_bundle_barcode',
+          'hub_arrived_at',
+          'customer_signed_at',
+          'hub_transit_released_at',
+          'owner_store_code',
+        ].join(',');
+        const [items, trips, savedKeys] = await Promise.all([
+          proxyGetPages('inventory_store_items', itemSelect, '', headers),
+          proxyGetPages(
+            'inventory_pkg_tracking',
+            'pack_barcode,trip_number,total_weight',
+            '&truck_loaded_at=not.is.null',
+            headers,
+          ),
+          proxyGetPages('inventory_export_costs', 'subject_kind,subject_key', '', headers),
+        ]);
+        pendingExport = assemblePendingExportCosts(items, trips, savedKeys, req.query && req.query.q);
+      } catch (pendingError) {
+        const message = pendingError instanceof Error ? pendingError.message : '待填出口成本加载失败';
+        console.warn('[export-cost] pending', message);
+        warnings.push(message);
+      }
       res.json({
         ok: true,
         at: new Date().toISOString(),
         section: 'export-costs',
-        warnings: [],
+        warnings,
+        pendingExport,
         ...selectExportCostRows(Array.isArray(data) ? data : [], scope),
       });
     } catch (error) {

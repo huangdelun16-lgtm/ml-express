@@ -1601,14 +1601,20 @@ export type PendingExportBoard = {
 
 export async function fetchExportCostRecords(
   period?: FinancePeriodParams | null,
+  query?: string,
+  options?: { pending?: boolean },
 ): Promise<{
   rows: ExportCostRecord[];
   totalCny: number;
   totalMmk: number;
   pending: PendingExportBoard | null;
+  pendingNote: string;
 }> {
   const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
   url.searchParams.set('section', 'export-costs');
+  const q = String(query || '').trim();
+  if (q) url.searchParams.set('q', q);
+  if (options?.pending === false) url.searchParams.set('pending', '0');
   applyFinancePeriodParams(url, period);
   const response = await adminAuthenticatedFetch(url.toString(), {
     method: 'GET',
@@ -1622,10 +1628,14 @@ export async function fetchExportCostRecords(
     throw new Error('MISSING_EXPORT_COST_API');
   }
   const pending = payload.pendingExport;
+  const pendingNote = Array.isArray(payload.warnings)
+    ? payload.warnings.map((item: unknown) => String(item || '').trim()).filter(Boolean).join(' ')
+    : '';
   return {
     rows: payload.exportCosts as ExportCostRecord[],
     totalCny: Number(payload.totalCny) || 0,
     totalMmk: Number(payload.totalMmk) || 0,
+    pendingNote,
     pending:
       pending && Array.isArray(pending.singles) && Array.isArray(pending.packages)
         ? {

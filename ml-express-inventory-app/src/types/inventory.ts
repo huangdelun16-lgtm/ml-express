@@ -183,6 +183,8 @@ export interface InventoryItemDetail extends InventoryItem {
   /** 入库时报的人民币。签收前还没有缅币。 */
   quote_cny?: string;
   payment_label?: string;
+  /** 入库时选的收费方式。体积重量或实际重量。 */
+  charge_basis?: 'volume' | 'weight';
   inbound_note?: string;
   /** 入库流水原始 note（含「 · 打包入 」等系统段，用于识别多个入库） */
   inbound_movement_note?: string;

@@ -752,7 +752,7 @@ const CrossBorderLogisticsPage: FC = () => {
     if (activeTab !== 'overview' && activeTab !== 'finance' && activeTab !== 'export-cost') return;
     const period = activeTab === 'overview' ? null : financePeriodParams;
     let cancelled = false;
-    void fetchExportCostRecords(period)
+    void fetchExportCostRecords(period, '', { pending: false })
       .then((result) => {
         if (cancelled) return;
         setExportCostCny(result.totalCny);

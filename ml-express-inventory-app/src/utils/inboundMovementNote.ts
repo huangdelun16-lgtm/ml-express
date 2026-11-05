@@ -11,6 +11,23 @@ import {
 const FEE_LABEL_PATTERN = /^(?:总费用|Total fee|ပို့ဆောင်ခ)\s+([\d.]+)\s*MMK$/i;
 const QUOTE_CNY_PATTERN = /^(?:报价|Quote)\s+([\d.]+)\s*CNY$/i;
 
+export type ChargeBasis = 'volume' | 'weight';
+
+const CHARGE_VOLUME_NOTE = '收费体积';
+const CHARGE_WEIGHT_NOTE = '收费重量';
+
+/** 写入入库流水的中文标记。界面语言不要写进 note。 */
+export function chargeBasisNote(basis: ChargeBasis): string {
+  return basis === 'volume' ? CHARGE_VOLUME_NOTE : CHARGE_WEIGHT_NOTE;
+}
+
+export function parseChargeBasis(raw: string | undefined): ChargeBasis | undefined {
+  const text = String(raw || '').trim();
+  if (text === CHARGE_VOLUME_NOTE || text === '体积重量') return 'volume';
+  if (text === CHARGE_WEIGHT_NOTE || text === '收费重量' || text === '按重量') return 'weight';
+  return undefined;
+}
+
 /** 付款方式归一化为中文业务标签（到付 / 预付） */
 export function normalizePaymentLabel(raw: string | undefined): string | undefined {
   const p = String(raw || '').trim();
@@ -25,6 +42,7 @@ export function parseInboundMovementNote(note: string): {
   totalFee?: string;
   quoteCny?: string;
   paymentLabel?: string;
+  chargeBasis?: ChargeBasis;
   userNote?: string;
   fxLock?: CrossBorderFxLock;
 } {
@@ -35,6 +53,7 @@ export function parseInboundMovementNote(note: string): {
   let totalFee: string | undefined;
   let quoteCny: string | undefined;
   let paymentLabel: string | undefined;
+  let chargeBasis: ChargeBasis | undefined;
   const userParts: string[] = [];
 
   for (const part of parts) {
@@ -51,6 +70,11 @@ export function parseInboundMovementNote(note: string): {
     if (isFxLockNotePart(part)) {
       continue;
     }
+    const basis = parseChargeBasis(part);
+    if (basis) {
+      chargeBasis = basis;
+      continue;
+    }
     const normalized = normalizePaymentLabel(part);
     if (normalized === '到付' || normalized === '预付') {
       paymentLabel = normalized;
@@ -64,6 +88,7 @@ export function parseInboundMovementNote(note: string): {
     totalFee,
     quoteCny,
     paymentLabel,
+    chargeBasis,
     userNote: userParts.length ? userParts.join(' · ') : undefined,
     fxLock: fxLock ?? undefined,
   };
@@ -159,18 +184,20 @@ export const HUB_RECEIVE_INBOUND_NOTE_RE =
 
 export function pickInboundFeeFields(
   ...notes: Array<string | null | undefined>
-): { totalFee?: string; quoteCny?: string; paymentLabel?: string } {
+): { totalFee?: string; quoteCny?: string; paymentLabel?: string; chargeBasis?: ChargeBasis } {
   let totalFee: string | undefined;
   let quoteCny: string | undefined;
   let paymentLabel: string | undefined;
+  let chargeBasis: ChargeBasis | undefined;
   for (const note of notes) {
     const parsed = parseInboundMovementNote(String(note || ''));
     if (!totalFee && parsed.totalFee?.trim()) totalFee = parsed.totalFee.trim();
     if (!quoteCny && parsed.quoteCny?.trim()) quoteCny = parsed.quoteCny.trim();
     if (!paymentLabel && parsed.paymentLabel) paymentLabel = parsed.paymentLabel;
-    if (totalFee && quoteCny && paymentLabel) break;
+    if (!chargeBasis && parsed.chargeBasis) chargeBasis = parsed.chargeBasis;
+    if (totalFee && quoteCny && paymentLabel && chargeBasis) break;
   }
-  return { totalFee, quoteCny, paymentLabel };
+  return { totalFee, quoteCny, paymentLabel, chargeBasis };
 }
 
 /** 发票/详情用发站那条入库（带总费用），不要用后补的「到站交付确认」 */

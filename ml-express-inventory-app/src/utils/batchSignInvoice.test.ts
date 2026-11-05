@@ -54,6 +54,22 @@ describe('buildBatchSignInvoice', () => {
     expect(model.totalFeeMmk).toBe(20000);
   });
 
+  it('bills a volumetric order by length × width × height ÷ 6000', () => {
+    const model = buildBatchSignInvoice([
+      {
+        id: 's2',
+        barcode: 'MDY002',
+        input_barcode: 'EXP-200',
+        weight: '0.8 Kg',
+        spec: '30 x 20 x 15 cm',
+        charge_basis: 'volume',
+        total_fee: '0',
+      },
+    ]);
+    expect(model.lines[0].weightKg).toBe(1.5);
+    expect(model.totalWeightKg).toBe(1.5);
+  });
+
   it('collapses packaging inbound to one line with joined express nos and pack totals', () => {
     const model = buildBatchSignInvoice([
       {

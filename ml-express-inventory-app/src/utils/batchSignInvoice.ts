@@ -3,6 +3,8 @@ import { parsePackagingStockInLineBarcode } from './inboundBarcode';
 import { cnyToMmk, formatCnyInput, mmkToCny } from './crossBorderFx';
 import { normalizeDestinationCode } from './destinationCode';
 import { formatWeight, parseWeightKg } from './itemFieldFormat';
+import type { ChargeBasis } from './inboundMovementNote';
+import { volumetricWeightFromSpec } from './volumetricWeight';
 
 function parseFeeMmk(raw: string | number | null | undefined): number {
   const n = Number(String(raw ?? '').replace(/[^\d.]/g, ''));
@@ -22,8 +24,11 @@ export type BatchSignInvoiceSource = {
   owner_store_code?: string | null;
   final_destination?: string | null;
   customer_code?: string | null;
+  spec?: string | null;
+  charge_basis?: ChargeBasis | null;
   pack?: {
     weight?: string | null;
+    spec?: string | null;
     items?: Array<{ item_id?: string; input_barcode?: string | null }>;
   } | null;
 };
@@ -89,6 +94,16 @@ function packBelongsToGroup(
     .filter((id): id is string => Boolean(id));
   if (packIds.length === 0) return true;
   return packIds.every((id) => groupIds.has(id));
+}
+
+function billedWeightKg(group: BatchSignInvoiceSource[], actualKg: number): number {
+  const basis = group.map((row) => row.charge_basis).find((value) => value === 'volume' || value === 'weight');
+  if (basis !== 'volume') return actualKg;
+  for (const row of group) {
+    const vol = volumetricWeightFromSpec(row.pack?.spec || row.spec || '');
+    if (vol != null && vol > 0) return vol;
+  }
+  return actualKg;
 }
 
 function packagingWeightKg(group: BatchSignInvoiceSource[]): number {
@@ -269,7 +284,7 @@ export function buildBatchSignInvoice(
       lines.push({
         kind: 'single',
         expressNos,
-        weightKg: parseWeightKg(row.weight ?? ''),
+        weightKg: billedWeightKg(group, parseWeightKg(row.weight ?? '')),
         feeMmk: money.mmk,
         route: routeFromGroup(group),
       });
@@ -279,7 +294,7 @@ export function buildBatchSignInvoice(
     lines.push({
       kind: 'packaging',
       expressNos: packagingExpressNos(group),
-      weightKg: packagingWeightKg(group),
+      weightKg: billedWeightKg(group, packagingWeightKg(group)),
       feeMmk: money.mmk,
       route: routeFromGroup(group),
     });

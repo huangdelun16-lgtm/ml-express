@@ -79,6 +79,7 @@ export function buildFrozenSignedInvoiceDocument(input: {
   packNo: string;
   pieceCount: number;
   payment: string;
+  chargeBasis?: string;
   issuedOn: string;
   labels: {
     customer: string;
@@ -89,6 +90,7 @@ export function buildFrozenSignedInvoiceDocument(input: {
     packNo: string;
     pieces: string;
     payment: string;
+    chargeBasis?: string;
     date: string;
     totalWeight: string;
     totalFee: string;
@@ -128,6 +130,9 @@ export function buildFrozenSignedInvoiceDocument(input: {
   if (input.packNo.trim()) meta.push({ label: input.labels.packNo, value: input.packNo.trim() });
   meta.push({ label: input.labels.pieces, value: String(input.pieceCount) });
   if (input.payment.trim()) meta.push({ label: input.labels.payment, value: input.payment.trim() });
+  if (input.chargeBasis?.trim() && input.labels.chargeBasis) {
+    meta.push({ label: input.labels.chargeBasis, value: input.chargeBasis.trim() });
+  }
   meta.push({ label: input.labels.date, value: input.issuedOn });
 
   const totals = [

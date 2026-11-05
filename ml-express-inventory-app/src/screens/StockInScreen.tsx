@@ -26,6 +26,8 @@ import {
   quoteCnyForEditedWeight,
 } from '../utils/crossBorderPricing';
 import { formatCnyInput } from '../utils/crossBorderFx';
+import { chargeBasisNote } from '../utils/inboundMovementNote';
+import { volumetricWeightKg } from '../utils/volumetricWeight';
 import { loadStockInContactDraft, saveStockInContactDraft } from '../utils/stockInDraft';
 import { resolveAppError, useTranslation } from '../i18n';
 import {
@@ -69,6 +71,7 @@ export default function StockInScreen({ route, navigation }: Props) {
   const [totalFee, setTotalFee] = useState('');
   const [totalFeeManual, setTotalFeeManual] = useState(false);
   const [feeFormulaHint, setFeeFormulaHint] = useState('');
+  const [chargeBasis, setChargeBasis] = useState<'volume' | 'weight'>('weight');
   const [payCod, setPayCod] = useState(false);
   const [payPrepaid, setPayPrepaid] = useState(false);
   const [note, setNote] = useState('');
@@ -133,7 +136,12 @@ export default function StockInScreen({ route, navigation }: Props) {
     return Number.isFinite(n) && n > 0;
   }, [weightN]);
   const destinationFilled = destination.trim().length > 0;
-  const canAutoTotalFee = destinationFilled && weightFilled && paymentSelected;
+  const volumetricKg = useMemo(
+    () => volumetricWeightKg(specL, specW, specH),
+    [specL, specW, specH],
+  );
+  const chargeKg = chargeBasis === 'volume' ? volumetricKg ?? 0 : Number(weightN.trim()) || 0;
+  const canAutoTotalFee = destinationFilled && chargeKg > 0 && paymentSelected;
 
   useEffect(() => {
     if (step !== 3 || totalFeeManual) return;
@@ -147,7 +155,7 @@ export default function StockInScreen({ route, navigation }: Props) {
     void fetchCrossBorderRoutePerKg(originHub, destination, customerCode).then(
       ({ perKg, originCode, destinationCode, mmkPerCny: rate, cnyPerKg }) => {
         if (cancelled) return;
-        const weightKg = Number(weightN.trim()) || 0;
+        const weightKg = chargeKg;
         const cny = quoteCnyForEditedWeight({
           cnyPerKg,
           perKgMmk: perKg,
@@ -171,7 +179,7 @@ export default function StockInScreen({ route, navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [step, destination, weightStr, weightN, totalFeeManual, canAutoTotalFee, hubCode, store, customerCode]);
+  }, [step, destination, weightStr, weightN, chargeKg, chargeBasis, totalFeeManual, canAutoTotalFee, hubCode, store, customerCode]);
 
   useEffect(() => {
     void loadStockInContactDraft().then((d) => {
@@ -254,6 +262,7 @@ export default function StockInScreen({ route, navigation }: Props) {
     setTotalFeeManual(false);
     setFeeFormulaHint('');
     setDetailAddress('');
+    setChargeBasis('weight');
     setPayCod(false);
     setPayPrepaid(false);
     setNote('');
@@ -314,6 +323,7 @@ export default function StockInScreen({ route, navigation }: Props) {
   const buildNote = () => {
     const parts: string[] = [];
     if (totalFee.trim()) parts.push(`报价 ${totalFee.trim()} CNY`);
+    parts.push(chargeBasisNote(chargeBasis));
     if (payCod) parts.push('到付');
     if (payPrepaid) parts.push('预付');
     if (note.trim()) parts.push(note.trim());
@@ -328,6 +338,10 @@ export default function StockInScreen({ route, navigation }: Props) {
     }
     if (!weightFilled) {
       feedbackService.notify(t.common.tip, t.stockIn.alertWeight);
+      return;
+    }
+    if (chargeBasis === 'volume' && !(volumetricKg && volumetricKg > 0)) {
+      feedbackService.notify(t.common.tip, t.stockIn.alertSpec);
       return;
     }
     const n = Number(qty);
@@ -472,6 +486,7 @@ export default function StockInScreen({ route, navigation }: Props) {
             specH={specH}
             weightN={weightN}
             qty={qty}
+            chargeBasis={chargeBasis}
             payCod={payCod}
             payPrepaid={payPrepaid}
             totalFee={totalFee}
@@ -504,6 +519,10 @@ export default function StockInScreen({ route, navigation }: Props) {
               setTotalFeeManual(false);
             }}
             onQtyChange={setQty}
+            onChargeBasis={(basis) => {
+              setChargeBasis(basis);
+              setTotalFeeManual(false);
+            }}
             onToggleCod={toggleCod}
             onTogglePrepaid={togglePrepaid}
             onTotalFeeChange={(v) => {

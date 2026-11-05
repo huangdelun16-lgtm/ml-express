@@ -75,11 +75,14 @@ function whenLabel(iso: string): string {
 const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal }) => {
   const [rows, setRows] = useState<ExportCostRecord[]>([]);
   const [pending, setPending] = useState<PendingExportBoard | null>(null);
+  const [pendingNote, setPendingNote] = useState('');
   const [totalCny, setTotalCny] = useState(0);
   const [totalMmk, setTotalMmk] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [retryTick, setRetryTick] = useState(0);
   const [openKey, setOpenKey] = useState('');
   const [leg, setLeg] = useState<'MSE' | 'LSO' | ''>('');
@@ -96,14 +99,24 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
   }, [stores]);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError('');
-    void fetchExportCostRecords(period)
+    if (!debouncedQuery) {
+      setLoading(true);
+      setError('');
+    } else {
+      setSearching(true);
+    }
+    void fetchExportCostRecords(period, debouncedQuery)
       .then((result) => {
         if (cancelled) return;
         setRows(result.rows);
         setPending(result.pending);
+        setPendingNote(result.pendingNote);
         setTotalCny(result.totalCny);
         setTotalMmk(result.totalMmk);
         onTotal?.(result.totalCny);
@@ -113,18 +126,22 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
         const message = err instanceof Error ? err.message : '';
         setRows([]);
         setPending(null);
+        setPendingNote('');
         setTotalCny(0);
         setTotalMmk(0);
         onTotal?.(null);
         setError(friendlyExportCostError(message, isEn));
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setSearching(false);
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [period, isEn, onTotal, retryTick]);
+  }, [period, isEn, onTotal, retryTick, debouncedQuery]);
 
   const paidWeightKg = useMemo(
     () => rows.reduce((sum, row) => sum + (Number(row.weight_kg) || 0), 0),
@@ -194,9 +211,11 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
                 ? isEn
                   ? `${pending.singleCount} orders · ${pending.packageCount} packs`
                   : `单个 ${pending.singleCount} · 包裹 ${pending.packageCount}`
-                : isEn
-                  ? 'Shows after the admin site is deployed'
-                  : '部署后台之后，这里会列出还没填的订单和包裹'}
+                : pendingNote
+                  ? pendingNote
+                  : isEn
+                    ? 'The unfilled list did not load.'
+                    : '待填清单没有加载出来。'}
             </span>
           </div>
           {pending && pendingRows.length > 0 ? (
@@ -334,13 +353,17 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
             </div>
           ) : pending ? (
             <p className="cbl-export-cost__empty">
-              {query.trim()
+              {query.trim() && (searching || query.trim() !== debouncedQuery)
                 ? isEn
-                  ? 'No matching orders still need a cost.'
-                  : '没有符合搜索的待填订单。'
-                : isEn
-                  ? 'Every stocked order already has an export cost.'
-                  : '已入库的订单和包裹都填过出口成本了。'}
+                  ? 'Searching stocked orders…'
+                  : '正在已入库的订单里查找…'
+                : query.trim()
+                  ? isEn
+                    ? 'No matching orders still need a cost.'
+                    : '没有符合搜索的待填订单。'
+                  : isEn
+                    ? 'Every stocked order already has an export cost.'
+                    : '已入库的订单和包裹都填过出口成本了。'}
             </p>
           ) : null}
           {pending?.truncated ? (

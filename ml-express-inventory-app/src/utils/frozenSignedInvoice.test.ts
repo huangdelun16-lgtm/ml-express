@@ -50,6 +50,7 @@ describe('buildFrozenSignedInvoiceDocument', () => {
       packNo: 'RUI26MDY40002',
       pieceCount: 18,
       payment: '到付',
+      chargeBasis: '体积重量',
       issuedOn: '2026-10-08',
       labels: {
         customer: '客户姓名',
@@ -60,6 +61,7 @@ describe('buildFrozenSignedInvoiceDocument', () => {
         packNo: '包装号',
         pieces: '件数',
         payment: '付款方式',
+        chargeBasis: '收费方式',
         date: '开单日期',
         totalWeight: '总重量',
         totalFee: '总费用',
@@ -87,6 +89,7 @@ describe('buildFrozenSignedInvoiceDocument', () => {
     expect(document.customerName).toBe('Ei Ei Khaing');
     expect(document.trip).toBe('RUI0026');
     expect(document.meta.find((row) => row.label === '车次')?.value).toBe('RUI0026');
+    expect(document.meta.find((row) => row.label === '收费方式')?.value).toBe('体积重量');
     expect(document.lines[0]?.measure).toBe('重量 8 Kg · 定价 ¥40/Kg');
     expect(document.totalFeeCny).toBe(320);
   });

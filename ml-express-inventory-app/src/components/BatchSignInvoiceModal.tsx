@@ -62,6 +62,7 @@ type InvoiceHeading = {
   packBarcode: string;
   trip: string;
   payment: string;
+  chargeBasis: string;
   dateLabel: string;
 };
 
@@ -132,10 +133,29 @@ async function loadPackTrips(
   return { trips, incomplete };
 }
 
+function chargeBasisLabel(
+  details: InventoryItemDetail[],
+  volumeLabel: string,
+  weightLabel: string,
+): string {
+  const seen = new Set<string>();
+  const labels: string[] = [];
+  for (const row of details) {
+    if (row.charge_basis !== 'volume' && row.charge_basis !== 'weight') continue;
+    const label = row.charge_basis === 'volume' ? volumeLabel : weightLabel;
+    if (seen.has(label)) continue;
+    seen.add(label);
+    labels.push(label);
+  }
+  return labels.join(' · ');
+}
+
 function headingFrom(
   details: InventoryItemDetail[],
   store: InventoryStoreSession | null,
   paymentLabel: (raw?: string | null) => string,
+  volumeLabel: string,
+  weightLabel: string,
   trips: string[],
   tripIncomplete: boolean,
   notLoadedLabel: string,
@@ -156,6 +176,7 @@ function headingFrom(
     packBarcode: details.map((row) => row.packed_bundle_barcode?.trim()).find(Boolean) || '',
     trip,
     payment: paymentLabel(details.map((row) => row.payment_label).find(Boolean)),
+    chargeBasis: chargeBasisLabel(details, volumeLabel, weightLabel),
     dateLabel,
   };
 }
@@ -299,6 +320,8 @@ export default function BatchSignInvoiceModal({
             details,
             store,
             (raw) => getPaymentLabelDisplay(t, raw),
+            t.stockIn.chargeByVolume,
+            t.stockIn.chargeByWeight,
             packTrips.trips,
             packTrips.incomplete,
             t.invoice.notLoaded,
@@ -379,6 +402,7 @@ export default function BatchSignInvoiceModal({
         packNo: heading.packBarcode,
         pieceCount,
         payment: heading.payment,
+        chargeBasis: heading.chargeBasis,
         issuedOn: heading.dateLabel,
         labels: {
           customer: t.invoice.customerName,
@@ -389,6 +413,7 @@ export default function BatchSignInvoiceModal({
           packNo: t.invoice.packNo,
           pieces: t.invoice.pieceCount,
           payment: t.invoice.payment,
+          chargeBasis: t.invoice.chargeBasis,
           date: t.invoice.issuedOn,
           totalWeight: t.invoice.batchTotalWeight,
           totalFee: t.invoice.batchTotalFee,
@@ -523,6 +548,7 @@ export default function BatchSignInvoiceModal({
               {heading.packBarcode ? <MetaRow label={t.invoice.packNo} value={heading.packBarcode} /> : null}
               <MetaRow label={t.invoice.pieceCount} value={String(pieceCount)} />
               {heading.payment ? <MetaRow label={t.invoice.payment} value={heading.payment} /> : null}
+              {heading.chargeBasis ? <MetaRow label={t.invoice.chargeBasis} value={heading.chargeBasis} /> : null}
               <MetaRow label={t.invoice.issuedOn} value={heading.dateLabel} />
             </View>
             {model.lines.map((line, index) => (

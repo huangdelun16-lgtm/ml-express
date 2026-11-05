@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   buildPendingExportBoard,
   withoutSavedExportCosts,
+  limitPendingExportBoard,
   countPendingPackItems,
   countPendingTruckLoads,
   countPendingNotify,
@@ -68,12 +69,63 @@ test('pending export keeps stocked singles and multi-inbound packs, then drops s
   assert.equal(board.packages[0].pieceCount, 2);
   assert.equal(board.packages[0].weightKg, 8);
 
+  const fromShell = buildPendingExportBoard(
+    [
+      {
+        id: 'a',
+        barcode: 'MDY120000050826(2-1)',
+        input_barcode: '111',
+        recipient_name: 'Ko',
+        final_destination: 'MDY',
+        weight: '',
+        packed_at: '2026-11-05',
+        packed_bundle_barcode: 'RUI26MDY20001',
+        owner_store_code: 'RUILI001',
+      },
+      {
+        id: 'b',
+        barcode: 'MDY120000050826(2-2)',
+        input_barcode: '222',
+        recipient_name: 'Ko',
+        final_destination: 'MDY',
+        weight: '',
+        packed_at: '2026-11-05',
+        packed_bundle_barcode: 'RUI26MDY20001',
+      },
+    ],
+    { packageWeightKg: new Map([['RUI26MDY20001', 12]]) },
+  );
+  assert.equal(fromShell.packages.length, 1);
+  assert.equal(fromShell.packages[0].weightKg, 12);
+  assert.equal(fromShell.packages[0].ownerStoreCode, 'RUILI001');
+
   const left = withoutSavedExportCosts(board, [
     { subject_kind: 'single', subject_key: 's1' },
     { subject_kind: 'package', subject_key: 'rui26mdy2' },
   ]);
   assert.equal(left.singles.length, 0);
   assert.equal(left.packages.length, 0);
+});
+
+test('export cost search looks through every pending order, not only the first page', () => {
+  const singles = Array.from({ length: 420 }, (_, index) => ({
+    id: `id-${index}`,
+    barcode: String(100000000000000 + index),
+    customer: 'AMT',
+    destination: 'MDY',
+    weightKg: 1,
+    tripNumber: '',
+  }));
+  singles[410].barcode = '98840722152519';
+  const limited = limitPendingExportBoard({ singles, packages: [] }, '');
+  assert.equal(limited.singles.some((row) => row.barcode === '98840722152519'), false);
+  assert.equal(limited.singleCount, 420);
+  assert.equal(limited.truncated, true);
+
+  const found = limitPendingExportBoard({ singles, packages: [] }, '52519');
+  assert.equal(found.singles.length, 1);
+  assert.equal(found.singles[0].barcode, '98840722152519');
+  assert.equal(found.singleCount, 1);
 });
 
 test('admin export cost settles yuan or locked kyat the same way as the app', () => {
