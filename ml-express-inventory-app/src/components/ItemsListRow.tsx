@@ -21,7 +21,7 @@ type Props = {
   selected: boolean;
   selectActive: boolean;
   selectAccent: string;
-  hasOpenException?: boolean;
+  exceptionState?: 'open' | 'resolved' | null;
   unnotified?: boolean;
   onPress: () => void;
 };
@@ -32,7 +32,7 @@ export default function ItemsListRow({
   selected,
   selectActive,
   selectAccent,
-  hasOpenException = false,
+  exceptionState = null,
   unnotified = false,
   onPress,
 }: Props) {
@@ -59,6 +59,8 @@ export default function ItemsListRow({
     <Pressable
       style={[
         styles.row,
+        exceptionState === 'open' && styles.rowExceptionOpen,
+        exceptionState === 'resolved' && styles.rowExceptionResolved,
         selectActive && selected && {
           borderColor: selectAccent,
           borderWidth: 2,
@@ -92,14 +94,26 @@ export default function ItemsListRow({
                 {productSubtitle}
               </Text>
             ) : null}
+            {exceptionState ? (
+              <View
+                style={[
+                  styles.exceptionFlag,
+                  exceptionState === 'resolved' ? styles.exceptionFlagResolved : styles.exceptionFlagOpen,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.exceptionFlagText,
+                    exceptionState === 'resolved'
+                      ? styles.exceptionFlagTextResolved
+                      : styles.exceptionFlagTextOpen,
+                  ]}
+                >
+                  {exceptionState === 'resolved' ? t.exception.resolvedBadge : t.exception.openBadge}
+                </Text>
+              </View>
+            ) : null}
             <View style={styles.statusRow}>
-              {hasOpenException ? (
-                <View style={[styles.statusBadge, styles.statusException]}>
-                  <Text style={[styles.statusText, styles.statusExceptionText]}>
-                    {t.exception.openBadge}
-                  </Text>
-                </View>
-              ) : null}
               {unnotified ? (
                 <View style={[styles.statusBadge, styles.statusUnnotified]}>
                   <Text style={[styles.statusText, styles.statusUnnotifiedText]}>
@@ -239,6 +253,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(148,163,184,0.28)',
   },
+  rowExceptionOpen: {
+    backgroundColor: '#3a220c',
+    borderColor: '#f59e0b',
+    borderWidth: 2,
+    borderLeftWidth: 6,
+  },
+  rowExceptionResolved: {
+    backgroundColor: '#241c12',
+    borderColor: '#d97706',
+    borderWidth: 2,
+    borderLeftWidth: 6,
+  },
+  exceptionFlag: {
+    alignSelf: 'flex-start',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
+  exceptionFlagOpen: { backgroundColor: '#f59e0b' },
+  exceptionFlagResolved: { backgroundColor: '#b45309' },
+  exceptionFlagText: { fontSize: 13, fontWeight: '900' },
+  exceptionFlagTextOpen: { color: '#1c1917' },
+  exceptionFlagTextResolved: { color: '#fff7ed' },
   check: {
     width: 22,
     height: 22,

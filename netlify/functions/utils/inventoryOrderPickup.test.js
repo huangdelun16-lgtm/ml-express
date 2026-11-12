@@ -20,6 +20,9 @@ test('attaches signed/notify timestamps by order barcode then express barcode', 
       input_barcode: 'SF-1',
       customer_signed_at: '2026-09-10T10:00:00Z',
       arrival_notified_at: '2026-09-10T09:00:00Z',
+      name: '衣服',
+      weight: '60',
+      spec: '30 x 20 x 15 cm',
     },
     {
       barcode: 'OTHER',
@@ -31,8 +34,13 @@ test('attaches signed/notify timestamps by order barcode then express barcode', 
 
   const attached = attachPickupToOrders(orders, items);
   assert.equal(attached[0].customer_signed_at, '2026-09-10T10:00:00Z');
+  assert.equal(attached[0].item_name, '衣服');
+  assert.equal(attached[0].weight, '60');
+  assert.equal(attached[0].spec, '30 x 20 x 15 cm');
   assert.equal(attached[1].arrival_notified_at, '2026-09-11T08:00:00Z');
+  assert.equal(attached[1].item_name, '');
   assert.equal(attached[2].customer_signed_at, null);
+  assert.equal(attached[2].weight, '');
   assert.deepEqual(collectItemLookupCodes(items), {
     barcodes: ['IN-1', 'OTHER'],
     expresses: ['SF-1', 'SF-2'],

@@ -17,6 +17,14 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 const { parseFinancePeriodQuery } = require('../netlify/functions/utils/yangonFinancePeriod');
 const { selectExportCostRows } = require('../netlify/functions/utils/exportCostFinance');
 const { assemblePendingExportCosts } = require('../netlify/functions/utils/inventoryHqMirror');
+const {
+  collapseExpressList,
+  expressDetailSubject,
+  isPackageBarcode,
+  loadExpressGroupContext,
+  mapExpressGroup,
+  mapExpressItem,
+} = require('../netlify/functions/utils/expressDetailsGroups');
 
 const FUNCTIONS_ORIGIN = String(
   process.env.ADMIN_FUNCTIONS_PROXY ||
@@ -327,6 +335,226 @@ async function proxyGetPages(table, select, extraQuery, headers) {
   return rows;
 }
 
+function proxyExpressIo(headers) {
+  const read = async (path) => {
+    try {
+      const data = await proxyGetJson(path, headers);
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  };
+  const listed = (codes) => encodeURIComponent(restIn(codes));
+  return {
+    shipmentItemsByBarcode(codes) {
+      return read(`/__sb/rest/v1/inventory_packed_shipment_items?select=item_barcode,pack_id&item_barcode=in.${listed(codes)}&limit=300`);
+    },
+    shipmentItemsByPack(packIds) {
+      return read(`/__sb/rest/v1/inventory_packed_shipment_items?select=item_barcode,pack_id&pack_id=in.${listed(packIds)}&limit=300`);
+    },
+    shipmentsById(ids) {
+      return read(`/__sb/rest/v1/inventory_packed_shipments?select=id,bundle_barcode&id=in.${listed(ids)}&limit=100`);
+    },
+    shipmentsByBarcode(codes) {
+      return read(`/__sb/rest/v1/inventory_packed_shipments?select=id,bundle_barcode&bundle_barcode=in.${listed(codes)}&limit=100`);
+    },
+    itemsByBarcode(codes) {
+      return read(`/__sb/rest/v1/inventory_store_items?select=${EXPRESS_SELECT}&barcode=in.${listed(codes)}`);
+    },
+    itemsLikeBase(base) {
+      return read(`/__sb/rest/v1/inventory_store_items?select=${EXPRESS_SELECT}&barcode=like.${encodeURIComponent(`${base}(*`)}&limit=30`);
+    },
+    packNotes(itemIds) {
+      return read(`/__sb/rest/v1/inventory_stock_movements?select=item_id,note&item_id=in.${listed(itemIds)}&note=ilike.*${encodeURIComponent('打包入')}*&limit=100`);
+    },
+  };
+}
+
+const EXPRESS_SELECT = [
+  'id',
+  'barcode',
+  'input_barcode',
+  'name',
+  'spec',
+  'unit',
+  'weight',
+  'qty_on_hand',
+  'recipient_name',
+  'final_destination',
+  'owner_store_code',
+  'note',
+  'packed_at',
+  'packed_bundle_barcode',
+  'hub_arrived_at',
+  'customer_signed_at',
+  'hub_transit_released_at',
+  'hub_transit_shipped_at',
+  'created_at',
+  'updated_at',
+].join(',');
+
+function restIn(codes) {
+  return `(${codes.map((code) => `"${code}"`).join(',')})`;
+}
+
+async function exceptionMarks(headers, rows) {
+  const codes = [
+    ...new Set(
+      rows
+        .flatMap((row) => [row.barcode, row.input_barcode])
+        .map((code) => String(code || '').trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ].slice(0, 40);
+  const marks = new Map();
+  if (!codes.length) return marks;
+  const list = encodeURIComponent(restIn(codes));
+  const [byItem, byExpress] = await Promise.all([
+    proxyGetJson(
+      `/__sb/rest/v1/inventory_exceptions?select=item_barcode,express_barcode,status&item_barcode=in.${list}&limit=200`,
+      headers,
+    ).catch(() => []),
+    proxyGetJson(
+      `/__sb/rest/v1/inventory_exceptions?select=item_barcode,express_barcode,status&express_barcode=in.${list}&limit=200`,
+      headers,
+    ).catch(() => []),
+  ]);
+  for (const row of [...(Array.isArray(byItem) ? byItem : []), ...(Array.isArray(byExpress) ? byExpress : [])]) {
+    const status = String(row.status || '');
+    for (const code of [row.item_barcode, row.express_barcode]) {
+      const key = String(code || '').trim().toUpperCase();
+      if (!key || marks.get(key) === 'open') continue;
+      if (status === 'open' || status === 'resolved') marks.set(key, status);
+    }
+  }
+  return marks;
+}
+
+function rowMark(row, marks) {
+  const codes = [row.barcode, row.input_barcode].map((code) => String(code || '').trim().toUpperCase());
+  if (codes.some((code) => marks.get(code) === 'open')) return 'open';
+  if (codes.some((code) => marks.get(code) === 'resolved')) return 'resolved';
+  return '';
+}
+
+function localExpressDetails(req, res, next) {
+  const section = String((req.query && req.query.section) || '').toLowerCase();
+  if (req.method !== 'GET' || section !== 'express-details') {
+    next();
+    return;
+  }
+  const serviceRole = readServiceRole();
+  if (!serviceRole) {
+    next();
+    return;
+  }
+  verifyAdminOnProduction(req.headers)
+    .then(async (valid) => {
+      if (res.headersSent || res.writableEnded) return;
+      if (!valid) {
+        res.status(401).json({ error: '未授权' });
+        return;
+      }
+      const headers = serviceHeaders(serviceRole);
+      const id = String((req.query && req.query.id) || '').trim();
+      if (id) {
+        const items = await proxyGetJson(
+          `/__sb/rest/v1/inventory_store_items?select=${EXPRESS_SELECT}&id=eq.${encodeURIComponent(id)}&limit=1`,
+          headers,
+        );
+        const item = Array.isArray(items) ? items[0] : null;
+        if (!item) {
+          res.json({ ok: true, section: 'express-details', detail: null });
+          return;
+        }
+        const context = await loadExpressGroupContext([item], proxyExpressIo(headers));
+        const subject = expressDetailSubject(item, context.relatedRows, context.packByItemBarcode);
+        const lines = subject.lines.length ? subject.lines : [item];
+        const grouped = lines.length > 1 || isPackageBarcode(subject.packBarcode);
+        const lineIds = lines.map((row) => row.id);
+        const barcodes = lines.map((row) => String(row.barcode || '').trim().toUpperCase()).filter(Boolean);
+        const [movements, exceptions, marks] = await Promise.all([
+          proxyGetJson(
+            `/__sb/rest/v1/inventory_stock_movements?select=recipient_name,recipient_phone,destination,detail_address,packaging,note,origin_store_name,created_at&item_id=in.${encodeURIComponent(restIn(lineIds))}&type=eq.in&order=created_at.desc&limit=20`,
+            headers,
+          ).catch(() => []),
+          barcodes.length
+            ? proxyGetJson(
+              `/__sb/rest/v1/inventory_exceptions?select=id,exception_type,status,note,created_at,resolved_at&item_barcode=in.${encodeURIComponent(restIn(barcodes))}&order=created_at.desc&limit=8`,
+              headers,
+            ).catch(() => [])
+            : [],
+          exceptionMarks(headers, lines),
+        ]);
+        const movementList = Array.isArray(movements) ? movements : [];
+        const movement = movementList.find((row) => String(row.recipient_phone || '').trim()) || movementList[0] || null;
+        const exception = lines.some((row) => rowMark(row, marks) === 'open')
+          ? 'open'
+          : lines.some((row) => rowMark(row, marks) === 'resolved')
+            ? 'resolved'
+            : '';
+        const base = grouped
+          ? mapExpressGroup(lines, subject.packBarcode, exception, subject.shells)
+          : mapExpressItem(lines[0], exception);
+        const detail = {
+          ...base,
+          phone: String((movement && movement.recipient_phone) || '').trim(),
+          address: String((movement && movement.detail_address) || '').trim(),
+          packaging: String((movement && movement.packaging) || '').trim(),
+          inboundNote: String((movement && movement.note) || lines.map((row) => row.note).find(Boolean) || '').trim(),
+          inboundStore: String((movement && movement.origin_store_name) || '').trim(),
+          inboundAt: (movement && movement.created_at) || base.inboundAt || '',
+          customerName: base.customerName || String((movement && movement.recipient_name) || '').trim(),
+          destination: base.destination || String((movement && movement.destination) || '').trim(),
+          exceptions: (Array.isArray(exceptions) ? exceptions : []).map((row) => ({
+            id: row.id,
+            type: row.exception_type,
+            status: row.status,
+            note: row.note || '',
+            createdAt: row.created_at || '',
+            resolvedAt: row.resolved_at || '',
+          })),
+        };
+        res.json({ ok: true, section: 'express-details', detail });
+        return;
+      }
+      const page = Math.max(1, parseInt((req.query && req.query.listPage) || '1', 10) || 1);
+      const pageSize = Math.min(50, Math.max(1, parseInt((req.query && req.query.listPageSize) || '20', 10) || 20));
+      const q = String((req.query && req.query.q) || '').trim().slice(0, 80);
+      const offset = (page - 1) * pageSize;
+      let path = `/__sb/rest/v1/inventory_store_items?select=${EXPRESS_SELECT}&barcode=not.ilike.PKG*&order=updated_at.desc&limit=${pageSize + 1}&offset=${offset}`;
+      if (q) {
+        const escaped = encodeURIComponent(q.replace(/[*%_,()]/g, ''));
+        path += `&or=(barcode.ilike.*${escaped}*,input_barcode.ilike.*${escaped}*,name.ilike.*${escaped}*,recipient_name.ilike.*${escaped}*,final_destination.ilike.*${escaped}*,packed_bundle_barcode.ilike.*${escaped}*)`;
+      }
+      const data = await proxyGetJson(path, headers);
+      const pageRows = Array.isArray(data) ? data : [];
+      const hasMore = pageRows.length > pageSize;
+      const rows = hasMore ? pageRows.slice(0, pageSize) : pageRows;
+      const context = await loadExpressGroupContext(rows, proxyExpressIo(headers));
+      const marks = await exceptionMarks(headers, rows.concat(context.relatedRows));
+      res.json({
+        ok: true,
+        section: 'express-details',
+        items: collapseExpressList({
+          pageRows: rows,
+          relatedRows: context.relatedRows,
+          packByItemBarcode: context.packByItemBarcode,
+          exceptionStatus: (row) => rowMark(row, marks),
+          searching: Boolean(q),
+        }),
+        total: -1,
+        hasMore,
+        page,
+        pageSize,
+      });
+    })
+    .catch((error) => {
+      if (res.headersSent || res.writableEnded) return;
+      res.status(500).json({ error: error instanceof Error ? error.message : '快递明细加载失败' });
+    });
+}
+
 function localExportCostList(req, res, next) {
   const section = String((req.query && req.query.section) || '').toLowerCase();
   if (req.method !== 'GET' || section !== 'export-costs') {
@@ -481,6 +709,7 @@ module.exports = function setupAdminFunctionsProxy(app) {
     return;
   }
 
+  app.use('/.netlify/functions/inventory-admin-data', localExpressDetails);
   app.use('/.netlify/functions/inventory-admin-data', localExportCostList);
   app.use('/.netlify/functions/inventory-admin-stock-in', localStockIn);
   app.use('/.netlify/functions', adminProxy());

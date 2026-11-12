@@ -140,6 +140,11 @@ describe('buildExportCostBoard', () => {
       mmkPerCny: 670,
     });
     expect(settleExportCost({ totalCny: 104, currency: 'MMK', mmkPerCny: null })).toBeNull();
+    expect(settleExportCost({ totalCny: 0, currency: 'CNY', mmkPerCny: null })).toEqual({
+      totalCny: 0,
+      totalMmk: 0,
+      mmkPerCny: null,
+    });
   });
 
   it('uses the bundle weight when multiple inbound pieces do not carry weight', () => {

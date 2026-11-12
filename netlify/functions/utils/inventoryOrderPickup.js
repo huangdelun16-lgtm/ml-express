@@ -13,6 +13,9 @@ function emptyPickup() {
     customer_signed_at: null,
     arrival_notified_at: null,
     hub_arrived_at: null,
+    item_name: '',
+    weight: '',
+    spec: '',
   };
 }
 
@@ -27,6 +30,9 @@ function buildPickupMap(items) {
       customer_signed_at: item.customer_signed_at || null,
       arrival_notified_at: item.arrival_notified_at || null,
       hub_arrived_at: item.hub_arrived_at || null,
+      item_name: String(item.name || '').trim(),
+      weight: String(item.weight || '').trim(),
+      spec: String(item.spec || '').trim(),
     };
     const barcode = String(item.barcode || '').trim().toUpperCase();
     const express = String(item.input_barcode || '').trim().toUpperCase();

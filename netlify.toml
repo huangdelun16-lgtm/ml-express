@@ -71,6 +71,11 @@
 [build.processing.html]
   pretty_urls = true
 
+[[headers]]
+  for = "/me/*.vcf"
+  [headers.values]
+    Content-Type = "text/vcard; charset=utf-8"
+
 # 忽略密钥扫描的文件模式
 [build.processing.skip]
   paths = ["*.md", "*.html", "test-*", "diagnose-*"]

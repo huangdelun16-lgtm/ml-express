@@ -70,29 +70,6 @@ const AdminDashboardHome: React.FC = () => {
     return () => clearInterval(id);
   }, [banners.length, carouselPaused]);
 
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.innerHTML = `
-      @keyframes pulse-alert {
-        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }
-        70% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
-        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
-      }
-      @keyframes admin-home-fade {
-        from { opacity: 0.35; transform: scale(1.02); }
-        to { opacity: 1; transform: scale(1); }
-      }
-      @keyframes admin-shimmer {
-        0% { background-position: 0% 50%; }
-        100% { background-position: 200% 50%; }
-      }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
-
   const bannerTitle = (b: Banner) => {
     if (language === 'my') return b.burmese_title || b.title;
     return b.title;
@@ -110,31 +87,51 @@ const AdminDashboardHome: React.FC = () => {
     }
   };
 
-  const totalPendingHighlight =
-    pendingRechargeCount +
-    pendingAssignmentCount +
-    pendingProductReviewCount +
-    pendingDeliveryAlertsCount +
-    overdueMerchantAcceptCount +
-    afterSalesCount +
-    pendingFinanceCashCount;
-
-  const quickLinks: { path: string; icon: string; labelZh: string; labelEn: string; labelMy: string }[] = [
-    { path: '/admin/city-packages', icon: '📦', labelZh: '同城订单', labelEn: 'Orders', labelMy: 'အပြင်ဘက်အော်ဒါများ' },
-    { path: '/admin/merchant-ops', icon: '🛎️', labelZh: '商家监管', labelEn: 'Merchant ops', labelMy: 'ဆိုင်စောင့်ကြည့်' },
-    { path: '/admin/after-sales', icon: '🎧', labelZh: '售后跟单', labelEn: 'After-sales', labelMy: 'ရောင်းချပြီး' },
-    { path: '/admin/tracking', icon: '🗺️', labelZh: '实时跟踪', labelEn: 'Tracking', labelMy: 'လမ်းကြောင်းခြေရာခံ' },
-    { path: '/admin/finance', icon: '💰', labelZh: '财务管理', labelEn: 'Finance', labelMy: 'ဘဏ္ဍာရေး' },
-    { path: '/admin/banners', icon: '🖼️', labelZh: '页面与广告', labelEn: 'Banners', labelMy: 'ကြေညာခြင်း' },
+  const quickLinks: {
+    path: string;
+    icon: string;
+    labelZh: string;
+    labelEn: string;
+    labelMy: string;
+    hintZh: string;
+    hintEn: string;
+    hintMy: string;
+  }[] = [
+    { path: '/admin/city-packages', icon: '📦', labelZh: '同城订单', labelEn: 'Orders', labelMy: 'အပြင်ဘက်အော်ဒါများ', hintZh: '分配骑手、看配送进度', hintEn: 'Assign riders and deliveries', hintMy: 'စီးနင်းသူနှင့် ပို့ဆောင်မှု' },
+    { path: '/admin/merchant-ops', icon: '🛎️', labelZh: '商家监管', labelEn: 'Merchant ops', labelMy: 'ဆိုင်စောင့်ကြည့်', hintZh: '接单超时和店铺状态', hintEn: 'Accept delays and stores', hintMy: 'ဆိုင်အခြေအနေ' },
+    { path: '/admin/after-sales', icon: '🎧', labelZh: '售后跟单', labelEn: 'After-sales', labelMy: 'ရောင်းချပြီး', hintZh: '评价、会话和退款', hintEn: 'Reviews, chats, refunds', hintMy: 'သုံးသပ်ချက်နှင့် ပြန်အမ်း' },
+    { path: '/admin/tracking', icon: '🗺️', labelZh: '实时跟踪', labelEn: 'Tracking', labelMy: 'လမ်းကြောင်းခြေရာခံ', hintZh: '包裹位置和当前状态', hintEn: 'Parcel location and status', hintMy: 'ပါဆယ်တည်နေရာ' },
+    { path: '/admin/finance', icon: '💰', labelZh: '财务管理', labelEn: 'Finance', labelMy: 'ဘဏ္ဍာရေး', hintZh: '对账和骑手现金', hintEn: 'Reconciliation and rider cash', hintMy: 'ငွေစာရင်းနှင့် ငွေသား' },
+    { path: '/admin/banners', icon: '🖼️', labelZh: '页面与广告', labelEn: 'Banners', labelMy: 'ကြေညာခြင်း', hintZh: '首页横幅和页面内容', hintEn: 'Homepage banners and pages', hintMy: 'ပင်မစာမျက်နှာ ကြေညာ' },
   ];
 
   const qlLabel = (q: (typeof quickLinks)[0]) =>
     language === 'zh' ? q.labelZh : language === 'en' ? q.labelEn : q.labelMy;
+  const qlHint = (q: (typeof quickLinks)[0]) =>
+    language === 'zh' ? q.hintZh : language === 'en' ? q.hintEn : q.hintMy;
+
+  const todayLabel = new Date().toLocaleDateString(
+    language === 'zh' ? 'zh-CN' : language === 'en' ? 'en-US' : 'my-MM',
+    { weekday: 'short', month: 'long', day: 'numeric' },
+  );
 
   const activeBanner = banners.length > 0 ? banners[carouselIndex % banners.length] : null;
 
   return (
     <div className="admin-home">
+      <header className="admin-home-head">
+        <h1>{language === 'zh' ? '欢迎回来' : language === 'en' ? 'Welcome back' : 'ပြန်လည်ကြိုဆိုပါသည်'}</h1>
+        <p>
+          {todayLabel}
+          {pendingTotal > 0
+            ? language === 'zh'
+              ? ` · ${pendingTotal} 项待处理`
+              : language === 'en'
+                ? ` · ${pendingTotal} pending`
+                : ` · ${pendingTotal}`
+            : ''}
+        </p>
+      </header>
       {(pendingRechargeCount > 0 ||
         pendingAssignmentCount > 0 ||
         pendingProductReviewCount > 0 ||
@@ -142,25 +139,16 @@ const AdminDashboardHome: React.FC = () => {
         overdueMerchantAcceptCount > 0 ||
         afterSalesCount > 0 ||
         pendingFinanceCashCount > 0) && (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 11,
-            maxWidth: 720,
-            margin: '0 auto 22px',
-          }}
-        >
+        <div className="admin-home-alerts">
           {pendingRechargeCount > 0 && (
             <div
               role="button"
               tabIndex={0}
-              className="admin-home-alert admin-home-alert--danger"
+              className="admin-home-alert admin-home-alert--danger admin-home-alert--pulse"
               onClick={() => navigate('/admin/recharges')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') navigate('/admin/recharges');
               }}
-              style={{ animation: 'pulse-alert 2s infinite' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: '1.6rem' }}>💰</span>
@@ -181,12 +169,11 @@ const AdminDashboardHome: React.FC = () => {
             <div
               role="button"
               tabIndex={0}
-              className="admin-home-alert admin-home-alert--info"
+              className="admin-home-alert admin-home-alert--info admin-home-alert--pulse"
               onClick={() => navigate('/admin/tracking')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') navigate('/admin/tracking');
               }}
-              style={{ animation: 'pulse-alert 2s infinite' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: '1.6rem' }}>📦</span>
@@ -207,12 +194,11 @@ const AdminDashboardHome: React.FC = () => {
             <div
               role="button"
               tabIndex={0}
-              className="admin-home-alert admin-home-alert--danger"
+              className="admin-home-alert admin-home-alert--danger admin-home-alert--pulse"
               onClick={() => navigate('/admin/delivery-alerts')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') navigate('/admin/delivery-alerts');
               }}
-              style={{ animation: 'pulse-alert 2s infinite' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: '1.6rem' }}>🚨</span>
@@ -241,12 +227,11 @@ const AdminDashboardHome: React.FC = () => {
             <div
               role="button"
               tabIndex={0}
-              className="admin-home-alert admin-home-alert--warn"
+              className="admin-home-alert admin-home-alert--warn admin-home-alert--pulse"
               onClick={() => navigate('/admin/merchant-ops?tab=overdue')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') navigate('/admin/merchant-ops?tab=overdue');
               }}
-              style={{ animation: 'pulse-alert 2s infinite' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: '1.6rem' }}>🛎️</span>
@@ -275,14 +260,13 @@ const AdminDashboardHome: React.FC = () => {
             <div
               role="button"
               tabIndex={0}
-              className="admin-home-alert admin-home-alert--warn"
+              className="admin-home-alert admin-home-alert--warn admin-home-alert--pulse"
               onClick={() => navigate('/admin/finance?tab=cash_collection')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   navigate('/admin/finance?tab=cash_collection');
                 }
               }}
-              style={{ animation: 'pulse-alert 2s infinite' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: '1.6rem' }}>💰</span>
@@ -311,12 +295,11 @@ const AdminDashboardHome: React.FC = () => {
             <div
               role="button"
               tabIndex={0}
-              className="admin-home-alert admin-home-alert--warn"
+              className="admin-home-alert admin-home-alert--warn admin-home-alert--pulse"
               onClick={() => navigate('/admin/after-sales')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') navigate('/admin/after-sales');
               }}
-              style={{ animation: 'pulse-alert 2s infinite' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: '1.6rem' }}>🎧</span>
@@ -339,12 +322,11 @@ const AdminDashboardHome: React.FC = () => {
             <div
               role="button"
               tabIndex={0}
-              className="admin-home-alert admin-home-alert--warn"
+              className="admin-home-alert admin-home-alert--warn admin-home-alert--pulse"
               onClick={() => navigate('/admin/product-reviews')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') navigate('/admin/product-reviews');
               }}
-              style={{ animation: 'pulse-alert 2s infinite' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: '1.6rem' }}>🛍️</span>
@@ -371,142 +353,42 @@ const AdminDashboardHome: React.FC = () => {
         </div>
       )}
 
-      {/* 动态待办摘要条 */}
-      <div className="admin-home-chips" style={{ maxWidth: 920, margin: '0 auto 18px', justifyContent: 'center' }}>
-        {[
-          {
-            n: pendingTotal,
-            zh: '待办合计',
-            en: 'All pending',
-            my: 'စုစုပေါင်း',
-            color: '#94a3b8',
-            path: '/admin/city-packages',
-          },
-          {
-            n: pendingRechargeCount,
-            zh: '充值待审',
-            en: 'Recharges',
-            my: 'အားပြန်သွင်းမှု',
-            color: '#f472b6',
-            path: '/admin/recharges',
-          },
-          {
-            n: pendingAssignmentCount,
-            zh: '待分配',
-            en: 'Assign',
-            my: 'ဖြန့်ပေးရန်',
-            color: '#38bdf8',
-            path: '/admin/tracking',
-          },
-          {
-            n: pendingDeliveryAlertsCount,
-            zh: '配送警报',
-            en: 'Alerts',
-            my: 'သတိပေးချက်များ',
-            color: '#fb7185',
-            path: '/admin/delivery-alerts',
-          },
-          {
-            n: pendingProductReviewCount,
-            zh: '待审商品',
-            en: 'Products',
-            my: 'ကုန်ပစ္စည်း',
-            color: '#fbbf24',
-            path: '/admin/product-reviews',
-          },
-          {
-            n: overdueMerchantAcceptCount,
-            zh: '接单超时',
-            en: 'Accept SLA',
-            my: 'လက်ခံကျော်',
-            color: '#fb7185',
-            path: '/admin/merchant-ops?tab=overdue',
-          },
-          {
-            n: afterSalesCount,
-            zh: '售后跟单',
-            en: 'After-sales',
-            my: 'ရောင်းချပြီး',
-            color: '#fbbf24',
-            path: '/admin/after-sales',
-          },
-          {
-            n: pendingFinanceCashCount,
-            zh: '骑手现金未结',
-            en: 'Rider cash',
-            my: 'စီးနင်းသူငွေ',
-            color: '#fbbf24',
-            path: '/admin/finance?tab=cash_collection',
-          },
-        ].map((item) => (
-          <button
-            key={item.zh}
-            type="button"
-            className="admin-home-chip"
-            onClick={() => navigate(item.path)}
-          >
-            <span style={{ color: item.color }}>
-              {language === 'zh' ? item.zh : language === 'en' ? item.en : item.my}
-            </span>
-            <span
-              style={{
-                background: `${item.color}33`,
-                color: item.color,
-                padding: '2px 8px',
-                borderRadius: 8,
-                minWidth: 22,
-                textAlign: 'center',
-              }}
-            >
-              {item.n}
-            </span>
-          </button>
-        ))}
-      </div>
+      {pendingTotal === 0 ? (
+        <p className="admin-home-clear">
+          {language === 'zh' ? '今天没有待办' : language === 'en' ? 'Nothing pending today' : 'ယနေ့လုပ်စရာမရှိ'}
+        </p>
+      ) : null}
 
       {/* 公司广告轮播（与「页面管理」banners 表同步） */}
       <div
-        style={{ maxWidth: 920, margin: '0 auto 20px', width: '100%' }}
+        className="admin-home-promo-slot"
         onMouseEnter={() => setCarouselPaused(true)}
         onMouseLeave={() => setCarouselPaused(false)}
       >
         {bannersLoading ? (
-          <div className="admin-home-empty" style={{ height: isMobile ? 140 : 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="admin-home-empty admin-home-promo--loading">
             {language === 'zh' ? '加载广告…' : language === 'en' ? 'Loading…' : 'ဆောင်ရွက်နေ…'}
           </div>
         ) : banners.length === 0 ? (
-          <div className="admin-home-empty">
-            <div style={{ fontSize: '1.35rem', marginBottom: 8 }}>📢</div>
-            <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: 6 }}>
-              {language === 'zh'
-                ? '暂无展示中的首页广告'
-                : language === 'en'
-                  ? 'No active homepage promos'
-                  : 'ကြေညာမရှိသေးပါ'}
+          <div className="admin-home-empty admin-home-promo--empty">
+            <div className="admin-home-promo__copy">
+              <strong>
+                {language === 'zh'
+                  ? '还没有启用中的首页广告'
+                  : language === 'en'
+                    ? 'No active homepage promo'
+                    : 'ကြေညာမရှိသေးပါ'}
+              </strong>
+              <p>
+                {language === 'zh'
+                  ? '需要展示时，到页面管理里上传并启用，这里会自动轮播。'
+                  : language === 'en'
+                    ? 'Upload and enable a banner in Page management to show it here.'
+                    : 'ကြေညာထည့်ပြီး ဖွင့်ထားမှ ဒီမှာပေါ်မည်။'}
+              </p>
             </div>
-            <p style={{ margin: '0 0 16px', fontSize: '0.85rem', opacity: 0.82, lineHeight: 1.5 }}>
-              {language === 'zh'
-                ? '在「页面管理」中上传横幅图、标题与链接，启用后即可在此自动轮播。'
-                : language === 'en'
-                  ? 'Add banners under Page management → enable to show them here.'
-                  : 'စီမံချက်မှ ကြေညာထည့်ပါ။'}
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate('/admin/banners')}
-              style={{
-                padding: '10px 22px',
-                borderRadius: 12,
-                border: 'none',
-                background: 'linear-gradient(135deg, #38bdf8, #6366f1)',
-                color: 'white',
-                fontWeight: 800,
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-                boxShadow: '0 10px 28px rgba(99, 102, 241, 0.35)',
-              }}
-            >
-              {language === 'zh' ? '去配置广告' : language === 'en' ? 'Manage banners' : 'ကြေညာစီမံရန်'}
+            <button type="button" className="admin-home-promo__btn" onClick={() => navigate('/admin/banners')}>
+              {language === 'zh' ? '去配置' : language === 'en' ? 'Manage' : 'စီမံရန်'}
             </button>
           </div>
         ) : (
@@ -694,47 +576,21 @@ const AdminDashboardHome: React.FC = () => {
         )}
       </div>
 
-      {/* 快捷入口 */}
-      <div
-        className="admin-home-quick"
-        style={{
-          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-        }}
-      >
-        {quickLinks.map((q) => (
-          <button
-            key={q.path}
-            type="button"
-            onClick={() => navigate(q.path)}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ fontSize: '1.75rem', marginBottom: 6 }}>{q.icon}</div>
-            <div style={{ fontWeight: 800, fontSize: '0.85rem' }}>{qlLabel(q)}</div>
-          </button>
-        ))}
-      </div>
-
-      <div className="admin-home-welcome">
-        <div style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: 8 }}>
-          {language === 'zh' ? '欢迎回来' : language === 'en' ? 'Welcome back' : 'ပြန်လည်ကြိုဆိုပါသည်'}
-          {totalPendingHighlight > 0 ? (
-            <span style={{ marginLeft: 10, fontSize: '0.78rem', fontWeight: 600, color: '#d48806' }}>
-              · {language === 'zh' ? `${totalPendingHighlight} 项待处理` : `${totalPendingHighlight} pending`}
-            </span>
-          ) : null}
+      <div className="admin-home-quick-wrap">
+        <div className="admin-home-section-label">
+          {language === 'zh' ? '常用入口' : language === 'en' ? 'Shortcuts' : 'အမြန်ဝင်ပေါက်'}
         </div>
-        <p style={{ margin: 0, fontSize: '0.88rem', lineHeight: 1.55, opacity: 0.88 }}>
-          {language === 'zh'
-            ? '左侧菜单进入各模块；上方轮播与「页面管理」中的启用广告同步。暂停轮播：鼠标移入横幅区域。'
-            : language === 'en'
-              ? 'Use the sidebar for modules. The carousel shows active banners from Page management. Hover the banner to pause rotation.'
-              : 'ဘေးဘားနှင့်ကြေညာများကို သုံးပါ။'}
-        </p>
+        <div className="admin-home-quick">
+          {quickLinks.map((q) => (
+            <button key={q.path} type="button" onClick={() => navigate(q.path)}>
+              <span className="admin-home-quick__icon" aria-hidden>{q.icon}</span>
+              <span>
+                <span className="admin-home-quick__title">{qlLabel(q)}</span>
+                <span className="admin-home-quick__hint">{qlHint(q)}</span>
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

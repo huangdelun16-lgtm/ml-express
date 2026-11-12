@@ -1,0 +1,53 @@
+/** 体积重量 = 长 × 宽 × 高（厘米）÷ 6000，单位公斤。和库存 App 同一套。 */
+export const VOLUMETRIC_DIVISOR = 6000;
+
+function positiveDim(raw: string): number | null {
+  const n = Number(String(raw ?? '').trim());
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+}
+
+function roundKg(kg: number): number {
+  return Math.round(kg * 100) / 100;
+}
+
+export function volumetricWeightKg(l: string, w: string, h: string): number | null {
+  const a = positiveDim(l);
+  const b = positiveDim(w);
+  const c = positiveDim(h);
+  if (a == null || b == null || c == null) return null;
+  const kg = roundKg((a * b * c) / VOLUMETRIC_DIVISOR);
+  return kg > 0 ? kg : null;
+}
+
+/** 两边都有数时才比较。体积重量更大就用体积重量，否则用实际重量。 */
+export function preferredChargeBasis(
+  volumetricKg: number | null,
+  actualKg: number,
+): 'volume' | 'weight' | null {
+  if (!(actualKg > 0) || volumetricKg == null || !(volumetricKg > 0)) return null;
+  return volumetricKg > actualKg ? 'volume' : 'weight';
+}
+
+/** 从「14 x 14 x 5 cm」这类规格算出体积重量。 */
+export function volumetricWeightFromSpec(spec: string): { kg: number; formula: string } | null {
+  const match = String(spec || '').match(
+    /(\d+(?:\.\d+)?)\s*[xX×*]\s*(\d+(?:\.\d+)?)\s*[xX×*]\s*(\d+(?:\.\d+)?)/,
+  );
+  if (!match) return null;
+  const kg = volumetricWeightKg(match[1], match[2], match[3]);
+  if (kg == null) return null;
+  return { kg, formula: volumetricFormula(match[1], match[2], match[3]) };
+}
+
+/** 30×20×15=9000÷6000 */
+export function volumetricFormula(l: string, w: string, h: string): string {
+  const a = positiveDim(l);
+  const b = positiveDim(w);
+  const c = positiveDim(h);
+  if (a == null || b == null || c == null) return '';
+  const product = a * b * c;
+  const shown = Number.isInteger(product) ? String(product) : String(roundKg(product));
+  const dim = (n: number) => (Number.isInteger(n) ? String(n) : String(n));
+  return `${dim(a)}×${dim(b)}×${dim(c)}=${shown}÷${VOLUMETRIC_DIVISOR}`;
+}

@@ -14,6 +14,7 @@ import {
   type RouteRateSetting,
 } from '../utils/crossBorderRoutePricing';
 import { yangonTodayYmd } from '../utils/yangonFinancePeriod';
+import { preferredChargeBasis, volumetricFormula, volumetricWeightKg } from '../utils/volumetricWeight';
 import {
   fetchCrossBorderRegisteredCustomers,
   submitCrossBorderStockIn,
@@ -22,6 +23,7 @@ import {
 } from '../services/inventoryConsoleService';
 
 type Pay = 'cod' | 'prepaid';
+type ChargeBasis = 'volume' | 'weight';
 type Mode = 'single' | 'batch';
 
 type Line = { key: string; expressCode: string; name: string; qty: string };
@@ -62,6 +64,8 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
   const [routeSettings, setRouteSettings] = useState<RouteRateSetting[]>([]);
   const [fxHistory, setFxHistory] = useState<CrossBorderFxHistoryEntry[]>([]);
   const [liveRate, setLiveRate] = useState<number | null>(null);
+  const [chargeBasis, setChargeBasis] = useState<ChargeBasis>('weight');
+  const [chargeManual, setChargeManual] = useState(false);
   const [pay, setPay] = useState<Pay | ''>('');
   const [note, setNote] = useState('');
   const [lines, setLines] = useState<Line[]>([newLine()]);
@@ -138,14 +142,48 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
     };
   }, []);
 
+  const volumetricKg = useMemo(
+    () => volumetricWeightKg(specL, specW, specH),
+    [specL, specW, specH],
+  );
+  const chargeKg = chargeBasis === 'volume' ? volumetricKg ?? 0 : Number(weightKg) || 0;
+  const autoBasis = preferredChargeBasis(volumetricKg, Number(weightKg) || 0);
+  const chargeHint = chargeManual
+    ? isEn
+      ? 'Chosen by hand. Editing size or weight compares again.'
+      : '已手动选择。改尺寸或重量后会重新比较'
+    : autoBasis === 'volume'
+      ? isEn
+        ? 'Volume is heavier, selected automatically.'
+        : '体积重量更大，已自动选用'
+      : autoBasis === 'weight'
+        ? isEn
+          ? 'Charging by actual weight.'
+          : '按实际重量收费'
+        : '';
+
+  useEffect(() => {
+    if (chargeManual) return;
+    if (!autoBasis || autoBasis === chargeBasis) return;
+    setQuoteManual(false);
+    setChargeBasis(autoBasis);
+  }, [chargeManual, autoBasis, chargeBasis]);
+
   useEffect(() => {
     if (quoteManual || !pay) return;
-    const weight = Number(weightKg);
+    const weight = chargeKg;
     const store = activeStores.find((item) => item.id === storeId);
     const origin = normalizeRouteHubCode(store?.store_code || '');
     const dest = normalizeRouteHubCode(destination);
     if (!origin || !dest || !(weight > 0)) {
-      setQuoteHint('');
+      setQuoteHint(
+        chargeBasis === 'volume' && origin && dest
+          ? isEn
+            ? 'Enter length, width and height to charge by volume.'
+            : '按体积重量收费时，请先填写长、宽、高。'
+          : '',
+      );
+      if (!(weight > 0)) setQuoteCny('');
       return;
     }
     const unit = resolveRouteUnitQuote({
@@ -168,6 +206,8 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
   }, [
     quoteManual,
     pay,
+    chargeKg,
+    chargeBasis,
     weightKg,
     storeId,
     destination,
@@ -186,6 +226,10 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
       setError(isEn ? 'Choose COD or prepaid.' : '请选择到付或预付。');
       return;
     }
+    if (chargeBasis === 'volume' && !(volumetricKg && volumetricKg > 0)) {
+      setError(isEn ? 'Enter length, width and height to charge by volume.' : '按体积重量收费时，请先填写长、宽、高。');
+      return;
+    }
     setSaving(true);
     try {
       const saved = await submitCrossBorderStockIn({
@@ -197,6 +241,7 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
         customerCode,
         inboundDate,
         quoteCny,
+        chargeBasis,
         pay,
         note,
         detailAddress,
@@ -221,6 +266,8 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
       setSpecW('');
       setSpecH('');
       setQuoteCny('');
+      setChargeBasis('weight');
+      setChargeManual(false);
       setNote('');
       setLines([newLine()]);
     } catch (err: unknown) {
@@ -511,39 +558,74 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
             <label className="cbl-inbound-field">
               <span>{isEn ? 'Length' : '长'}</span>
               <div className="cbl-inbound-affix">
-                <input value={specL} onChange={(event) => setSpecL(event.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" placeholder="0" />
+                <input value={specL} onChange={(event) => { setChargeManual(false); setSpecL(event.target.value.replace(/[^\d.]/g, '')); }} inputMode="decimal" placeholder="0" />
                 <b>cm</b>
               </div>
             </label>
             <label className="cbl-inbound-field">
               <span>{isEn ? 'Width' : '宽'}</span>
               <div className="cbl-inbound-affix">
-                <input value={specW} onChange={(event) => setSpecW(event.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" placeholder="0" />
+                <input value={specW} onChange={(event) => { setChargeManual(false); setSpecW(event.target.value.replace(/[^\d.]/g, '')); }} inputMode="decimal" placeholder="0" />
                 <b>cm</b>
               </div>
             </label>
             <label className="cbl-inbound-field">
               <span>{isEn ? 'Height' : '高'}</span>
               <div className="cbl-inbound-affix">
-                <input value={specH} onChange={(event) => setSpecH(event.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" placeholder="0" />
+                <input value={specH} onChange={(event) => { setChargeManual(false); setSpecH(event.target.value.replace(/[^\d.]/g, '')); }} inputMode="decimal" placeholder="0" />
                 <b>cm</b>
               </div>
             </label>
-            <p className="cbl-inbound-match is-empty">
-              {isEn ? 'Optional. Saved as L x W x H cm.' : '选填。记成 长 x 宽 x 高 cm。'}
-            </p>
+            <div className="cbl-inbound-field">
+              <span>{isEn ? 'Volumetric weight' : '体积重量'}</span>
+              <div className={`cbl-inbound-volume${volumetricKg ? '' : ' is-empty'}`}>
+                <strong>{volumetricKg ? `${volumetricKg} Kg` : '—'}</strong>
+              </div>
+              <em>
+                {volumetricFormula(specL, specW, specH) ||
+                  (isEn ? 'Enter length, width and height' : '填完长、宽、高后自动算出')}
+              </em>
+            </div>
           </div>
-          <div className="cbl-inbound-grid">
+          <div className="cbl-inbound-grid cbl-inbound-fee">
             <label className="cbl-inbound-field">
               <span>{mode === 'single' ? (isEn ? 'Weight' : '重量') : isEn ? 'Package weight' : '整包重量'}</span>
               <div className="cbl-inbound-affix">
-                <input value={weightKg} onChange={(event) => setWeightKg(event.target.value)} inputMode="decimal" placeholder="0" />
+                <input value={weightKg} onChange={(event) => { setChargeManual(false); setWeightKg(event.target.value); }} inputMode="decimal" placeholder="0" />
                 <b>Kg</b>
               </div>
             </label>
-            <div className="cbl-inbound-field cbl-inbound-span-2">
+            <div className="cbl-inbound-field">
+              <span>{isEn ? 'Charge by' : '收费方式'}</span>
+              <div className="cbl-inbound-choice">
+                <button
+                  type="button"
+                  className={`cbl-btn cbl-btn--sm${chargeBasis === 'volume' ? ' cbl-btn--primary' : ' cbl-btn--light'}`}
+                  onClick={() => {
+                    setQuoteManual(false);
+                    setChargeManual(true);
+                    setChargeBasis('volume');
+                  }}
+                >
+                  {isEn ? 'Volume' : '体积重量'}
+                </button>
+                <button
+                  type="button"
+                  className={`cbl-btn cbl-btn--sm${chargeBasis === 'weight' ? ' cbl-btn--primary' : ' cbl-btn--light'}`}
+                  onClick={() => {
+                    setQuoteManual(false);
+                    setChargeManual(true);
+                    setChargeBasis('weight');
+                  }}
+                >
+                  {isEn ? 'Weight' : '重量'}
+                </button>
+              </div>
+              {chargeHint ? <em>{chargeHint}</em> : null}
+            </div>
+            <div className="cbl-inbound-field">
               <span>{isEn ? 'Payment' : '付款'}</span>
-              <div className="cbl-inbound-pay">
+              <div className="cbl-inbound-choice">
                 <button
                   type="button"
                   className={`cbl-btn cbl-btn--sm${pay === 'cod' ? ' cbl-btn--primary' : ' cbl-btn--light'}`}

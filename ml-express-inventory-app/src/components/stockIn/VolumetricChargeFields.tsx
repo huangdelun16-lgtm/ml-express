@@ -26,9 +26,11 @@ export function VolumetricWeightLine({ l, w, h }: { l: string; w: string; h: str
 
 export function ChargeBasisField({
   basis,
+  hint,
   onChange,
 }: {
   basis: ChargeBasis;
+  hint?: string;
   onChange: (basis: ChargeBasis) => void;
 }) {
   const { t } = useTranslation();
@@ -53,6 +55,7 @@ export function ChargeBasisField({
           </Text>
         </Pressable>
       </View>
+      {hint ? <Text style={styles.chargeHint}>{hint}</Text> : null}
     </View>
   );
 }
@@ -89,4 +92,5 @@ const styles = StyleSheet.create({
   },
   payCheckText: { color: colors.muted, fontWeight: '800', fontSize: 14 },
   payCheckTextOn: { color: colors.successText },
+  chargeHint: { color: colors.muted, fontSize: 12, marginTop: 6, lineHeight: 16 },
 });

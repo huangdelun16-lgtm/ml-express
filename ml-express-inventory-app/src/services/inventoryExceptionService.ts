@@ -209,13 +209,30 @@ export async function listInventoryExceptions(options?: {
   });
 }
 
+function exceptionCodes(row: { item_barcode: string; express_barcode: string }): string[] {
+  return [row.item_barcode, row.express_barcode].map((code) => code.trim().toUpperCase()).filter(Boolean);
+}
+
 export async function listOpenExceptionBarcodes(): Promise<Set<string>> {
   const rows = await listInventoryExceptions({ status: 'open', limit: 200 });
-  return new Set(
-    rows.flatMap((row) =>
-      [row.item_barcode, row.express_barcode].map((code) => code.trim().toUpperCase()).filter(Boolean),
-    ),
-  );
+  return new Set(rows.flatMap(exceptionCodes));
+}
+
+/** 快递明细用来区分未处理和已处理的异常件。同一单号仍未关单时，按未处理算。 */
+export async function listExceptionBarcodeMarks(): Promise<{
+  open: Set<string>;
+  resolved: Set<string>;
+}> {
+  const rows = await listInventoryExceptions({ status: 'all', limit: 400 });
+  const open = new Set<string>();
+  const resolved = new Set<string>();
+  for (const row of rows) {
+    const target = row.status === 'open' ? open : row.status === 'resolved' ? resolved : null;
+    if (!target) continue;
+    exceptionCodes(row).forEach((code) => target.add(code));
+  }
+  for (const code of open) resolved.delete(code);
+  return { open, resolved };
 }
 
 export async function resolveInventoryException(params: {

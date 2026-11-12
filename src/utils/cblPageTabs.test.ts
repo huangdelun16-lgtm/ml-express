@@ -6,6 +6,7 @@ describe('parseCblPageTab', () => {
     expect(parseCblPageTab('export-cost')).toBe('export-cost');
     expect(parseCblPageTab('customers')).toBe('customers');
     expect(parseCblPageTab('inbound')).toBe('inbound');
+    expect(parseCblPageTab('express')).toBe('express');
     expect(parseCblPageTab('transport')).toBe('transport');
     expect(parseCblPageTab('invoices')).toBe('invoices');
     expect(parseCblPageTab('settings')).toBe('settings');

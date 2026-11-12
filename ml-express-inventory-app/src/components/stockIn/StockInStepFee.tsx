@@ -28,6 +28,7 @@ export default function StockInStepFee({
   weightN,
   qty,
   chargeBasis,
+  chargeHint,
   payCod,
   payPrepaid,
   totalFee,
@@ -56,6 +57,7 @@ export default function StockInStepFee({
   weightN: string;
   qty: string;
   chargeBasis: ChargeBasis;
+  chargeHint?: string;
   payCod: boolean;
   payPrepaid: boolean;
   totalFee: string;
@@ -163,7 +165,7 @@ export default function StockInStepFee({
             <Text style={styles.qtyUnit}>{stockUnitLabel()}</Text>
           </View>
         </View>
-        <ChargeBasisField basis={chargeBasis} onChange={onChargeBasis} />
+        <ChargeBasisField basis={chargeBasis} hint={chargeHint} onChange={onChargeBasis} />
         <View style={styles.payRow}>
           <Text style={styles.payLabel}>{t.stockIn.paymentRequired}</Text>
           <View style={styles.payChecks}>

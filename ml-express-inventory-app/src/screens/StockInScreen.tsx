@@ -27,7 +27,7 @@ import {
 } from '../utils/crossBorderPricing';
 import { formatCnyInput } from '../utils/crossBorderFx';
 import { chargeBasisNote } from '../utils/inboundMovementNote';
-import { volumetricWeightKg } from '../utils/volumetricWeight';
+import { preferredChargeBasis, volumetricWeightKg } from '../utils/volumetricWeight';
 import { loadStockInContactDraft, saveStockInContactDraft } from '../utils/stockInDraft';
 import { resolveAppError, useTranslation } from '../i18n';
 import {
@@ -72,6 +72,7 @@ export default function StockInScreen({ route, navigation }: Props) {
   const [totalFeeManual, setTotalFeeManual] = useState(false);
   const [feeFormulaHint, setFeeFormulaHint] = useState('');
   const [chargeBasis, setChargeBasis] = useState<'volume' | 'weight'>('weight');
+  const [chargeManual, setChargeManual] = useState(false);
   const [payCod, setPayCod] = useState(false);
   const [payPrepaid, setPayPrepaid] = useState(false);
   const [note, setNote] = useState('');
@@ -141,6 +142,21 @@ export default function StockInScreen({ route, navigation }: Props) {
     [specL, specW, specH],
   );
   const chargeKg = chargeBasis === 'volume' ? volumetricKg ?? 0 : Number(weightN.trim()) || 0;
+  const autoBasis = preferredChargeBasis(volumetricKg, Number(weightN.trim()) || 0);
+  const chargeHint = chargeManual
+    ? t.stockIn.chargeManual
+    : autoBasis === 'volume'
+      ? t.stockIn.chargeAutoVolume
+      : autoBasis === 'weight'
+        ? t.stockIn.chargeAutoWeight
+        : '';
+
+  useEffect(() => {
+    if (chargeManual) return;
+    if (!autoBasis || autoBasis === chargeBasis) return;
+    setTotalFeeManual(false);
+    setChargeBasis(autoBasis);
+  }, [chargeManual, autoBasis, chargeBasis]);
   const canAutoTotalFee = destinationFilled && chargeKg > 0 && paymentSelected;
 
   useEffect(() => {
@@ -263,6 +279,7 @@ export default function StockInScreen({ route, navigation }: Props) {
     setFeeFormulaHint('');
     setDetailAddress('');
     setChargeBasis('weight');
+    setChargeManual(false);
     setPayCod(false);
     setPayPrepaid(false);
     setNote('');
@@ -509,17 +526,21 @@ export default function StockInScreen({ route, navigation }: Props) {
               setTotalFeeManual(false);
             }}
             onDetailAddressChange={setDetailAddress}
+            chargeHint={chargeHint}
             onSpecChange={({ l, w, h }) => {
               setSpecL(l);
               setSpecW(w);
               setSpecH(h);
+              setChargeManual(false);
             }}
             onWeightChange={(v) => {
               setWeightN(v);
               setTotalFeeManual(false);
+              setChargeManual(false);
             }}
             onQtyChange={setQty}
             onChargeBasis={(basis) => {
+              setChargeManual(true);
               setChargeBasis(basis);
               setTotalFeeManual(false);
             }}

@@ -435,14 +435,17 @@ function settleAdminExportCost(input) {
   if (!key || key.length > 80) throw new Error('缺少订单');
   if (dest !== 'MSE' && dest !== 'LSO') throw new Error('运达站只能是木姐或腊戌');
   if (!(weight > 0) || weight > 100000) throw new Error('缺少重量，无法保存');
-  if (!(unit > 0) || unit > 1000000) throw new Error('请填写每公斤人民币单价');
+  if (!Number.isFinite(unit) || unit < 0 || unit > 1000000) throw new Error('请填写每公斤人民币单价');
   if (currency !== 'CNY' && currency !== 'MMK') throw new Error('请选择人民币或缅币');
   const quote = Math.round(weight * unit * 100) / 100;
-  if (!(quote > 0)) throw new Error('请填写每公斤人民币单价');
+  if (quote < 0) throw new Error('请填写每公斤人民币单价');
   let totalCny = 0;
   let totalMmk = 0;
   let fx = null;
-  if (currency === 'MMK') {
+  if (quote === 0) {
+    totalCny = 0;
+    totalMmk = 0;
+  } else if (currency === 'MMK') {
     if (!(rate > 0) || rate > 1000000) throw new Error('缅币结算需要填写汇率');
     totalMmk = Math.round(quote * rate);
     if (!(totalMmk > 0)) throw new Error('缅币结算需要填写汇率');
@@ -461,7 +464,7 @@ function settleAdminExportCost(input) {
     weight_kg: weight,
     unit_price_cny: Math.round(unit * 100) / 100,
     total_cny: totalCny,
-    pay_currency: currency,
+    pay_currency: quote === 0 ? 'CNY' : currency,
     fx_mmk_per_cny: fx,
     total_mmk: totalMmk,
     trip_number: text(input.tripNumber).toUpperCase().slice(0, 40),

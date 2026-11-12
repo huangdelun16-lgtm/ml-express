@@ -27,7 +27,7 @@ const {
   parseSignedInvoiceListQuery,
   yangonYear,
 } = require('./utils/signedInvoiceList');
-const { buildTripFeeGroupMap } = require('./utils/tripTransportFee');
+const { buildTripFeeGroupMap, parseTripTransportFee } = require('./utils/tripTransportFee');
 const {
   PACK_DISPLAY_LABEL,
   matchesPackTransportFilter,
@@ -43,6 +43,14 @@ const {
   uniqueCodes,
 } = require('./utils/inventoryOrderPickup');
 const { applyStationKeys, parseStationKeys, rowTouchesStation } = require('./utils/inventoryStationFilter');
+const {
+  collapseExpressList,
+  expressDetailSubject,
+  isPackageBarcode,
+  loadExpressGroupContext,
+  mapExpressGroup,
+  mapExpressItem,
+} = require('./utils/expressDetailsGroups');
 const {
   ORDER_SEARCH_COLUMNS,
   PACK_SEARCH_COLUMNS,
@@ -64,9 +72,9 @@ const ORDER_STATION_COLUMNS = ['destination_code', 'hub_received_by_store_code']
 const ORDER_TRACKING_SELECT =
   'id, pack_barcode, order_barcode, express_barcode, order_name, destination_code, qty, status, recipient_name, recipient_phone, inbound_store_name, hub_received_at, hub_received_by_store_code, hub_received_by_store_name, created_at, updated_at';
 const STORE_ITEM_PICKUP_SELECT =
-  'barcode, input_barcode, customer_signed_at, arrival_notified_at, hub_arrived_at';
+  'barcode, input_barcode, name, weight, spec, customer_signed_at, arrival_notified_at, hub_arrived_at';
 const STORE_ITEM_PICKUP_SELECT_FALLBACK =
-  'barcode, input_barcode, customer_signed_at, hub_arrived_at';
+  'barcode, input_barcode, name, weight, spec, customer_signed_at, hub_arrived_at';
 
 
 async function countRows(supabase, table, filters = []) {
@@ -401,6 +409,29 @@ function normalizeOrderRow(row) {
   };
 }
 
+async function attachPackTrips(supabase, orders) {
+  const codes = uniqueCodes((orders || []).map((order) => order.pack_barcode));
+  if (!codes.length) return orders || [];
+  const { data, error } = await supabase
+    .from('inventory_pkg_tracking')
+    .select('pack_barcode, trip_number')
+    .in('pack_barcode', codes);
+  if (error || !data) return orders || [];
+  const trips = new Map(
+    data.map((row) => [
+      String(row.pack_barcode || '').trim().toUpperCase(),
+      String(row.trip_number || '').trim(),
+    ]),
+  );
+  return (orders || []).map((order) => ({
+    ...order,
+    trip_number:
+      String(order.trip_number || '').trim() ||
+      trips.get(String(order.pack_barcode || '').trim().toUpperCase()) ||
+      '',
+  }));
+}
+
 function missingArrivalNotifiedColumn(message) {
   return /arrival_notified_at/i.test(String(message || ''));
 }
@@ -525,6 +556,82 @@ async function loadSignedRecentOrders(supabase, warnings) {
   return filterSignedOrders(attachPickupToOrders(orders, items));
 }
 
+function mapPackExportCost(row) {
+  if (!row) return null;
+  const currency = String(row.pay_currency || '').toUpperCase() === 'MMK' ? 'MMK' : 'CNY';
+  return {
+    payCurrency: currency,
+    unitPriceCny: Number(row.unit_price_cny) || 0,
+    totalCny: Number(row.total_cny) || 0,
+    totalMmk: Number(row.total_mmk) || 0,
+    weightKg: Number(row.weight_kg) || 0,
+  };
+}
+
+async function loadPackGlance(supabase, packBarcode, warnings) {
+  const code = String(packBarcode || '').trim();
+  const empty = {
+    packName: '',
+    tripNumber: '',
+    transportFee: null,
+    exportCost: null,
+  };
+  if (!code) return empty;
+  try {
+    const { data: packs, error: packError } = await supabase
+      .from('inventory_pkg_tracking')
+      .select('pack_name, trip_number, transport_fee')
+      .ilike('pack_barcode', escapePostgrestIlike(code))
+      .limit(1);
+    if (packError) throw packError;
+    const pack = packs?.[0] || null;
+    let fee = pack ? parseTripTransportFee(pack.transport_fee) : null;
+    const trip = String(pack?.trip_number || '').trim();
+    if (trip && !(Number(fee) > 0)) {
+      const { data: siblings, error: siblingError } = await supabase
+        .from('inventory_pkg_tracking')
+        .select('transport_fee')
+        .eq('trip_number', trip)
+        .limit(40);
+      if (siblingError) throw siblingError;
+      let shared = 0;
+      for (const row of siblings || []) shared = Math.max(shared, parseTripTransportFee(row.transport_fee));
+      if (shared > 0) fee = shared;
+    }
+
+    const upper = code.toUpperCase();
+    const { data: byKey, error: keyError } = await supabase
+      .from('inventory_export_costs')
+      .select('subject_kind, subject_key, display_barcode, unit_price_cny, total_cny, total_mmk, pay_currency, weight_kg')
+      .eq('subject_kind', 'package')
+      .eq('subject_key', upper)
+      .limit(1);
+    if (keyError) throw keyError;
+    let cost = byKey?.[0] || null;
+    if (!cost) {
+      const { data: byDisplay, error: displayError } = await supabase
+        .from('inventory_export_costs')
+        .select('subject_kind, subject_key, display_barcode, unit_price_cny, total_cny, total_mmk, pay_currency, weight_kg')
+        .eq('subject_kind', 'package')
+        .ilike('display_barcode', escapePostgrestIlike(code))
+        .limit(1);
+      if (displayError) throw displayError;
+      cost = byDisplay?.[0] || null;
+    }
+
+    return {
+      packName: String(pack?.pack_name || '').trim(),
+      tripNumber: trip,
+      transportFee: pack ? fee : null,
+      exportCost: mapPackExportCost(cost),
+    };
+  } catch (error) {
+    console.warn('inventory-admin-data: pack glance failed', error?.message || error);
+    warnings.push(`包裹车次或出口成本暂不可用：${error?.message || error}`);
+    return empty;
+  }
+}
+
 async function loadOrdersByPack(supabase, packBarcode, warnings) {
   const code = String(packBarcode || '').trim();
   if (!code) return [];
@@ -545,12 +652,15 @@ async function loadOrdersByPack(supabase, packBarcode, warnings) {
 async function loadRecentOrders(supabase, orderStatus, warnings, packBarcode, stationKeys = []) {
   const pack = String(packBarcode || '').trim();
   if (pack) {
-    const orders = await loadOrdersByPack(supabase, pack, warnings);
+    const orders = await attachPackTrips(supabase, await loadOrdersByPack(supabase, pack, warnings));
     return { orders, truncated: orders.length >= CONSOLE_LIST_LIMIT };
   }
   if (orderStatus === 'signed') {
-    const orders = (await loadSignedRecentOrders(supabase, warnings)).filter((order) =>
-      rowTouchesStation(order, stationKeys, ORDER_STATION_COLUMNS),
+    const orders = await attachPackTrips(
+      supabase,
+      (await loadSignedRecentOrders(supabase, warnings)).filter((order) =>
+        rowTouchesStation(order, stationKeys, ORDER_STATION_COLUMNS),
+      ),
     );
     return { orders, truncated: orders.length >= CONSOLE_LIST_LIMIT };
   }
@@ -585,8 +695,9 @@ async function loadRecentOrders(supabase, orderStatus, warnings, packBarcode, st
     (orderRows || []).map(normalizeOrderRow),
     warnings,
   );
-  const scoped = enriched.filter((order) =>
-    rowTouchesStation(order, stationKeys, ORDER_STATION_COLUMNS),
+  const scoped = await attachPackTrips(
+    supabase,
+    enriched.filter((order) => rowTouchesStation(order, stationKeys, ORDER_STATION_COLUMNS)),
   );
   return {
     orders: orderStatus === 'awaiting_pickup' ? filterAwaitingPickupOrders(scoped) : scoped,
@@ -815,8 +926,9 @@ async function loadOrderPage(supabase, orderStatus, warnings, stationKeys, list)
     (data || []).map(normalizeOrderRow),
     warnings,
   );
-  const orders = enriched.filter((order) =>
-    rowTouchesStation(order, stationKeys, ORDER_STATION_COLUMNS),
+  const orders = await attachPackTrips(
+    supabase,
+    enriched.filter((order) => rowTouchesStation(order, stationKeys, ORDER_STATION_COLUMNS)),
   );
   const total = count ?? orders.length;
   return { orders, total, hasMore: from + (data || []).length < total };
@@ -1090,20 +1202,19 @@ async function handleOrders(supabase, orderStatus, warnings, packBarcode, statio
       warnings,
     };
   }
-  const { orders: recentOrders, truncated } = await loadRecentOrders(
-    supabase,
-    orderStatus,
-    warnings,
-    packBarcode,
-    stationKeys,
-  );
+  const packCode = String(packBarcode || '').trim();
+  const [{ orders: recentOrders, truncated }, packGlance] = await Promise.all([
+    loadRecentOrders(supabase, orderStatus, warnings, packBarcode, stationKeys),
+    packCode ? loadPackGlance(supabase, packCode, warnings) : Promise.resolve(null),
+  ]);
   return {
     ok: true,
     at: new Date().toISOString(),
     section: 'orders',
     recentOrders,
     orderStatusFilter: orderStatus,
-    packBarcode: String(packBarcode || '').trim() || undefined,
+    packBarcode: packCode || undefined,
+    packGlance: packGlance || undefined,
     ordersTruncated: truncated,
     warnings,
   };
@@ -1219,6 +1330,177 @@ async function handleSignedInvoices(supabase, warnings, params) {
   }
 }
 
+const EXPRESS_ITEM_SELECT =
+  'id, barcode, input_barcode, name, spec, unit, weight, qty_on_hand, recipient_name, final_destination, owner_store_code, note, packed_at, packed_bundle_barcode, hub_arrived_at, customer_signed_at, hub_transit_released_at, hub_transit_shipped_at, created_at, updated_at';
+
+function expressGroupIo(supabase) {
+  const quiet = async (run) => {
+    try {
+      const { data, error } = await run();
+      if (error) return [];
+      return data || [];
+    } catch {
+      return [];
+    }
+  };
+  return {
+    shipmentItemsByBarcode(codes) {
+      return quiet(() => supabase.from('inventory_packed_shipment_items').select('item_barcode, pack_id').in('item_barcode', codes).limit(300));
+    },
+    shipmentItemsByPack(packIds) {
+      return quiet(() => supabase.from('inventory_packed_shipment_items').select('item_barcode, pack_id').in('pack_id', packIds).limit(300));
+    },
+    shipmentsById(ids) {
+      return quiet(() => supabase.from('inventory_packed_shipments').select('id, bundle_barcode').in('id', ids).limit(100));
+    },
+    shipmentsByBarcode(codes) {
+      return quiet(() => supabase.from('inventory_packed_shipments').select('id, bundle_barcode').in('bundle_barcode', codes).limit(100));
+    },
+    async itemsByBarcode(codes) {
+      const { data, error } = await supabase.from('inventory_store_items').select(EXPRESS_ITEM_SELECT).in('barcode', codes);
+      if (error) throw error;
+      return data || [];
+    },
+    itemsLikeBase(base) {
+      return quiet(() => supabase.from('inventory_store_items').select(EXPRESS_ITEM_SELECT).like('barcode', `${base}(%`).limit(30));
+    },
+    packNotes(itemIds) {
+      return quiet(() => supabase.from('inventory_stock_movements').select('item_id, note').in('item_id', itemIds).ilike('note', '%打包入%').limit(100));
+    },
+  };
+}
+
+function expressException(rows, marks) {
+  if (rows.some((row) => rowExceptionStatus(row, marks) === 'open')) return 'open';
+  if (rows.some((row) => rowExceptionStatus(row, marks) === 'resolved')) return 'resolved';
+  return '';
+}
+
+async function exceptionStatusByCodes(supabase, rows) {
+  const codes = uniqueCodes(rows.flatMap((row) => [row.barcode, row.input_barcode]));
+  const marks = new Map();
+  if (!codes.length) return marks;
+  const [byItem, byExpress] = await Promise.all([
+    supabase.from('inventory_exceptions').select('item_barcode, express_barcode, status').in('item_barcode', codes).limit(200),
+    supabase.from('inventory_exceptions').select('item_barcode, express_barcode, status').in('express_barcode', codes).limit(200),
+  ]);
+  for (const row of [...(byItem.data || []), ...(byExpress.data || [])]) {
+    const status = String(row.status || '');
+    for (const code of uniqueCodes([row.item_barcode, row.express_barcode])) {
+      if (marks.get(code) === 'open') continue;
+      if (status === 'open' || status === 'resolved') marks.set(code, status);
+    }
+  }
+  return marks;
+}
+
+function rowExceptionStatus(row, marks) {
+  const codes = uniqueCodes([row.barcode, row.input_barcode]);
+  if (codes.some((code) => marks.get(code) === 'open')) return 'open';
+  if (codes.some((code) => marks.get(code) === 'resolved')) return 'resolved';
+  return '';
+}
+
+async function loadExpressDetail(supabase, id) {
+  const { data: item, error } = await supabase
+    .from('inventory_store_items')
+    .select(EXPRESS_ITEM_SELECT)
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!item) return null;
+  const context = await loadExpressGroupContext([item], expressGroupIo(supabase));
+  const subject = expressDetailSubject(item, context.relatedRows, context.packByItemBarcode);
+  const lines = subject.lines.length ? subject.lines : [item];
+  const grouped = lines.length > 1 || isPackageBarcode(subject.packBarcode);
+  const marks = await exceptionStatusByCodes(supabase, lines);
+  const exception = expressException(lines, marks);
+  const base = grouped
+    ? mapExpressGroup(lines, subject.packBarcode, exception, subject.shells)
+    : mapExpressItem(lines[0], exception);
+  const lineIds = lines.map((row) => row.id);
+  const { data: movements } = await supabase
+    .from('inventory_stock_movements')
+    .select('item_id, recipient_name, recipient_phone, destination, detail_address, packaging, note, origin_store_name, created_at')
+    .in('item_id', lineIds)
+    .eq('type', 'in')
+    .order('created_at', { ascending: false })
+    .limit(20);
+  const movement = (movements || []).find((row) => String(row.recipient_phone || '').trim()) || movements?.[0] || null;
+  const barcodes = uniqueCodes(lines.map((row) => row.barcode));
+  const { data: exceptions } = barcodes.length
+    ? await supabase
+      .from('inventory_exceptions')
+      .select('id, exception_type, status, note, created_at, resolved_at')
+      .in('item_barcode', barcodes)
+      .order('created_at', { ascending: false })
+      .limit(8)
+    : { data: [] };
+  return {
+    ...base,
+    phone: String(movement?.recipient_phone || '').trim(),
+    address: String(movement?.detail_address || '').trim(),
+    packaging: String(movement?.packaging || '').trim(),
+    inboundNote: String(movement?.note || lines.map((row) => row.note).find(Boolean) || '').trim(),
+    inboundStore: String(movement?.origin_store_name || '').trim(),
+    inboundAt: movement?.created_at || base.inboundAt || '',
+    customerName: base.customerName || String(movement?.recipient_name || '').trim(),
+    destination: base.destination || String(movement?.destination || '').trim(),
+    exceptions: (exceptions || []).map((row) => ({
+      id: row.id,
+      type: row.exception_type,
+      status: row.status,
+      note: row.note || '',
+      createdAt: row.created_at || '',
+      resolvedAt: row.resolved_at || '',
+    })),
+  };
+}
+
+async function handleExpressDetails(supabase, query) {
+  const id = String(query.id || '').trim();
+  if (id) {
+    const detail = await loadExpressDetail(supabase, id);
+    return { detail };
+  }
+  const list = parseConsoleListQuery(query);
+  const { from } = listRange(list.page, list.pageSize);
+  let request = supabase
+    .from('inventory_store_items')
+    .select(EXPRESS_ITEM_SELECT)
+    .not('barcode', 'ilike', 'PKG%')
+    .order('updated_at', { ascending: false });
+  const filter = searchOrFilter(list.q, [
+    'barcode',
+    'input_barcode',
+    'name',
+    'recipient_name',
+    'final_destination',
+    'packed_bundle_barcode',
+  ]);
+  if (filter) request = request.or(filter);
+  const { data, error } = await request.range(from, from + list.pageSize);
+  if (error) throw error;
+  const pageRows = data || [];
+  const hasMore = pageRows.length > list.pageSize;
+  const rows = hasMore ? pageRows.slice(0, list.pageSize) : pageRows;
+  const context = await loadExpressGroupContext(rows, expressGroupIo(supabase));
+  const marks = await exceptionStatusByCodes(supabase, rows.concat(context.relatedRows));
+  return {
+    items: collapseExpressList({
+      pageRows: rows,
+      relatedRows: context.relatedRows,
+      packByItemBarcode: context.packByItemBarcode,
+      exceptionStatus: (row) => rowExceptionStatus(row, marks),
+      searching: Boolean(String(list.q || '').trim()),
+    }),
+    total: -1,
+    hasMore,
+    page: list.page,
+    pageSize: list.pageSize,
+  };
+}
+
 async function handleExportCosts(supabase, warnings, financeScope, queryText) {
   const { data, error } = await supabase
     .from('inventory_export_costs')
@@ -1251,6 +1533,8 @@ async function handleExportCosts(supabase, warnings, financeScope, queryText) {
 
   return { ...saved, pendingExport, warnings };
 }
+
+exports.handleExpressDetails = handleExpressDetails;
 
 exports.handler = async (event) => {
   const preflightResponse = handleCorsPreflight(event, {
@@ -1341,6 +1625,31 @@ exports.handler = async (event) => {
       };
     } else if (section === 'finance') {
       body = await handleFinance(supabase, warnings, financePagination, financeScope);
+    } else if (section === 'pack-facts') {
+      const barcodes = String(event.queryStringParameters?.barcodes || '')
+        .split(',')
+        .map((code) => code.trim().toUpperCase())
+        .filter((code) => /^[A-Z0-9]+$/.test(code))
+        .slice(0, 40);
+      let packs = [];
+      if (barcodes.length) {
+        const { data, error } = await supabase
+          .from('inventory_pkg_tracking')
+          .select('pack_barcode, trip_number, transport_fee, item_count, total_weight, pack_name')
+          .in('pack_barcode', barcodes);
+        if (error) throw error;
+        packs = data || [];
+      }
+      body = { ok: true, at: new Date().toISOString(), section: 'pack-facts', packs, warnings };
+    } else if (section === 'express-details') {
+      const listed = await handleExpressDetails(supabase, event.queryStringParameters || {});
+      body = {
+        ok: true,
+        at: new Date().toISOString(),
+        section: 'express-details',
+        ...listed,
+        warnings,
+      };
     } else if (section === 'packs') {
       body = await handlePacks(supabase, packStatus, warnings, stationKeys, list);
     } else if (section === 'orders') {

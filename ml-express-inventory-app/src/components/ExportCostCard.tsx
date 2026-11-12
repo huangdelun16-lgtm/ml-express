@@ -135,14 +135,16 @@ export default function ExportCostCard({ board, loading, error, saved, onOpen, o
 
   const submit = async (line: Line) => {
     const unit = Number(price);
+    if (price.trim() === '' || !Number.isFinite(unit) || unit < 0) return;
     const totalCny = exportCostLineTotal(unit, line.weightKg);
     const mmkPerCny = Number(rate);
+    const free = unit === 0;
     const settled =
       currency === 'CNY' || currency === 'MMK'
         ? settleExportCost({
             totalCny,
             currency,
-            mmkPerCny: currency === 'MMK' ? mmkPerCny : null,
+            mmkPerCny: currency === 'MMK' && !free ? mmkPerCny : null,
           })
         : null;
     if (!leg || !settled || savingKey) return;
@@ -158,8 +160,8 @@ export default function ExportCostCard({ board, loading, error, saved, onOpen, o
         legDestination: leg,
         weightKg: line.weightKg,
         unitPriceCny: unit,
-        payCurrency: currency === 'MMK' ? 'MMK' : 'CNY',
-        mmkPerCny: currency === 'MMK' ? mmkPerCny : null,
+        payCurrency: currency === 'MMK' && !free ? 'MMK' : 'CNY',
+        mmkPerCny: currency === 'MMK' && !free ? mmkPerCny : null,
         tripNumber: line.tripNumber,
       });
       setOpenKey(null);
@@ -448,10 +450,11 @@ function CostSection({
         const saved = savedByKey.get(line.key);
         const expanded = openKey === line.key && !saved;
         const unit = Number(price);
-        const total = exportCostLineTotal(unit, line.weightKg);
+        const priceFilled = price.trim() !== '' && Number.isFinite(unit) && unit >= 0;
+        const total = priceFilled ? exportCostLineTotal(unit, line.weightKg) : 0;
         const mmkPerCny = Number(rate);
         const settled =
-          currency === 'CNY' || currency === 'MMK'
+          priceFilled && (currency === 'CNY' || currency === 'MMK')
             ? settleExportCost({
                 totalCny: total,
                 currency,
@@ -572,9 +575,9 @@ function CostSection({
                         placeholderTextColor="#64748b"
                       />
                     </View>
-                    {unit > 0 ? (
+                    {priceFilled ? (
                       <Text style={styles.calc}>
-                        {currency === 'MMK' && settled
+                        {currency === 'MMK' && settled && unit > 0
                           ? fmt(t.home.exportCostMmkLine, {
                               total: trimKg(total),
                               rate: trimKg(mmkPerCny),

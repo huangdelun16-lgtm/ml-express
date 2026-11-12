@@ -150,6 +150,10 @@ export type InventoryOrderRow = {
   customer_signed_at?: string | null;
   arrival_notified_at?: string | null;
   hub_arrived_at?: string | null;
+  item_name?: string;
+  weight?: string;
+  spec?: string;
+  trip_number?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -619,6 +623,47 @@ export async function fetchInventoryConsolePacks(
   };
 }
 
+async function withPackTrips(orders: InventoryOrderRow[]): Promise<InventoryOrderRow[]> {
+  const codes = Array.from(
+    new Set(
+      orders
+        .filter((order) => !String(order.trip_number || '').trim())
+        .map((order) => order.pack_barcode.trim())
+        .filter(Boolean),
+    ),
+  );
+  if (!codes.length) return orders;
+  const trips = new Map<string, string>();
+  await Promise.all(
+    codes.map(async (code) => {
+      try {
+        const payload = await fetchInventoryConsoleSection('packs', 'all', undefined, undefined, undefined, {
+          list: { q: code, page: 1, pageSize: 5 },
+        });
+        const pack = (payload.recentPacks || []).find(
+          (row) => String(row.pack_barcode || '').trim().toUpperCase() === code.toUpperCase(),
+        );
+        const trip = String(pack?.trip_number || '').trim();
+        if (trip) trips.set(code.toUpperCase(), trip);
+      } catch {
+        /* 车次稍后补，不挡住订单表 */
+      }
+    }),
+  );
+  if (!trips.size) return orders;
+  return orders.map((order) => ({
+    ...order,
+    trip_number:
+      String(order.trip_number || '').trim() ||
+      trips.get(order.pack_barcode.trim().toUpperCase()) ||
+      '',
+  }));
+}
+
+export async function attachOrderTrips(orders: InventoryOrderRow[]): Promise<InventoryOrderRow[]> {
+  return withPackTrips(orders);
+}
+
 export async function fetchInventoryConsoleOrders(
   orderStatus: OrderStatusFilter = 'active',
   stationKeys: string[] = [],
@@ -649,8 +694,149 @@ export async function fetchInventoryConsoleOrders(
   };
 }
 
+export type PackExportCostGlance = {
+  payCurrency: 'CNY' | 'MMK';
+  unitPriceCny: number;
+  totalCny: number;
+  totalMmk: number;
+  weightKg: number;
+};
+
+export type PackGlance = {
+  packName: string;
+  tripNumber: string;
+  transportFee: number | null;
+  exportCost: PackExportCostGlance | null;
+  pieceCount: number | null;
+  weightLabel: string;
+};
+
+function packagingBase(barcode: string): string {
+  const raw = String(barcode || '').trim();
+  const match = raw.match(/^(.*)\(\d+-\d+\)$/);
+  return (match ? match[1] : raw).trim().toUpperCase();
+}
+
+function exportCostKeys(row: ExportCostRecord): string[] {
+  const extra = row as ExportCostRecord & { subject_key?: string; barcode?: string; title?: string };
+  return [row.display_barcode, extra.subject_key, extra.barcode, extra.title]
+    .map((value) => String(value || '').trim().toUpperCase())
+    .filter(Boolean);
+}
+
+function toPackExportCost(row: ExportCostRecord): PackExportCostGlance {
+  return {
+    payCurrency: String(row.pay_currency || '').toUpperCase() === 'MMK' ? 'MMK' : 'CNY',
+    unitPriceCny: Number(row.unit_price_cny) || 0,
+    totalCny: Number(row.total_cny) || 0,
+    totalMmk: Number(row.total_mmk) || 0,
+    weightKg: Number(row.weight_kg) || 0,
+  };
+}
+
+function parseWeightKg(raw?: string | number | null): number {
+  const n = Number(String(raw ?? '').replace(/[^\d.]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatKg(kg: number): string {
+  if (!(kg > 0)) return '';
+  const rounded = Math.round(kg * 100) / 100;
+  return `${rounded} Kg`;
+}
+
+function combineExportCosts(rows: ExportCostRecord[]): PackExportCostGlance | null {
+  if (!rows.length) return null;
+  if (rows.length === 1) return toPackExportCost(rows[0]);
+  const currencies = new Set(rows.map((row) => String(row.pay_currency || '').toUpperCase()));
+  if (currencies.size === 1 && currencies.has('MMK')) {
+    return {
+      payCurrency: 'MMK',
+      unitPriceCny: 0,
+      totalCny: 0,
+      totalMmk: rows.reduce((sum, row) => sum + (Number(row.total_mmk) || 0), 0),
+      weightKg: rows.reduce((sum, row) => sum + (Number(row.weight_kg) || 0), 0),
+    };
+  }
+  return {
+    payCurrency: 'CNY',
+    unitPriceCny: 0,
+    totalCny: rows.reduce((sum, row) => sum + (Number(row.total_cny) || 0), 0),
+    totalMmk: 0,
+    weightKg: rows.reduce((sum, row) => sum + (Number(row.weight_kg) || 0), 0),
+  };
+}
+
+async function fillPackGlance(
+  packBarcode: string,
+  orders: InventoryOrderRow[],
+  glance: PackGlance | null,
+): Promise<PackGlance> {
+  const code = packBarcode.trim().toUpperCase();
+  let packName = String(glance?.packName || '').trim();
+  let tripNumber = String(glance?.tripNumber || orders.find((order) => order.trip_number)?.trip_number || '').trim();
+  let transportFee = glance?.transportFee ?? null;
+  let exportCost = glance?.exportCost ?? null;
+  let pieceCount = glance?.pieceCount ?? null;
+  let weightLabel = String(glance?.weightLabel || '').trim();
+
+  if (!packName || !tripNumber || transportFee == null || pieceCount == null || !weightLabel) {
+    try {
+      const payload = await fetchInventoryConsoleSection('packs', 'all', undefined, undefined, undefined, {
+        list: { q: packBarcode.trim(), page: 1, pageSize: 5 },
+      });
+      const pack = (payload.recentPacks || []).find(
+        (row) => String(row.pack_barcode || '').trim().toUpperCase() === code,
+      );
+      if (pack) {
+        packName = packName || String(pack.pack_name || '').trim();
+        tripNumber = tripNumber || String(pack.trip_number || '').trim();
+        if (transportFee == null && pack.transport_fee != null && Number.isFinite(Number(pack.transport_fee))) {
+          transportFee = Number(pack.transport_fee);
+        }
+        if (pieceCount == null && Number(pack.item_count) > 0) pieceCount = Number(pack.item_count);
+        weightLabel = weightLabel || formatKg(parseWeightKg(pack.total_weight));
+      }
+    } catch {
+      /* 包装资料暂时读不到时保留已有值 */
+    }
+  }
+
+  if (!exportCost) {
+    try {
+      const saved = await fetchExportCostRecords(null, '', { pending: false });
+      const wanted = new Set<string>([code]);
+      orders.forEach((order) => {
+        const barcode = String(order.order_barcode || '').trim().toUpperCase();
+        const express = String(order.express_barcode || '').trim().toUpperCase();
+        if (barcode) {
+          wanted.add(barcode);
+          wanted.add(packagingBase(barcode));
+        }
+        if (express) wanted.add(express);
+      });
+      const matched = saved.rows.filter((row) => exportCostKeys(row).some((key) => wanted.has(key)));
+      exportCost = combineExportCosts(matched);
+    } catch {
+      /* 出口成本暂时读不到时显示未填 */
+    }
+  }
+
+  if (pieceCount == null) {
+    const summed = orders.reduce((sum, order) => sum + (Number(order.qty) || 0), 0);
+    pieceCount = summed > 0 ? summed : null;
+  }
+  if (!weightLabel) {
+    const summed = orders.reduce((sum, order) => sum + parseWeightKg(order.weight), 0);
+    weightLabel = formatKg(summed);
+  }
+
+  return { packName, tripNumber, transportFee, exportCost, pieceCount, weightLabel };
+}
+
 export async function fetchInventoryConsoleOrdersByPack(packBarcode: string): Promise<{
   recentOrders: InventoryOrderRow[];
+  packGlance?: PackGlance | null;
   ordersTruncated?: boolean;
   warnings?: string[];
 }> {
@@ -670,8 +856,10 @@ export async function fetchInventoryConsoleOrdersByPack(packBarcode: string): Pr
   if (!response.ok) {
     throw new Error(payload.error || `加载失败 (${response.status})`);
   }
+  const recentOrders = await withPackTrips((payload.recentOrders ?? []) as InventoryOrderRow[]);
   return {
-    recentOrders: (payload.recentOrders ?? []) as InventoryOrderRow[],
+    recentOrders,
+    packGlance: await fillPackGlance(code, recentOrders, payload.packGlance ?? null),
     ordersTruncated: Boolean(payload.ordersTruncated),
     warnings: payload.warnings,
   };
@@ -708,6 +896,77 @@ export async function fetchPeriodSignedIncome(
     extraMmk: Number(payload.extraMmk) || 0,
     extraCny: Number(payload.extraCny) || 0,
   };
+}
+
+export type ExpressDetailRow = {
+  id: string;
+  customerName: string;
+  productName: string;
+  expressBarcode: string;
+  inboundBarcode: string;
+  destination: string;
+  spec: string;
+  unit: string;
+  weight: string;
+  qty: number;
+  status: string;
+  packed: boolean;
+  packBarcode: string;
+  ownerStoreCode: string;
+  note: string;
+  inboundAt: string;
+  updatedAt: string;
+  arrivedAt: string;
+  signedAt: string;
+  exceptionStatus: string;
+  phone?: string;
+  address?: string;
+  packaging?: string;
+  inboundNote?: string;
+  inboundStore?: string;
+  exceptions?: Array<{
+    id: string;
+    type: string;
+    status: string;
+    note: string;
+    createdAt: string;
+    resolvedAt: string;
+  }>;
+};
+
+export async function fetchExpressDetails(options?: {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+}): Promise<{ items: ExpressDetailRow[]; total: number; hasMore: boolean; page: number; pageSize: number }> {
+  const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
+  url.searchParams.set('section', 'express-details');
+  url.searchParams.set('listPage', String(options?.page && options.page > 0 ? options.page : 1));
+  url.searchParams.set('listPageSize', String(options?.pageSize && options.pageSize > 0 ? options.pageSize : 20));
+  const q = String(options?.q || '').trim();
+  if (q) url.searchParams.set('q', q);
+  const response = await adminAuthenticatedFetch(url.toString(), { method: 'GET', credentials: 'include' });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `加载快递明细失败 (${response.status})`);
+  if (!Array.isArray(payload.items)) throw new Error('快递明细还没接到后台');
+  return {
+    items: payload.items as ExpressDetailRow[],
+    total: Number.isFinite(Number(payload.total)) ? Number(payload.total) : -1,
+    hasMore: Boolean(payload.hasMore),
+    page: Number(payload.page) || 1,
+    pageSize: Number(payload.pageSize) || 20,
+  };
+}
+
+export async function fetchExpressDetail(id: string): Promise<ExpressDetailRow> {
+  const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
+  url.searchParams.set('section', 'express-details');
+  url.searchParams.set('id', id);
+  const response = await adminAuthenticatedFetch(url.toString(), { method: 'GET', credentials: 'include' });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `加载订单详情失败 (${response.status})`);
+  if (!payload.detail) throw new Error('没有这张订单');
+  return payload.detail as ExpressDetailRow;
 }
 
 export async function fetchInventoryCustomerSummaries(): Promise<{
@@ -1222,6 +1481,7 @@ export async function submitCrossBorderStockIn(body: {
   customerCode?: string;
   inboundDate: string;
   quoteCny?: string;
+  chargeBasis?: 'volume' | 'weight';
   pay: 'cod' | 'prepaid';
   note?: string;
   detailAddress?: string;

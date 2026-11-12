@@ -27,6 +27,7 @@ import RegionFilterBar from '../components/RegionFilterBar';
 import PhoneBarcodeScanModal from '../components/PhoneBarcodeScanModal';
 import { normalizeScanCode } from '../utils/barcodeScan';
 import { itemMatchesKeyword } from '../utils/itemKeywordMatch';
+import { resolveSelectedRows } from '../utils/resolveSelectedRows';
 import { useAuth } from '../contexts/AuthContext';
 import { packOrderBarcodeData, listItemOrderBarcodeData, type PackBarcodePayload } from '../utils/orderBarcodeData';
 import { runBarcodeLabelPrintWithAlert } from '../services/labelPrintFlow';
@@ -58,7 +59,7 @@ import { isExpressPackItem } from '../utils/packItem';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 import { feedbackService } from '../services/FeedbackService';
-import { listOpenExceptionBarcodes } from '../services/inventoryExceptionService';
+import { listExceptionBarcodeMarks } from '../services/inventoryExceptionService';
 import type { ExceptionReportTarget } from '../types/inventoryException';
 import { exceptionTargetFromItem } from '../utils/inventoryException';
 import { needsArrivalNotify } from '../utils/arrivalNotify';
@@ -71,6 +72,16 @@ type Nav = {
   setParams: (params: { initialMode?: 'pack' | 'sign' }) => void;
   goBack: () => void;
 };
+
+function exceptionStateForItem(
+  item: InventoryItemListRow,
+  marks: { open: Set<string>; resolved: Set<string> },
+): 'open' | 'resolved' | null {
+  const codes = [item.barcode, item.input_barcode || ''].map((code) => code.trim().toUpperCase()).filter(Boolean);
+  if (codes.some((code) => marks.open.has(code))) return 'open';
+  if (codes.some((code) => marks.resolved.has(code))) return 'resolved';
+  return null;
+}
 
 type ItemsRoute = RouteProp<RootStackParamList, 'Items'>;
 
@@ -113,13 +124,17 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const [filterRegion, setFilterRegion] = useState('');
   const [statusFilter, setStatusFilter] = useState<'' | 'unpacked' | 'signed'>('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const selectedItemById = useRef(new Map<string, InventoryItemListRow>());
   const [packModalVisible, setPackModalVisible] = useState(false);
   const [actionItem, setActionItem] = useState<InventoryItemListRow | null>(null);
   const [actionCanEdit, setActionCanEdit] = useState(false);
   const [viewItemId, setViewItemId] = useState<string | null>(null);
   const [exceptionTarget, setExceptionTarget] = useState<ExceptionReportTarget | null>(null);
   const [notifyTargets, setNotifyTargets] = useState<ArrivalNotifyTarget[]>([]);
-  const [openExceptionCodes, setOpenExceptionCodes] = useState<Set<string>>(new Set());
+  const [exceptionMarks, setExceptionMarks] = useState<{
+    open: Set<string>;
+    resolved: Set<string>;
+  }>({ open: new Set(), resolved: new Set() });
   const [orderBarcodeRequireDone, setOrderBarcodeRequireDone] = useState(false);
   const [signRequest, setSignRequest] = useState<CustomerSignFlowRequest | null>(null);
   const [invoiceVisible, setInvoiceVisible] = useState(false);
@@ -171,13 +186,14 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   useFocusEffect(
     useCallback(() => {
       void load();
-      void listOpenExceptionBarcodes()
-        .then(setOpenExceptionCodes)
-        .catch(() => setOpenExceptionCodes(new Set()));
+      void listExceptionBarcodeMarks()
+        .then(setExceptionMarks)
+        .catch(() => setExceptionMarks({ open: new Set(), resolved: new Set() }));
     }, [load]),
   );
 
   useEffect(() => {
+    selectedItemById.current.clear();
     setSelectedIds(new Set());
   }, [listMode, filterRegion, statusFilter]);
 
@@ -234,8 +250,8 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   }, [items, filterRegion, statusFilter, incompleteOnly]);
 
   const selectedItems = useMemo(
-    () => displayedItems.filter((i) => selectedIds.has(i.id)),
-    [displayedItems, selectedIds],
+    () => resolveSelectedRows(items, selectedIds, selectedItemById.current),
+    [items, selectedIds],
   );
 
   const selectActive = listMode !== 'normal';
@@ -251,23 +267,39 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
       setSelectedIds((prev) => {
         const next = new Set(prev);
         const allSelected = peerIds.every((peerId) => next.has(peerId));
-        if (allSelected) peerIds.forEach((peerId) => next.delete(peerId));
-        else peerIds.forEach((peerId) => next.add(peerId));
+        if (allSelected) {
+          peerIds.forEach((peerId) => {
+            next.delete(peerId);
+            selectedItemById.current.delete(peerId);
+          });
+        } else {
+          peers.forEach((peer) => {
+            next.add(peer.id);
+            selectedItemById.current.set(peer.id, peer);
+          });
+        }
         return next;
       });
       return;
     }
 
+    const picked = displayedItems.find((item) => item.id === id) ?? items.find((item) => item.id === id);
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+        selectedItemById.current.delete(id);
+      } else {
+        next.add(id);
+        if (picked) selectedItemById.current.set(id, picked);
+      }
       return next;
     });
   };
 
   const exitSelectMode = () => {
     setListMode('normal');
+    selectedItemById.current.clear();
     setSelectedIds(new Set());
     setPackModalVisible(false);
   };
@@ -364,6 +396,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
       t.items.packSuccess,
       `${bundleItem.name}\n${bundleItem.barcode}`,
     );
+    selectedItemById.current.clear();
     setSelectedIds(new Set());
     await load();
     openPackBarcode(
@@ -405,6 +438,8 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
       return;
     }
     if (item.stocked_in && !item.packed && item.qty_on_hand > 0) {
+      selectedItemById.current.clear();
+      selectedItemById.current.set(item.id, item);
       setSelectedIds(new Set([item.id]));
       setListMode('pack');
       setPackModalVisible(true);
@@ -591,10 +626,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
             selected={selectedIds.has(item.id)}
             selectActive={selectActive}
             selectAccent={selectAccent}
-            hasOpenException={
-              openExceptionCodes.has(item.barcode.trim().toUpperCase())
-              || openExceptionCodes.has((item.input_barcode || '').trim().toUpperCase())
-            }
+            exceptionState={exceptionStateForItem(item, exceptionMarks)}
             unnotified={!!store && needsArrivalNotify(store, item)}
             onPress={() => {
               if (selectActive) toggleSelect(item.id);
@@ -699,8 +731,8 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         target={exceptionTarget}
         onClose={() => setExceptionTarget(null)}
         onSubmitted={() => {
-          void listOpenExceptionBarcodes()
-            .then(setOpenExceptionCodes)
+          void listExceptionBarcodeMarks()
+            .then(setExceptionMarks)
             .catch(() => undefined);
         }}
       />
@@ -761,6 +793,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         onClose={() => setSignRequest(null)}
         resolveError={(e) => resolveAppError(t, e)}
         onSuccess={(detail, signedCount) => {
+          selectedItemById.current.clear();
           setSelectedIds(new Set());
           exitSelectMode();
           showTaskSuccess(

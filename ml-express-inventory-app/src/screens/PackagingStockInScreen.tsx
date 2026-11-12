@@ -51,7 +51,7 @@ import {
 } from '../utils/crossBorderPricing';
 import { formatCnyInput } from '../utils/crossBorderFx';
 import { chargeBasisNote } from '../utils/inboundMovementNote';
-import { volumetricWeightKg } from '../utils/volumetricWeight';
+import { preferredChargeBasis, volumetricWeightKg } from '../utils/volumetricWeight';
 import { loadStockInContactDraft, saveStockInContactDraft } from '../utils/stockInDraft';
 import { normalizePackageOriginPrefix } from '../utils/packageNumber';
 import { resolveAppError, useTranslation } from '../i18n';
@@ -116,6 +116,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
   const [totalFee, setTotalFee] = useState('');
   const [totalFeeManual, setTotalFeeManual] = useState(false);
   const [chargeBasis, setChargeBasis] = useState<'volume' | 'weight'>('weight');
+  const [chargeManual, setChargeManual] = useState(false);
   const [payCod, setPayCod] = useState(false);
   const [payPrepaid, setPayPrepaid] = useState(false);
   const [batchNote, setBatchNote] = useState('');
@@ -157,6 +158,21 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     [specL, specW, specH],
   );
   const chargeKg = chargeBasis === 'volume' ? volumetricKg ?? 0 : Number(batchWeightN.trim()) || 0;
+  const autoBasis = preferredChargeBasis(volumetricKg, Number(batchWeightN.trim()) || 0);
+  const chargeHint = chargeManual
+    ? t.stockIn.chargeManual
+    : autoBasis === 'volume'
+      ? t.stockIn.chargeAutoVolume
+      : autoBasis === 'weight'
+        ? t.stockIn.chargeAutoWeight
+        : '';
+
+  useEffect(() => {
+    if (chargeManual) return;
+    if (!autoBasis || autoBasis === chargeBasis) return;
+    setTotalFeeManual(false);
+    setChargeBasis(autoBasis);
+  }, [chargeManual, autoBasis, chargeBasis]);
   const canAutoTotalFee = batchDestination.trim() && chargeKg > 0 && paymentSelected;
   const grandTotalFee = useMemo(() => {
     const fee = Number(totalFee);
@@ -337,6 +353,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     setTotalFee('');
     setTotalFeeManual(false);
     setChargeBasis('weight');
+    setChargeManual(false);
     setPayCod(false);
     setPayPrepaid(false);
     setBatchNote('');
@@ -652,6 +669,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
                   setSpecL(l);
                   setSpecW(w);
                   setSpecH(h);
+                  setChargeManual(false);
                 }}
               />
               <VolumetricWeightLine l={specL} w={specW} h={specH} />
@@ -662,12 +680,15 @@ export default function PackagingStockInScreen({ navigation }: Props) {
                 onChange={(v) => {
                   setBatchWeightN(v);
                   setTotalFeeManual(false);
+                  setChargeManual(false);
                 }}
                 placeholder="0"
               />
               <ChargeBasisField
                 basis={chargeBasis}
+                hint={chargeHint}
                 onChange={(basis) => {
+                  setChargeManual(true);
                   setChargeBasis(basis);
                   setTotalFeeManual(false);
                 }}

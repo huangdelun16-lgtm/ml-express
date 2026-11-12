@@ -27,6 +27,18 @@ export function volumetricWeightFromSpec(spec: string | null | undefined): numbe
   return volumetricWeightKg(parts.l, parts.w, parts.h);
 }
 
+/**
+ * 两边都有数时才比较。体积重量更大就用体积重量，否则用实际重量。
+ * 还没填齐时返回 null，调用方保持现状。
+ */
+export function preferredChargeBasis(
+  volumetricKg: number | null,
+  actualKg: number,
+): 'volume' | 'weight' | null {
+  if (!(actualKg > 0) || volumetricKg == null || !(volumetricKg > 0)) return null;
+  return volumetricKg > actualKg ? 'volume' : 'weight';
+}
+
 /** 30×20×15=9000÷6000 */
 export function volumetricFormula(l: string, w: string, h: string): string {
   const a = positiveDim(l);

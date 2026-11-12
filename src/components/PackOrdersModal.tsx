@@ -3,16 +3,13 @@ import { createPortal } from 'react-dom';
 import {
   fetchInventoryConsoleOrdersByPack,
   type InventoryOrderRow,
+  type PackGlance,
 } from '../services/inventoryConsoleService';
 import { filterOrders } from '../utils/crossBorderConsoleSearch';
 import { INVENTORY_CONSOLE_LIST_LIMIT } from '../services/inventoryConsoleService';
 import CblSearchCombobox from './CblSearchCombobox';
-import CblContactActions from './CblContactActions';
+import TransportOrderList from './TransportOrderList';
 import type { CblSearchOption } from '../utils/cblSearchCombobox';
-import {
-  orderTrackingStatusBadgeClass,
-  orderTrackingStatusLabel,
-} from '../utils/inventoryOrderTracking';
 import '../styles/crossBorderLogistics.css';
 
 export type PackOrdersTarget = {
@@ -30,40 +27,25 @@ type Props = {
   onClose: () => void;
 };
 
-function formatDateTime(value?: string | null, lang: string = 'zh'): string {
-  if (!value) return '—';
-  try {
-    const loc = lang === 'en' ? 'en-US' : 'zh-CN';
-    return new Date(value).toLocaleString(loc, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return value;
-  }
+function formatFee(fee: number | null | undefined): string {
+  if (fee == null || !Number.isFinite(fee)) return '—';
+  return `${Math.round(fee).toLocaleString('en-US')} MMK`;
 }
 
-function notifyLabel(order: InventoryOrderRow, isEn: boolean, language: string): string {
-  if (order.arrival_notified_at) return formatDateTime(order.arrival_notified_at, language);
-  if (order.status === 'hub_received' || order.hub_received_at) {
-    return isEn ? 'Not notified' : '未通知';
+function formatExportCost(cost: PackGlance['exportCost'], isEn: boolean): string {
+  if (!cost) return isEn ? 'Not filled' : '未填';
+  if (cost.payCurrency === 'MMK') {
+    return `${Math.round(cost.totalMmk).toLocaleString('en-US')} MMK`;
   }
-  return '—';
-}
-
-function signedLabel(order: InventoryOrderRow, isEn: boolean, language: string): string {
-  if (order.customer_signed_at) return formatDateTime(order.customer_signed_at, language);
-  if (order.status === 'hub_received' || order.hub_received_at) {
-    return isEn ? 'Awaiting pickup' : '待签收';
-  }
-  return '—';
+  const total = Number(cost.totalCny) || 0;
+  const text = `¥${total.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+  if (cost.unitPriceCny > 0) return `${text} · ¥${cost.unitPriceCny}/Kg`;
+  return text;
 }
 
 const PackOrdersModal: React.FC<Props> = ({ open, pack, isEn, language, onClose }) => {
   const [orders, setOrders] = useState<InventoryOrderRow[]>([]);
+  const [glance, setGlance] = useState<PackGlance | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -72,6 +54,7 @@ const PackOrdersModal: React.FC<Props> = ({ open, pack, isEn, language, onClose 
   useEffect(() => {
     if (!open || !pack?.pack_barcode) {
       setOrders([]);
+      setGlance(null);
       setError('');
       setSearch('');
       setTruncated(false);
@@ -86,11 +69,13 @@ const PackOrdersModal: React.FC<Props> = ({ open, pack, isEn, language, onClose 
       .then((result) => {
         if (cancelled) return;
         setOrders(result.recentOrders);
+        setGlance(result.packGlance ?? null);
         setTruncated(Boolean(result.ordersTruncated) || result.recentOrders.length >= INVENTORY_CONSOLE_LIST_LIMIT);
       })
       .catch((err) => {
         if (cancelled) return;
         setOrders([]);
+        setGlance(null);
         setTruncated(false);
         setError(err instanceof Error ? err.message : isEn ? 'Failed to load' : '加载失败');
       })
@@ -104,6 +89,14 @@ const PackOrdersModal: React.FC<Props> = ({ open, pack, isEn, language, onClose 
   }, [open, pack?.pack_barcode, isEn]);
 
   const visibleOrders = useMemo(() => filterOrders(orders, search), [orders, search]);
+  const cargoLabel = useMemo(() => {
+    const counted = orders.reduce((sum, order) => sum + (Number(order.qty) || 0), 0);
+    const pieces = glance?.pieceCount ?? (counted > 0 ? counted : null);
+    const weight = String(glance?.weightLabel || '').trim();
+    const pieceText = pieces && pieces > 0 ? `${pieces} ${isEn ? 'pcs' : '件'}` : '';
+    return [pieceText, weight].filter(Boolean).join(' · ');
+  }, [glance?.pieceCount, glance?.weightLabel, orders, isEn]);
+  const tripLabel = String(glance?.tripNumber || pack?.trip_number || '').trim();
   const searchOptions = useMemo((): CblSearchOption[] => {
     return orders.map((order) => ({
       id: order.id,
@@ -162,6 +155,24 @@ const PackOrdersModal: React.FC<Props> = ({ open, pack, isEn, language, onClose 
               ? 'Headquarters view only. Customer pickup and arrival notify stay on Inventory App.'
               : '总部只看，不代客户签收、不代发到站通知。签收与通知以站点 Inventory App 为准。'}
           </p>
+          <dl className="cbl-pack-orders-modal__facts">
+            <div>
+              <dt>{isEn ? 'Pieces and weight' : '件数和重量'}</dt>
+              <dd>{loading ? '…' : cargoLabel || '—'}</dd>
+            </div>
+            <div>
+              <dt>{isEn ? 'Trip' : '车次'}</dt>
+              <dd>{loading ? '…' : tripLabel || '—'}</dd>
+            </div>
+            <div>
+              <dt>{isEn ? 'Truck fee' : '车费'}</dt>
+              <dd>{loading ? '…' : formatFee(glance?.transportFee)}</dd>
+            </div>
+            <div>
+              <dt>{isEn ? 'Export cost' : '出口成本'}</dt>
+              <dd>{loading ? '…' : formatExportCost(glance?.exportCost ?? null, isEn)}</dd>
+            </div>
+          </dl>
           <CblSearchCombobox
             value={search}
             onChange={setSearch}
@@ -189,55 +200,12 @@ const PackOrdersModal: React.FC<Props> = ({ open, pack, isEn, language, onClose 
           {loading ? (
             <div className="cbl-empty">{isEn ? 'Loading orders…' : '正在加载包内订单…'}</div>
           ) : visibleOrders.length ? (
-            <div className="cbl-table-wrap">
-              <table className="cbl-table">
-                <thead>
-                  <tr>
-                    <th>{isEn ? 'Order' : '订单条码'}</th>
-                    <th>{isEn ? 'Customer' : '客户'}</th>
-                    <th>{isEn ? 'Phone' : '电话'}</th>
-                    <th>{isEn ? 'Destination' : '目的地'}</th>
-                    <th>{isEn ? 'Status' : '状态'}</th>
-                    <th>{isEn ? 'Notify' : '通知'}</th>
-                    <th>{isEn ? 'Signed' : '签收'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleOrders.map((order) => (
-                    <tr key={order.id}>
-                      <td>
-                        <div style={{ fontWeight: 650 }}>{order.order_barcode || '—'}</div>
-                        {order.express_barcode ? (
-                          <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
-                            {order.express_barcode}
-                          </div>
-                        ) : null}
-                      </td>
-                      <td>{order.recipient_name || order.order_name || '—'}</td>
-                      <td>
-                        <CblContactActions
-                          phone={order.recipient_phone}
-                          isEn={isEn}
-                          message={
-                            isEn
-                              ? `Hello, this is ML Express regarding ${order.order_barcode || 'your shipment'}.`
-                              : `您好，我是 ML Express，关于快件 ${order.order_barcode || ''}。`
-                          }
-                        />
-                      </td>
-                      <td>{order.destination_code || '—'}</td>
-                      <td>
-                        <span className={orderTrackingStatusBadgeClass(order.status)}>
-                          {orderTrackingStatusLabel(order.status, isEn)}
-                        </span>
-                      </td>
-                      <td>{notifyLabel(order, isEn, language)}</td>
-                      <td>{signedLabel(order, isEn, language)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <TransportOrderList
+              orders={visibleOrders}
+              isEn={isEn}
+              language={language}
+              showPack={false}
+            />
           ) : (
             <div className="cbl-empty">
               {search.trim()

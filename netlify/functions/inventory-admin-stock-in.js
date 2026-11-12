@@ -75,10 +75,22 @@ function inboundIso(ymd) {
   return `${day}T${clock.hour}:${clock.minute}:${clock.second}.000+06:30`;
 }
 
+function volumetricKgFromSpec(spec) {
+  const match = String(spec || '').trim().match(/^(\S+)\s*x\s*(\S+)\s*x\s*(\S+)\s*cm$/i);
+  if (!match) return 0;
+  const a = Number(match[1]);
+  const b = Number(match[2]);
+  const c = Number(match[3]);
+  if (!(a > 0) || !(b > 0) || !(c > 0)) return 0;
+  const kg = Math.round(((a * b * c) / 6000) * 100) / 100;
+  return kg > 0 ? kg : 0;
+}
+
 function quoteNote(body) {
   const parts = [];
   const quote = String(body.quoteCny || '').trim();
   if (quote) parts.push(`报价 ${quote} CNY`);
+  parts.push(body.chargeBasis === 'volume' ? '收费体积' : '收费重量');
   if (body.pay === 'cod') parts.push('到付');
   if (body.pay === 'prepaid') parts.push('预付');
   const note = String(body.note || '').trim();
@@ -193,6 +205,9 @@ async function executeStockIn(supabase, body, operator) {
   if (!recipientName) return fail(400, '请填写客户姓名');
   if (!recipientPhone) return fail(400, '请填写手机号码');
   if (!pay) return fail(400, '请选择到付或预付');
+  if (body.chargeBasis === 'volume' && !(volumetricKgFromSpec(body.spec) > 0)) {
+    return fail(400, '按体积重量收费时，请先填写长、宽、高');
+  }
 
   const note = quoteNote(body);
   const inboundAt = inboundIso(body.inboundDate);
