@@ -1,5 +1,10 @@
 apply plugin: "com.android.application"
-apply plugin: "org.jetbrains.kotlin.android"
+// AGP 9 enables built-in Kotlin. Applying kotlin-android again fails with
+// "Cannot add extension with name 'kotlin'".
+def builtInKotlin = (findProperty("android.builtInKotlin")?.toString() ?: "true").toBoolean()
+if (!builtInKotlin) {
+    apply plugin: "org.jetbrains.kotlin.android"
+}
 apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
