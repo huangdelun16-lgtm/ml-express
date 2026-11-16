@@ -163,12 +163,13 @@ export default function HomeToolsSection({
   onNearby,
   onTrack,
   onSupport,
-}: Props) {
+  dark = false,
+}: Props & { dark?: boolean }) {
   return (
     <View style={styles.wrap}>
       <View style={styles.sectionHead}>
         <View style={styles.sectionBar} />
-        <FitLabel text={t.logistics} style={styles.sectionTitle} />
+        <FitLabel text={t.logistics} style={[styles.sectionTitle, dark && styles.sectionTitleDark]} />
         <TouchableOpacity onPress={onViewAll} hitSlop={8} style={styles.viewAllBtn}>
           <FitLabel text={t.viewAll} style={styles.viewAll} weight="semibold" />
           <Ionicons name="chevron-forward" size={14} color={TEAL} />
@@ -321,6 +322,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: '800',
     color: NAVY,
+  },
+  sectionTitleDark: {
+    color: '#F8FAFC',
   },
   viewAllBtn: {
     flexDirection: 'row',

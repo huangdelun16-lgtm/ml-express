@@ -16,7 +16,7 @@ import { theme } from '../config/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function NotificationCenterScreen({ navigation }: any) {
-  const { language } = useApp();
+  const { language, isDarkMode } = useApp();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
@@ -126,7 +126,7 @@ export default function NotificationCenterScreen({ navigation }: any) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDarkMode && { backgroundColor: '#0B1220' }]}>
       <LinearGradient
         colors={['#1F7A84', '#2C98A6']}
         style={styles.header}

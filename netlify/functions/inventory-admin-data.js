@@ -16,7 +16,12 @@ const { getAdminTokenFromEvent } = require('./utils/adminToken');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 const { aggregateFinanceForTransitStores } = require('./utils/inventoryFinanceAggregate');
 const { selectExportCostRows } = require('./utils/exportCostFinance');
-const { loadHqTodoCounts, loadPendingExportCosts, loadHqQueue } = require('./utils/inventoryHqMirror');
+const {
+  loadHqTodoCounts,
+  loadPendingExportCosts,
+  loadHqQueue,
+  annotateExportCostsWithPackBarcode,
+} = require('./utils/inventoryHqMirror');
 const { fetchPeriodSignedIncome } = require('./utils/inventoryCustomerAggregate');
 const { parseFinancePeriodQuery } = require('./utils/yangonFinancePeriod');
 const {
@@ -1505,7 +1510,7 @@ async function handleExportCosts(supabase, warnings, financeScope, queryText) {
   const { data, error } = await supabase
     .from('inventory_export_costs')
     .select(
-      'id, subject_kind, display_barcode, customer_name, final_destination, leg_origin, leg_destination, weight_kg, unit_price_cny, total_cny, pay_currency, fx_mmk_per_cny, total_mmk, trip_number, store_code, created_by, created_at',
+      'id, subject_kind, subject_key, display_barcode, customer_name, final_destination, leg_origin, leg_destination, weight_kg, unit_price_cny, total_cny, pay_currency, fx_mmk_per_cny, total_mmk, trip_number, store_code, created_by, created_at',
     )
     .order('created_at', { ascending: false })
     .limit(500);
@@ -1526,7 +1531,9 @@ async function handleExportCosts(supabase, warnings, financeScope, queryText) {
     truncated: false,
   };
   try {
-    pendingExport = await loadPendingExportCosts(supabase, queryText);
+    const loaded = await loadPendingExportCosts(supabase, queryText);
+    pendingExport = loaded.pendingExport;
+    saved.exportCosts = annotateExportCostsWithPackBarcode(saved.exportCosts, loaded.items);
   } catch (pendingError) {
     warnings.push(pendingError?.message || '待填出口成本加载失败');
   }

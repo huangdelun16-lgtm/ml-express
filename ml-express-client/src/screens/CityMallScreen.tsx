@@ -51,7 +51,7 @@ interface DeliveryStore {
   updated_at?: string | null;
 }
 
-const AllMerchantsSectionHeader = React.memo(({ title, count, language }: { title: string; count: number; language: string }) => {
+const AllMerchantsSectionHeader = React.memo(({ title, count, language, dark = false }: { title: string; count: number; language: string; dark?: boolean }) => {
   const kicker =
     language === 'zh' ? '精选商户' : language === 'en' ? 'Curated stores' : 'ရွေးချယ်ထားသော ဆိုင်များ';
   return (
@@ -64,9 +64,9 @@ const AllMerchantsSectionHeader = React.memo(({ title, count, language }: { titl
           style={styles.allMerchantsAccentBar}
         />
         <View style={styles.allMerchantsTitleBlock}>
-          <Text style={styles.allMerchantsKicker}>{kicker}</Text>
+          <Text style={[styles.allMerchantsKicker, dark && styles.mutedDark]}>{kicker}</Text>
           <View style={styles.allMerchantsTitleLine}>
-            <Text style={styles.allMerchantsTitleText}>{title}</Text>
+            <Text style={[styles.allMerchantsTitleText, dark && styles.textDark]}>{title}</Text>
             {count > 0 ? (
               <View style={styles.allMerchantsCountPill}>
                 <Text style={styles.allMerchantsCountText}>{count}</Text>
@@ -86,7 +86,7 @@ const AllMerchantsSectionHeader = React.memo(({ title, count, language }: { titl
 });
 
 // 🚀 优化：使用 React.memo 包装组件，减少不必要的重绘
-const StoreCard = React.memo(({ item, status, language, t, productMatches, stats, onVisit, onShowReviews }: any) => {
+const StoreCard = React.memo(({ item, status, language, t, productMatches, stats, onVisit, onShowReviews, dark }: any) => {
   const matchedProducts = productMatches[item.id] || [];
   const statusLabel = status.isOpen
     ? t.openNow
@@ -101,7 +101,7 @@ const StoreCard = React.memo(({ item, status, language, t, productMatches, stats
 
   return (
     <TouchableOpacity
-      style={[styles.storeCard, !status.isOpen && styles.storeCardClosed]}
+      style={[styles.storeCard, dark && styles.cardDark, !status.isOpen && styles.storeCardClosed]}
       onPress={() => onVisit(item, status)}
       activeOpacity={status.isOpen ? 0.86 : 1}
     >
@@ -126,7 +126,7 @@ const StoreCard = React.memo(({ item, status, language, t, productMatches, stats
 
         <View style={styles.storeMainInfo}>
           <View style={styles.storeTitleRow}>
-            <Text style={[styles.storeName, !status.isOpen && styles.storeNameClosed]} numberOfLines={1}>
+            <Text style={[styles.storeName, dark && styles.textDark, !status.isOpen && styles.storeNameClosed]} numberOfLines={1}>
               {item.store_name}
             </Text>
             <View style={[styles.statusPill, status.isOpen ? styles.statusPillOpen : styles.statusPillClosed]}>
@@ -181,17 +181,17 @@ const StoreCard = React.memo(({ item, status, language, t, productMatches, stats
   );
 });
 
-const ProductCard = React.memo(({ item, t, onVisit, onAddToCart, language }: any) => {
+const ProductCard = React.memo(({ item, t, onVisit, onAddToCart, language, dark }: any) => {
   const store = item.delivery_stores;
   const storeStatus = store ? checkStoreOpenStatus(store as any) : { isOpen: true };
   const langKey = language === 'zh' ? 'zh' : language === 'my' ? 'my' : 'en';
 
   return (
-    <TouchableOpacity style={styles.productCard} onPress={() => onVisit(item, store)} activeOpacity={0.86}>
+    <TouchableOpacity style={[styles.productCard, dark && styles.cardDark]} onPress={() => onVisit(item, store)} activeOpacity={0.86}>
       <View style={styles.productMain}>
         <ProxiedImage uri={item.image_url} style={styles.productImage} iconSize={22} />
         <View style={styles.productInfo}>
-          <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+          <Text style={[styles.productName, dark && styles.textDark]} numberOfLines={2}>{item.name}</Text>
           <Text style={styles.productPrice} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
             {formatProductPriceLabel(item, langKey)}
           </Text>
@@ -272,7 +272,7 @@ const checkStoreOpenStatus = (store: DeliveryStore) => {
 };
 
 export default function CityMallScreen({ navigation }: any) {
-  const { language } = useApp();
+  const { language, isDarkMode } = useApp();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -660,13 +660,13 @@ export default function CityMallScreen({ navigation }: any) {
     switch (item.type) {
       case 'header':
         return (
-          <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <View style={[styles.header, isDarkMode && styles.pageDark, { paddingTop: insets.top + 8 }]}>
             <View style={styles.headerContent}>
-              <Text style={styles.headerTitle}>{t.title}</Text>
-              <View style={styles.searchContainer}>
+              <Text style={[styles.headerTitle, isDarkMode && styles.textDark]}>{t.title}</Text>
+              <View style={[styles.searchContainer, isDarkMode && styles.inputDark]}>
                 <Ionicons name="search" size={20} color="#94a3b8" />
                 <TextInput
-                  style={styles.searchInput}
+                  style={[styles.searchInput, isDarkMode && styles.textDark]}
                   placeholder={t.searchPlaceholder}
                   placeholderTextColor="#94a3b8"
                   value={searchText}
@@ -679,7 +679,7 @@ export default function CityMallScreen({ navigation }: any) {
         );
       case 'region':
         return (
-          <View style={styles.regionContainer}>
+          <View style={[styles.regionContainer, isDarkMode && styles.pageDark]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.regionScroll}>
               {regions.map((region) => (
                 <TouchableOpacity
@@ -688,7 +688,7 @@ export default function CityMallScreen({ navigation }: any) {
                     Vibration.vibrate(10);
                     setSelectedRegion(region.id);
                   }}
-                  style={[styles.regionTab, selectedRegion === region.id && styles.regionTabActive]}
+                  style={[styles.regionTab, isDarkMode && styles.chipDark, selectedRegion === region.id && styles.regionTabActive]}
                 >
                   <Text style={[styles.regionTabText, selectedRegion === region.id && styles.regionTabTextActive]}>
                     {language === 'zh' ? region.zh : (language === 'en' ? region.en : region.my)}
@@ -701,7 +701,7 @@ export default function CityMallScreen({ navigation }: any) {
         );
       case 'categories':
         return (
-          <View style={styles.categoryContainer}>
+          <View style={[styles.categoryContainer, isDarkMode && styles.pageDark]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
               {categories.map((cat) => (
                 <TouchableOpacity
@@ -712,7 +712,7 @@ export default function CityMallScreen({ navigation }: any) {
                   }}
                   style={[styles.categoryItem, selectedCategory === cat.id && styles.categoryItemActive]}
                 >
-                  <View style={[styles.categoryIconCircle, selectedCategory === cat.id && styles.categoryIconCircleActive]}>
+                  <View style={[styles.categoryIconCircle, isDarkMode && styles.chipDark, selectedCategory === cat.id && styles.categoryIconCircleActive]}>
                     <Ionicons name={cat.icon as any} size={20} color={selectedCategory === cat.id ? '#fff' : '#94a3b8'} />
                   </View>
                   <Text style={[styles.categoryText, selectedCategory === cat.id && styles.categoryTextActive]}>
@@ -770,7 +770,7 @@ export default function CityMallScreen({ navigation }: any) {
         return (
           <View style={styles.sectionContainer}>
             <View style={[styles.sectionHeader, { paddingHorizontal: 20 }]}>
-              <Text style={styles.sectionTitle}>{t.guessYouLike}</Text>
+              <Text style={[styles.sectionTitle, isDarkMode && styles.textDark]}>{t.guessYouLike}</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
               <View style={{ width: 20 }} />
@@ -781,7 +781,7 @@ export default function CityMallScreen({ navigation }: any) {
                 return (
                   <TouchableOpacity
                     key={store.id}
-                    style={styles.hStoreCard}
+                    style={[styles.hStoreCard, isDarkMode && styles.cardDark]}
                     onPress={() => handleStoreVisit(store, status)}
                   >
                     <View style={styles.hStoreIconContainer}>
@@ -792,7 +792,7 @@ export default function CityMallScreen({ navigation }: any) {
                       )}
                       {!status.isOpen && <View style={styles.hStoreClosedOverlay}><Text style={styles.hStoreClosedText}>{t.closedNow}</Text></View>}
                     </View>
-                    <Text style={styles.hStoreName} numberOfLines={1}>{store.store_name}</Text>
+                    <Text style={[styles.hStoreName, isDarkMode && styles.textDark]} numberOfLines={1}>{store.store_name}</Text>
                     <View style={styles.hStoreStats}>
                     <Text style={styles.hStoreRating}>★ {stats?.average || '4.9'}</Text>
                       <Text style={styles.hStoreDistance}>{getStoreTypeLabel(store.store_type, language).slice(0, 4)}</Text>
@@ -809,6 +809,7 @@ export default function CityMallScreen({ navigation }: any) {
             title={t.allMerchants}
             count={filteredStores.length}
             language={language}
+            dark={isDarkMode}
           />
         );
       case 'store':
@@ -822,6 +823,7 @@ export default function CityMallScreen({ navigation }: any) {
             stats={storeReviewStats[item.id]}
             onVisit={handleStoreVisit}
             onShowReviews={loadStoreReviews}
+            dark={isDarkMode}
           />
         );
       case 'product':
@@ -832,6 +834,7 @@ export default function CityMallScreen({ navigation }: any) {
             language={language}
             onVisit={handleProductVisit} 
             onAddToCart={handleAddToCart}
+            dark={isDarkMode}
           />
         );
       case 'search_tabs':
@@ -861,7 +864,7 @@ export default function CityMallScreen({ navigation }: any) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDarkMode && styles.pageDark]}>
       {loading && listData.length === 0 ? (
         <ScrollView style={styles.loadingContainer} contentContainerStyle={[styles.loadingContent, { paddingTop: insets.top + 24 }]}>
           <ListItemSkeleton />
@@ -1664,4 +1667,10 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     textAlign: 'center',
   },
+  pageDark: { backgroundColor: '#0B1220' },
+  cardDark: { backgroundColor: '#152033', borderColor: '#243044' },
+  textDark: { color: '#F8FAFC' },
+  mutedDark: { color: '#94A3B8' },
+  inputDark: { backgroundColor: '#1C2C40', borderColor: '#243044' },
+  chipDark: { backgroundColor: '#1C2C40', borderColor: '#243044' },
 });

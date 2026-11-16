@@ -21,7 +21,7 @@ const PAGE_BG = '#F3F5F7';
 const NAVY = '#0f172a';
 
 export default function CartScreen({ navigation }: any) {
-  const { language } = useApp();
+  const { language, isDarkMode } = useApp();
   const insets = useSafeAreaInsets();
   const { cartItems, removeFromCart, updateQuantity, clearCart, cartTotal, cartCount } = useCart();
   const [storeName, setStoreName] = useState('');
@@ -135,11 +135,11 @@ export default function CartScreen({ navigation }: any) {
   const renderStoreHeader = () => {
     if (cartItems.length === 0) return null;
     return (
-      <TouchableOpacity style={styles.storeHeader} onPress={goToStore} activeOpacity={0.85}>
+      <TouchableOpacity style={[styles.storeHeader, isDarkMode && styles.cardDark]} onPress={goToStore} activeOpacity={0.85}>
         <View style={styles.storeIconWrap}>
           <Ionicons name="storefront" size={16} color="#fff" />
         </View>
-        <Text style={styles.storeHeaderName} numberOfLines={1}>
+        <Text style={[styles.storeHeaderName, isDarkMode && styles.textDark]} numberOfLines={1}>
           {displayStoreName}
         </Text>
         <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
@@ -151,7 +151,7 @@ export default function CartScreen({ navigation }: any) {
     const lineKey = getCartItemLineKey(item);
     const imageUri = remoteImageUri(item.image_url);
     return (
-      <View style={[styles.itemRow, index > 0 && styles.itemRowDivider, index === cartItems.length - 1 && styles.itemRowLast]}>
+      <View style={[styles.itemRow, isDarkMode && styles.cardDark, index > 0 && styles.itemRowDivider, isDarkMode && index > 0 && styles.lineDark, index === cartItems.length - 1 && styles.itemRowLast]}>
         <TouchableOpacity
           style={styles.itemTap}
           activeOpacity={0.8}
@@ -167,7 +167,7 @@ export default function CartScreen({ navigation }: any) {
             )}
           </View>
           <View style={styles.itemInfo}>
-            <Text style={styles.itemName} numberOfLines={2}>
+            <Text style={[styles.itemName, isDarkMode && styles.textDark]} numberOfLines={2}>
               {item.name}
             </Text>
             {item.variant_name ? (
@@ -216,10 +216,10 @@ export default function CartScreen({ navigation }: any) {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+    <View style={[styles.container, isDarkMode && styles.pageDark]}>
+      <View style={[styles.header, isDarkMode && styles.pageDark, { paddingTop: insets.top + 8 }]}>
         <View style={styles.titleRow}>
-          <Text style={styles.headerTitle}>{t.title}</Text>
+          <Text style={[styles.headerTitle, isDarkMode && styles.textDark]}>{t.title}</Text>
           {cartItems.length > 0 ? (
             <TouchableOpacity onPress={handleClearCart} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={styles.clearText}>{t.clear}</Text>
@@ -227,7 +227,7 @@ export default function CartScreen({ navigation }: any) {
           ) : null}
         </View>
         {cartItems.length > 0 ? (
-          <Text style={styles.itemCountText}>
+          <Text style={[styles.itemCountText, isDarkMode && styles.mutedDark]}>
             {t.itemTotal.replace('{count}', String(cartCount))}
           </Text>
         ) : null}
@@ -248,8 +248,8 @@ export default function CartScreen({ navigation }: any) {
             <View style={styles.emptyIconCircle}>
               <Ionicons name="cart-outline" size={56} color="#cbd5e1" />
             </View>
-            <Text style={styles.emptyText}>{t.empty}</Text>
-            <Text style={styles.emptyDesc}>{t.emptyDesc}</Text>
+            <Text style={[styles.emptyText, isDarkMode && styles.textDark]}>{t.empty}</Text>
+            <Text style={[styles.emptyDesc, isDarkMode && styles.mutedDark]}>{t.emptyDesc}</Text>
             <TouchableOpacity
               style={styles.goShoppingBtn}
               onPress={() => navigation.navigate('Main', { screen: 'CityMall' })}
@@ -261,10 +261,10 @@ export default function CartScreen({ navigation }: any) {
       />
 
       {cartItems.length > 0 ? (
-        <View style={styles.footer}>
+        <View style={[styles.footer, isDarkMode && styles.cardDark]}>
           <View style={styles.totalInfo}>
-            <Text style={styles.totalLabel}>{t.total}</Text>
-            <Text {...moneyLineProps} style={styles.totalAmount}>
+            <Text style={[styles.totalLabel, isDarkMode && styles.mutedDark]}>{t.total}</Text>
+            <Text {...moneyLineProps} style={[styles.totalAmount, isDarkMode && styles.textDark]}>
               {cartTotal.toLocaleString()} MMK
             </Text>
           </View>
@@ -533,4 +533,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
+  pageDark: { backgroundColor: '#0B1220' },
+  cardDark: { backgroundColor: '#152033', borderBottomColor: '#243044', borderTopColor: '#243044' },
+  textDark: { color: '#F8FAFC' },
+  mutedDark: { color: '#94A3B8' },
+  lineDark: { borderTopColor: '#243044' },
 });

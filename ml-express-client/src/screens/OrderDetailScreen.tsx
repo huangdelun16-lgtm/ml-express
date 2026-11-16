@@ -69,7 +69,7 @@ interface TrackingEvent {
 
 export default function OrderDetailScreen({ route, navigation }: any) {
   const { orderId } = route.params;
-  const { language } = useApp();
+  const { language, isDarkMode } = useApp();
   const c = common(language);
   const { showLoading, hideLoading } = useLoading();
   const [order, setOrder] = useState<Order | null>(null);
@@ -650,7 +650,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   const receiverPhone = (order.receiver_phone || '').trim();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDarkMode && { backgroundColor: '#0B1220' }]}>
       {/* Toast通知 */}
       <Toast
         visible={toastVisible}

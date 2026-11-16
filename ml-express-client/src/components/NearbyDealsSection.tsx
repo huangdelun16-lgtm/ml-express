@@ -89,7 +89,8 @@ export default function NearbyDealsSection({
   gpsStatus,
   onRequestLocate,
   onOpenProduct,
-}: Props) {
+  dark = false,
+}: Props & { dark?: boolean }) {
   const lang: Lang = language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh';
   const t = COPY[lang];
   const [loadingDeals, setLoadingDeals] = useState(false);
@@ -133,8 +134,8 @@ export default function NearbyDealsSection({
       <View style={styles.head}>
         <View style={styles.headAccent} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>{t.title}</Text>
-          <Text style={styles.hint}>{t.hint}</Text>
+          <Text style={[styles.title, dark && styles.textDark]}>{t.title}</Text>
+          <Text style={[styles.hint, dark && styles.mutedDark]}>{t.hint}</Text>
         </View>
       </View>
 
@@ -145,7 +146,7 @@ export default function NearbyDealsSection({
       ) : null}
 
       {status === 'need_permission' || status === 'error' ? (
-        <TouchableOpacity style={styles.stateCard} onPress={onRequestLocate} activeOpacity={0.86}>
+        <TouchableOpacity style={[styles.stateCard, dark && styles.cardDark]} onPress={onRequestLocate} activeOpacity={0.86}>
           <Ionicons
             name={status === 'need_permission' ? 'navigate-outline' : 'refresh-outline'}
             size={22}
@@ -157,7 +158,7 @@ export default function NearbyDealsSection({
       ) : null}
 
       {status === 'ready' && deals.length === 0 ? (
-        <View style={styles.stateCard}>
+        <View style={[styles.stateCard, dark && styles.cardDark]}>
           <Ionicons name="pricetag-outline" size={22} color={MUTED} />
           <Text style={styles.stateText}>{t.empty}</Text>
         </View>
@@ -168,7 +169,7 @@ export default function NearbyDealsSection({
           {deals.map((deal) => (
             <TouchableOpacity
               key={deal.id}
-              style={styles.card}
+              style={[styles.card, dark && styles.cardDark]}
               activeOpacity={0.88}
               onPress={() => onOpenProduct(deal)}
             >
@@ -179,7 +180,7 @@ export default function NearbyDealsSection({
                 </View>
               </View>
               <View style={styles.cardBody}>
-                <Text style={styles.name} numberOfLines={2}>
+                <Text style={[styles.name, dark && styles.textDark]} numberOfLines={2}>
                   {deal.name}
                 </Text>
                 <Text style={styles.price} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
@@ -320,4 +321,7 @@ const styles = StyleSheet.create({
     color: MUTED,
     fontWeight: '600',
   },
+  cardDark: { backgroundColor: '#152033' },
+  textDark: { color: '#F8FAFC' },
+  mutedDark: { color: '#94A3B8' },
 });

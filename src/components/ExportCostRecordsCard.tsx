@@ -158,6 +158,7 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
         row.final_destination,
         row.leg_destination,
         row.trip_number,
+        row.pack_barcode,
         row.store_code,
         kindLabel(row.subject_kind, false),
       ]
@@ -176,7 +177,7 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
     ];
     if (!q) return lines;
     return lines.filter((row) =>
-      [row.barcode, row.base, row.customer, row.destination, row.tripNumber]
+      [row.barcode, row.base, row.packBarcode, ...(row.orderBarcodes || []), row.customer, row.destination, row.tripNumber]
         .join(' ')
         .toLowerCase()
         .includes(q),
@@ -198,7 +199,7 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
           className="cbl-export-cost__search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder={isEn ? 'Search barcode, customer, trip' : '搜单号、客户、车次'}
+          placeholder={isEn ? 'Barcode, customer, trip, pack no.' : '搜单号、客户、车次、包装号'}
           aria-label={isEn ? 'Search export costs' : '搜索出口成本'}
         />
       </div>
@@ -220,11 +221,12 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
           </div>
           {pending && pendingRows.length > 0 ? (
             <div className="cbl-table-wrap">
-              <table className="cbl-table cbl-table--expense">
+              <table className="cbl-table cbl-table--expense cbl-table--export-pending">
                 <thead>
                   <tr>
                     <th>{isEn ? 'Type' : '类型'}</th>
                     <th>{isEn ? 'Order' : '单号'}</th>
+                    <th>{isEn ? 'Pack no.' : '包装号'}</th>
                     <th>{isEn ? 'Customer' : '客户'}</th>
                     <th>{isEn ? 'Destination' : '目的地'}</th>
                     <th>{isEn ? 'Weight' : '重量'}</th>
@@ -241,7 +243,13 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
                       <Fragment key={row.key}>
                         <tr>
                           <td>{kindLabel(row.kind, isEn)}</td>
-                          <td className="cbl-code">{row.kind === 'package' ? row.base : row.barcode || '—'}</td>
+                          <td className="cbl-code">
+                            {row.kind === 'package' ? row.base : row.barcode || '—'}
+                            {row.kind === 'package' && row.orderBarcodes && row.orderBarcodes.length ? (
+                              <div className="cbl-dim">{row.orderBarcodes.join(' · ')}</div>
+                            ) : null}
+                          </td>
+                          <td className="cbl-code">{row.packBarcode || '—'}</td>
                           <td>{row.customer || '—'}</td>
                           <td>{row.destination || '—'}</td>
                           <td>
@@ -278,7 +286,7 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
                         </tr>
                         {open ? (
                           <tr>
-                            <td colSpan={7}>
+                            <td colSpan={8}>
                               <div className="cbl-export-fill">
                                 <label>
                                   {isEn ? 'Leg' : '运达'}

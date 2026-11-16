@@ -8,6 +8,8 @@ const {
   countPendingTruckLoads,
   countPendingNotify,
   settleAdminExportCost,
+  annotateExportCostsWithPackBarcode,
+  applyPackLinks,
 } = require('./inventoryHqMirror');
 
 test('pending export keeps stocked singles and multi-inbound packs, then drops saved ones', () => {
@@ -98,6 +100,50 @@ test('pending export keeps stocked singles and multi-inbound packs, then drops s
   assert.equal(fromShell.packages.length, 1);
   assert.equal(fromShell.packages[0].weightKg, 12);
   assert.equal(fromShell.packages[0].ownerStoreCode, 'RUILI001');
+  assert.equal(fromShell.packages[0].packBarcode, 'RUI26MDY20001');
+  assert.equal(
+    limitPendingExportBoard(fromShell, 'rui26mdy20001').packages.length,
+    1,
+  );
+
+  const annotated = annotateExportCostsWithPackBarcode(
+    [{ subject_kind: 'package', subject_key: 'MDY120000050826', display_barcode: 'MDY120000050826' }],
+    [{ barcode: 'MDY120000050826(2-1)', packed_bundle_barcode: 'RUI26MDY20001' }],
+  );
+  assert.equal(annotated[0].pack_barcode, 'RUI26MDY20001');
+
+  const linked = applyPackLinks(
+    [
+      {
+        id: 'a',
+        barcode: 'MDY1(2-1)',
+        input_barcode: 'EX1',
+        packed_bundle_barcode: '',
+        packed_at: '2026-11-01',
+        qty_on_hand: 0,
+        recipient_name: 'AMT',
+        final_destination: 'MDY',
+      },
+      {
+        id: 'b',
+        barcode: 'MDY1(2-2)',
+        input_barcode: 'EX2',
+        packed_bundle_barcode: '',
+        packed_at: '2026-11-01',
+        qty_on_hand: 0,
+        recipient_name: 'AMT',
+        final_destination: 'MDY',
+      },
+    ],
+    [
+      { pack_id: 'p1', item_id: 'a', item_barcode: 'MDY1(2-1)' },
+      { pack_id: 'p1', item_id: 'b', item_barcode: 'MDY1(2-2)' },
+    ],
+    [{ id: 'p1', bundle_barcode: 'RUI26MDY300001' }],
+  );
+  const found = limitPendingExportBoard(buildPendingExportBoard(linked), 'RUI26MDY300001');
+  assert.equal(found.packages.length, 1);
+  assert.deepEqual(found.packages[0].orderBarcodes, ['EX1', 'EX2']);
 
   const left = withoutSavedExportCosts(board, [
     { subject_kind: 'single', subject_key: 's1' },

@@ -1465,6 +1465,33 @@ export const meStyles = StyleSheet.create({
     fontSize: 12,
     marginTop: 12,
   },
+  darkCard: {
+    backgroundColor: '#152033',
+  },
+  darkText: {
+    color: '#F8FAFC',
+  },
+  darkMuted: {
+    color: '#94A3B8',
+  },
+  darkHairline: {
+    backgroundColor: '#243044',
+    borderLeftColor: '#243044',
+    borderBottomColor: '#243044',
+  },
+  darkWell: {
+    backgroundColor: '#1C2C40',
+    borderColor: '#243044',
+  },
+  darkGear: {
+    backgroundColor: '#1C2C40',
+  },
+  darkSheet: {
+    backgroundColor: '#152033',
+  },
+  darkSheetHandle: {
+    backgroundColor: '#334155',
+  },
 });
 
 

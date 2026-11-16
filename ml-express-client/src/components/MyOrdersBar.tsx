@@ -79,18 +79,20 @@ export default function MyOrdersBar({
   counts,
   onPressItem,
   onPressAll,
+  dark = false,
 }: {
   counts?: Record<string, number>;
   onPressItem?: (key: string, filter: string) => void;
   onPressAll?: () => void;
+  dark?: boolean;
 }) {
   const { language } = useApp();
   const lang = language === 'en' || language === 'my' ? language : 'zh';
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, dark && styles.cardDark]}>
       <View style={styles.header}>
-        <Text style={styles.title}>
+        <Text style={[styles.title, dark && styles.titleDark]}>
           {lang === 'en' ? 'My orders' : lang === 'my' ? 'ကျွန်ုပ်၏အော်ဒါ' : '我的订单'}
         </Text>
         <TouchableOpacity onPress={onPressAll} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -120,7 +122,7 @@ export default function MyOrdersBar({
                   </View>
                 ) : null}
               </View>
-              <Text style={[styles.label, item.muted && styles.labelMuted]} numberOfLines={1}>
+              <Text style={[styles.label, item.muted && styles.labelMuted, dark && styles.labelDark]} numberOfLines={1}>
                 {item.label[lang]}
               </Text>
             </TouchableOpacity>
@@ -154,6 +156,9 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 17, fontWeight: '800', color: NAVY, letterSpacing: -0.2 },
   all: { fontSize: 13, color: MUTED, fontWeight: '600' },
+  cardDark: { backgroundColor: '#152033' },
+  titleDark: { color: '#F8FAFC' },
+  labelDark: { color: '#CBD5E1' },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

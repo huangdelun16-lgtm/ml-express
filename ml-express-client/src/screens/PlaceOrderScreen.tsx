@@ -55,12 +55,23 @@ import Toast from '../components/Toast';
 const WIZARD_LAST_STEP: OrderWizardStepIndex = 3;
 
 export default function PlaceOrderScreen({ navigation, route }: any) {
-  const { language } = useApp();
+  const { language, isDarkMode } = useApp();
   const c = common(language);
   const insets = useSafeAreaInsets();
   const { showLoading, hideLoading } = useLoading();
   const { clearCart } = useCart();
-  const styles = useLanguageStyles(baseStyles);
+  const lightStyles = useLanguageStyles(baseStyles);
+  const styles = isDarkMode
+    ? {
+        ...lightStyles,
+        container: [lightStyles.container, { backgroundColor: '#0B1220' }],
+        section: [lightStyles.section, { backgroundColor: '#152033', borderColor: '#243044' }],
+        sectionTitle: [lightStyles.sectionTitle, { color: '#F8FAFC' }],
+        label: [lightStyles.label, { color: '#94A3B8' }],
+        switchLabel: [lightStyles.switchLabel, { color: '#94A3B8' }],
+        input: [lightStyles.input, { backgroundColor: '#1C2C40', color: '#F8FAFC', borderColor: '#243044' }],
+      }
+    : lightStyles;
   
   const submitGuardRef = useRef(0);
   const orderDraftRef = useRef<{
@@ -1818,13 +1829,14 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         <View
           style={[
             wizardStyles.topChrome,
+            isDarkMode && { backgroundColor: '#0B1220' },
             { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 12 : 8) },
             keyboardVisible && wizardStyles.topChromeCompact,
           ]}
         >
           <View style={wizardStyles.navRow}>
             <TouchableOpacity
-              style={wizardStyles.navBtn}
+              style={[wizardStyles.navBtn, isDarkMode && { backgroundColor: '#152033', borderColor: '#243044' }]}
               onPress={wizardStep > 0 ? handleWizardBack : handleWizardExit}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
@@ -1834,9 +1846,9 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                   : (currentT as { wizardExit?: string }).wizardExit
               }
             >
-              <Ionicons name="chevron-back" size={22} color="#0f172a" />
+              <Ionicons name="chevron-back" size={22} color={isDarkMode ? '#F8FAFC' : '#0f172a'} />
             </TouchableOpacity>
-            <Text style={wizardStyles.navTitle} numberOfLines={1}>
+            <Text style={[wizardStyles.navTitle, isDarkMode && { color: '#F8FAFC' }]} numberOfLines={1}>
               {currentT.title}
             </Text>
             <View style={wizardStyles.navSide} />
@@ -2032,6 +2044,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       <View
         style={[
           wizardStyles.bottomBar,
+          isDarkMode && { backgroundColor: '#152033', borderTopColor: '#243044' },
           { paddingBottom: bottomBarInset },
         ]}
       >

@@ -67,7 +67,7 @@ interface Order {
 }
 
 export default function MyOrdersScreen({ navigation, route }: any) {
-  const { language } = useApp();
+  const { language, isDarkMode } = useApp();
   const insets = useSafeAreaInsets();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
@@ -915,7 +915,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
     return (
       <TouchableOpacity
-        style={styles.orderCard}
+        style={[styles.orderCard, isDarkMode && styles.cardDark]}
         onPress={() => handleViewDetail(order.id)}
         activeOpacity={0.85}
       >
@@ -931,7 +931,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
             <View style={styles.orderIdChip}>
               <Text style={styles.orderIdChipText}>#{order.id.slice(-6).toUpperCase()}</Text>
             </View>
-            <Text style={styles.orderPackageSpec} numberOfLines={1}>
+            <Text style={[styles.orderPackageSpec, isDarkMode && styles.textDark]} numberOfLines={1}>
               {formatPackageSpec(order.package_type, order.weight)}
             </Text>
           </View>
@@ -1020,19 +1020,19 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
   const renderPageHeader = () => (
     <LinearGradient
-      colors={['#2C98A6', '#5BB8C4', PAGE_BG]}
+      colors={isDarkMode ? ['#12343C', '#0E1A2B', '#0B1220'] : ['#2C98A6', '#5BB8C4', PAGE_BG]}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
-      style={[styles.pageHeader, { paddingTop: Math.max(insets.top, 12) }]}
+      style={[styles.pageHeader, isDarkMode && styles.pageDark, { paddingTop: Math.max(insets.top, 12) }]}
     >
       <View style={styles.navRow}>
         <TouchableOpacity
-          style={styles.backBtn}
+          style={[styles.backBtn, isDarkMode && styles.cardDark]}
           onPress={() => navigation.navigate('Main', { screen: 'Home' })}
           accessibilityRole="button"
           activeOpacity={0.85}
         >
-          <Ionicons name="chevron-back" size={22} color={NAVY} />
+          <Ionicons name="chevron-back" size={22} color={isDarkMode ? '#F8FAFC' : NAVY} />
         </TouchableOpacity>
         <View style={styles.headerTitles}>
           <Text style={styles.headerTitle}>{t.title}</Text>
@@ -1074,14 +1074,14 @@ export default function MyOrdersScreen({ navigation, route }: any) {
           return (
             <TouchableOpacity
               key={filter.key}
-              style={[styles.filterChip, active && styles.filterChipActive]}
+              style={[styles.filterChip, isDarkMode && styles.chipDark, active && styles.filterChipActive]}
               onPress={() => handleStatusChange(filter.key)}
               onLayout={(event) => {
                 filterCardPositions.current[filter.key] = event.nativeEvent.layout.x;
               }}
               activeOpacity={0.85}
             >
-              <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+              <Text style={[styles.filterChipText, isDarkMode && !active && styles.textDark, active && styles.filterChipTextActive]}>
                 {filter.label}
               </Text>
               {filter.key !== 'all' && count > 0 && !active ? (
@@ -1098,7 +1098,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
   if (loading && !refreshing) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, isDarkMode && styles.pageDark]}>
         {renderPageHeader()}
         {renderFilters()}
         <View style={styles.content}>
@@ -1113,7 +1113,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   }
 
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, isDarkMode && styles.pageDark]}>
         {renderPageHeader()}
         {renderFilters()}
 
@@ -1136,8 +1136,8 @@ export default function MyOrdersScreen({ navigation, route }: any) {
             <View style={styles.emptyIconWrap}>
               <Ionicons name="cube-outline" size={42} color={TEAL} />
             </View>
-            <Text style={styles.emptyText}>{t.noOrders}</Text>
-            <Text style={styles.emptyDesc}>{t.noOrdersDesc}</Text>
+            <Text style={[styles.emptyText, isDarkMode && styles.textDark]}>{t.noOrders}</Text>
+            <Text style={[styles.emptyDesc, isDarkMode && styles.mutedDark]}>{t.noOrdersDesc}</Text>
             <TouchableOpacity
               style={styles.emptyButton}
               onPress={() => navigation.navigate('PlaceOrder')}
@@ -1815,4 +1815,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: '600',
   },
+  pageDark: { backgroundColor: '#0B1220' },
+  cardDark: { backgroundColor: '#152033' },
+  textDark: { color: '#F8FAFC' },
+  mutedDark: { color: '#94A3B8' },
+  chipDark: { backgroundColor: '#1C2C40' },
 });

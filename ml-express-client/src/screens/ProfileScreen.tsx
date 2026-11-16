@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import LoggerService from './../services/LoggerService';
 import { profileTranslations } from './profile/profileTranslations';
 import { profileStyles as styles, meStyles as me } from './profile/profileStyles';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Alert, Modal, TextInput, Switch, Dimensions, Linking, ActivityIndicator, Image, Vibration, Animated, Easing, PanResponder } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Alert, Modal, TextInput, Switch, Dimensions, Linking, ActivityIndicator, Image, Vibration, Animated, Easing, PanResponder, StatusBar } from 'react-native';
 import { Platform } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -173,8 +173,7 @@ export default function ProfileScreen({ navigation }: any) {
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gesture) =>
           shouldClaimSettingsSheetPan(gesture.dx, gesture.dy),
-        onMoveShouldSetPanResponderCapture: (_, gesture) =>
-          shouldClaimSettingsSheetPan(gesture.dx, gesture.dy, true),
+        onMoveShouldSetPanResponderCapture: () => false,
         onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
           settingsSheetY.stopAnimation();
@@ -1170,7 +1169,7 @@ export default function ProfileScreen({ navigation }: any) {
       <>
         <View style={[me.hero, { paddingTop: insets.top + 6 }]}>
           <LinearGradient
-            colors={['#B6DFFB', '#D7F1F5', '#EAF7F6']}
+            colors={isDarkMode ? ['#0E2430', '#12343C', '#0B1220'] : ['#B6DFFB', '#D7F1F5', '#EAF7F6']}
             start={{ x: 0.15, y: 0 }}
             end={{ x: 0.85, y: 1 }}
             style={StyleSheet.absoluteFill}
@@ -1183,7 +1182,7 @@ export default function ProfileScreen({ navigation }: any) {
                 resizeMode="contain"
               />
               <View style={me.wordmark}>
-                <Text style={me.brandKicker}>MARKET LINK</Text>
+                <Text style={[me.brandKicker, isDarkMode && me.darkText]}>MARKET LINK</Text>
                 <View style={me.brandHairline} />
                 <Text style={me.brandSub}>EXPRESS</Text>
               </View>
@@ -1192,7 +1191,7 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </View>
 
-        <View style={me.profileCard}>
+        <View style={[me.profileCard, isDarkMode && me.darkCard]}>
           <View style={me.identity}>
             <TouchableOpacity
               style={me.avatarHit}
@@ -1227,7 +1226,7 @@ export default function ProfileScreen({ navigation }: any) {
               activeOpacity={0.86}
             >
               <View style={me.nameRow}>
-                <Text style={me.userName} numberOfLines={1}>{userName}</Text>
+                <Text style={[me.userName, isDarkMode && me.darkText]} numberOfLines={1}>{userName}</Text>
                 {!isGuest ? (
                   <View style={me.memberPill}>
                     <Text style={me.memberPillText}>{memberBadgeLabel()}</Text>
@@ -1249,7 +1248,7 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
           {!isGuest ? (
             <TouchableOpacity
-              style={me.walletBar}
+              style={[me.walletBar, isDarkMode && me.darkWell]}
               onPress={() => handleQuickAction('recharge')}
               activeOpacity={0.88}
             >
@@ -1257,25 +1256,25 @@ export default function ProfileScreen({ navigation }: any) {
                 <Ionicons name="wallet" size={16} color="#fff" />
               </View>
               <View style={me.walletMain}>
-                <Text style={me.walletLabel} numberOfLines={1}>{t.walletBalance}</Text>
-                <MoneyText amount={accountBalance} style={me.walletValue} />
+                <Text style={[me.walletLabel, isDarkMode && me.darkMuted]} numberOfLines={1}>{t.walletBalance}</Text>
+                <MoneyText amount={accountBalance} style={[me.walletValue, isDarkMode && me.darkText]} />
               </View>
               <Text style={me.walletCta} numberOfLines={1}>{t.goRecharge}</Text>
             </TouchableOpacity>
           ) : null}
         </View>
 
-        <View style={me.statCard}>
+        <View style={[me.statCard, isDarkMode && me.darkCard]}>
           {statItems.map((item, index) => (
             <TouchableOpacity
               key={item.key}
-              style={[me.statCell, index > 0 && me.statCellBorder]}
+              style={[me.statCell, index > 0 && me.statCellBorder, isDarkMode && index > 0 && me.darkHairline]}
               activeOpacity={0.85}
               onPress={() => handleQuickAction(item.action)}
             >
               <View style={me.statIconWell}>{item.icon}</View>
-              <Text style={me.statValue} numberOfLines={1}>{formatMoney(item.value)}</Text>
-              <Text style={me.statLabel}>{item.label}</Text>
+              <Text style={[me.statValue, isDarkMode && me.darkText]} numberOfLines={1}>{formatMoney(item.value)}</Text>
+              <Text style={[me.statLabel, isDarkMode && me.darkMuted]}>{item.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -1293,19 +1292,20 @@ export default function ProfileScreen({ navigation }: any) {
           }}
           onPressAll={() => openOrders('all')}
           onPressItem={(_key, filter) => openOrders(filter)}
+          dark={isDarkMode}
         />
 
-        <View style={me.menuCard}>
+        <View style={[me.menuCard, isDarkMode && me.darkCard]}>
           <TouchableOpacity style={me.menuRow} onPress={() => handleQuickAction('address')}>
             <View style={me.menuIcon}><ClayPin size={26} /></View>
-            <Text style={me.menuLabel}>{t.shippingAddress}</Text>
+            <Text style={[me.menuLabel, isDarkMode && me.darkText]}>{t.shippingAddress}</Text>
             <Ionicons name="chevron-forward" size={18} color="#D0D7DE" />
           </TouchableOpacity>
-          <View style={me.menuDivider} />
+          <View style={[me.menuDivider, isDarkMode && me.darkHairline]} />
           <View style={me.langBlock}>
             <View style={me.langHead}>
               <View style={me.menuIcon}><ClayGlobe size={26} /></View>
-              <MyanmarAwareText style={me.menuLabel} myanmarWeight="bold">
+              <MyanmarAwareText style={[me.menuLabel, isDarkMode && me.darkText]} myanmarWeight="bold">
                 {t.languageSettings}
               </MyanmarAwareText>
               <MyanmarAwareText style={me.langCurrent} myanmarWeight="semibold">
@@ -1314,30 +1314,30 @@ export default function ProfileScreen({ navigation }: any) {
             </View>
             <LanguageSegment language={language} onChange={handleLanguageChange} />
           </View>
-          <View style={me.menuDivider} />
+          <View style={[me.menuDivider, isDarkMode && me.darkHairline]} />
           <TouchableOpacity style={me.menuRow} onPress={openCustomerService}>
             <View style={me.menuIcon}><ClayHeadset size={26} /></View>
-            <Text style={me.menuLabel}>{t.customerService}</Text>
+            <Text style={[me.menuLabel, isDarkMode && me.darkText]}>{t.customerService}</Text>
             <Ionicons name="chevron-forward" size={18} color="#D0D7DE" />
           </TouchableOpacity>
-          <View style={me.menuDivider} />
+          <View style={[me.menuDivider, isDarkMode && me.darkHairline]} />
           <TouchableOpacity style={me.menuRow} onPress={() => setShowAboutModal(true)}>
             <View style={me.menuIcon}><ClayInfo size={26} /></View>
-            <Text style={me.menuLabel}>{t.aboutBrand}</Text>
+            <Text style={[me.menuLabel, isDarkMode && me.darkText]}>{t.aboutBrand}</Text>
             <Ionicons name="chevron-forward" size={18} color="#D0D7DE" />
           </TouchableOpacity>
-          <View style={me.menuDivider} />
+          <View style={[me.menuDivider, isDarkMode && me.darkHairline]} />
           <TouchableOpacity
             style={[me.menuRow, isGuest && { paddingBottom: 4 }]}
             onPress={openSettingsSheet}
           >
             <View style={me.menuIcon}><ClayGear size={26} /></View>
-            <Text style={me.menuLabel}>{t.settings}</Text>
+            <Text style={[me.menuLabel, isDarkMode && me.darkText]}>{t.settings}</Text>
             <Ionicons name="chevron-forward" size={18} color="#D0D7DE" />
           </TouchableOpacity>
           {!isGuest ? (
             <>
-              <View style={me.menuDivider} />
+              <View style={[me.menuDivider, isDarkMode && me.darkHairline]} />
               <TouchableOpacity
                 style={[me.menuRow, { paddingBottom: 4 }]}
                 onPress={handleLogout}
@@ -1356,9 +1356,10 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   return (
-    <View style={me.container}>
+    <View style={[me.container, isDarkMode && { backgroundColor: '#0B1220' }]}>
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <LinearGradient
-        colors={['#B6DFFB', '#E7F5F7', '#F3F5F7']}
+        colors={isDarkMode ? ['#0B1220', '#0E1A2B', '#0B1220'] : ['#B6DFFB', '#E7F5F7', '#F3F5F7']}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -1398,6 +1399,7 @@ export default function ProfileScreen({ navigation }: any) {
             {...settingsSheetPan.panHandlers}
             style={[
               me.sheet,
+              isDarkMode && me.darkSheet,
               {
                 paddingBottom: Math.max(insets.bottom, 16),
                 transform: [{ translateY: settingsSheetY }],
@@ -1405,53 +1407,57 @@ export default function ProfileScreen({ navigation }: any) {
             ]}
           >
             <View style={me.sheetHandleHit} accessibilityElementsHidden>
-              <View style={me.sheetHandle} pointerEvents="none" />
+              <View style={[me.sheetHandle, isDarkMode && me.darkSheetHandle]} pointerEvents="none" />
             </View>
-            <Text style={me.sheetTitle}>{t.extraSettings}</Text>
+            <Text style={[me.sheetTitle, isDarkMode && me.darkText]}>{t.extraSettings}</Text>
             {!isGuest ? (
-              <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(handleEditProfile)}>
+              <TouchableOpacity style={[me.sheetRow, isDarkMode && me.darkHairline]} onPress={() => closeSettingsSheet(handleEditProfile)}>
                 <Ionicons name="person-circle-outline" size={22} color="#2C98A6" />
-                <Text style={me.sheetRowText}>{t.editProfile}</Text>
+                <Text style={[me.sheetRowText, isDarkMode && me.darkText]}>{t.editProfile}</Text>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(handleLogin)}>
+              <TouchableOpacity style={[me.sheetRow, isDarkMode && me.darkHairline]} onPress={() => closeSettingsSheet(handleLogin)}>
                 <Ionicons name="log-in-outline" size={22} color="#2C98A6" />
-                <Text style={me.sheetRowText}>{t.login}</Text>
+                <Text style={[me.sheetRowText, isDarkMode && me.darkText]}>{t.login}</Text>
               </TouchableOpacity>
             )}
             {!isGuest ? (
-              <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(() => setShowRechargeModal(true))}>
+              <TouchableOpacity style={[me.sheetRow, isDarkMode && me.darkHairline]} onPress={() => closeSettingsSheet(() => setShowRechargeModal(true))}>
                 <Ionicons name="wallet-outline" size={22} color="#2C98A6" />
-                <Text style={me.sheetRowText}>{t.recharge}</Text>
+                <Text style={[me.sheetRowText, isDarkMode && me.darkText]}>{t.recharge}</Text>
                 <MoneyText amount={accountBalance} style={me.sheetMeta} />
               </TouchableOpacity>
             ) : null}
-            <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(() => navigation.navigate('NotificationCenter'))}>
+            <TouchableOpacity style={[me.sheetRow, isDarkMode && me.darkHairline]} onPress={() => closeSettingsSheet(() => navigation.navigate('NotificationCenter'))}>
               <Ionicons name="notifications-outline" size={22} color="#2C98A6" />
-                <Text style={me.sheetRowText}>{t.inbox}</Text>
+                <Text style={[me.sheetRowText, isDarkMode && me.darkText]}>{t.inbox}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(openNotificationSettings)}>
+            <TouchableOpacity style={[me.sheetRow, isDarkMode && me.darkHairline]} onPress={() => closeSettingsSheet(openNotificationSettings)}>
               <Ionicons name="settings-outline" size={22} color="#2C98A6" />
-              <Text style={me.sheetRowText}>{t.notifications}</Text>
+              <Text style={[me.sheetRowText, isDarkMode && me.darkText]}>{t.notifications}</Text>
             </TouchableOpacity>
-            <View style={me.sheetRow}>
+            <View style={[me.sheetRow, isDarkMode && me.darkHairline]}>
               <Ionicons name={isDarkMode ? 'moon' : 'sunny-outline'} size={22} color="#2C98A6" />
-              <Text style={me.sheetRowText}>{t.darkMode}</Text>
+              <Text style={[me.sheetRowText, isDarkMode && me.darkText]}>{t.darkMode}</Text>
               <Switch
                 value={isDarkMode}
-                onValueChange={setIsDarkMode}
+                onValueChange={(next) => {
+                  setIsDarkMode(next);
+                  Vibration.vibrate(12);
+                }}
                 trackColor={{ false: '#cbd5e1', true: '#2C98A6' }}
                 thumbColor="#ffffff"
+                ios_backgroundColor="#cbd5e1"
               />
             </View>
             {!isGuest ? (
-              <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(() => setShowPasswordModal(true))}>
+              <TouchableOpacity style={[me.sheetRow, isDarkMode && me.darkHairline]} onPress={() => closeSettingsSheet(() => setShowPasswordModal(true))}>
                 <Ionicons name="lock-closed-outline" size={22} color="#2C98A6" />
-                <Text style={me.sheetRowText}>{t.changePassword}</Text>
+                <Text style={[me.sheetRowText, isDarkMode && me.darkText]}>{t.changePassword}</Text>
               </TouchableOpacity>
             ) : null}
             {!isGuest ? (
-              <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(handleDeleteAccount)}>
+              <TouchableOpacity style={[me.sheetRow, isDarkMode && me.darkHairline]} onPress={() => closeSettingsSheet(handleDeleteAccount)}>
                 <Ionicons name="trash-outline" size={22} color="#ef4444" />
                 <Text style={[me.sheetRowText, { color: '#ef4444' }]}>{t.deleteAccount}</Text>
               </TouchableOpacity>

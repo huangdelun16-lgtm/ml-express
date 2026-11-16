@@ -81,7 +81,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     openProductDetailId,
     openProductDetailVariantId,
   } = route.params || {};
-  const { language } = useApp();
+  const { language, isDarkMode } = useApp();
   const insets = useSafeAreaInsets();
   const { addToCart, removeFromCart, updateQuantity, cartItems, updateCartItemDetails } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
@@ -568,7 +568,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDarkMode && { backgroundColor: '#0B1220' }]}>
       {loading ? (
         <View style={styles.loadingContainer}>
           <TouchableOpacity

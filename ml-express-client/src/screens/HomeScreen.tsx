@@ -96,7 +96,7 @@ interface OrderStats {
 }
 
 export default function HomeScreen({ navigation }: any) {
-  const { language } = useApp();
+  const { language, isDarkMode } = useApp();
   const c = common(language);
   const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
@@ -420,7 +420,7 @@ export default function HomeScreen({ navigation }: any) {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDarkMode && styles.pageDark]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 28 }}
@@ -428,7 +428,7 @@ export default function HomeScreen({ navigation }: any) {
       >
         <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) + 4 }]}>
           <TouchableOpacity
-            style={styles.gpsTile}
+            style={[styles.gpsTile, isDarkMode && styles.cardDark]}
             onPress={() => void locateAccountGps({ silent: false })}
             activeOpacity={0.82}
             accessibilityRole="button"
@@ -441,7 +441,7 @@ export default function HomeScreen({ navigation }: any) {
             )}
           </TouchableOpacity>
           <View style={styles.gpsCol}>
-            <Text style={styles.gpsHint} numberOfLines={2}>
+            <Text style={[styles.gpsHint, isDarkMode && styles.mutedDark]} numberOfLines={2}>
               {gpsStatus === 'locating'
                 ? t.gpsLocating
                 : gpsStatus === 'denied'
@@ -456,11 +456,11 @@ export default function HomeScreen({ navigation }: any) {
             </Text>
           </View>
           <TouchableOpacity
-            style={styles.helloPill}
+            style={[styles.helloPill, isDarkMode && styles.cardDark]}
             onPress={() => navigation.navigate(isGuest ? 'Login' : 'Profile')}
             activeOpacity={0.86}
           >
-            <Text style={styles.helloText} numberOfLines={1}>
+            <Text style={[styles.helloText, isDarkMode && styles.textDark]} numberOfLines={1}>
               {t.hello}{greetName ? `, ${greetName}` : ''}
             </Text>
             <View style={styles.helloAvatar}>
@@ -473,11 +473,11 @@ export default function HomeScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.tutorialCard} onPress={() => setShowTutorialModal(true)} activeOpacity={0.88}>
+        <TouchableOpacity style={[styles.tutorialCard, isDarkMode && styles.cardDark]} onPress={() => setShowTutorialModal(true)} activeOpacity={0.88}>
           <ClayBook size={46} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.tutorialTitle}>{t.howToUse}</Text>
-            <Text style={styles.tutorialHint}>{t.howToUseHint}</Text>
+            <Text style={[styles.tutorialTitle, isDarkMode && styles.textDark]}>{t.howToUse}</Text>
+            <Text style={[styles.tutorialHint, isDarkMode && styles.mutedDark]}>{t.howToUseHint}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#C5CDD6" />
         </TouchableOpacity>
@@ -518,6 +518,7 @@ export default function HomeScreen({ navigation }: any) {
           onNearby={() => navigation.navigate('CityMall')}
           onTrack={() => navigation.navigate('TrackOrder')}
           onSupport={handleCallHotline}
+          dark={isDarkMode}
         />
 
         <NearbyDealsSection
@@ -530,6 +531,7 @@ export default function HomeScreen({ navigation }: any) {
           gpsStatus={gpsStatus}
           onRequestLocate={() => void locateAccountGps({ silent: false })}
           onOpenProduct={openNearbyDeal}
+          dark={isDarkMode}
         />
       </ScrollView>
 
@@ -734,5 +736,9 @@ const styles = StyleSheet.create({
     width: 16,
     backgroundColor: TEAL,
   },
+  pageDark: { backgroundColor: '#0B1220' },
+  cardDark: { backgroundColor: '#152033' },
+  textDark: { color: '#F8FAFC' },
+  mutedDark: { color: '#94A3B8' },
 });
 

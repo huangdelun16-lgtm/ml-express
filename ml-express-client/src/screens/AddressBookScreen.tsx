@@ -148,7 +148,7 @@ const baseStyles = StyleSheet.create({
 });
 
 export default function AddressBookScreen({ navigation, route }: any) {
-  const { language } = useApp();
+  const { language, isDarkMode } = useApp();
   const [loading, setLoading] = useState(true);
   const [addresses, setAddresses] = useState<AddressItem[]>([]);
   const [userId, setUserId] = useState<string>('');
@@ -448,7 +448,7 @@ export default function AddressBookScreen({ navigation, route }: any) {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDarkMode && { backgroundColor: '#0B1220' }]}>
       <LinearGradient
         colors={['#1F7A84', '#2C98A6']}
         style={styles.header}

@@ -592,7 +592,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     const summaryText = packageData.description || packageData.package_type || t.orderInfo;
 
     return (
-      <View style={ui.page}>
+      <View style={[ui.page, isDarkMode && { backgroundColor: '#0B1220' }]}>
         <View style={ui.hero} collapsable={false}>
           {showMap && mapMounted && !mapError ? (
             <MapView
@@ -670,7 +670,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
           </View>
         </View>
 
-        <View style={ui.sheet}>
+        <View style={[ui.sheet, isDarkMode && { backgroundColor: '#152033' }]}>
           <View style={ui.riderBar}>
             <View style={ui.riderAvatar}>
               <Text style={ui.riderAvatarText}>{(courierName || '骑').trim().charAt(0)}</Text>
@@ -762,7 +762,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   }
 
   return (
-    <View style={ui.page}>
+    <View style={[ui.page, isDarkMode && { backgroundColor: '#0B1220' }]}>
       {renderPageHeader(false)}
 
       <ScrollView 

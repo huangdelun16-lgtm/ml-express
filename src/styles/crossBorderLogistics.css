@@ -1003,6 +1003,41 @@ button.cbl-io-overview-card--in:focus-visible {
   vertical-align: top;
 }
 
+.cbl-table--export-pending {
+  table-layout: fixed;
+}
+
+.cbl-table--export-pending th,
+.cbl-table--export-pending td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cbl-table--export-pending th:nth-child(1),
+.cbl-table--export-pending td:nth-child(1) { width: 96px; }
+
+.cbl-table--export-pending th:nth-child(2),
+.cbl-table--export-pending td:nth-child(2) { width: 22%; }
+
+.cbl-table--export-pending th:nth-child(3),
+.cbl-table--export-pending td:nth-child(3) { width: 18%; }
+
+.cbl-table--export-pending th:nth-child(4),
+.cbl-table--export-pending td:nth-child(4) { width: 14%; }
+
+.cbl-table--export-pending th:nth-child(5),
+.cbl-table--export-pending td:nth-child(5) { width: 72px; }
+
+.cbl-table--export-pending th:nth-child(6),
+.cbl-table--export-pending td:nth-child(6) { width: 108px; }
+
+.cbl-table--export-pending th:nth-child(7),
+.cbl-table--export-pending td:nth-child(7) { width: 88px; }
+
+.cbl-table--export-pending th:nth-child(8),
+.cbl-table--export-pending td:nth-child(8) { width: 76px; overflow: visible; }
+
 .cbl-badge--red {
   background: rgba(239, 68, 68, 0.12);
   color: #dc2626;

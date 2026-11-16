@@ -1768,6 +1768,7 @@ export type ExportCostRecord = {
   pay_currency?: string;
   fx_mmk_per_cny?: number | string | null;
   trip_number: string;
+  pack_barcode?: string;
   store_code: string;
   created_by: string;
   created_at: string;
@@ -1849,6 +1850,8 @@ export type PendingExportLine = {
   tripNumber: string;
   pieceCount?: number;
   ownerStoreCode?: string;
+  packBarcode?: string;
+  orderBarcodes?: string[];
 };
 
 export type PendingExportBoard = {

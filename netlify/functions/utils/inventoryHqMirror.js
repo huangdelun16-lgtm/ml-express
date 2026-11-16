@@ -85,6 +85,32 @@ function lookupMap(keys, map) {
   return '';
 }
 
+/** 订单没写包装号时，用打包记录里的包装号补上。 */
+function applyPackLinks(items, shipmentItems, shipments) {
+  const bundleByPackId = new Map();
+  for (const pack of shipments || []) {
+    const id = text(pack.id);
+    const code = text(pack.bundle_barcode).toUpperCase();
+    if (id && code) bundleByPackId.set(id, code);
+  }
+  const byItemId = new Map();
+  const byBarcode = new Map();
+  for (const line of shipmentItems || []) {
+    const bundle = bundleByPackId.get(text(line.pack_id));
+    if (!bundle) continue;
+    const itemId = text(line.item_id);
+    const barcode = text(line.item_barcode).toUpperCase();
+    if (itemId) byItemId.set(itemId, bundle);
+    if (barcode) byBarcode.set(barcode, bundle);
+  }
+  return (items || []).map((row) => {
+    if (text(row.packed_bundle_barcode)) return row;
+    const pack = byItemId.get(text(row.id)) || byBarcode.get(text(row.barcode).toUpperCase()) || '';
+    if (!pack) return row;
+    return { ...row, packed_bundle_barcode: pack };
+  });
+}
+
 function buildPendingExportBoard(items, options = {}) {
   const pending = items.filter((row) => isStockedIn(row) && !isPackageBarcode(row.barcode));
   const bases = new Set();
@@ -109,6 +135,7 @@ function buildPendingExportBoard(items, options = {}) {
     singles.push({
       id: text(row.id),
       barcode: text(row.input_barcode) || text(row.barcode),
+      packBarcode: text(row.packed_bundle_barcode).toUpperCase(),
       customer: text(row.recipient_name),
       destination: text(row.final_destination),
       weightKg: parseWeightKg(row.weight),
@@ -129,9 +156,13 @@ function buildPendingExportBoard(items, options = {}) {
       Number(lookupMap([base, parsed?.base, shellCode], options.packageWeightKg)) || 0;
     packages.push({
       base: parsed?.base || base,
+      packBarcode: shellCode,
       customer: rows.map((row) => text(row.recipient_name)).find(Boolean) || '',
       destination: rows.map((row) => text(row.final_destination)).find(Boolean) || '',
       pieceCount: rows.length,
+      orderBarcodes: rows
+        .map((row) => text(row.input_barcode) || text(row.barcode))
+        .filter(Boolean),
       weightKg: packWeight > 0 ? packWeight : pieceWeight,
       tripNumber: lookupMap(
         [base, ...rows.flatMap((row) => [row.barcode, row.packed_bundle_barcode, `id:${row.id}`])],
@@ -147,7 +178,16 @@ function buildPendingExportBoard(items, options = {}) {
 }
 
 function pendingExportHaystack(row) {
-  return [row.barcode, row.base, row.customer, row.destination, row.tripNumber, row.id]
+  return [
+    row.barcode,
+    row.base,
+    row.packBarcode,
+    ...(row.orderBarcodes || []),
+    row.customer,
+    row.destination,
+    row.tripNumber,
+    row.id,
+  ]
     .map((part) => text(part).toLowerCase())
     .filter(Boolean)
     .join(' ');
@@ -166,6 +206,40 @@ function limitPendingExportBoard(board, queryText) {
     packageCount: q ? packages.length : board.packages.length,
     truncated: singles.length > limit || packages.length > limit,
   };
+}
+
+function indexPackBarcodes(items) {
+  const byBase = new Map();
+  const byCode = new Map();
+  for (const row of items || []) {
+    const pack = text(row.packed_bundle_barcode).toUpperCase();
+    if (!pack) continue;
+    const barcode = text(row.barcode).toUpperCase();
+    const input = text(row.input_barcode).toUpperCase();
+    if (barcode) byCode.set(barcode, pack);
+    if (input) byCode.set(input, pack);
+    const parsed = parsePackagingLine(barcode);
+    if (parsed) byBase.set(parsed.base.toUpperCase(), pack);
+  }
+  return { byBase, byCode };
+}
+
+function exportCostPackBarcode(row, index) {
+  if (!index) return '';
+  const display = text(row.display_barcode).toUpperCase();
+  const key = text(row.subject_key).toUpperCase();
+  if (text(row.subject_kind) === 'package') {
+    return index.byBase.get(key) || index.byBase.get(display) || index.byCode.get(display) || '';
+  }
+  return index.byCode.get(display) || index.byCode.get(key) || '';
+}
+
+function annotateExportCostsWithPackBarcode(costs, items) {
+  const index = indexPackBarcodes(items);
+  return (costs || []).map((row) => ({
+    ...row,
+    pack_barcode: exportCostPackBarcode(row, index),
+  }));
 }
 
 function withoutSavedExportCosts(board, saved) {
@@ -294,20 +368,44 @@ function assemblePendingExportCosts(items, trips, saved, queryText) {
   return limitPendingExportBoard(board, queryText);
 }
 
+async function loadPackedBundleItems(supabase) {
+  return fetchPages(
+    supabase,
+    'inventory_store_items',
+    'barcode, input_barcode, packed_bundle_barcode',
+    (query) => query.not('packed_bundle_barcode', 'is', null).neq('packed_bundle_barcode', ''),
+  );
+}
+
+async function loadPackMembership(supabase) {
+  const [shipments, lines] = await Promise.all([
+    fetchPages(supabase, 'inventory_packed_shipments', 'id, bundle_barcode'),
+    fetchPages(supabase, 'inventory_packed_shipment_items', 'pack_id, item_id, item_barcode'),
+  ]);
+  return { shipments, lines };
+}
+
 async function loadPendingExportCosts(supabase, queryText) {
   const itemSelect =
     'id, barcode, input_barcode, recipient_name, final_destination, weight, qty_on_hand, packed_at, packed_bundle_barcode, hub_arrived_at, customer_signed_at, hub_transit_released_at, owner_store_code';
-  const items = await fetchPages(supabase, 'inventory_store_items', itemSelect);
-  const trips = await fetchPages(
-    supabase,
-    'inventory_pkg_tracking',
-    'pack_barcode, trip_number, total_weight',
-    (query) => query.not('truck_loaded_at', 'is', null),
-  );
+  const [rawItems, trips, membership] = await Promise.all([
+    fetchPages(supabase, 'inventory_store_items', itemSelect),
+    fetchPages(
+      supabase,
+      'inventory_pkg_tracking',
+      'pack_barcode, trip_number, total_weight',
+      (query) => query.not('truck_loaded_at', 'is', null),
+    ),
+    loadPackMembership(supabase),
+  ]);
+  const items = applyPackLinks(rawItems, membership.lines, membership.shipments);
   let saved = [];
   const savedResult = await supabase.from('inventory_export_costs').select('subject_kind, subject_key');
   if (!savedResult.error) saved = savedResult.data || [];
-  return assemblePendingExportCosts(items, trips || [], saved, queryText);
+  return {
+    pendingExport: assemblePendingExportCosts(items, trips || [], saved, queryText),
+    items,
+  };
 }
 
 const QUEUE_PAGE_SIZE = 50;
@@ -481,7 +579,10 @@ module.exports = {
   countPendingNotify,
   loadHqTodoCounts,
   loadPendingExportCosts,
+  applyPackLinks,
   assemblePendingExportCosts,
+  annotateExportCostsWithPackBarcode,
+  loadPackedBundleItems,
   limitPendingExportBoard,
   loadHqQueue,
   settleAdminExportCost,

@@ -40,6 +40,7 @@ const LABELS = {
 function ScrollableTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { cartCount } = useCart();
+  const { isDarkMode } = useApp();
   const scrollRef = useRef<ScrollView>(null);
   const itemX = useRef<Record<number, number>>({});
   const metrics = useRef({ x: 0, viewW: 0, contentW: 0 });
@@ -98,7 +99,7 @@ function ScrollableTabBar({ state, descriptors, navigation }: BottomTabBarProps)
   });
 
   return (
-    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <View style={[styles.bar, isDarkMode && styles.barDark, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -168,7 +169,7 @@ function ScrollableTabBar({ state, descriptors, navigation }: BottomTabBarProps)
       {canScrollLeft ? (
         <View pointerEvents="none" style={styles.hintLeft}>
           <LinearGradient
-            colors={['#FFFFFF', 'rgba(255,255,255,0)']}
+            colors={isDarkMode ? ['#152033', 'rgba(21,32,51,0)'] : ['#FFFFFF', 'rgba(255,255,255,0)']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={StyleSheet.absoluteFill}
@@ -187,7 +188,7 @@ function ScrollableTabBar({ state, descriptors, navigation }: BottomTabBarProps)
       {canScrollRight ? (
         <View pointerEvents="none" style={styles.hintRight}>
           <LinearGradient
-            colors={['rgba(255,255,255,0)', '#FFFFFF']}
+            colors={isDarkMode ? ['rgba(21,32,51,0)', '#152033'] : ['rgba(255,255,255,0)', '#FFFFFF']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={StyleSheet.absoluteFill}
@@ -294,6 +295,10 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E2E8F0',
     paddingTop: 6,
+  },
+  barDark: {
+    backgroundColor: '#152033',
+    borderTopColor: '#243044',
   },
   row: {
     flexGrow: 1,
