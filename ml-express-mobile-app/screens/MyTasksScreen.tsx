@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -52,6 +52,15 @@ import { openMapsToAddress } from '../utils/openMapsNavigation';
 import { DeliveryCountdownBadge } from '../components/DeliveryCountdownBadge';
 import { MyTaskPackageCard } from '../components/MyTaskPackageCard';
 import { myTasksScreenStyles as styles } from './myTasks/myTasksScreenStyles';
+import { explainScanStop } from '../utils/scanStop';
+import { riderActionCopy } from '../utils/riderActionCopy';
+import {
+  courierTaskPoint,
+  formatCourierDistance,
+  haversineMeters,
+  sortCourierTasksByDistance,
+  type GeoPoint,
+} from '../utils/courierTaskDistance';
 
 const { width, height } = Dimensions.get('window');
 
@@ -99,17 +108,26 @@ const MyTasksScreen: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
+  const [arrivedMerchantId, setArrivedMerchantId] = useState<string | null>(null);
+
+  const riderLat = currentLocation?.coords.latitude;
+  const riderLng = currentLocation?.coords.longitude;
+  const riderPoint = useMemo<GeoPoint | null>(() => {
+    if (typeof riderLat !== 'number' || typeof riderLng !== 'number') return null;
+    if (!Number.isFinite(riderLat) || !Number.isFinite(riderLng)) return null;
+    return { lat: riderLat, lng: riderLng };
+  }, [riderLat, riderLng]);
 
   const taskSections = useMemo(() => {
     const dates = selectedDate ? [selectedDate] : Object.keys(groupedPackages);
     return dates
       .filter((date) => (groupedPackages[date] || []).length > 0)
-      .map((date) => ({ title: date, data: groupedPackages[date] }));
-  }, [groupedPackages, selectedDate]);
-
-    // 🚀 地理围栏与实时距离状态
-  const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
-  const [arrivedMerchantId, setArrivedMerchantId] = useState<string | null>(null);
+      .map((date) => ({
+        title: date,
+        data: sortCourierTasksByDistance(groupedPackages[date] || [], riderPoint),
+      }));
+  }, [groupedPackages, selectedDate, riderPoint]);
 
   // 按日期分组包裹
   const groupPackagesByDate = (packages: Package[]) => {
@@ -660,7 +678,33 @@ const MyTasksScreen: React.FC = () => {
 
   const handleScanCode = async (data: string) => {
     if (scannedOnce.current) return;
+    const code = String(data || '').replace(/[\x00-\x1F\x7F]/g, '').trim();
+    if (code.length < 4) return;
     scannedOnce.current = true;
+    setShowScanModal(false);
+    setScanning(false);
+    const copy = riderActionCopy(language);
+    const reopenScan = () => {
+      scannedOnce.current = false;
+      setScanning(true);
+      setShowScanModal(true);
+    };
+    const stopScan = (message: string, withPhoto = false) => {
+      explainScanStop({
+        title: copy.scanStopTitle,
+        message,
+        scanAgainLabel: copy.continueScan,
+        dismissLabel: copy.ok,
+        onScanAgain: reopenScan,
+        photoLabel: withPhoto ? copy.photoDeliver : undefined,
+        onPhoto: withPhoto
+          ? () => {
+              scannedOnce.current = false;
+              void handleOpenCamera();
+            }
+          : undefined,
+      });
+    };
 
     try {
       setLoading(true);
@@ -670,17 +714,12 @@ const MyTasksScreen: React.FC = () => {
       const { deviceHealthService } = require('../services/deviceHealthService');
       const health = await deviceHealthService.performFullCheck();
       if (health.location.isMocked) {
-        feedbackService.warning(
-          language === 'zh' ? '禁止使用模拟定位进行扫码' : 'Mock location is not allowed',
-        );
+        stopScan(language === 'zh' ? '禁止使用模拟定位进行扫码' : 'Mock location is not allowed');
         return;
       }
 
-      // 取件：匹配本单码
       if (isPickupFlowStatus(statusNormLocal)) {
-        setShowScanModal(false);
-        setScanning(false);
-        if (scanMatchesPackage(data, selectedPackage)) {
+        if (scanMatchesPackage(code, selectedPackage)) {
           const success = await packageService.updatePackageStatus(
             selectedPackage.id,
             '已取件',
@@ -697,40 +736,23 @@ const MyTasksScreen: React.FC = () => {
           } else {
             feedbackService.error(language === 'zh' ? '取件失败' : 'Pickup failed');
           }
-        } else if (isDeliveryStoreScan(data)) {
-          feedbackService.warning(
-            language === 'zh'
-              ? '取件请扫包裹码；店长码用于送达'
-              : 'Scan package code for pickup; store code is for delivery',
-          );
+        } else if (isDeliveryStoreScan(code)) {
+          stopScan(copy.pickupWrongStage);
         } else {
-          feedbackService.warning(
-            language === 'zh' ? '扫码与当前任务不匹配' : 'Code does not match this task',
-          );
+          stopScan(copy.scanMismatch);
         }
         return;
       }
 
-      // 送达：店长码
       if (
         isDeliveryActionStatus(statusNormLocal) ||
         statusNormLocal === '异常上报'
       ) {
-        if (!isDeliveryStoreScan(data)) {
-          setShowScanModal(false);
-          setScanning(false);
-          if (scanMatchesPackage(data, selectedPackage)) {
-            feedbackService.info(
-              language === 'zh'
-                ? '请扫描店长收件码，或改用拍照送达'
-                : 'Scan store receive code, or use photo delivery',
-            );
+        if (!isDeliveryStoreScan(code)) {
+          if (scanMatchesPackage(code, selectedPackage)) {
+            stopScan(copy.scanStoreOrPhoto, true);
           } else {
-            feedbackService.warning(
-              language === 'zh'
-                ? '请扫描店长收件码（STORE_…）'
-                : 'Scan store receive code (STORE_…)',
-            );
+            stopScan(copy.scanStoreToDeliver, true);
           }
           return;
         }
@@ -750,24 +772,17 @@ const MyTasksScreen: React.FC = () => {
             pkgData.receiver_longitude,
           );
           if (dist > 200) {
-            feedbackService.warning(
-              language === 'zh'
-                ? `距离送达点约 ${Math.round(dist)} 米，请靠近后再扫码`
-                : `About ${Math.round(dist)}m away. Move closer.`,
-            );
+            stopScan(copy.tooFarScan(Math.round(dist)), true);
             return;
           }
         }
 
-        setScannedData(data);
-        setScanning(false);
-        setShowScanModal(false);
+        setScannedData(code);
 
-        const parsed = parseStoreReceiveCode(data);
+        const parsed = parseStoreReceiveCode(code);
         const storeId = parsed?.storeId || '';
         if (!storeId) {
-          feedbackService.warning(language === 'zh' ? '收件码无效' : 'Invalid store code');
-          resetScanState();
+          stopScan(copy.invalidStoreCode, true);
           return;
         }
 
@@ -782,7 +797,7 @@ const MyTasksScreen: React.FC = () => {
           new Date().toISOString(),
           currentCourierName,
           undefined,
-          { storeId, storeName, receiveCode: data },
+          { storeId, storeName, receiveCode: code },
         );
 
         if (success.ok) {
@@ -807,8 +822,7 @@ const MyTasksScreen: React.FC = () => {
         return;
       }
 
-      setShowScanModal(false);
-      feedbackService.warning(
+      stopScan(
         language === 'zh'
           ? `当前状态「${selectedPackage.status}」无法扫码操作`
           : `Cannot scan-action status ${selectedPackage.status}`,
@@ -817,7 +831,6 @@ const MyTasksScreen: React.FC = () => {
       feedbackService.error(language === 'zh' ? '扫码处理失败' : 'Scan failed');
     } finally {
       setLoading(false);
-      scannedOnce.current = false;
     }
   };
 
@@ -964,14 +977,29 @@ const MyTasksScreen: React.FC = () => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
         }
         ListHeaderComponent={
-          selectedDate ? (
-            <View style={styles.activeFilter}>
-              <Text style={styles.filterText}>📅 {selectedDate}</Text>
-              <TouchableOpacity onPress={() => setSelectedDate(null)}>
-                <Ionicons name="close-circle" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          ) : null
+          <View>
+            <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '700', paddingHorizontal: 4, paddingBottom: 8 }}>
+              {riderPoint
+                ? language === 'zh'
+                  ? '近的在前'
+                  : language === 'my'
+                    ? 'အနီးဆုံးအရင်'
+                    : 'Nearest first'
+                : language === 'zh'
+                  ? '打开定位后按距离排'
+                  : language === 'my'
+                    ? 'တည်နေရာဖွင့်မှ အကွာအဝေးအလိုက်'
+                    : 'Turn on location to sort'}
+            </Text>
+            {selectedDate ? (
+              <View style={styles.activeFilter}>
+                <Text style={styles.filterText}>📅 {selectedDate}</Text>
+                <TouchableOpacity onPress={() => setSelectedDate(null)}>
+                  <Ionicons name="close-circle" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+          </View>
         }
         ListEmptyComponent={
           !loading ? (
@@ -986,15 +1014,23 @@ const MyTasksScreen: React.FC = () => {
             <Text style={styles.dateGroupTitle}>{section.title}</Text>
           </View>
         )}
-        renderItem={({ item }) => (
+        renderItem={({ item }) => {
+          const point = courierTaskPoint(item);
+          const distanceLabel =
+            riderPoint && point
+              ? formatCourierDistance(haversineMeters(riderPoint, point), language)
+              : '';
+          return (
           <MyTaskPackageCard
             item={item}
             language={language}
+            distanceLabel={distanceLabel}
             onPress={handlePackagePress}
             getStatusColor={getStatusColor}
             getStatusText={getStatusText}
           />
-        )}
+          );
+        }}
         contentContainerStyle={
           taskSections.length === 0 ? { flexGrow: 1 } : { paddingBottom: 24 }
         }
@@ -1190,7 +1226,7 @@ const MyTasksScreen: React.FC = () => {
                 normalizePackageStatusZh(selectedPackage.status),
               ) ? (
                 <>
-                  <TouchableOpacity style={styles.gridActionBtn} onPress={() => { setShowCameraModal(false); setShowScanModal(true); setScanning(true); }}>
+                  <TouchableOpacity style={styles.gridActionBtn} onPress={() => { scannedOnce.current = false; setShowCameraModal(false); setShowScanModal(true); setScanning(true); }}>
                     <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.gridBtnGradient}>
                       <Ionicons name="qr-code" size={28} color="white" />
                       <Text style={styles.gridBtnText}>{language === 'zh' ? '扫码取件' : 'Scan'}</Text>
@@ -1217,7 +1253,7 @@ const MyTasksScreen: React.FC = () => {
                       <Text style={styles.gridBtnText}>{language === 'zh' ? '拍照送达' : 'Photo'}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.gridActionBtn} onPress={() => { setShowCameraModal(false); setShowScanModal(true); setScanning(true); }}>
+                  <TouchableOpacity style={styles.gridActionBtn} onPress={() => { scannedOnce.current = false; setShowCameraModal(false); setShowScanModal(true); setScanning(true); }}>
                     <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.gridBtnGradient}>
                       <Ionicons name="qr-code" size={28} color="white" />
                       <Text style={styles.gridBtnText}>{language === 'zh' ? '扫码送达' : 'Scan'}</Text>
@@ -1268,9 +1304,9 @@ const MyTasksScreen: React.FC = () => {
               style={StyleSheet.absoluteFill}
               facing="back"
               barcodeScannerSettings={{
-                barcodeTypes: ['qr', 'code128', 'code39', 'ean13', 'ean8'],
+                barcodeTypes: ['qr', 'code128', 'code39', 'ean13', 'ean8', 'pdf417'],
               }}
-              onBarcodeScanned={({ data }) => handleScanCode(data)}
+              onBarcodeScanned={scanning ? ({ data }) => { void handleScanCode(data); } : undefined}
             />
           ) : (
             <View style={[StyleSheet.absoluteFill, styles.cameraPaused]}>

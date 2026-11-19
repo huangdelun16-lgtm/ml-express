@@ -150,6 +150,9 @@ export default function HubReceiveScreen({
         onClose={flow.closeOrdersModal}
         onConfirmPack={() => void flow.handleConfirmPack()}
         onConfirmOrder={(orderId) => void flow.handleConfirmOrder(orderId)}
+        onScanInbound={flow.handleScanInbound}
+        onScanSessionBegin={flow.beginScanInbound}
+        onScanSessionEnd={flow.finishScanInbound}
         onBatchInbound={() => void flow.handleBatchInbound()}
         onPayTransportFee={flow.handlePayTransportFee}
         onReleaseTransit={() => void flow.handleReleaseTransit()}

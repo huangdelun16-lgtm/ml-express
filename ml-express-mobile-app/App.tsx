@@ -44,6 +44,8 @@ import { hasAcceptedLocationDisclosure } from './utils/locationDisclosureStorage
 import LocationDisclosureScreen from './screens/LocationDisclosureScreen';
 import * as Linking from 'expo-linking';
 import { navigationRef } from './navigation/navigationRef';
+import { courierTabBarStyle } from './navigation/courierTabBarStyle';
+import { CourierTabItem } from './navigation/CourierTabItem';
 import LocationPrecheckModalHost from './components/LocationPrecheckModalHost';
 import { GlobalToast } from './components/GlobalToast';
 
@@ -176,34 +178,19 @@ function CourierTabs() {
   const insets = useSafeAreaInsets();
 
   return (
-    <Tab.Navigator
+    <>
+      <StatusBar barStyle="light-content" />
+      <Tab.Navigator
       screenOptions={{
         lazy: true,
         headerShown: false,
-        tabBarActiveTintColor: '#2c5282',
-        tabBarInactiveTintColor: '#999',
+        tabBarActiveTintColor: '#99f6e4',
+        tabBarInactiveTintColor: '#8b9cb3',
         tabBarHideOnKeyboard: true,
-        tabBarStyle: {
-          height: Platform.OS === 'ios' ? 85 + insets.bottom : 75 + Math.max(insets.bottom, 10),
-          paddingBottom: Platform.OS === 'ios' ? insets.bottom + 5 : Math.max(insets.bottom, 12),
-          paddingTop: 8,
-          borderTopWidth: 1,
-          borderTopColor: '#e5e7eb',
-          backgroundColor: '#fff',
-          elevation: 20,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.15,
-          shadowRadius: 10,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '700',
-          marginTop: 2,
-          marginBottom: Platform.OS === 'android' ? 8 : 0,
-        },
-        tabBarIconStyle: {
-          marginTop: 4,
+        tabBarShowLabel: false,
+        tabBarStyle: courierTabBarStyle(insets.bottom),
+        tabBarItemStyle: {
+          paddingVertical: 0,
         },
       }}
     >
@@ -212,8 +199,8 @@ function CourierTabs() {
         component={LazyCourierHomeScreen}
         options={{
           tabBarLabel: t.tabMyTasks,
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'cube' : 'cube-outline'} size={22} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <CourierTabItem focused={focused} label={t.tabMyTasks} icon="cube-outline" iconFocused="cube" />
           ),
         }}
       />
@@ -222,8 +209,8 @@ function CourierTabs() {
         component={LazyMapScreen}
         options={{
           tabBarLabel: t.map,
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'map' : 'map-outline'} size={22} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <CourierTabItem focused={focused} label={t.map} icon="map-outline" iconFocused="map" />
           ),
         }}
       />
@@ -232,8 +219,8 @@ function CourierTabs() {
         component={LazyScanScreen}
         options={{
           tabBarLabel: t.scan,
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'scan' : 'scan-outline'} size={22} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <CourierTabItem focused={focused} label={t.scan} icon="scan-outline" iconFocused="scan" />
           ),
         }}
       />
@@ -242,12 +229,13 @@ function CourierTabs() {
         component={LazyProfileScreen}
         options={{
           tabBarLabel: t.tabAccount,
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <CourierTabItem focused={focused} label={t.tabAccount} icon="person-outline" iconFocused="person" />
           ),
         }}
       />
     </Tab.Navigator>
+    </>
   );
 }
 
@@ -340,27 +328,26 @@ const GlobalOrderMonitor = () => {
             .single();
 
           if (!error && data && data.current_session_id && data.current_session_id !== localSessionId) {
-            console.log(`🛑 [监控器] 会话不匹配! DB: ${data.current_session_id}, Local: ${localSessionId}`);
-
-            if (checkSessionTimer) clearInterval(checkSessionTimer);
-
-            Alert.alert(t.sessionKickedTitle, t.sessionKickedMessage, [
-              {
-                text: t.ok,
-                onPress: async () => {
-                  await AsyncStorage.multiRemove([
-                    'currentUserId',
-                    'currentUser',
-                    'currentUserName',
-                    'currentUserRole',
-                    'currentUserPosition',
-                    'currentSessionId',
-                  ]);
-                  const Updates = require('expo-updates');
-                  Updates.reloadAsync();
-                },
-              },
-            ], { cancelable: false });
+            const { data: again } = await supabase
+              .from('admin_accounts')
+              .select('current_session_id')
+              .eq('id', id)
+              .single();
+            if (!again?.current_session_id || again.current_session_id === localSessionId) return;
+            await supabase
+              .from('admin_accounts')
+              .update({ current_session_id: localSessionId })
+              .eq('id', id);
+            const position = await AsyncStorage.getItem('currentUserPosition');
+            if (position === '骑手' || position === '骑手队长') {
+              const courierId = await AsyncStorage.getItem('currentCourierId');
+              if (courierId) {
+                await supabase
+                  .from('couriers')
+                  .update({ current_session_id: localSessionId })
+                  .eq('id', courierId);
+              }
+            }
           }
         }
       } catch (e) {
@@ -376,7 +363,7 @@ const GlobalOrderMonitor = () => {
       clearTimeout(initialTimeout);
       if (checkSessionTimer) clearInterval(checkSessionTimer);
     };
-  }, [courierName, userId, t]);
+  }, [courierName, userId]);
 
   useEffect(() => {
     if (!courierName) return;
@@ -514,7 +501,6 @@ function AppContent() {
       <StatusBar barStyle="dark-content" />
       <LocationPrecheckModalHost />
       <GlobalOrderMonitor />
-      <SyncIndicator />
       <NavigationContainer
         ref={navigationRef}
         linking={linking}
@@ -582,6 +568,7 @@ function AppContent() {
           </Stack.Navigator>
         </Suspense>
       </NavigationContainer>
+      <SyncIndicator />
     </>
   );
 }

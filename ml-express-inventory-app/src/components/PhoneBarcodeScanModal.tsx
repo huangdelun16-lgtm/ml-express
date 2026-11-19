@@ -10,6 +10,7 @@ type Props = {
   onScanned: (code: string) => void;
   title?: string;
   subtitle?: string;
+  hintTone?: 'ok' | 'warn';
   /** 连扫：扫到后不关相机 */
   continuous?: boolean;
   busy?: boolean;
@@ -25,6 +26,7 @@ export default function PhoneBarcodeScanModal({
   onScanned,
   title,
   subtitle,
+  hintTone,
   continuous = false,
   busy = false,
   scannedCount = 0,
@@ -78,6 +80,7 @@ export default function PhoneBarcodeScanModal({
           active={visible && !busy && !listVisible}
           onScan={handleScanned}
           subtitle={subtitle ?? t.forms.scanAutoFill}
+          hintTone={hintTone}
         />
         {listVisible ? (
           <View style={styles.sheetWrap} pointerEvents="box-none">

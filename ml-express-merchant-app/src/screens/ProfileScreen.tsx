@@ -2572,9 +2572,6 @@ export default function ProfileScreen({ navigation }: any) {
       case "help":
         showToast(language === "zh" ? "即将推出" : "Coming soon", "info");
         break;
-      case "notificationTest":
-        navigation.navigate("NotificationWorkflow");
-        break;
       default:
         break;
     }

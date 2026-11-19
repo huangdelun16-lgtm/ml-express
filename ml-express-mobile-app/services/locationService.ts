@@ -203,6 +203,11 @@ export const locationService = {
       await this.enableUpdates();
       return true;
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err ?? '');
+      if (message.includes('NSLocation')) {
+        logger.warn('当前安装包没有后台定位说明，后台追踪先跳过。重新打原生包后才会生效。');
+        return false;
+      }
       logger.error('启动后台追踪失败:', err);
       return false;
     }

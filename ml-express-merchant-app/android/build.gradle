@@ -22,3 +22,13 @@ allprojects {
 
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"
+
+// AGP 9 turns BuildConfig off. Bluetooth and the app still declare buildConfigField.
+subprojects { subproject ->
+  subproject.plugins.withId("com.android.library") {
+    subproject.android.buildFeatures.buildConfig = true
+  }
+  subproject.plugins.withId("com.android.application") {
+    subproject.android.buildFeatures.buildConfig = true
+  }
+}

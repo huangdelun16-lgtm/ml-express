@@ -66,6 +66,22 @@ function friendlyExportCostError(message: string, isEn: boolean): string {
   return message || (isEn ? 'Could not load export costs' : '出口成本加载失败');
 }
 
+function exportCostFormError(
+  input: { leg: string; currency: string; price: string; fx: string },
+  isEn: boolean,
+): string {
+  if (!input.leg || !input.currency) {
+    return isEn ? 'Choose the destination and the currency first.' : '请先选择运达和实付币种。';
+  }
+  if (input.price.trim() === '' || !Number.isFinite(Number(input.price)) || Number(input.price) < 0) {
+    return isEn ? 'Enter the unit price. 0 can be saved.' : '请填写单价。填 0 也可以保存。';
+  }
+  if (input.currency === 'MMK' && (!input.fx.trim() || !Number.isFinite(Number(input.fx)) || Number(input.fx) <= 0)) {
+    return isEn ? 'Enter the MMK per CNY rate.' : '实付缅币时请填写汇率。';
+  }
+  return '';
+}
+
 function whenLabel(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '—';
@@ -90,13 +106,23 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
   const [currency, setCurrency] = useState<'CNY' | 'MMK' | ''>('');
   const [fx, setFx] = useState('');
   const [savingKey, setSavingKey] = useState('');
-  const [formError, setFormError] = useState('');
+  const [saveNotice, setSaveNotice] = useState<{ ok: boolean; title: string; text: string } | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [batchLeg, setBatchLeg] = useState<'MSE' | 'LSO' | ''>('');
+  const [batchPrice, setBatchPrice] = useState('');
+  const [batchCurrency, setBatchCurrency] = useState<'CNY' | 'MMK' | ''>('');
+  const [batchFx, setBatchFx] = useState('');
+  const [batchSaving, setBatchSaving] = useState(false);
   const storeName = useMemo(() => {
     const map = new Map(
       stores.map((store) => [store.store_code.trim().toUpperCase(), store.store_name]),
     );
     return (code: string) => map.get(code.trim().toUpperCase()) || '';
   }, [stores]);
+
+  useEffect(() => {
+    if (rate && rate > 0) setBatchFx((current) => current || String(rate));
+  }, [rate]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 250);
@@ -184,6 +210,96 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
     );
   }, [pending, query]);
 
+  const fillableKeys = useMemo(
+    () => pendingRows.filter((row) => Number(row.weightKg) > 0).map((row) => row.key),
+    [pendingRows],
+  );
+  const pickedKeys = useMemo(
+    () => picked.filter((key) => fillableKeys.includes(key)),
+    [picked, fillableKeys],
+  );
+  const allFillablePicked = fillableKeys.length > 0 && fillableKeys.every((key) => pickedKeys.includes(key));
+
+  const saveBatch = () => {
+    if (batchSaving || savingKey) return;
+    const problem = exportCostFormError(
+      { leg: batchLeg, currency: batchCurrency, price: batchPrice, fx: batchFx },
+      isEn,
+    );
+    if (problem) {
+      setSaveNotice({ ok: false, title: isEn ? 'Not saved' : '保存失败', text: problem });
+      return;
+    }
+    const targets = pendingRows.filter((row) => pickedKeys.includes(row.key));
+    if (targets.length === 0) {
+      setSaveNotice({
+        ok: false,
+        title: isEn ? 'Not saved' : '保存失败',
+        text: isEn ? 'Select the orders to fill.' : '请先勾选要填写的订单。',
+      });
+      return;
+    }
+    setBatchSaving(true);
+    void (async () => {
+      const failed: string[] = [];
+      const done: string[] = [];
+      for (const row of targets) {
+        const subjectKey = row.kind === 'package' ? row.base || '' : row.id || '';
+        const label = row.kind === 'package' ? row.base || row.barcode || row.key : row.barcode || row.key;
+        if (!subjectKey) {
+          failed.push(`${label}: ${isEn ? 'Missing order id' : '缺少单号'}`);
+          continue;
+        }
+        try {
+          await saveAdminExportCost({
+            subjectKind: row.kind,
+            subjectKey,
+            displayBarcode: row.kind === 'package' ? row.base || '' : row.barcode || '',
+            customerName: row.customer,
+            finalDestination: row.destination,
+            legDestination: batchLeg as 'MSE' | 'LSO',
+            weightKg: Number(row.weightKg),
+            unitPriceCny: Number(batchPrice),
+            payCurrency: batchCurrency as 'CNY' | 'MMK',
+            mmkPerCny: batchCurrency === 'MMK' ? Number(batchFx) : null,
+            tripNumber: row.tripNumber,
+            storeCode: row.ownerStoreCode,
+          });
+          done.push(row.key);
+        } catch (err: unknown) {
+          const raw = err instanceof Error ? err.message : '';
+          failed.push(`${label}: ${raw ? friendlyExportCostError(raw, isEn) : isEn ? 'Save failed' : '保存失败'}`);
+        }
+      }
+      setPicked((current) => current.filter((key) => !done.includes(key)));
+      if (done.length > 0) setRetryTick((n) => n + 1);
+      if (failed.length === 0) {
+        setSaveNotice({
+          ok: true,
+          title: isEn ? 'Saved' : '保存成功',
+          text: isEn
+            ? `Saved export cost for ${done.length} orders.`
+            : `已批量保存 ${done.length} 单的出口成本。`,
+        });
+      } else if (done.length === 0) {
+        setSaveNotice({
+          ok: false,
+          title: isEn ? 'Not saved' : '保存失败',
+          text: failed.slice(0, 5).join('\n'),
+        });
+      } else {
+        setSaveNotice({
+          ok: false,
+          title: isEn ? 'Partly saved' : '部分保存',
+          text: isEn
+            ? `Saved ${done.length}. Failed ${failed.length}.\n${failed.slice(0, 5).join('\n')}`
+            : `已保存 ${done.length} 单，失败 ${failed.length} 单。\n${failed.slice(0, 5).join('\n')}`,
+        });
+      }
+      setBatchSaving(false);
+    })();
+  };
+
   return (
     <section className="cbl-card cbl-export-cost">
       <div className="cbl-card__head">
@@ -219,11 +335,67 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
                     : '待填清单没有加载出来。'}
             </span>
           </div>
+          {pending && fillableKeys.length > 0 ? (
+            <div className="cbl-export-batch">
+              <span className="cbl-export-batch__count">
+                {isEn ? `${pickedKeys.length} selected` : `已选 ${pickedKeys.length} 单`}
+              </span>
+              <button
+                type="button"
+                className="cbl-btn cbl-btn--ghost cbl-btn--sm"
+                onClick={() => setPicked(allFillablePicked ? [] : fillableKeys)}
+              >
+                {allFillablePicked ? (isEn ? 'Clear' : '取消全选') : (isEn ? 'Select fillable' : '全选可填')}
+              </button>
+              <label>
+                {isEn ? 'Leg' : '运达'}
+                <select value={batchLeg} onChange={(event) => setBatchLeg(event.target.value as 'MSE' | 'LSO' | '')}>
+                  <option value="">{isEn ? 'Choose' : '请选择'}</option>
+                  <option value="MSE">{isEn ? 'Muse' : '木姐'}</option>
+                  <option value="LSO">{isEn ? 'Lashio' : '腊戌'}</option>
+                </select>
+              </label>
+              <label>
+                {isEn ? 'CNY / Kg' : '¥/Kg'}
+                <input value={batchPrice} inputMode="decimal" onChange={(event) => setBatchPrice(event.target.value)} />
+              </label>
+              <label>
+                {isEn ? 'Pay in' : '实付'}
+                <select value={batchCurrency} onChange={(event) => setBatchCurrency(event.target.value as 'CNY' | 'MMK' | '')}>
+                  <option value="">{isEn ? 'Choose' : '请选择'}</option>
+                  <option value="CNY">{isEn ? 'CNY' : '人民币'}</option>
+                  <option value="MMK">{isEn ? 'MMK' : '缅币'}</option>
+                </select>
+              </label>
+              {batchCurrency === 'MMK' ? (
+                <label>
+                  {isEn ? 'MMK per CNY' : '汇率'}
+                  <input value={batchFx} inputMode="decimal" onChange={(event) => setBatchFx(event.target.value)} />
+                </label>
+              ) : null}
+              <button
+                type="button"
+                className="cbl-btn cbl-btn--primary cbl-btn--sm"
+                disabled={batchSaving || Boolean(savingKey)}
+                onClick={saveBatch}
+              >
+                {batchSaving ? (isEn ? 'Saving…' : '保存中…') : (isEn ? 'Save selected' : '批量保存')}
+              </button>
+            </div>
+          ) : null}
           {pending && pendingRows.length > 0 ? (
             <div className="cbl-table-wrap">
               <table className="cbl-table cbl-table--expense cbl-table--export-pending">
                 <thead>
                   <tr>
+                    <th>
+                      <input
+                        type="checkbox"
+                        aria-label={isEn ? 'Select fillable orders' : '全选可填订单'}
+                        checked={allFillablePicked}
+                        onChange={() => setPicked(allFillablePicked ? [] : fillableKeys)}
+                      />
+                    </th>
                     <th>{isEn ? 'Type' : '类型'}</th>
                     <th>{isEn ? 'Order' : '单号'}</th>
                     <th>{isEn ? 'Pack no.' : '包装号'}</th>
@@ -242,6 +414,22 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
                     return (
                       <Fragment key={row.key}>
                         <tr>
+                          <td>
+                            <input
+                              type="checkbox"
+                              aria-label={isEn ? 'Select order' : '选择订单'}
+                              disabled={missingWeight || batchSaving}
+                              checked={!missingWeight && pickedKeys.includes(row.key)}
+                              onChange={() => {
+                                if (missingWeight) return;
+                                setPicked((current) =>
+                                  current.includes(row.key)
+                                    ? current.filter((key) => key !== row.key)
+                                    : [...current, row.key],
+                                );
+                              }}
+                            />
+                          </td>
                           <td>{kindLabel(row.kind, isEn)}</td>
                           <td className="cbl-code">
                             {row.kind === 'package' ? row.base : row.barcode || '—'}
@@ -267,7 +455,6 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
                                 type="button"
                                 className="cbl-btn cbl-btn--primary cbl-btn--sm"
                                 onClick={() => {
-                                  setFormError('');
                                   if (open) {
                                     setOpenKey('');
                                     return;
@@ -286,7 +473,7 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
                         </tr>
                         {open ? (
                           <tr>
-                            <td colSpan={8}>
+                            <td colSpan={9}>
                               <div className="cbl-export-fill">
                                 <label>
                                   {isEn ? 'Leg' : '运达'}
@@ -317,11 +504,35 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
                                 <button
                                   type="button"
                                   className="cbl-btn cbl-btn--primary cbl-btn--sm"
-                                  disabled={savingKey === row.key}
+                                  disabled={savingKey === row.key || batchSaving}
                                   onClick={() => {
-                                    if (!leg || !currency || savingKey) return;
+                                    if (savingKey) return;
+                                    const label = row.kind === 'package' ? row.base || row.barcode : row.barcode;
+                                    if (!leg || !currency) {
+                                      setSaveNotice({
+                                        ok: false,
+                                        title: isEn ? 'Not saved' : '保存失败',
+                                        text: isEn ? 'Choose the destination and the currency first.' : '请先选择运达和实付币种。',
+                                      });
+                                      return;
+                                    }
+                                    if (price.trim() === '' || !Number.isFinite(Number(price)) || Number(price) < 0) {
+                                      setSaveNotice({
+                                        ok: false,
+                                        title: isEn ? 'Not saved' : '保存失败',
+                                        text: isEn ? 'Enter the unit price. 0 can be saved.' : '请填写单价。填 0 也可以保存。',
+                                      });
+                                      return;
+                                    }
+                                    if (currency === 'MMK' && (!fx.trim() || !Number.isFinite(Number(fx)) || Number(fx) <= 0)) {
+                                      setSaveNotice({
+                                        ok: false,
+                                        title: isEn ? 'Not saved' : '保存失败',
+                                        text: isEn ? 'Enter the MMK per CNY rate.' : '实付缅币时请填写汇率。',
+                                      });
+                                      return;
+                                    }
                                     setSavingKey(row.key);
-                                    setFormError('');
                                     void saveAdminExportCost({
                                       subjectKind: row.kind,
                                       subjectKey,
@@ -339,16 +550,31 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
                                       .then(() => {
                                         setOpenKey('');
                                         setRetryTick((n) => n + 1);
+                                        setSaveNotice({
+                                          ok: true,
+                                          title: isEn ? 'Saved' : '保存成功',
+                                          text: isEn
+                                            ? `Export cost for ${label || 'this order'} is saved.`
+                                            : `已保存${label ? ` ${label} ` : ''}的出口成本。`,
+                                        });
                                       })
                                       .catch((err: unknown) => {
-                                        setFormError(err instanceof Error ? err.message : (isEn ? 'Save failed' : '保存失败'));
+                                        const raw = err instanceof Error ? err.message : '';
+                                        setSaveNotice({
+                                          ok: false,
+                                          title: isEn ? 'Not saved' : '保存失败',
+                                          text: raw
+                                            ? friendlyExportCostError(raw, isEn)
+                                            : isEn
+                                              ? 'Save failed. Try again.'
+                                              : '保存失败，请再试一次。',
+                                        });
                                       })
                                       .finally(() => setSavingKey(''));
                                   }}
                                 >
                                   {savingKey === row.key ? (isEn ? 'Saving…' : '保存中…') : (isEn ? 'Save' : '保存')}
                                 </button>
-                                {formError && open ? <span className="cbl-export-fill__error">{formError}</span> : null}
                               </div>
                             </td>
                           </tr>
@@ -472,6 +698,27 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
           </div>
         )}
       </div>
+      {saveNotice ? (
+        <div className="admin-modal-scrim" role="presentation" onClick={() => setSaveNotice(null)}>
+          <div
+            className="admin-modal cbl-export-notice"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cbl-export-notice-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="cbl-export-notice-title" className={saveNotice.ok ? 'is-ok' : 'is-bad'}>
+              {saveNotice.title}
+            </h2>
+            <p>{saveNotice.text}</p>
+            <div className="admin-modal__actions">
+              <button type="button" className="cbl-btn cbl-btn--primary" onClick={() => setSaveNotice(null)}>
+                {isEn ? 'OK' : '知道了'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 };

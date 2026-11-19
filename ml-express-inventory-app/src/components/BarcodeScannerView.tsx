@@ -22,6 +22,7 @@ import { isBarcodeInsideFrame, scanFrameRect, type ScanFrame } from '../utils/ba
 type Props = {
   onScan: (code: string) => void;
   subtitle?: string;
+  hintTone?: 'ok' | 'warn';
   manualPlaceholder?: string;
   style?: StyleProp<ViewStyle>;
   active?: boolean;
@@ -44,6 +45,7 @@ const MASK_BOTTOM_FLEX = 1.25;
 export default function BarcodeScannerView({
   onScan,
   subtitle,
+  hintTone,
   manualPlaceholder,
   style,
   active = true,
@@ -207,8 +209,21 @@ export default function BarcodeScannerView({
             <View style={styles.maskSide} />
           </View>
           <View style={styles.maskBottom}>
-            <View style={styles.hintChip}>
-              <Text style={styles.hintText} numberOfLines={2}>
+            <View
+              style={[
+                styles.hintChip,
+                hintTone === 'ok' && styles.hintChipOk,
+                hintTone === 'warn' && styles.hintChipWarn,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.hintText,
+                  hintTone === 'ok' && styles.hintTextOk,
+                  hintTone === 'warn' && styles.hintTextWarn,
+                ]}
+                numberOfLines={3}
+              >
                 {resolvedHint}
               </Text>
             </View>
@@ -317,7 +332,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(148, 163, 184, 0.28)',
   },
+  hintChipOk: {
+    backgroundColor: 'rgba(6, 78, 59, 0.94)',
+    borderColor: 'rgba(52, 211, 153, 0.7)',
+  },
+  hintChipWarn: {
+    backgroundColor: 'rgba(127, 29, 29, 0.94)',
+    borderColor: 'rgba(252, 165, 165, 0.75)',
+  },
   hintText: { color: '#e2e8f0', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  hintTextOk: { color: '#bbf7d0' },
+  hintTextWarn: { color: '#fecaca' },
   frame: {
     position: 'relative',
   },

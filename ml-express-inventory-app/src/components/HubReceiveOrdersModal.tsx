@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -9,12 +9,14 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { InventoryStoreSession } from '../services/authService';
 import type { PkgTrackingDetail } from '../types/tracking';
 import { getOrderStatusLabel, getPkgStatusLabel, getTransportFeeDisplay, useTranslation } from '../i18n';
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
 import { parseTransportFeeAmount } from '../services/hubTransportFeeService';
 import { canReleaseTransitManually } from '../utils/inventoryReliability';
+import { vibrateScanReject } from '../utils/barcodeScan';
 import {
   areAllPackOrdersProcessed,
   countPendingPackInboundOrders,
@@ -23,6 +25,7 @@ import {
   resolveHubReceiveStep,
   resolvePackLegDestinationCode,
 } from '../utils/hubReceivePack';
+import PhoneBarcodeScanModal from './PhoneBarcodeScanModal';
 
 function hubOrderStatusLabel(
   line: PkgTrackingDetail['orders'][number],
@@ -54,6 +57,9 @@ type Props = {
   onClose: () => void;
   onConfirmPack: () => void;
   onConfirmOrder: (orderId: string) => void;
+  onScanInbound: (code: string) => Promise<{ ok: boolean; message: string; done: boolean }>;
+  onScanSessionBegin: () => Promise<{ ok: true; pending: number } | { ok: false; message: string }>;
+  onScanSessionEnd: () => void;
   onBatchInbound: () => void;
   onPayTransportFee: () => void;
   onReleaseTransit: () => void;
@@ -80,6 +86,9 @@ export default function HubReceiveOrdersModal({
   onClose,
   onConfirmPack,
   onConfirmOrder,
+  onScanInbound,
+  onScanSessionBegin,
+  onScanSessionEnd,
   onBatchInbound,
   onPayTransportFee,
   onReleaseTransit,
@@ -88,6 +97,19 @@ export default function HubReceiveOrdersModal({
 }: Props) {
   const { t, fmt } = useTranslation();
   const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanHint, setScanHint] = useState('');
+  const [scanTone, setScanTone] = useState<'ok' | 'warn' | undefined>(undefined);
+  const [scanCount, setScanCount] = useState(0);
+  const scanBusyRef = useRef(false);
+
+  useEffect(() => {
+    if (visible || !scanOpen) return;
+    setScanOpen(false);
+    setScanHint('');
+    onScanSessionEnd();
+  }, [visible, scanOpen, onScanSessionEnd]);
 
   const layout = useMemo(() => {
     const cardMax = windowHeight * 0.92;
@@ -136,7 +158,48 @@ export default function HubReceiveOrdersModal({
     if (canDismiss) onClose();
   };
 
+  const closeScan = () => {
+    setScanOpen(false);
+    setScanHint('');
+    setScanTone(undefined);
+    setScanCount(0);
+    onScanSessionEnd();
+  };
+
+  const openScan = () => {
+    if (scanBusyRef.current) return;
+    scanBusyRef.current = true;
+    void onScanSessionBegin()
+      .then((ready) => {
+        if (!ready.ok) return;
+        setScanHint(fmt(t.hubReceive.scanInboundRemain, { count: ready.pending }));
+        setScanTone(undefined);
+        setScanCount(0);
+        setScanOpen(true);
+      })
+      .finally(() => {
+        scanBusyRef.current = false;
+      });
+  };
+
+  const handleScanned = (code: string) => {
+    if (scanBusyRef.current) return;
+    scanBusyRef.current = true;
+    void onScanInbound(code)
+      .then((result) => {
+        setScanHint(result.message);
+        setScanTone(result.ok ? 'ok' : 'warn');
+        if (result.ok) setScanCount((count) => count + 1);
+        else vibrateScanReject();
+        if (result.done) closeScan();
+      })
+      .finally(() => {
+        scanBusyRef.current = false;
+      });
+  };
+
   return (
+    <>
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         {canDismiss ? (
@@ -341,17 +404,28 @@ export default function HubReceiveOrdersModal({
             ) : null}
 
             {canBatchInbound ? (
-              <Pressable
-                style={[styles.batchInboundBtn, actionBusy && styles.btnBusy]}
-                onPress={onBatchInbound}
-                disabled={actionBusy || Boolean(confirmingOrderId)}
-              >
-                <Text style={styles.batchInboundBtnText}>
-                  {batchInbounding || confirmingHubReceive
-                    ? t.common.processing
-                    : t.hubReceive.modalBatchInbound}
-                </Text>
-              </Pressable>
+              <View style={styles.inboundActionRow}>
+                <Pressable
+                  style={[styles.scanInboundBtn, actionBusy && styles.btnBusy]}
+                  onPress={openScan}
+                  disabled={actionBusy || Boolean(confirmingOrderId)}
+                >
+                  <Text style={styles.scanInboundBtnText}>
+                    {fmt(t.hubReceive.modalScanInboundCount, { count: pendingInboundCount })}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.batchInboundBtn, actionBusy && styles.btnBusy]}
+                  onPress={onBatchInbound}
+                  disabled={actionBusy || Boolean(confirmingOrderId)}
+                >
+                  <Text style={styles.batchInboundBtnText}>
+                    {batchInbounding || confirmingHubReceive
+                      ? t.common.processing
+                      : t.hubReceive.modalBatchInbound}
+                  </Text>
+                </Pressable>
+              </View>
             ) : null}
 
             {showTripFeeWaitHint ? (
@@ -391,8 +465,25 @@ export default function HubReceiveOrdersModal({
             ) : null}
           </View>
         </View>
+        {scanOpen ? (
+          <View style={[styles.scanCover, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+            <PhoneBarcodeScanModal
+              embedded
+              visible
+              continuous
+              busy={Boolean(confirmingOrderId) || batchInbounding}
+              scannedCount={scanCount}
+              title={t.hubReceive.scanInboundTitle}
+              subtitle={scanHint || t.hubReceive.scanInboundSubtitle}
+              hintTone={scanTone}
+              onClose={closeScan}
+              onScanned={handleScanned}
+            />
+          </View>
+        ) : null}
       </View>
     </Modal>
+    </>
   );
 }
 
@@ -417,6 +508,16 @@ function StepChip({
 }
 
 const styles = StyleSheet.create({
+  scanCover: {
+    position: 'absolute',
+    top: -12,
+    right: -12,
+    bottom: -12,
+    left: -12,
+    backgroundColor: '#0f172a',
+    zIndex: 30,
+    elevation: 30,
+  },
   overlay: {
     flex: 1,
     justifyContent: 'center',
@@ -678,13 +779,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   inboundBtnText: { color: '#fff', fontWeight: '900', fontSize: 11 },
+  inboundActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  scanInboundBtn: {
+    flex: 1,
+    backgroundColor: '#0f766e',
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  scanInboundBtnText: { color: '#fff', fontWeight: '900', fontSize: 14 },
   batchInboundBtn: {
+    flex: 1,
     backgroundColor: '#059669',
     borderRadius: 10,
     paddingVertical: 11,
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 2,
   },
   batchInboundBtnText: { color: '#fff', fontWeight: '900', fontSize: 14 },
   doneMark: {

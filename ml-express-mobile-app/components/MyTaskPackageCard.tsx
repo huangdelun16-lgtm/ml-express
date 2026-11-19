@@ -7,6 +7,7 @@ import { DeliveryCountdownBadge } from './DeliveryCountdownBadge';
 type Props = {
   item: Package;
   language: string;
+  distanceLabel?: string;
   onPress: (item: Package) => void;
   getStatusColor: (status: string) => string;
   getStatusText: (status: string) => string;
@@ -15,6 +16,7 @@ type Props = {
 export function MyTaskPackageCard({
   item,
   language,
+  distanceLabel,
   onPress,
   getStatusColor,
   getStatusText,
@@ -69,6 +71,7 @@ export function MyTaskPackageCard({
           <Text style={styles.cardValue} numberOfLines={1}>
             {item.receiver_address}
           </Text>
+          {distanceLabel ? <Text style={styles.distanceText}>{distanceLabel}</Text> : null}
         </View>
       </View>
       {payMatch?.[1] ? (
@@ -150,6 +153,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
   },
+  distanceText: { color: '#5eead4', fontSize: 13, fontWeight: '800', marginLeft: 8 },
   cardFooter: {
     flexDirection: 'row',
     gap: 8,

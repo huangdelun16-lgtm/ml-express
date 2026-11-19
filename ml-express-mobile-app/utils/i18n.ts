@@ -172,6 +172,8 @@ export interface LanguageTexts {
   tipTitle: string;
   sessionKickedTitle: string;
   sessionKickedMessage: string;
+  sessionContinue: string;
+  sessionContinueFailed: string;
   criticalAppErrorTitle: string;
   criticalAppErrorMessage: string;
   unknownError: string;
@@ -455,7 +457,9 @@ export const translations: { [key: string]: LanguageTexts } = {
     tabMyTasks: '我的任务',
     tipTitle: '提示',
     sessionKickedTitle: '登录状态异常',
-    sessionKickedMessage: '您的账号已在其他设备登录，当前设备已被强制下线。',
+    sessionKickedMessage: '这台手机的登录和服务器不一致。可以在这台手机上继续，不必退出重登。',
+    sessionContinue: '在这台手机继续',
+    sessionContinueFailed: '暂时续不上。请检查网络后再点一次，不必退出。',
     criticalAppErrorTitle: '⚠️ 应用程序异常',
     criticalAppErrorMessage: '很抱歉，程序遇到一个致命错误。我们已记录此问题，请尝试重启应用。',
     unknownError: '未知错误',
@@ -734,7 +738,9 @@ export const translations: { [key: string]: LanguageTexts } = {
     tabMyTasks: 'My Tasks',
     tipTitle: 'Notice',
     sessionKickedTitle: 'Session issue',
-    sessionKickedMessage: 'Your account signed in on another device. This device was signed out.',
+    sessionKickedMessage: 'This phone does not match the server session. You can continue here without signing out.',
+    sessionContinue: 'Continue on this phone',
+    sessionContinueFailed: 'Could not restore yet. Check the network and try again. You do not need to sign out.',
     criticalAppErrorTitle: '⚠️ Application error',
     criticalAppErrorMessage: 'Sorry, the app hit a fatal error. This has been reported. Please try restarting the app.',
     unknownError: 'Unknown error',
@@ -1013,7 +1019,9 @@ export const translations: { [key: string]: LanguageTexts } = {
     tabMyTasks: 'ကျွန်ုပ်၏တာဝန်',
     tipTitle: 'အသိပေးချက်',
     sessionKickedTitle: 'အကောင့်အခြေအနေ',
-    sessionKickedMessage: 'သင့်အကောင့်ကို အခြားစက်တစ်ခုမှဝင်ရောက်ထားပါသည်။ ဤစက်မှထွက်ပြီးပါပြီ။',
+    sessionKickedMessage: 'ဤဖုန်းသည် ဆာဗာနှင့် မကိုက်ပါ။ ထွက်စရာမလိုဘဲ ဤဖုန်းတွင် ဆက်လုပ်နိုင်သည်။',
+    sessionContinue: 'ဤဖုန်းတွင် ဆက်လုပ်ရန်',
+    sessionContinueFailed: 'မဆက်နိုင်သေးပါ။ ကွန်ရက်စစ်ပြီး ထပ်နှိပ်ပါ။ ထွက်ရန်မလိုပါ။',
     criticalAppErrorTitle: '⚠️ အက်ပ်အမှား',
     criticalAppErrorMessage: 'တောင်းပန်ပါသည်၊ အက်ပ်တွင် အရေးကြီးအမှားအယွင်းရှိပါသည်။ ကျွန်ုပ်တို့မှတ်တမ်းတင်ပြီးပါပြီ။ အက်ပ်ကို ပြန်ဖွင့်ကြည့်ပါ။',
     unknownError: 'မသိရသောအမှား',

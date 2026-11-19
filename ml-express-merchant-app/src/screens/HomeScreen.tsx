@@ -333,7 +333,9 @@ export default function HomeScreen({ navigation }: any) {
         ]}
       >
         <LinearGradient
-          colors={["#1e293b", "#0f172a"]}
+          colors={["#16324f", "#0f172a"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
         <View style={styles.headerContent}>
@@ -375,7 +377,12 @@ export default function HomeScreen({ navigation }: any) {
                   {currentT.welcome}
                 </Text>
               </Animated.View>
-              <Text style={styles.storeName} numberOfLines={1}>
+              <Text
+                style={styles.storeName}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
                 {merchantInfo?.store_name || (loading ? "Loading..." : "—")}
               </Text>
             </View>
@@ -421,7 +428,7 @@ export default function HomeScreen({ navigation }: any) {
             <View style={[styles.iconBg, { backgroundColor: "#fff7ed" }]}>
               <Ionicons name="add-circle-outline" size={28} color="#f59e0b" />
             </View>
-            <Text style={styles.actionText}>{currentT.placeOrder}</Text>
+            <Text style={styles.actionText} numberOfLines={2}>{currentT.placeOrder}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -431,7 +438,7 @@ export default function HomeScreen({ navigation }: any) {
             <View style={[styles.iconBg, { backgroundColor: "#f5f3ff" }]}>
               <Ionicons name="list-outline" size={28} color="#8b5cf6" />
             </View>
-            <Text style={styles.actionText}>{currentT.myOrders}</Text>
+            <Text style={styles.actionText} numberOfLines={2}>{currentT.myOrders}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -452,7 +459,7 @@ export default function HomeScreen({ navigation }: any) {
             <View style={[styles.iconBg, { backgroundColor: "#f0fdf4" }]}>
               <Ionicons name="cube-outline" size={28} color="#10b981" />
             </View>
-            <Text style={styles.actionText}>{currentT.myProducts}</Text>
+            <Text style={styles.actionText} numberOfLines={2}>{currentT.myProducts}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -462,43 +469,59 @@ export default function HomeScreen({ navigation }: any) {
             <View style={[styles.iconBg, { backgroundColor: "#eff6ff" }]}>
               <Ionicons name="business-outline" size={28} color="#3b82f6" />
             </View>
-            <Text style={styles.actionText}>{currentT.profile}</Text>
+            <Text style={styles.actionText} numberOfLines={2}>{currentT.profile}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.pipelineCard}>
           <Text style={styles.kicker}>{currentT.businessStatus}</Text>
-          <View style={styles.pipelineRow}>
-            {[
-              { value: stats.pendingConfirm, label: currentT.pendingOrders, filter: "待确认" },
-              { value: stats.processing, label: currentT.processingOrders, filter: "打包中" },
-              { value: stats.awaitingPayment, label: currentT.awaitingPaymentOrders, filter: "待收款" },
-              { value: stats.awaitingPickup, label: currentT.pickupPendingOrders, filter: "待取件" },
-              { value: stats.pickedUp, label: currentT.pickedUpOrders, filter: "已取件" },
-              { value: stats.delivering, label: currentT.deliveringOrders, filter: "配送中" },
-              { value: stats.completed, label: currentT.completedOrders, filter: "已送达" },
-            ].map((item) => (
-              <TouchableOpacity
-                key={item.filter}
-                style={styles.pipelineCell}
-                onPress={() => navigation.navigate("MyOrders", { filterStatus: item.filter })}
-              >
-                <Text style={styles.pipelineValue}>{item.value}</Text>
-                <Text style={styles.pipelineLabel} numberOfLines={2}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {[
+            [
+              { value: stats.pendingConfirm, label: currentT.pendingOrders, filter: "待确认", tone: "#d97706" },
+              { value: stats.processing, label: currentT.processingOrders, filter: "打包中", tone: "#059669" },
+              { value: stats.awaitingPayment, label: currentT.awaitingPaymentOrders, filter: "待收款", tone: "#dc2626" },
+              { value: stats.awaitingPickup, label: currentT.pickupPendingOrders, filter: "待取件", tone: "#ea580c" },
+            ],
+            [
+              { value: stats.pickedUp, label: currentT.pickedUpOrders, filter: "已取件", tone: "#2563eb" },
+              { value: stats.delivering, label: currentT.deliveringOrders, filter: "配送中", tone: "#7c3aed" },
+              { value: stats.completed, label: currentT.completedOrders, filter: "已送达", tone: "#0f766e" },
+            ],
+          ].map((row, rowIndex) => (
+            <View
+              key={rowIndex}
+              style={[styles.pipelineRow, rowIndex > 0 && styles.pipelineRowFollow]}
+            >
+              {row.map((item) => (
+                <TouchableOpacity
+                  key={item.filter}
+                  style={[styles.pipelineCell, row.length === 3 && styles.pipelineCellThird]}
+                  onPress={() => navigation.navigate("MyOrders", { filterStatus: item.filter })}
+                >
+                  <Text
+                    style={[
+                      styles.pipelineValue,
+                      { color: item.value > 0 ? item.tone : "#0f172a" },
+                    ]}
+                  >
+                    {item.value}
+                  </Text>
+                  <Text style={styles.pipelineLabel} numberOfLines={2}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ))}
           <View style={styles.pipelineMeta}>
-            <View style={styles.metaChip}>
-              <Ionicons name="flash" size={12} color="#ef4444" />
+            <View style={[styles.metaChip, styles.metaChipUrgent]}>
+              <Ionicons name="flash" size={13} color="#ef4444" />
               <Text style={styles.metaText}>
                 {currentT.urgentOrders} {stats.urgent}
               </Text>
             </View>
-            <View style={styles.metaChip}>
-              <Ionicons name="apps" size={12} color="#2563eb" />
+            <View style={[styles.metaChip, styles.metaChipStandard]}>
+              <Ionicons name="apps" size={13} color="#2563eb" />
               <Text style={styles.metaText}>
                 {currentT.standardOrders} {stats.standard}
               </Text>
@@ -508,52 +531,27 @@ export default function HomeScreen({ navigation }: any) {
 
         <View style={styles.revenuePanel}>
           <Text style={styles.kicker}>{currentT.revenueToday}</Text>
-          <Text style={styles.revenueHero} numberOfLines={1} adjustsFontSizeToFit>
-            {stats.todayRevenue.toLocaleString()}
-          </Text>
+          <View style={styles.revenueHeroRow}>
+            <Text style={styles.revenueHero} numberOfLines={1} adjustsFontSizeToFit>
+              {stats.todayRevenue.toLocaleString()}
+            </Text>
+            <Text style={styles.revenueUnit}>MMK</Text>
+          </View>
           <Text style={styles.revenueHint}>{currentT.revenueMmkHint}</Text>
-          <View style={styles.chartArea}>
-            <View style={styles.chartBarRow}>
-              <Text style={styles.chartDayLabel}>{currentT.today}</Text>
-              <View style={styles.barBackground}>
-                <View
-                  style={[
-                    styles.barFill,
-                    {
-                      backgroundColor: "#d97706",
-                      width:
-                        stats.todayOrderCount > 0 || stats.yesterdayOrderCount > 0
-                          ? `${(stats.todayOrderCount / Math.max(stats.todayOrderCount, stats.yesterdayOrderCount, 1)) * 100}%`
-                          : "0%",
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={styles.chartValueLabel}>
+          <View style={styles.compareRow}>
+            <View style={styles.compareCell}>
+              <Text style={styles.compareValue}>
                 {stats.todayOrderCount.toLocaleString()}
                 {currentT.orderCountUnit}
               </Text>
+              <Text style={styles.compareLabel}>{currentT.today}</Text>
             </View>
-            <View style={styles.chartBarRow}>
-              <Text style={styles.chartDayLabel}>{currentT.yesterday}</Text>
-              <View style={styles.barBackground}>
-                <View
-                  style={[
-                    styles.barFill,
-                    {
-                      backgroundColor: "#94a3b8",
-                      width:
-                        stats.todayOrderCount > 0 || stats.yesterdayOrderCount > 0
-                          ? `${(stats.yesterdayOrderCount / Math.max(stats.todayOrderCount, stats.yesterdayOrderCount, 1)) * 100}%`
-                          : "0%",
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={styles.chartValueLabel}>
+            <View style={styles.compareCell}>
+              <Text style={[styles.compareValue, styles.compareValueMuted]}>
                 {stats.yesterdayOrderCount.toLocaleString()}
                 {currentT.orderCountUnit}
               </Text>
+              <Text style={styles.compareLabel}>{currentT.yesterday}</Text>
             </View>
           </View>
           <View style={styles.revenueSplit}>
@@ -563,7 +561,6 @@ export default function HomeScreen({ navigation }: any) {
                 {stats.yesterdayRevenue.toLocaleString()}
               </Text>
             </View>
-            <View style={styles.revenueSplitRule} />
             <View style={styles.revenueSplitCell}>
               <Text style={styles.revenueSplitLabel}>{currentT.revenueOneYear}</Text>
               <Text style={styles.revenueSplitValue} numberOfLines={1} adjustsFontSizeToFit>
@@ -697,10 +694,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   storeName: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: "800",
     color: "#fff",
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
   notificationBtn: {
     backgroundColor: "rgba(255,255,255,0.1)",
@@ -820,33 +817,35 @@ const styles = StyleSheet.create({
   },
   quickActions: {
     flexDirection: "row",
-    marginTop: 20,
+    marginTop: 18,
     backgroundColor: "#fff",
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 4,
+    borderRadius: 22,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
     shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.07,
+    shadowRadius: 18,
     elevation: 3,
   },
   actionItem: {
     width: "25%",
     alignItems: "center",
-    paddingVertical: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 2,
   },
   iconBg: {
-    width: 50,
-    height: 50,
-    borderRadius: 15,
+    width: 52,
+    height: 52,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 8,
   },
   actionText: {
-    fontSize: 11,
-    color: "#475569",
+    fontSize: 12,
+    lineHeight: 16,
+    color: "#334155",
     fontWeight: "700",
     textAlign: "center",
   },
@@ -977,29 +976,34 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   pipelineCard: {
-    marginTop: 16,
+    marginTop: 14,
     backgroundColor: "#fff",
-    borderRadius: 20,
-    paddingTop: 14,
-    paddingBottom: 12,
-    paddingHorizontal: 8,
+    borderRadius: 22,
+    paddingTop: 16,
+    paddingBottom: 14,
+    paddingHorizontal: 10,
     shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.05,
-    shadowRadius: 12,
+    shadowRadius: 14,
     elevation: 2,
   },
   kicker: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "800",
-    color: "#64748b",
-    letterSpacing: 0.4,
-    marginBottom: 10,
-    paddingHorizontal: 8,
+    color: "#475569",
+    letterSpacing: 0.2,
+    marginBottom: 12,
+    paddingHorizontal: 6,
   },
   pipelineRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
+  },
+  pipelineRowFollow: {
+    marginTop: 4,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#e8eef4",
   },
   pipelineCell: {
     width: "25%",
@@ -1007,16 +1011,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     paddingVertical: 6,
   },
+  pipelineCellThird: {
+    width: "33.33%",
+  },
   pipelineValue: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "800",
     color: "#0f172a",
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
   },
   pipelineLabel: {
     marginTop: 4,
-    fontSize: 10,
-    lineHeight: 13,
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: "700",
     color: "#64748b",
     textAlign: "center",
@@ -1025,16 +1032,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     marginTop: 12,
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
   },
   metaChip: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    backgroundColor: "#f8fafc",
-    borderRadius: 999,
+    justifyContent: "center",
+    gap: 5,
+    borderRadius: 12,
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 8,
+  },
+  metaChipUrgent: {
+    backgroundColor: "#fef2f2",
+  },
+  metaChipStandard: {
+    backgroundColor: "#eff6ff",
   },
   metaText: {
     fontSize: 12,
@@ -1042,21 +1056,33 @@ const styles = StyleSheet.create({
     color: "#334155",
   },
   revenuePanel: {
-    marginTop: 16,
+    marginTop: 14,
     backgroundColor: "#fff",
-    borderRadius: 20,
+    borderRadius: 22,
     padding: 16,
     shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.05,
-    shadowRadius: 12,
+    shadowRadius: 14,
     elevation: 2,
   },
+  revenueHeroRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+  },
   revenueHero: {
-    fontSize: 34,
+    flexShrink: 1,
+    fontSize: 36,
     fontWeight: "800",
     color: "#0f172a",
     letterSpacing: -1,
+  },
+  revenueUnit: {
+    marginBottom: 6,
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#64748b",
   },
   revenueHint: {
     marginTop: 2,
@@ -1065,23 +1091,44 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#94a3b8",
   },
+  compareRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  compareCell: {
+    flex: 1,
+    backgroundColor: "#f8fafc",
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  compareValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#b45309",
+    letterSpacing: -0.4,
+  },
+  compareValueMuted: {
+    color: "#334155",
+  },
+  compareLabel: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748b",
+  },
   revenueSplit: {
     flexDirection: "row",
-    alignItems: "center",
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#e2e8f0",
+    gap: 10,
+    marginTop: 10,
   },
   revenueSplitCell: {
     flex: 1,
     minWidth: 0,
-  },
-  revenueSplitRule: {
-    width: StyleSheet.hairlineWidth,
-    alignSelf: "stretch",
-    backgroundColor: "#e2e8f0",
-    marginHorizontal: 12,
+    backgroundColor: "#f8fafc",
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
   },
   revenueSplitLabel: {
     fontSize: 11,

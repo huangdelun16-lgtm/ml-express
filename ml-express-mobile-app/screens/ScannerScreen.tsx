@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, TextInput } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput } from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { packageService, Package } from '../services/supabase';
 import { feedbackService } from '../services/feedbackService';
@@ -16,6 +16,7 @@ export default function ScannerScreen({ visible, onClose, onPackageFound }: Scan
   const [loading, setLoading] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualInput, setManualInput] = useState('');
+  const handlingRef = useRef(false);
 
   useEffect(() => {
     if (visible && (!permission || !permission.granted)) {
@@ -28,65 +29,35 @@ export default function ScannerScreen({ visible, onClose, onPackageFound }: Scan
   }, [visible, permission]);
 
   const handleBarCodeScanned = async (result: BarcodeScanningResult) => {
-    if (scanned || loading) return;
-    
+    const code = String(result.data || '').trim();
+    if (code.length < 4 || handlingRef.current || scanned || loading) return;
+    handlingRef.current = true;
     setScanned(true);
     setLoading(true);
-    
+
     try {
-      await searchPackage(result.data);
+      await searchPackage(code);
     } catch (error) {
       console.error('扫码处理失败:', error);
       feedbackService.notify('错误', '扫码处理失败，请重试');
       setScanned(false);
     } finally {
       setLoading(false);
+      handlingRef.current = false;
     }
   };
 
   const searchPackage = async (packageId: string) => {
     try {
-      // 获取所有包裹并查找匹配的
-      const allPackages = await packageService.getAllPackages();
-      const foundPackage = allPackages.find(pkg => 
-        pkg.id.toLowerCase().includes(packageId.toLowerCase()) ||
-        packageId.toLowerCase().includes(pkg.id.toLowerCase())
-      );
+      const foundPackage = await packageService.findPackageByScanCode(packageId);
 
       if (foundPackage) {
-        Alert.alert(
-          '找到包裹！',
-          `包裹ID: ${foundPackage.id}\n收件人: ${foundPackage.receiver_name}\n状态: ${foundPackage.status}`,
-          [
-            {
-              text: '查看详情',
-              onPress: () => {
-                onPackageFound(foundPackage);
-                onClose();
-              }
-            },
-            {
-              text: '继续扫码',
-              onPress: () => setScanned(false)
-            }
-          ]
-        );
-      } else {
-        Alert.alert(
-          '未找到包裹',
-          `扫描的ID: ${packageId}\n\n未找到匹配的包裹，请检查包裹ID是否正确。`,
-          [
-            {
-              text: '继续扫码',
-              onPress: () => setScanned(false)
-            },
-            {
-              text: '手动输入',
-              onPress: () => setShowManualInput(true)
-            }
-          ]
-        );
+        onPackageFound(foundPackage);
+        onClose();
+        return;
       }
+      feedbackService.notify('未找到包裹', `扫描的ID: ${packageId}`);
+      setScanned(false);
     } catch (error) {
       console.error('搜索包裹失败:', error);
       feedbackService.notify('搜索失败', '网络错误，请检查连接后重试');
@@ -159,13 +130,17 @@ export default function ScannerScreen({ visible, onClose, onPackageFound }: Scan
 
         {/* 摄像头视图 */}
         <View style={styles.cameraContainer}>
+          {!(scanned || loading) ? (
           <CameraView
             style={styles.camera}
-            onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+            onBarcodeScanned={handleBarCodeScanned}
             barcodeScannerSettings={{
-              barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39'],
+              barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'pdf417'],
             }}
           />
+          ) : (
+            <View style={[styles.camera, { backgroundColor: '#0f172a' }]} />
+          )}
           {/* 🚀 优化布局：使用绝对定位覆盖层，提高启动速度和稳定性 */}
           <View style={styles.overlayContainer}>
             <View style={styles.overlay}>

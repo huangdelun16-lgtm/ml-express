@@ -2,6 +2,14 @@ import type { PkgTrackingDetail } from '../types/tracking';
 import { destinationCodesMatch } from './destinationCode';
 import { resolveOrderDestinationCode } from './orderDestination';
 
+function normalizeInboundScan(raw: string): string {
+  return String(raw || '')
+    .replace(/[\x00-\x1F\x7F]/g, '')
+    .trim()
+    .replace(/^\][A-Za-z]\d/, '')
+    .toUpperCase();
+}
+
 export function resolvePackLegDestinationCode(pack: PkgTrackingDetail): string {
   return (pack.leg_destination_code || pack.destination_code || '').trim().toUpperCase();
 }
@@ -111,6 +119,41 @@ export function preferConfirmedHubReceivePack(
 
 /** 到站现场 3 步：1 确认到站 → 2 入库/分拨 → 3 支付车费 */
 export type HubReceiveStep = 1 | 2 | 3;
+
+export type ScanInboundMatch =
+  | { ok: true; orderId: string; barcode: string }
+  | { ok: false; reason: 'empty' | 'packBarcode' | 'notInPack' | 'alreadyDone' | 'notThisHub' | 'ambiguous'; barcode: string };
+
+/** 到站窗口扫码：只匹配本包里仍待入库的一单，扫一单入一单。 */
+export function matchScanInboundOrder(
+  pack: PkgTrackingDetail,
+  hubCode: string,
+  rawCode: string,
+): ScanInboundMatch {
+  const code = normalizeInboundScan(rawCode);
+  if (!code) return { ok: false, reason: 'empty', barcode: '' };
+  if (normalizeInboundScan(pack.pack_barcode || '') === code) {
+    return { ok: false, reason: 'packBarcode', barcode: code };
+  }
+
+  const matches = pack.orders.filter(
+    (order) =>
+      normalizeInboundScan(order.order_barcode || '') === code ||
+      normalizeInboundScan(order.express_barcode || '') === code,
+  );
+  if (matches.length > 1) return { ok: false, reason: 'ambiguous', barcode: code };
+  const found = matches[0];
+  if (!found) return { ok: false, reason: 'notInPack', barcode: code };
+
+  const pending = listPendingPackInboundOrders(pack, hubCode);
+  if (pending.some((order) => order.id === found.id)) {
+    return { ok: true, orderId: found.id, barcode: found.order_barcode || code };
+  }
+  if (found.status !== 'in_transit') {
+    return { ok: false, reason: 'alreadyDone', barcode: found.order_barcode || code };
+  }
+  return { ok: false, reason: 'notThisHub', barcode: found.order_barcode || code };
+}
 
 export function resolveHubReceiveStep(pack: PkgTrackingDetail, hubCode: string): HubReceiveStep {
   if (pack.status === 'in_transit') return 1;

@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  FlatList,
   Modal,
   Dimensions,
   Image,
@@ -34,6 +33,7 @@ import { imageUriToBase64 } from '../utils/imageUriToBase64';
 import { isWriteOk, isWriteQueued, pendingWriteUserMessage } from '../utils/pendingWrite';
 import { riderActionCopy } from '../utils/riderActionCopy';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { courierTabBarStyle } from '../navigation/courierTabBarStyle';
 import { AppState, AppStateStatus, DeviceEventEmitter } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -59,6 +59,7 @@ import {
   getDeliverySpeedShortLabel,
   isScheduledDeliverySpeed,
 } from '../utils/courierScheduledDelivery';
+import { sortCourierTasksByDistance } from '../utils/courierTaskDistance';
 import { DeliveryCountdownBadge } from '../components/DeliveryCountdownBadge';
 import InAppNavigationModal, { type NavStop } from '../components/InAppNavigationModal';
 
@@ -237,11 +238,15 @@ export default function MapScreen({ navigation }: any) {
     renderTimes: [] as number[]
   });
 
+  const insets = useSafeAreaInsets();
+
   useLayoutEffect(() => {
     navigation.setOptions({
-      tabBarStyle: showMapPreview ? { display: 'none', height: 0 } : undefined,
+      tabBarStyle: showMapPreview
+        ? { display: 'none', height: 0 }
+        : courierTabBarStyle(insets.bottom),
     });
-  }, [navigation, showMapPreview]);
+  }, [navigation, showMapPreview, insets.bottom]);
 
   // 3. 核心功能函数 (useCallback)
   
@@ -1878,23 +1883,50 @@ export default function MapScreen({ navigation }: any) {
         return p.delivery_speed === speedFilter;
       });
     }
+    const riderPoint = location
+      ? { lat: location.latitude, lng: location.longitude }
+      : null;
+    const nearest = sortCourierTasksByDistance(filtered, riderPoint);
     if (approachingHint?.packageId) {
       const id = approachingHint.packageId;
-      const hit = filtered.find((p) => p.id === id);
-      if (hit) {
-        filtered = [hit, ...filtered.filter((p) => p.id !== id)];
-      }
+      const hit = nearest.find((p) => p.id === id);
+      if (hit) return [hit, ...nearest.filter((p) => p.id !== id)];
     }
-    return filtered;
-  }, [packages, searchQuery, statusFilter, speedFilter, completedPackageIds, approachingHint]);
+    return nearest;
+  }, [packages, searchQuery, statusFilter, speedFilter, completedPackageIds, approachingHint, location]);
+
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 16, 88],
+    outputRange: [1, 0.65, 0],
+    extrapolate: 'clamp',
+  });
+  const onPageScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    { useNativeDriver: true },
+  );
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <Animated.FlatList
+        style={{ flex: 1 }}
+        data={loading ? [] : filteredPackages}
+        renderItem={renderPackageItem}
+        keyExtractor={(p) => p.id}
+        extraData={approachingHint}
+        showsVerticalScrollIndicator={false}
+        bounces
+        onScroll={onPageScroll}
+        scrollEventThrottle={16}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        ListHeaderComponent={
+          <View>
+      <Animated.View style={[styles.header, { opacity: headerOpacity }]}>
         <Text style={styles.headerTitle}>
           🗺️ {language === 'zh' ? '配送路线' : language === 'en' ? 'Delivery Route' : 'ပို့ဆောင်ရေးလမ်းကြောင်း'}
         </Text>
-      </View>
+      </Animated.View>
 
       {mapNewOrderBannerId && (
         <View style={styles.newOrderBannerWrap} accessibilityRole="alert">
@@ -2022,13 +2054,13 @@ export default function MapScreen({ navigation }: any) {
                   </Text>
                 </View>
       )}
-      <View style={styles.listContainer}>
-        <View style={styles.searchFilterContainer}>
+      <View style={styles.searchFilterContainer}>
           <View style={styles.searchContainer}>
             <Text style={styles.searchIcon}>🔍</Text>
             <TextInput 
               style={styles.searchInput} 
-              placeholder={language === 'zh' ? '搜索包裹...' : language === 'en' ? 'Search packages...' : 'ပါဆယ်ထုပ်များကိုရှာဖွေပါ...'} 
+              placeholder={language === 'zh' ? '搜索包裹...' : language === 'en' ? 'Search packages...' : 'ပါဆယ်ထုပ်များကိုရှာဖွေပါ...'}
+              placeholderTextColor="#94a3b8" 
               value={searchQuery} 
               onChangeText={setSearchQuery}
               accessibilityLabel={t.a11yMapSearchPackages}
@@ -2047,11 +2079,12 @@ export default function MapScreen({ navigation }: any) {
           </TouchableOpacity>
           )}
         </View>
-        
-        {loading ? (
-            <ActivityIndicator size="large" color="#3b82f6" />
-        ) : (
-          packages.length === 0 ? (
+          </View>
+        }
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator size="large" color="#3b82f6" style={{ marginTop: 24 }} />
+          ) : packages.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyEmoji}>📦</Text>
             <Text style={styles.emptyTitle}>
@@ -2068,17 +2101,9 @@ export default function MapScreen({ navigation }: any) {
               </Text>
             </TouchableOpacity>
           </View>
-        ) : (
-          <FlatList
-              data={filteredPackages} 
-            renderItem={renderPackageItem}
-              keyExtractor={p => p.id}
-              extraData={approachingHint}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />} 
-            />
-          )
-        )}
-      </View>
+          ) : null
+        }
+      />
 
       <InAppNavigationModal
         visible={showMapPreview}

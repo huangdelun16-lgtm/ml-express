@@ -764,6 +764,60 @@ button.cbl-io-overview-card--in:focus-visible {
   font-weight: 700;
 }
 
+.cbl-export-notice h2.is-ok {
+  color: #047857;
+}
+
+.cbl-export-notice h2.is-bad {
+  color: #b91c1c;
+}
+
+.cbl-export-notice p {
+  margin: 0 0 18px;
+  line-height: 1.5;
+  color: #334155;
+  white-space: pre-line;
+}
+
+.cbl-export-batch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid #dbe4ee;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.cbl-export-batch__count {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.cbl-export-batch label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.cbl-export-batch input,
+.cbl-export-batch select {
+  min-height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0 8px;
+  color: #0f172a;
+  background: #fff;
+}
+
 .cbl-export-pending__title {
   margin: 0;
   font-size: 0.95rem;
@@ -1015,28 +1069,31 @@ button.cbl-io-overview-card--in:focus-visible {
 }
 
 .cbl-table--export-pending th:nth-child(1),
-.cbl-table--export-pending td:nth-child(1) { width: 96px; }
+.cbl-table--export-pending td:nth-child(1) { width: 36px; overflow: visible; text-align: center; }
 
 .cbl-table--export-pending th:nth-child(2),
-.cbl-table--export-pending td:nth-child(2) { width: 22%; }
+.cbl-table--export-pending td:nth-child(2) { width: 96px; }
 
 .cbl-table--export-pending th:nth-child(3),
-.cbl-table--export-pending td:nth-child(3) { width: 18%; }
+.cbl-table--export-pending td:nth-child(3) { width: 22%; }
 
 .cbl-table--export-pending th:nth-child(4),
-.cbl-table--export-pending td:nth-child(4) { width: 14%; }
+.cbl-table--export-pending td:nth-child(4) { width: 18%; }
 
 .cbl-table--export-pending th:nth-child(5),
-.cbl-table--export-pending td:nth-child(5) { width: 72px; }
+.cbl-table--export-pending td:nth-child(5) { width: 14%; }
 
 .cbl-table--export-pending th:nth-child(6),
-.cbl-table--export-pending td:nth-child(6) { width: 108px; }
+.cbl-table--export-pending td:nth-child(6) { width: 72px; }
 
 .cbl-table--export-pending th:nth-child(7),
-.cbl-table--export-pending td:nth-child(7) { width: 88px; }
+.cbl-table--export-pending td:nth-child(7) { width: 108px; }
 
 .cbl-table--export-pending th:nth-child(8),
-.cbl-table--export-pending td:nth-child(8) { width: 76px; overflow: visible; }
+.cbl-table--export-pending td:nth-child(8) { width: 88px; }
+
+.cbl-table--export-pending th:nth-child(9),
+.cbl-table--export-pending td:nth-child(9) { width: 76px; overflow: visible; }
 
 .cbl-badge--red {
   background: rgba(239, 68, 68, 0.12);

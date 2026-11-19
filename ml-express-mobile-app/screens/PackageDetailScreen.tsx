@@ -54,6 +54,7 @@ import { DeliveryCountdownBadge } from '../components/DeliveryCountdownBadge';
 import { imageUriToBase64 } from '../utils/imageUriToBase64';
 import { isWriteOk, isWriteQueued, pendingWriteUserMessage } from '../utils/pendingWrite';
 import { riderActionCopy } from '../utils/riderActionCopy';
+import { explainScanStop } from '../utils/scanStop';
 import { distanceMeters } from '../utils/storeReceiveMatch';
 
 const { width } = Dimensions.get('window');
@@ -538,6 +539,27 @@ export default function PackageDetailScreen({ route, navigation }: any) {
     scanLockRef.current = true;
     lastScanAtRef.current = now;
     setShowScanModal(false);
+    const reopenScan = () => {
+      scanLockRef.current = false;
+      lastScanAtRef.current = 0;
+      setShowScanModal(true);
+    };
+    const stopScan = (message: string, withPhoto = false) => {
+      explainScanStop({
+        title: copy.scanStopTitle,
+        message,
+        scanAgainLabel: copy.continueScan,
+        dismissLabel: copy.ok,
+        onScanAgain: reopenScan,
+        photoLabel: withPhoto ? copy.photoDeliver : undefined,
+        onPhoto: withPhoto
+          ? () => {
+              scanLockRef.current = false;
+              void handleOpenCamera();
+            }
+          : undefined,
+      });
+    };
 
     try {
       setLoading(true);
@@ -547,7 +569,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       const { deviceHealthService } = require('../services/deviceHealthService');
       const health = await deviceHealthService.performFullCheck();
       if (health.location.isMocked) {
-        feedbackService.warning(copy.mockLocationScan);
+        stopScan(copy.mockLocationScan);
         return;
       }
 
@@ -570,9 +592,9 @@ export default function PackageDetailScreen({ route, navigation }: any) {
             feedbackService.error(copy.pickupFailed);
           }
         } else if (isDeliveryStoreScan(data)) {
-          feedbackService.warning(copy.pickupWrongStage);
+          stopScan(copy.pickupWrongStage);
         } else {
-          feedbackService.warning(copy.scanMismatch);
+          stopScan(copy.scanMismatch);
         }
         return;
       }
@@ -582,13 +604,13 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         if (isDeliveryStoreScan(data)) {
           const parsed = parseStoreReceiveCode(data);
           if (!parsed) {
-            feedbackService.warning(copy.invalidStoreCode);
+            stopScan(copy.invalidStoreCode, true);
             return;
           }
 
           const boundStoreId = String(pkg.delivery_store_id || '').trim();
           if (boundStoreId && boundStoreId !== parsed.storeId) {
-            feedbackService.warning(copy.storeMismatch);
+            stopScan(copy.storeMismatch, true);
             return;
           }
 
@@ -614,7 +636,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
           if (scanCoords && target) {
             const dist = distanceMeters(scanCoords, target);
             if (dist > 200) {
-              feedbackService.warning(copy.tooFarScan(Math.round(dist)));
+              stopScan(copy.tooFarScan(Math.round(dist)), true);
               return;
             }
           }
@@ -670,20 +692,22 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         }
 
         if (scanMatchesPackage(data, pkg)) {
-          feedbackService.info(copy.scanStoreOrPhoto);
+          stopScan(copy.scanStoreOrPhoto, true);
           return;
         }
 
-        feedbackService.warning(copy.scanStoreToDeliver);
+        stopScan(copy.scanStoreToDeliver, true);
         return;
       }
 
-      feedbackService.warning(copy.cannotScanStatus(pkg.status));
+      stopScan(copy.cannotScanStatus(pkg.status));
     } catch (error) {
       feedbackService.error(copy.scanHandlingFailed);
     } finally {
       setLoading(false);
-      scanLockRef.current = false;
+      setTimeout(() => {
+        scanLockRef.current = false;
+      }, 800);
     }
   };
 
@@ -1360,7 +1384,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
               style={StyleSheet.absoluteFill}
               facing="back"
               barcodeScannerSettings={{
-                barcodeTypes: ['qr', 'code128', 'code39', 'ean13', 'ean8'],
+                barcodeTypes: ['qr', 'code128', 'code39', 'ean13', 'ean8', 'pdf417'],
               }}
               onBarcodeScanned={({ data }) => handleScanCode(data)}
             />

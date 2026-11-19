@@ -40,6 +40,5 @@ export { systemSettingsService } from "./merchantApi/systemSettingsService";
 export { rechargeService } from "./merchantApi/rechargeService";
 export { merchantService } from "./merchantApi/merchantService";
 export { reviewService } from "./merchantApi/reviewService";
-export { tutorialService } from "./merchantApi/tutorialService";
 export { welcomeScreenService } from "./merchantApi/welcomeScreenService";
 export { deliveryPhotoService } from "./merchantApi/deliveryPhotoService";

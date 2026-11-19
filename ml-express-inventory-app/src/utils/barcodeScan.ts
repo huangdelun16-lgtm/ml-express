@@ -31,6 +31,14 @@ export function vibrateScanSuccess(): void {
   }
 }
 
+export function vibrateScanReject(): void {
+  try {
+    Vibration.vibrate([0, 35, 50, 35]);
+  } catch {
+    /* 部分设备不支持 */
+  }
+}
+
 export function shouldAcceptScan(
   code: string,
   lastCode: string,

@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
-  FlatList,
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
   Platform,
   DeviceEventEmitter,
+  Animated,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,6 +29,16 @@ import {
   navigateCourierTask,
 } from '../utils/courierTaskQuickActions';
 import { COURIER_NEW_ORDER_EVENT } from '../services/courierNewOrderMonitor';
+import { locationService } from '../services/locationService';
+import {
+  courierTaskPoint,
+  formatCourierDistance,
+  haversineMeters,
+  matchesCourierTaskFilter,
+  sortCourierTasksByDistance,
+  type CourierTaskFilter,
+  type GeoPoint,
+} from '../utils/courierTaskDistance';
 
 export default function CourierHomeScreen({ navigation }: any) {
   const { language, t } = useApp();
@@ -36,6 +46,18 @@ export default function CourierHomeScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [currentUserName, setCurrentUserName] = useState('');
+  const [riderPoint, setRiderPoint] = useState<GeoPoint | null>(null);
+  const [taskFilter, setTaskFilter] = useState<CourierTaskFilter>('all');
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 24, 120],
+    outputRange: [1, 0.72, 0],
+    extrapolate: 'clamp',
+  });
+  const onPageScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    { useNativeDriver: true },
+  );
 
   const loadUserInfo = async () => {
     const userName = await AsyncStorage.getItem('currentUserName') || '骑手';
@@ -74,7 +96,10 @@ export default function CourierHomeScreen({ navigation }: any) {
   useFocusEffect(
     useCallback(() => {
       void loadMyPackages({ showSpinner: false });
-    }, [loadMyPackages]),
+      void locationService.getCurrentLocation(language).then((loc) => {
+        if (loc) setRiderPoint({ lat: loc.latitude, lng: loc.longitude });
+      });
+    }, [loadMyPackages, language]),
   );
 
   useEffect(() => {
@@ -158,6 +183,11 @@ export default function CourierHomeScreen({ navigation }: any) {
     }
   };
 
+  const orderedPackages = useMemo(() => {
+    const filtered = packages.filter((pkg) => matchesCourierTaskFilter(pkg, taskFilter));
+    return sortCourierTasksByDistance(filtered, riderPoint);
+  }, [packages, riderPoint, taskFilter]);
+
   const renderPackageItem = ({ item }: { item: Package }) => {
     const merchantFirst = isMerchantFirstTask(item);
     const callLabel = merchantFirst
@@ -177,11 +207,14 @@ export default function CourierHomeScreen({ navigation }: any) {
         : language === 'en'
           ? 'Pickup'
           : 'ယူရန်'
-      : language === 'zh'
-        ? '去送货'
-        : language === 'en'
-          ? 'Dropoff'
-          : 'ပို့ရန်';
+        : language === 'zh'
+          ? '去送货'
+          : language === 'en'
+            ? 'Dropoff'
+            : 'ပို့ရန်';
+    const point = courierTaskPoint(item);
+    const distanceLabel =
+      riderPoint && point ? formatCourierDistance(haversineMeters(riderPoint, point), language) : '';
 
     return (
     <TouchableOpacity
@@ -193,8 +226,8 @@ export default function CourierHomeScreen({ navigation }: any) {
       accessibilityHint={item.receiver_name}
     >
       <LinearGradient
-        colors={['rgba(255, 255, 255, 0.12)', 'rgba(255, 255, 255, 0.05)']}
-        style={styles.packageGlassCard}
+        colors={['#1e293b', '#152033']}
+        style={[styles.packageGlassCard, { borderLeftColor: getStatusColor(item.status) }]}
       >
         <View style={styles.cardHeader}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 8 }}>
@@ -240,6 +273,7 @@ export default function CourierHomeScreen({ navigation }: any) {
               ? item.sender_address || item.receiver_address
               : item.receiver_address}
           </Text>
+          {distanceLabel ? <Text style={styles.distanceText}>{distanceLabel}</Text> : null}
         </View>
 
         {(() => {
@@ -339,77 +373,122 @@ export default function CourierHomeScreen({ navigation }: any) {
       <View style={[styles.circle, { top: -100, right: -100, backgroundColor: 'rgba(59, 130, 246, 0.15)' }]} />
       <View style={[styles.circle, { bottom: -50, left: -50, backgroundColor: 'rgba(30, 58, 138, 0.2)' }]} />
 
-      {/* 头部 */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>👋 {language === 'zh' ? '你好' : 'Hello'},</Text>
-          <Text style={styles.userName}>{currentUserName}</Text>
-        </View>
-        <TouchableOpacity 
-          style={styles.notificationButton}
-          onPress={() => navigation.navigate('MyTasks')}
-        >
-          <View style={styles.badgeContainer}>
-            <Text style={styles.badgeText}>{packages.length}</Text>
-          </View>
-          <Ionicons name="notifications-outline" size={24} color="white" />
-        </TouchableOpacity>
-      </View>
+      <Animated.FlatList
+        data={loading ? [] : orderedPackages}
+        renderItem={renderPackageItem}
+        keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
+        bounces
+        onScroll={onPageScroll}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
+        }
+        contentContainerStyle={styles.pageContent}
+        ListHeaderComponent={
+          <View>
+            <Animated.View style={[styles.header, { opacity: headerOpacity }]}>
+              <View>
+                <Text style={styles.greeting}>👋 {language === 'zh' ? '你好' : 'Hello'},</Text>
+                <Text style={styles.userName}>{currentUserName}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.notificationButton}
+                onPress={() => setTaskFilter((current) => (current === 'today' ? 'all' : 'today'))}
+                accessibilityRole="button"
+                accessibilityLabel={language === 'zh' ? '只看今天的任务' : 'Today'}
+              >
+                <View style={styles.badgeContainer}>
+                  <Text style={styles.badgeText}>{packages.length}</Text>
+                </View>
+                <Ionicons name="notifications-outline" size={24} color="white" />
+              </TouchableOpacity>
+            </Animated.View>
 
-      {/* 快捷统计 */}
-      <View style={styles.statsRow}>
-        <LinearGradient colors={['rgba(245, 158, 11, 0.2)', 'rgba(245, 158, 11, 0.05)']} style={styles.statCard}>
-          <Text style={[styles.statNumber, {color: '#fbbf24'}]}>{todoCount}</Text>
-          <Text style={styles.statLabel}>{language === 'zh' ? '待取件' : 'Todo'}</Text>
-        </LinearGradient>
-        <LinearGradient colors={['rgba(59, 130, 246, 0.2)', 'rgba(59, 130, 246, 0.05)']} style={styles.statCard}>
-          <Text style={[styles.statNumber, {color: '#60a5fa'}]}>{pickedCount}</Text>
-          <Text style={styles.statLabel}>{language === 'zh' ? '已取件' : 'Picked'}</Text>
-        </LinearGradient>
-        <LinearGradient colors={['rgba(139, 92, 246, 0.2)', 'rgba(139, 92, 246, 0.05)']} style={styles.statCard}>
-          <Text style={[styles.statNumber, {color: '#a78bfa'}]}>{deliveringCount}</Text>
-          <Text style={styles.statLabel}>{language === 'zh' ? '配送中' : 'Active'}</Text>
-        </LinearGradient>
-      </View>
-
-      {/* 任务列表 */}
-      <View style={styles.listContainer}>
-        <View style={styles.listHeader}>
-          <Text style={styles.listTitle}>📦 {language === 'zh' ? '当前任务' : 'Current Tasks'}</Text>
-          <TouchableOpacity
-            onPress={onRefresh}
-            accessibilityRole="button"
-            accessibilityLabel={t.a11yRefreshTaskList}
-          >
-            <Ionicons name="refresh" size={20} color="rgba(255,255,255,0.5)" />
-          </TouchableOpacity>
-        </View>
-
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3b82f6" />
-          </View>
-        ) : packages.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconContainer}>
-              <Ionicons name="checkmark-done-circle-outline" size={80} color="rgba(255,255,255,0.1)" />
+            <View style={styles.statsRow}>
+              <LinearGradient colors={['rgba(245, 158, 11, 0.2)', 'rgba(245, 158, 11, 0.05)']} style={styles.statCard}>
+                <Text style={[styles.statNumber, { color: '#fbbf24' }]}>{todoCount}</Text>
+                <Text style={styles.statLabel}>{language === 'zh' ? '待取件' : 'Todo'}</Text>
+              </LinearGradient>
+              <LinearGradient colors={['rgba(59, 130, 246, 0.2)', 'rgba(59, 130, 246, 0.05)']} style={styles.statCard}>
+                <Text style={[styles.statNumber, { color: '#60a5fa' }]}>{pickedCount}</Text>
+                <Text style={styles.statLabel}>{language === 'zh' ? '已取件' : 'Picked'}</Text>
+              </LinearGradient>
+              <LinearGradient colors={['rgba(139, 92, 246, 0.2)', 'rgba(139, 92, 246, 0.05)']} style={styles.statCard}>
+                <Text style={[styles.statNumber, { color: '#a78bfa' }]}>{deliveringCount}</Text>
+                <Text style={styles.statLabel}>{language === 'zh' ? '配送中' : 'Active'}</Text>
+              </LinearGradient>
             </View>
-            <Text style={styles.emptyText}>{language === 'zh' ? '全部完成！' : 'All Clear!'}</Text>
-            <Text style={styles.emptySubtext}>{language === 'zh' ? '当前没有待配送的包裹' : 'No pending deliveries'}</Text>
+
+            <View style={styles.listHeader}>
+              <View>
+                <Text style={styles.listTitle}>
+                  {language === 'zh' ? '当前任务' : language === 'my' ? 'လက်ရှိအလုပ်' : 'Current tasks'}
+                </Text>
+                <Text style={styles.listHint}>
+                  {riderPoint
+                    ? language === 'zh'
+                      ? '近的在前'
+                      : language === 'my'
+                        ? 'အနီးဆုံးအရင်'
+                        : 'Nearest first'
+                    : language === 'zh'
+                      ? '打开定位后按距离排'
+                      : language === 'my'
+                        ? 'တည်နေရာဖွင့်မှ အကွာအဝေးအလိုက်'
+                        : 'Turn on location to sort'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={onRefresh}
+                accessibilityRole="button"
+                accessibilityLabel={t.a11yRefreshTaskList}
+              >
+                <Ionicons name="refresh" size={20} color="rgba(255,255,255,0.5)" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.filterRow}>
+              {(
+                [
+                  { key: 'all' as const, zh: '全部', en: 'All', my: 'အားလုံး' },
+                  { key: 'today' as const, zh: '今天', en: 'Today', my: 'ယနေ့' },
+                  { key: 'pickup' as const, zh: '待取', en: 'Pickup', my: 'ယူရန်' },
+                  { key: 'delivering' as const, zh: '配送中', en: 'Active', my: 'ပို့ဆောင်' },
+                ]
+              ).map((item) => {
+                const selected = taskFilter === item.key;
+                const label = language === 'zh' ? item.zh : language === 'my' ? item.my : item.en;
+                return (
+                  <TouchableOpacity
+                    key={item.key}
+                    style={[styles.filterChip, selected && styles.filterChipOn]}
+                    onPress={() => setTaskFilter(item.key)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                  >
+                    <Text style={[styles.filterChipText, selected && styles.filterChipTextOn]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
-        ) : (
-          <FlatList
-            data={packages}
-            renderItem={renderPackageItem}
-            keyExtractor={item => item.id}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
-            }
-            contentContainerStyle={{ paddingBottom: 100 }}
-          />
-        )}
-      </View>
+        }
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#3b82f6" />
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconContainer}>
+                <Ionicons name="checkmark-done-circle-outline" size={72} color="#5eead4" />
+              </View>
+              <Text style={styles.emptyText}>{language === 'zh' ? '全部完成！' : 'All Clear!'}</Text>
+              <Text style={styles.emptySubtext}>{language === 'zh' ? '当前没有待配送的包裹' : 'No pending deliveries'}</Text>
+            </View>
+          )
+        }
+      />
     </View>
   );
 }
@@ -427,16 +506,15 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingHorizontal: 24,
     paddingBottom: 24,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   greeting: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 16,
-    fontWeight: '600',
+    color: '#e2e8f0',
+    fontSize: 15,
+    fontWeight: '700',
   },
   userName: {
     color: '#fff',
@@ -476,7 +554,6 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    paddingHorizontal: 24,
     gap: 12,
     marginBottom: 32,
   },
@@ -494,14 +571,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statLabel: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+    color: '#cbd5e1',
+    fontSize: 12,
+    fontWeight: '800',
   },
-  listContainer: {
-    flex: 1,
+  pageContent: {
     paddingHorizontal: 24,
+    paddingBottom: 120,
   },
   listHeader: {
     flexDirection: 'row',
@@ -514,19 +590,51 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#fff',
   },
+  listHint: {
+    color: '#5eead4',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.25)',
+  },
+  filterChipOn: {
+    backgroundColor: 'rgba(45, 212, 191, 0.18)',
+    borderColor: 'rgba(94, 234, 212, 0.7)',
+  },
+  filterChipText: { color: '#94a3b8', fontSize: 12, fontWeight: '700' },
+  filterChipTextOn: { color: '#ecfeff', fontWeight: '800' },
+  distanceText: {
+    marginTop: 6,
+    marginLeft: 26,
+    color: '#5eead4',
+    fontSize: 13,
+    fontWeight: '800',
+  },
   packageCardWrapper: {
     marginBottom: 16,
   },
   packageGlassCard: {
-    borderRadius: 28,
-    padding: 20,
+    borderRadius: 22,
+    padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderLeftWidth: 4,
+    borderColor: 'rgba(148, 163, 184, 0.28)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 15,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 6,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -572,10 +680,10 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   addressText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.5)',
+    fontSize: 15,
+    color: '#e2e8f0',
     fontWeight: '600',
-    lineHeight: 20,
+    lineHeight: 22,
     marginLeft: 26,
   },
   cardFooter: {
@@ -597,8 +705,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   tagText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 11,
+    color: '#cbd5e1',
+    fontSize: 12,
     fontWeight: '700',
   },
   actionButton: {
@@ -639,7 +747,7 @@ const styles = StyleSheet.create({
   },
   emptySubtext: {
     fontSize: 15,
-    color: 'rgba(255,255,255,0.4)',
+    color: '#cbd5e1',
     fontWeight: '600',
   },
   identityBadge: {

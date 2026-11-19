@@ -62,17 +62,16 @@ export default function LoginScreen({ navigation }: any) {
           
           // 🚀 修正：更新 admin_accounts 表（或 couriers 表，取决于您的账号体系）
           // 这里我们同时更新 admin_accounts 表
-          await supabase
+          const { error: sessionError } = await supabase
             .from('admin_accounts')
             .update({ current_session_id: newSessionId })
             .eq('id', userId);
 
-          // 如果是骑手，也要同步更新 couriers 表中的会话
           if (userPosition === '骑手' || userPosition === '骑手队长') {
             await supabase
               .from('couriers')
               .update({ current_session_id: newSessionId })
-              .eq('employee_id', account.employee_id || ''); // 通过员工编号关联
+              .eq('employee_id', account.employee_id || '');
           }
 
           const pricingRegionId = resolveRiderPricingRegionId(
@@ -85,9 +84,11 @@ export default function LoginScreen({ navigation }: any) {
             AsyncStorage.setItem('currentUserName', userEmployeeName),
             AsyncStorage.setItem('currentUserRole', userRole),
             AsyncStorage.setItem('currentUserPosition', userPosition),
-            AsyncStorage.setItem('currentSessionId', newSessionId), // 本地也存一份
             AsyncStorage.setItem('pricingRegionId', pricingRegionId),
           ];
+          if (!sessionError) {
+            storageOps.push(AsyncStorage.setItem('currentSessionId', newSessionId));
+          }
           if (userPosition === '骑手' || userPosition === '骑手队长') {
             storageOps.push(AsyncStorage.setItem(COURIER_ONLINE_MODE_KEY, 'true'));
           }

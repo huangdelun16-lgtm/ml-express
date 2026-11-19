@@ -53,9 +53,9 @@ export function riderActionCopy(language: string) {
     tooFarScan: (meters: number) =>
       tr3(
         language,
-        `距离送达点约 ${meters} 米，请靠近后再扫码`,
-        `About ${meters}m away. Move closer before scanning.`,
-        `ပို့ဆောင်ရာနေရာမှ ${meters} မီတာခန့်။ နီးကပ်မှ စကင်န်ဖတ်ပါ။`,
+        `距离送达点约 ${meters} 米，超过 200 米不能记送达。靠近后再扫，或改用拍照送达。`,
+        `About ${meters}m away, past the 200m limit. Move closer and scan again, or use a photo.`,
+        `${meters} မီတာ ဝေးနေသဖြင့် ၂၀၀ မီတာထက်ကျော်၍ မှတ်မရပါ။ နီးကပ်မှ ပြန်စကင်န်ဖတ်ပါ သို့မဟုတ် ဓာတ်ပုံသုံးပါ။`,
       ),
     confirmPickupTitle: tr3(language, '确认取件', 'Confirm Pickup', 'ပစ္စည်းယူရန် အတည်ပြုပါ'),
     confirmPickupBody: tr3(
@@ -169,6 +169,7 @@ export function riderActionCopy(language: string) {
         `Status ${status} cannot be updated via scan`,
         `ယခု အခြေအနေ (${status}) ကို စကင်န်ဖြင့် မပြောင်းနိုင်ပါ`,
       ),
+    scanStopTitle: tr3(language, '这次还不能继续', 'Cannot continue yet', 'ယခု မဆက်နိုင်သေးပါ'),
     scanHandlingFailed: tr3(language, '扫码处理失败', 'Scan handling failed', 'စကင်န်လုပ်ဆောင်မှု မအောင်မြင်ပါ'),
     anomalyReport: tr3(language, '异常上报', 'Anomaly', 'ပုံမှန်မဟုတ် တင်ပြ'),
     anomalyTitle: tr3(language, '异常场景申报', 'Anomaly Report', 'ပုံမှန်မဟုတ်သော အခြေအနေ တင်ပြရန်'),

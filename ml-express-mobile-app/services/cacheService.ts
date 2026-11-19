@@ -30,6 +30,8 @@ export interface OfflineUpdate {
   };
   timestamp: number;
   retryCount: number;
+  /** 最近一次上传失败的原因；没有则表示还没传过 */
+  lastError?: string;
 }
 
 export const cacheService = {
@@ -62,18 +64,21 @@ export const cacheService = {
   /**
    * 更新队列中的重试次数
    */
-  async incrementRetry(updateId: string) {
+  async recordFailure(updateId: string, reason: string) {
     try {
       const queueJson = await AsyncStorage.getItem(OFFLINE_QUEUE_KEY);
       if (!queueJson) return;
       const queue: OfflineUpdate[] = JSON.parse(queueJson);
-      const index = queue.findIndex(item => item.id === updateId);
+      const index = queue.findIndex((item) => item.id === updateId);
       if (index !== -1) {
         queue[index].retryCount += 1;
+        queue[index].lastError = reason.slice(0, 120);
         await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
         DeviceEventEmitter.emit(OFFLINE_QUEUE_CHANGED, { count: queue.length });
       }
-    } catch (error) {}
+    } catch {
+      /* 失败原因写不进去时，下一次打开仍能看到这条还在队列里 */
+    }
   },
 
   /**

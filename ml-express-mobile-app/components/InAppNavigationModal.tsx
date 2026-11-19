@@ -14,12 +14,14 @@ import {
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   computeDrivingRoute,
   formatRouteDistance,
   formatRouteDuration,
   pickRouteEtaSeconds,
+  pickUpcomingStep,
   type ComputedRoute,
   type RouteCoordinate,
 } from '../services/routingService';
@@ -80,6 +82,7 @@ export default function InAppNavigationModal({
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
   const [route, setRoute] = useState<ComputedRoute | null>(null);
+  const [riderPoint, setRiderPoint] = useState<RouteCoordinate | null>(null);
   const [loadingRoute, setLoadingRoute] = useState(false);
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
   const [stopFilter, setStopFilter] = useState<'all' | 'pickup' | 'delivery'>('all');
@@ -265,25 +268,61 @@ export default function InAppNavigationModal({
           latitude: s.latitude,
           longitude: s.longitude,
         })),
+        language,
       );
       setRoute(result);
     } finally {
       setLoadingRoute(false);
     }
-  }, [visible, origin, destinationStop, orderedStops, intermediateStops]);
+  }, [visible, origin, destinationStop, orderedStops, intermediateStops, language]);
 
   useEffect(() => {
     void loadRoute();
   }, [loadRoute]);
 
+  const originLat = origin?.latitude;
+  const originLng = origin?.longitude;
+
+  useEffect(() => {
+    if (!visible) {
+      setRiderPoint(null);
+      return undefined;
+    }
+    if (originLat != null && originLng != null) {
+      setRiderPoint({ latitude: originLat, longitude: originLng });
+    }
+    let cancelled = false;
+    let watch: Location.LocationSubscription | null = null;
+    void (async () => {
+      const current = await Location.getForegroundPermissionsAsync();
+      if (cancelled || current.status !== 'granted') return;
+      watch = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: 4000,
+          distanceInterval: 12,
+        },
+        (loc) => {
+          setRiderPoint({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+        },
+      );
+      if (cancelled) watch.remove();
+    })();
+    return () => {
+      cancelled = true;
+      watch?.remove();
+    };
+  }, [visible, originLat, originLng]);
+
+  const guidance = useMemo(
+    () => pickUpcomingStep(route?.steps || [], riderPoint || origin),
+    [route?.steps, riderPoint, origin],
+  );
+
   const polylineCoords = useMemo(() => {
     if (route?.coordinates?.length) return route.coordinates;
-    if (!origin || orderedStops.length === 0) return [];
-    return [
-      origin,
-      ...orderedStops.map((s) => ({ latitude: s.latitude, longitude: s.longitude })),
-    ];
-  }, [route, origin, orderedStops]);
+    return [];
+  }, [route]);
 
   useEffect(() => {
     if (!visible || polylineCoords.length < 2 || !mapRef.current) return;
@@ -577,6 +616,31 @@ export default function InAppNavigationModal({
           ) : null}
 
           <View style={styles.overlay} pointerEvents="box-none">
+            {guidance && route?.fromRoadNetwork ? (
+              <View style={styles.guidanceCard}>
+                <Text style={styles.guidanceDistance}>
+                  {guidance.imminent
+                    ? language === 'zh'
+                      ? '现在'
+                      : language === 'en'
+                        ? 'Now'
+                        : 'ယခု'
+                    : formatRouteDistance(guidance.remainMeters, language)}
+                </Text>
+                <View style={styles.guidanceCopy}>
+                  <Text style={styles.guidanceText} numberOfLines={2}>
+                    {guidance.instruction}
+                  </Text>
+                  <Text style={styles.guidanceTotal}>
+                    {language === 'zh'
+                      ? `全程还剩 ${formatRouteDistance(guidance.totalRemainMeters, language)}`
+                      : language === 'en'
+                        ? `${formatRouteDistance(guidance.totalRemainMeters, language)} remaining`
+                        : `ကျန် ${formatRouteDistance(guidance.totalRemainMeters, language)}`}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
             {panelsCollapsed ? (
               <View style={styles.collapsedDock}>
                 <TouchableOpacity
@@ -600,7 +664,17 @@ export default function InAppNavigationModal({
                 >
                   <Ionicons name="navigate" size={16} color="#fff" />
                   <Text style={styles.collapsedNavText}>
-                    {language === 'zh' ? '导航' : language === 'en' ? 'Nav' : 'လမ်းညွှန်'}
+                    {route?.steps?.length
+                      ? language === 'zh'
+                        ? '外部地图'
+                        : language === 'en'
+                          ? 'Maps'
+                          : 'မြေပုံ'
+                      : language === 'zh'
+                        ? '导航'
+                        : language === 'en'
+                          ? 'Nav'
+                          : 'လမ်းညွှန်'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -728,11 +802,17 @@ export default function InAppNavigationModal({
                 >
                   <Ionicons name="navigate" size={18} color="#fff" />
                   <Text style={styles.googleNavText}>
-                    {language === 'zh'
-                      ? 'Google 语音导航'
-                      : language === 'en'
-                        ? 'Google voice nav'
-                        : 'Google လမ်းညွှန်'}
+                    {route?.steps?.length
+                      ? language === 'zh'
+                        ? '用外部地图继续'
+                        : language === 'en'
+                          ? 'Open external map'
+                          : 'ပြင်ပမြေပုံ'
+                      : language === 'zh'
+                        ? 'Google 语音导航'
+                        : language === 'en'
+                          ? 'Google voice nav'
+                          : 'Google လမ်းညွှန်'}
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -964,6 +1044,23 @@ const styles = StyleSheet.create({
   },
   mapRetryText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   overlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, justifyContent: 'flex-end' },
+  guidanceCard: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    backgroundColor: '#0f172a',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(94, 234, 212, 0.35)',
+  },
+  guidanceDistance: { color: '#5eead4', fontSize: 20, fontWeight: '800', minWidth: 72 },
+  guidanceCopy: { flex: 1 },
+  guidanceText: { color: '#f8fafc', fontSize: 16, fontWeight: '800' },
+  guidanceTotal: { color: '#94a3b8', fontSize: 12, fontWeight: '700', marginTop: 3 },
   collapsedDock: {
     marginHorizontal: 12,
     marginBottom: Platform.OS === 'ios' ? 24 : 14,

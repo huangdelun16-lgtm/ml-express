@@ -572,12 +572,15 @@ export const packageService = {
           await cacheService.removeFromQueue(item.id);
           console.log(`✅ 成功同步离线记录: ${item.id}`);
         } else {
-          await cacheService.incrementRetry(item.id);
+          const reason = item.type === 'photo' ? 'photo_rejected' : 'status_rejected';
+          await cacheService.recordFailure(item.id, reason);
           if (isOfflineQueueStuck((item.retryCount || 0) + 1)) stuckCount += 1;
         }
       } catch (error) {
         console.warn('同步离线记录失败:', error);
-        await cacheService.incrementRetry(item.id);
+        const message = error instanceof Error ? error.message : '';
+        const reason = /network|timeout|fetch|failed/i.test(message) ? 'network' : 'status_rejected';
+        await cacheService.recordFailure(item.id, reason);
         if (isOfflineQueueStuck((item.retryCount || 0) + 1)) stuckCount += 1;
       }
     }

@@ -31,6 +31,7 @@ import {
 } from '../utils/scanCodeHelpers';
 import { isWriteOk, isWriteQueued, pendingWriteUserMessage } from '../utils/pendingWrite';
 import { riderActionCopy } from '../utils/riderActionCopy';
+import { explainScanStop } from '../utils/scanStop';
 import { distanceMeters, matchPackagesForStoreReceive } from '../utils/storeReceiveMatch';
 import { locationService } from '../services/locationService';
 
@@ -50,6 +51,7 @@ export default function ScanScreen({ navigation }: any) {
   const [networkError, setNetworkError] = useState<string | null>(null);
   const scannedDataRef = useRef<string | null>(null);
   const lastScanTimeRef = useRef<number>(0);
+  const handlingRef = useRef(false);
   
   // 扫描动画
   const scanAnimation = useRef(new Animated.Value(0)).current;
@@ -227,10 +229,22 @@ export default function ScanScreen({ navigation }: any) {
   // 重置扫描状态
   const resetScanState = () => {
     logger.debug('重置扫描状态');
+    handlingRef.current = false;
     setScanned(false);
     setIsProcessing(false);
     scannedDataRef.current = null;
-    lastScanTimeRef.current = 0; // 重置时间戳
+    lastScanTimeRef.current = 0;
+  };
+
+  const askAfterCamera = (
+    title: string,
+    message: string,
+    buttons: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[],
+  ) => {
+    setIsProcessing(false);
+    setTimeout(() => {
+      Alert.alert(title, message, buttons, { cancelable: false });
+    }, 80);
   };
 
   // 检查相机权限状态
@@ -281,41 +295,26 @@ export default function ScanScreen({ navigation }: any) {
 
   // 注意：相机错误现在在扫码界面中显示，而不是阻止整个页面
 
-  const handleBarCodeScanned = async ({ data }: any) => {
+  const handleBarCodeScanned = async ({ data }: { data?: string }) => {
     const currentTime = Date.now();
-    
-    // 多重检查防止重复扫描
-    if (scanned || isProcessing) {
-      logger.debug('扫描被阻止：已扫描或正在处理中');
-      return;
-    }
-    
-    // 检查是否扫描了相同的数据
-    if (scannedDataRef.current === data) {
-      logger.debug('扫描被阻止：相同数据已处理');
-      return;
-    }
-    
-    // 防抖：如果距离上次扫描时间少于2秒，忽略
-    if (currentTime - lastScanTimeRef.current < 2000) {
-      logger.debug('扫描被阻止：防抖保护');
-      return;
-    }
-    
-    logger.debug('开始处理扫描数据');
-    
-    // 设置处理状态和时间戳
+    const code = String(data || '').replace(/[\x00-\x1F\x7F]/g, '').trim();
+    if (code.length < 4) return;
+    if (handlingRef.current || scanned || isProcessing) return;
+    if (scannedDataRef.current === code && currentTime - lastScanTimeRef.current < 2000) return;
+
+    handlingRef.current = true;
     setScanned(true);
     setIsProcessing(true);
-    scannedDataRef.current = data;
+    scannedDataRef.current = code;
     lastScanTimeRef.current = currentTime;
-    
+
     try {
-      await searchPackage(data);
+      await searchPackage(code);
     } catch (error) {
       logger.error('扫描处理错误', error);
-      // 发生错误时重置状态
       resetScanState();
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -355,15 +354,15 @@ export default function ScanScreen({ navigation }: any) {
           (ns === '配送中' && !foundPackage.courier);
         if (canAssign || ns === '已送达' || raw === '待派送') {
           const statusText = ns === '已送达' ? copy.atStation : foundPackage.status;
-          Alert.alert(
+          askAfterCamera(
             copy.claimTransferTitle,
             copy.claimTransferBody(foundPackage.id, statusText, packageId, currentCourierName),
             [
               { text: copy.cancel, onPress: resetScanState },
               {
                 text: copy.assignConfirm,
-                onPress: async () => {
-                  await assignPackageToCourier(foundPackage);
+                onPress: () => {
+                  void assignPackageToCourier(foundPackage);
                 },
               },
             ],
@@ -373,46 +372,18 @@ export default function ScanScreen({ navigation }: any) {
       }
 
       if (isPickupFlowStatus(ns)) {
-        Alert.alert(
-          copy.confirmPickupTitle,
-          copy.confirmPickupScanBody(foundPackage.id, foundPackage.receiver_name),
-          [
-            { text: copy.cancel, onPress: resetScanState },
-            {
-              text: copy.confirmPickupTitle,
-              onPress: async () => {
-                await confirmPickup(foundPackage);
-              },
-            },
-          ],
-        );
+        await confirmPickup(foundPackage);
         return;
       }
 
       if (ns === '打包中' || ns === '待确认') {
-        Alert.alert(
-          copy.notReadyTitle,
-          copy.notReadyBody(foundPackage.id, foundPackage.status),
-          [
-            { text: copy.viewDetail, onPress: () => openPackageDetail(foundPackage.id) },
-            { text: copy.continueScan, onPress: resetScanState },
-          ],
-        );
+        feedbackService.info(copy.notReadyBody(foundPackage.id, foundPackage.status));
+        openPackageDetail(foundPackage.id);
         return;
       }
 
       if (isDeliveryActionStatus(ns)) {
-        Alert.alert(
-          copy.continueDeliveryTitle,
-          copy.continueDeliveryBody(foundPackage.id, foundPackage.status),
-          [
-            {
-              text: copy.goDeliver,
-              onPress: () => openPackageDetail(foundPackage.id),
-            },
-            { text: copy.continueScan, style: 'cancel', onPress: resetScanState },
-          ],
-        );
+        openPackageDetail(foundPackage.id);
         return;
       }
 
@@ -422,14 +393,8 @@ export default function ScanScreen({ navigation }: any) {
         return;
       }
 
-      Alert.alert(
-        copy.cannotActionTitle,
-        copy.cannotActionBody(foundPackage.id, foundPackage.status),
-        [
-          { text: copy.viewDetail, onPress: () => openPackageDetail(foundPackage.id) },
-          { text: copy.continueScan, onPress: resetScanState },
-        ],
-      );
+      feedbackService.warning(copy.cannotActionBody(foundPackage.id, foundPackage.status));
+      openPackageDetail(foundPackage.id);
     } catch (error: any) {
       logger.error('查询包裹失败', error);
       const errorMessage = error?.message || '';
@@ -501,16 +466,26 @@ export default function ScanScreen({ navigation }: any) {
     try {
       const parsed = parseStoreReceiveCode(receiveCode);
       if (!parsed) {
-        feedbackService.warning(copy.invalidStoreCode);
-        resetScanState();
+        explainScanStop({
+          title: copy.scanStopTitle,
+          message: copy.invalidStoreCode,
+          scanAgainLabel: copy.continueScan,
+          dismissLabel: copy.ok,
+          onScanAgain: resetScanState,
+        });
         return;
       }
 
       const { deviceHealthService } = require('../services/deviceHealthService');
       const health = await deviceHealthService.performFullCheck();
       if (health.location.isMocked) {
-        feedbackService.warning(copy.mockLocationScan);
-        resetScanState();
+        explainScanStop({
+          title: copy.scanStopTitle,
+          message: copy.mockLocationScan,
+          scanAgainLabel: copy.continueScan,
+          dismissLabel: copy.ok,
+          onScanAgain: resetScanState,
+        });
         return;
       }
 
@@ -554,7 +529,7 @@ export default function ScanScreen({ navigation }: any) {
         void completeStoreDelivery(pkg, receiveCode, parsed.storeId, storeName, storeLat, storeLng);
 
       if (candidates.length === 1) {
-        Alert.alert(copy.storeReceiveTitle, copy.storeReceiveConfirmOne(candidates[0].id, storeName), [
+        askAfterCamera(copy.storeReceiveTitle, copy.storeReceiveConfirmOne(candidates[0].id, storeName), [
           { text: copy.cancel, style: 'cancel', onPress: resetScanState },
           { text: copy.confirm, onPress: () => finishOne(candidates[0]) },
         ]);
@@ -562,7 +537,7 @@ export default function ScanScreen({ navigation }: any) {
       }
 
       if (bound.length > 1) {
-        Alert.alert(copy.storeReceiveTitle, copy.storeReceiveConfirmMany(bound.length, storeName), [
+        askAfterCamera(copy.storeReceiveTitle, copy.storeReceiveConfirmMany(bound.length, storeName), [
           { text: copy.cancel, style: 'cancel', onPress: resetScanState },
           { text: copy.storeReceiveDeliverFirst, onPress: () => finishOne(bound[0]) },
           {
@@ -573,7 +548,7 @@ export default function ScanScreen({ navigation }: any) {
         return;
       }
 
-      Alert.alert(copy.storeReceiveTitle, copy.storeReceiveUnmatched(deliverable.length, storeName), [
+      askAfterCamera(copy.storeReceiveTitle, copy.storeReceiveUnmatched(deliverable.length, storeName), [
         { text: copy.cancel, style: 'cancel', onPress: resetScanState },
         {
           text: copy.storeReceiveOpenDetail,
@@ -589,7 +564,7 @@ export default function ScanScreen({ navigation }: any) {
   };
 
   const ensureStoreDeliveryDistance = async (
-    pkg: { receiver_latitude?: number; receiver_longitude?: number },
+    pkg: { id: string; receiver_latitude?: number; receiver_longitude?: number },
     storeLat: number | null,
     storeLng: number | null,
   ): Promise<boolean> => {
@@ -604,7 +579,16 @@ export default function ScanScreen({ navigation }: any) {
     if (!coords || !target) return true;
     const dist = distanceMeters(coords, target);
     if (dist > 200) {
-      feedbackService.warning(copy.tooFarScan(Math.round(dist)));
+      const meters = Math.round(dist);
+      explainScanStop({
+        title: copy.scanStopTitle,
+        message: copy.tooFarScan(meters),
+        scanAgainLabel: copy.continueScan,
+        dismissLabel: copy.ok,
+        onScanAgain: resetScanState,
+        detailLabel: copy.viewDetail,
+        onOpenDetail: () => openPackageDetail(pkg.id),
+      });
       return false;
     }
     return true;
@@ -746,23 +730,27 @@ export default function ScanScreen({ navigation }: any) {
             copy.pickupSuccessId(packageData.id),
           ),
         );
-        Alert.alert(
-          isWriteQueued(success) ? copy.savedOfflineTitle : copy.pickupSuccessTitle,
-          pendingWriteUserMessage(
-            language,
-            success,
-            copy.pickupNextSteps(packageData.id),
-            copy.pickupNextSteps(packageData.id),
-            copy.pickupNextSteps(packageData.id),
-          ),
-          [
-            {
-              text: copy.goDeliver,
-              onPress: () => openPackageDetail(packageData.id),
-            },
-            { text: copy.continueScan, onPress: resetScanState },
-          ],
-        );
+        setIsProcessing(false);
+        setTimeout(() => {
+          Alert.alert(
+            isWriteQueued(success) ? copy.savedOfflineTitle : copy.pickupSuccessTitle,
+            pendingWriteUserMessage(
+              language,
+              success,
+              copy.pickupNextSteps(packageData.id),
+              copy.pickupNextSteps(packageData.id),
+              copy.pickupNextSteps(packageData.id),
+            ),
+            [
+              {
+                text: copy.goDeliver,
+                onPress: () => openPackageDetail(packageData.id),
+              },
+              { text: copy.continueScan, onPress: resetScanState },
+            ],
+            { cancelable: false },
+          );
+        }, 80);
       } else {
         feedbackService.error(copy.pickupFailedRetry);
         resetScanState();
@@ -821,7 +809,7 @@ export default function ScanScreen({ navigation }: any) {
         <View style={styles.scanContainer}>
           {permission?.granted ? (
             <View style={styles.cameraContainer}>
-              {isFocused ? (
+              {isFocused && !scanned ? (
                 <>
                   <View
                     style={styles.camera}
@@ -832,9 +820,9 @@ export default function ScanScreen({ navigation }: any) {
                   <CameraView
                     style={StyleSheet.absoluteFill}
                     facing="back"
-                    onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+                    onBarcodeScanned={handleBarCodeScanned}
                     barcodeScannerSettings={{
-                      barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'pdf417'],
+                      barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'pdf417'],
                     }}
                     onCameraReady={() => {
                       logger.debug('相机已准备就绪');
@@ -889,6 +877,8 @@ export default function ScanScreen({ navigation }: any) {
                     </View>
                   </View>
                 </>
+              ) : scanned ? (
+                <View style={[styles.camera, { backgroundColor: '#0f172a' }]} />
               ) : (
                 <View style={styles.cameraErrorContainer}>
                   <View style={styles.errorIconContainer}>
@@ -1284,24 +1274,21 @@ const baseStyles = StyleSheet.create({
   },
   manualContainer: {
     flex: 1,
-    backgroundColor: '#f7fafc',
+    backgroundColor: '#0f172a',
     justifyContent: 'center',
     padding: 20,
   },
   manualContent: {
-    backgroundColor: '#fff',
+    backgroundColor: '#152033',
     padding: 24,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.28)',
   },
   manualTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2c5282',
+    fontWeight: '800',
+    color: '#f8fafc',
     marginBottom: 20,
     textAlign: 'center',
   },

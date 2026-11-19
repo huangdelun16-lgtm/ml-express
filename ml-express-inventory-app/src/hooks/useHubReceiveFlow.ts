@@ -42,6 +42,7 @@ import {
   isDestinationHubPack,
   listPendingPackInboundOrders,
   preferConfirmedHubReceivePack,
+  matchScanInboundOrder,
 } from '../utils/hubReceivePack';
 import { collectArrivalNotifyTargets, type ArrivalNotifyTarget } from '../utils/arrivalNotify';
 import { resolveStoreHubCode } from '../utils/storeZone';
@@ -59,6 +60,12 @@ export function useHubReceiveFlow(openPackBarcode: string) {
   const { t, fmt } = useTranslation();
   const openedFromRouteRef = useRef('');
   const scanLockRef = useRef(false);
+  const scanNotifyBufferRef = useRef<OrderTrackingRecord[]>([]);
+  const scanSessionOpenRef = useRef(false);
+  const scanInboundIdsRef = useRef(new Set<string>());
+  const scanInboundLockRef = useRef(false);
+  const lastGateMessageRef = useRef('');
+  const activePackRef = useRef<PkgTrackingDetail | null>(null);
   const [scanBusy, setScanBusy] = useState(false);
   const { store, hubCode: authHubCode, operatorName } = useAuth();
   const hubCode = authHubCode ?? (store ? resolveStoreHubCode(store) : '');
@@ -66,6 +73,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
   const [cloudConnected, setCloudConnected] = useState<boolean | null>(null);
   const [scan, setScan] = useState('');
   const [activePack, setActivePack] = useState<PkgTrackingDetail | null>(null);
+  activePackRef.current = activePack;
   const [ordersModalVisible, setOrdersModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null);
@@ -133,16 +141,18 @@ export function useHubReceiveFlow(openPackBarcode: string) {
   const preflightHubReceive = useCallback(async (options?: { forWrite?: boolean }): Promise<boolean> => {
     const gate = await ensureHubReceiveCloudReady(options);
     if (!gate.ok) {
-      setError(
+      const message =
         gate.reason === 'notConfigured'
           ? getSupabaseConfigHint() || t.hubReceive.supabaseMissing
           : gate.reason === 'notAuthenticated'
             ? t.hubReceive.cloudFailSession
-            : t.hubReceive.cloudFailNetwork,
-      );
+            : t.hubReceive.cloudFailNetwork;
+      lastGateMessageRef.current = message;
+      setError(message);
       setCloudConnected(false);
       return false;
     }
+    lastGateMessageRef.current = '';
     setCloudConnected(true);
     return true;
   }, [t]);
@@ -307,7 +317,11 @@ export function useHubReceiveFlow(openPackBarcode: string) {
   );
 
   const inboundSingleOrder = useCallback(
-    async (orderId: string, knownPack?: PkgTrackingDetail | null) => {
+    async (
+      orderId: string,
+      knownPack?: PkgTrackingDetail | null,
+      options?: { notify?: boolean },
+    ) => {
       if (!store) return;
       const pack = knownPack ?? activePack;
       if (!pack) return;
@@ -328,8 +342,8 @@ export function useHubReceiveFlow(openPackBarcode: string) {
       } catch {
         // 入库已成功，刷新列表失败不回滚
       }
-      queueArrivalNotify([order]);
-      return pkg;
+      if (options?.notify !== false) queueArrivalNotify([order]);
+      return { pkg, order };
     },
     [store, activePack, hubCode, operator, finishInboundFlow, queueArrivalNotify],
   );
@@ -689,6 +703,111 @@ export function useHubReceiveFlow(openPackBarcode: string) {
     }
   };
 
+  const scanInboundMessage = (
+    reason: 'empty' | 'packBarcode' | 'notInPack' | 'alreadyDone' | 'notThisHub' | 'ambiguous',
+    barcode: string,
+  ) => {
+    if (reason === 'empty') return t.hubReceive.scanInboundEmpty;
+    if (reason === 'packBarcode') return t.hubReceive.scanInboundPackCode;
+    if (reason === 'alreadyDone') return fmt(t.hubReceive.scanInboundAlready, { barcode });
+    if (reason === 'notThisHub') return fmt(t.hubReceive.scanInboundNotThisHub, { barcode });
+    if (reason === 'ambiguous') return fmt(t.hubReceive.scanInboundAmbiguous, { barcode });
+    return fmt(t.hubReceive.scanInboundNotInPack, { barcode });
+  };
+
+  const rememberPack = (pkg: PkgTrackingDetail) => {
+    activePackRef.current = pkg;
+    setActivePack(pkg);
+  };
+
+  const handleScanInbound = async (
+    rawCode: string,
+  ): Promise<{ ok: boolean; message: string; done: boolean }> => {
+    const packNow = activePackRef.current;
+    if (!store || !packNow || scanInboundLockRef.current || batchInbounding || confirmingHubReceive) {
+      return { ok: false, message: t.common.processing, done: false };
+    }
+    const match = matchScanInboundOrder(packNow, hubCode, rawCode);
+    if (!match.ok) {
+      const message = scanInboundMessage(match.reason, match.barcode);
+      setError(message);
+      return { ok: false, message, done: false };
+    }
+    if (scanInboundIdsRef.current.has(match.orderId)) {
+      const message = fmt(t.hubReceive.scanInboundAlready, { barcode: match.barcode });
+      setError(message);
+      return { ok: false, message, done: false };
+    }
+    if (!(await preflightHubReceive({ forWrite: true }))) {
+      const message = lastGateMessageRef.current || t.hubReceive.cloudFailSession;
+      return { ok: false, message, done: false };
+    }
+    if (scanInboundLockRef.current || scanInboundIdsRef.current.has(match.orderId)) {
+      const message = fmt(t.hubReceive.scanInboundAlready, { barcode: match.barcode });
+      return { ok: false, message, done: false };
+    }
+    scanInboundLockRef.current = true;
+    scanInboundIdsRef.current.add(match.orderId);
+    const previous = activePackRef.current ?? packNow;
+    const optimistic: PkgTrackingDetail = {
+      ...previous,
+      received_order_count: previous.received_order_count + 1,
+      orders: previous.orders.map((order) =>
+        order.id === match.orderId && order.status === 'in_transit'
+          ? { ...order, status: 'hub_received' }
+          : order,
+      ),
+    };
+    rememberPack(optimistic);
+    setConfirmingOrderId(match.orderId);
+    setError('');
+    try {
+      const pkg = await resolvePackForInbound(activePackRef.current ?? optimistic);
+      const result = await inboundSingleOrder(match.orderId, pkg, { notify: false });
+      if (result?.order) {
+        if (scanSessionOpenRef.current) scanNotifyBufferRef.current.push(result.order);
+        else queueArrivalNotify([result.order]);
+      }
+      const latest = activePackRef.current ?? optimistic;
+      const left = listPendingPackInboundOrders(latest, hubCode).length;
+      const message =
+        left > 0
+          ? fmt(t.hubReceive.scanInboundProgress, { barcode: match.barcode, count: left })
+          : t.hubReceive.scanInboundAllDone;
+      setModalSuccess(message);
+      setError('');
+      return { ok: true, message, done: left === 0 };
+    } catch (e: unknown) {
+      scanInboundIdsRef.current.delete(match.orderId);
+      rememberPack(previous);
+      const message = explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e);
+      setError(message);
+      return { ok: false, message, done: false };
+    } finally {
+      scanInboundLockRef.current = false;
+      setConfirmingOrderId(null);
+    }
+  };
+
+  const beginScanInbound = async (): Promise<{ ok: true; pending: number } | { ok: false; message: string }> => {
+    const packNow = activePackRef.current;
+    if (!store || !packNow) {
+      return { ok: false, message: t.hubReceive.batchInboundNothingPending };
+    }
+    if (!(await preflightHubReceive({ forWrite: true }))) {
+      return { ok: false, message: lastGateMessageRef.current || t.hubReceive.cloudFailSession };
+    }
+    scanSessionOpenRef.current = true;
+    return { ok: true, pending: listPendingPackInboundOrders(packNow, hubCode).length };
+  };
+
+  const finishScanInbound = () => {
+    scanSessionOpenRef.current = false;
+    const rows = scanNotifyBufferRef.current;
+    scanNotifyBufferRef.current = [];
+    if (rows.length > 0) queueArrivalNotify(rows);
+  };
+
   const handleBatchInbound = async () => {
     if (!store || !activePack || confirmingOrderId || batchInbounding || loading || confirmingHubReceive) return;
     setError('');
@@ -869,6 +988,9 @@ export function useHubReceiveFlow(openPackBarcode: string) {
     openPackOrdersModal,
     handleConfirmPack,
     handleConfirmOrder,
+    handleScanInbound,
+    beginScanInbound,
+    finishScanInbound,
     handleBatchInbound,
     handlePayTransportFee,
     handleReleaseTransit,

@@ -7,6 +7,7 @@ import {
   hasUnreleasedTransitOrders,
   isDestinationHubPack,
   listPendingPackInboundOrders,
+  matchScanInboundOrder,
   preferConfirmedHubReceivePack,
   resolveHubReceiveStep,
 } from './hubReceivePack';
@@ -185,5 +186,95 @@ describe('hubReceivePack', () => {
     const merged = preferConfirmedHubReceivePack(confirmed, staleFetch);
     expect(merged.orders[0].status).toBe('hub_received');
     expect(resolveHubReceiveStep(merged, 'LSO')).toBe(3);
+  });
+
+  it('扫码只命中本包里仍待入库的一单', () => {
+    const detail = pack([
+      {
+        id: '1',
+        order_barcode: 'LSO260801001',
+        express_barcode: 'JT111',
+        order_name: 'A',
+        destination_code: 'LSO',
+        status: 'in_transit',
+        pack_barcode: 'RUI26LSO20001',
+        qty: 1,
+      },
+      {
+        id: '2',
+        order_barcode: 'LSO260801002',
+        express_barcode: 'JT222',
+        order_name: 'B',
+        destination_code: 'LSO',
+        status: 'hub_received',
+        pack_barcode: 'RUI26LSO20001',
+        qty: 1,
+      },
+      {
+        id: '3',
+        order_barcode: 'YGN260801003',
+        express_barcode: 'JT333',
+        order_name: 'C',
+        destination_code: 'YGN',
+        status: 'in_transit',
+        pack_barcode: 'RUI26LSO20001',
+        qty: 1,
+      },
+    ] as PkgTrackingDetail['orders']);
+
+    expect(matchScanInboundOrder(detail, 'LSO', 'jt111')).toEqual({
+      ok: true,
+      orderId: '1',
+      barcode: 'LSO260801001',
+    });
+    expect(matchScanInboundOrder(detail, 'LSO', 'JT333')).toEqual({
+      ok: true,
+      orderId: '3',
+      barcode: 'YGN260801003',
+    });
+    expect(matchScanInboundOrder(detail, 'LSO', 'LSO260801002')).toMatchObject({ reason: 'alreadyDone' });
+    expect(matchScanInboundOrder(detail, 'LSO', 'RUI26LSO20001')).toMatchObject({ reason: 'packBarcode' });
+    expect(matchScanInboundOrder(detail, 'LSO', 'NOPE')).toMatchObject({ reason: 'notInPack' });
+
+    const transit = pack(
+      [
+        {
+          id: '9',
+          order_barcode: 'LSO260801009',
+          express_barcode: 'JT999',
+          order_name: 'T',
+          destination_code: 'LSO',
+          status: 'in_transit',
+          pack_barcode: 'RUI26LSO20001',
+          qty: 1,
+        },
+      ] as PkgTrackingDetail['orders'],
+      { leg_destination_code: 'LSO', destination_code: 'LSO' },
+    );
+    expect(matchScanInboundOrder(transit, 'MDY', 'JT999')).toMatchObject({ reason: 'notThisHub' });
+
+    const duplicated = pack([
+      {
+        id: '1',
+        order_barcode: 'LSO260801001',
+        express_barcode: 'JT111',
+        order_name: 'A',
+        destination_code: 'LSO',
+        status: 'in_transit',
+        pack_barcode: 'RUI26LSO20001',
+        qty: 1,
+      },
+      {
+        id: '2',
+        order_barcode: 'LSO260801002',
+        express_barcode: 'JT111',
+        order_name: 'B',
+        destination_code: 'LSO',
+        status: 'in_transit',
+        pack_barcode: 'RUI26LSO20001',
+        qty: 1,
+      },
+    ] as PkgTrackingDetail['orders']);
+    expect(matchScanInboundOrder(duplicated, 'LSO', 'JT111')).toMatchObject({ reason: 'ambiguous' });
   });
 });
