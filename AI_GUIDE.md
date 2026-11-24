@@ -25,12 +25,12 @@ Market Link Express 做两件事：缅甸城里的配送和商城，以及中缅
 | 目录 | 是什么 | 技术栈 | 怎么启动 |
 |------|--------|--------|----------|
 | `src\`、`public\`、`netlify.toml`、根 `package.json` | 管理后台。根 `package.json` 名是 `market-link-express`，版本 **2.2.4** | CRA，React 18，TypeScript 4.9，React Router **v6** | 仓库根 `npm start` |
-| `ml-express-client` | 会员 App，`com.mlexpress.client` | Expo SDK 57 | 该目录 `npx expo start` |
+| `ml-express-client` | 会员 App，`com.mlexpress.client` | Expo SDK 58，React Native 0.88 | 该目录 `npx expo start` |
 | `ml-express-client-web` | 会员网站 `market-link-express.com`，`package.json` 版本 0.1.0 | CRA，React Router **v7** | 该目录 `npm start` |
-| `ml-express-merchant-app` | 商家 App，`com.mlexpress.merchants` | Expo SDK 57 | 该目录 `npx expo start` |
+| `ml-express-merchant-app` | 商家 App，`com.mlexpress.merchants` | Expo SDK 58，React Native 0.88 | 该目录 `npx expo start` |
 | `ml-express-merchant-web` | 商家网站 `mlexpress-merchants.com`，版本 0.1.0 | CRA，React Router **v7** | 该目录 `npm start` |
-| `ml-express-mobile-app` | 骑手 / 员工 App。Expo slug `MarketLinkStaffApp`。目录里没有 `src\` 前缀 | Expo SDK 57 | 该目录 `npx expo start` |
-| `ml-express-inventory-app` | 库存 / 站点 App，显示名 ML Inventory，slug `ml-express-inventory` | Expo SDK 57。不走 `/shared` | 该目录 `npx expo start` |
+| `ml-express-mobile-app` | 骑手 / 员工 App。Expo slug `MarketLinkStaffApp`。目录里没有 `src\` 前缀 | Expo SDK 58，React Native 0.88 | 该目录 `npx expo start` |
+| `ml-express-inventory-app` | 库存 / 站点 App，显示名 ML Inventory，slug `ml-express-inventory` | Expo SDK 58。不走 `/shared` | 该目录 `npx expo start` |
 | `netlify\functions` | 管理端函数：登录、跨境读写、短信邮件 | Node | 本地 `npm start` **不跑**这些文件，见下节 |
 | `netlify\edge-functions` | `/__sb` 转到 Supabase，并剥掉 `__cf_bm` | Netlify Edge | 随三站一起发布 |
 | `supabase\migrations` | 同一库的 SQL。本次核对 **89** 个 `.sql` | SQL | 不要擅自 `supabase db push` |
@@ -53,16 +53,16 @@ Market Link Express 做两件事：缅甸城里的配送和商城，以及中缅
 
 生产三站只跑对应目录的 `npm run deploy:netlify`（入口 `scripts\deploy-web.mjs`）。不要跑 `netlify deploy --trigger`。站点 ID、回滚锚点在 §15.3。
 
-App 版本以各目录 `app.json` 为准（2026-10-12 核对）：
+App 版本以各目录 `app.json` 为准（2026-11-20 核对）：
 
-| App | slug / 显示名 | 包名 | 版本 / iOS build / Android versionCode | EAS projectId |
-|-----|----------------|------|----------------------------------------|---------------|
-| 库存 | `ml-express-inventory` / ML Inventory | `com.mlexpress.inventory` | **2.2.7 / 48** | `d125c924-b3da-476d-a176-8fa3117bd2ad` |
-| 会员 | `ml-express-client` / MARKET LINK EXPRESS | `com.mlexpress.client` | **2.8.6 / 81** | `80b0873d-1d76-429e-8c79-738a817d8a15` |
-| 骑手 | `MarketLinkStaffApp` / MARKET LINK STAFF | `com.mlexpress.courier` | **2.5.1 / 88** | `9831d961-9124-46ed-8581-bf406616439f` |
-| 商家 | `ml-express-merchants` / MARKET LINK MERCHANT | `com.mlexpress.merchants` | **2.5.5 / 25** | `0c1336bd-5ebe-428c-a815-4a91519cdf16` |
+| App | slug / 显示名 | 包名 | 版本 / iOS build / Android versionCode | EAS projectId | App Store id |
+|-----|----------------|------|----------------------------------------|---------------|--------------|
+| 库存 | `ml-express-inventory` / ML Inventory | `com.mlexpress.inventory` | **2.4.0 / 61** | `d125c924-b3da-476d-a176-8fa3117bd2ad` | `6782287070` |
+| 会员 | `ml-express-client` / MARKET LINK EXPRESS | `com.mlexpress.client` | **2.8.7 / 82** | `80b0873d-1d76-429e-8c79-738a817d8a15` | `6756466778` |
+| 骑手 | `MarketLinkStaffApp` / MARKET LINK STAFF | `com.mlexpress.courier` | **2.5.2 / 89** | `9831d961-9124-46ed-8581-bf406616439f` | `6758951062` |
+| 商家 | `ml-express-merchants` / MARKET LINK MERCHANT | `com.mlexpress.merchants` | **2.5.7 / 27** | `0c1336bd-5ebe-428c-a815-4a91519cdf16` | 以 `eas.json` 为准 |
 
-会员和商家仓库里提交了 `android\` 和 `ios\`。商店包的 versionCode 还要看 Gradle / Info.plist / pbxproj，只改 `app.json` 会打出旧号（§7.8）。骑手和库存是 managed，改 `app.json` 即可。
+会员和商家仓库里提交了 `android\` 和 `ios\`。商店包的 versionCode 还要看 Gradle / Info.plist / pbxproj，只改 `app.json` 会打出旧号（§7.8）。骑手和库存是 managed，改 `app.json` 即可。四端 `package.json` 现为 Expo `^58`、React Native `0.88`、React `19.3`。骑手 `eas.json` 的 `submit.production.ios` 已写 `ascAppId` `6758951062`、`appleTeamId` `U3H693HPH9`。
 
 ### 身份与数据
 
@@ -144,11 +144,11 @@ Supabase 项目是 `uopkyuluxnrewvlmutam`。全端同一个库。缅甸客户端
 
 **会员 App** `ml-express-client`：客户用。底部是首页、下单、商场、购物车、订单、追踪、我的（`MainTabNavigator.tsx`）。订单走 `clientApi`，生产 REST 到 `market-link-express.com/__sb/`。登录是 `users` 的 customer 会话。Android 地图和证书指纹见 §7.10，不要改指纹表。
 
-**骑手 App** `ml-express-mobile-app`：骑手，以及可以切到管理督导的员工。屏幕在 `screens\`，服务在 `services\`。管理侧 Tab 是 Dashboard、Map、Scan、Profile；骑手侧是 MyTasks、Map、Scan、Profile。登录走 `admin_accounts`。生产 REST 到 `admin-market-link-express.com/__sb/`。
+**骑手 App** `ml-express-mobile-app`：骑手，以及可以切到管理督导的员工。屏幕在 `screens\`，服务在 `services\`。管理侧 Tab 是 Dashboard、Map、Scan、Profile；骑手侧是 MyTasks、Map、Scan、Profile，底栏是深色胶囊（`navigation\courierTabBarStyle.ts`、`CourierTabItem.tsx`）。登录走 `admin_accounts`。生产 REST 到 `admin-market-link-express.com/__sb/`。任务只有首页这一份列表：默认近的在前，可筛今天 / 待取 / 配送中；铃铛只切到「今天」，不再打开第二套按日期分组的列表。地图页与任务页同一套深色卡片。应用内路线沿街道画，并显示下一路口和剩余距离；外部地图是备用。扫码被拦住时用 `utils\scanStop.ts` 说明原因，并给出再扫或拍照送达。离线队列在 `SyncIndicator` 里按条显示待上传或失败原因。
 
-**库存 App** `ml-express-inventory-app`：站点人员用。关键屏幕有 Home、入库、多个入库、出库、到站收货、异常、在途、货物、包装、跨境财务、设置、打印（`AppNavigator.tsx`）。登录后拿店铺 JWT，生产 REST 到管理站 `/__sb/`。发站出库和到站签收要分开改，见 §10.2。
+**库存 App** `ml-express-inventory-app`：站点人员用。关键屏幕有 Home、入库、多个入库、出库、到站收货、异常、在途、货物、包装、跨境财务、设置、打印（`AppNavigator.tsx`）。到站窗口可批量入库，也可在同一窗口里逐单扫码入库（扫码层嵌在已有 Modal 里，不要再套一层 iOS Modal）。登录后拿店铺 JWT，生产 REST 到管理站 `/__sb/`。发站出库和到站签收要分开改，见 §10.2。
 
-商家 App 的边界在 §8。当前 `app.json` 仍是 **2.5.5 (25)**。
+商家 App 的边界在 §8。当前 `app.json` 是 **2.5.7 (27)**。管理后台出口成本保存后有成功或失败提示，待填列表可批量填写（`ExportCostRecordsCard.tsx`）。
 
 ### 改的时候不要破坏
 
@@ -171,7 +171,7 @@ Supabase 项目是 `uopkyuluxnrewvlmutam`。全端同一个库。缅甸客户端
     - [2.1 缅甸网络与 `/__sb` 代理（必读）](#21-缅甸网络与-__sb-代理必读)
 3. [子项目一览](#3-子项目一览)
 3.1. [各子项目架构详解（总览）](#31-各子项目架构详解总览)
-3.2. [Expo 四端原生架构（SDK 57）](#32-expo-四端原生架构sdk-57)
+3.2. [Expo 四端原生架构（SDK 58）](#32-expo-四端原生架构sdk-58)
 4. [管理后台（仓库根 `src/`）](#4-管理后台仓库根-src)
 5. [会员端网站 `ml-express-client-web`](#5-会员端网站-ml-express-client-web)
 6. [商家端网站 `ml-express-merchant-web`](#6-商家端网站-ml-express-merchant-web)
@@ -317,10 +317,10 @@ ml-express/                          # 仓库根 = Admin Web（market-link-expre
 | 管理后台 | **`https://admin-market-link-express.com`** | **仓库根** CRA + Functions + Edge `/__sb`；站点 `admin-market-link-express` |
 | 商家 Web | `https://mlexpress-merchants.com` | 目录 `ml-express-merchant-web`；站点 `mlexpress-merchant`；同源 `/__sb/` |
 | Inventory App Support | `https://market-link-express.com/support` | App Store Support URL |
-| Inventory iOS / Android | App Store / 内测 APK `com.mlexpress.inventory` | EAS，当前 **2.2.7 (48)**（以 `app.json` 为准） |
-| 会员 App | `com.mlexpress.client` | EAS **2.8.6 (81)**；原生 REST 走 `market-link-express.com/__sb/`；Android 地图见 **§7.10** |
-| 商家 App | `com.mlexpress.merchants` | EAS **2.5.5 (25)**；原生 REST 走 `mlexpress-merchants.com/__sb/` |
-| 骑手 App | `com.mlexpress.courier` | EAS **2.5.1 (88)**；原生 REST 走 `admin-market-link-express.com/__sb/`；规划路线地图见 **§7.10** |
+| Inventory iOS / Android | App Store / 内测 APK `com.mlexpress.inventory` | EAS，当前 **2.4.0 (61)**（以 `app.json` 为准） |
+| 会员 App | `com.mlexpress.client` | EAS **2.8.7 (82)**；原生 REST 走 `market-link-express.com/__sb/`；Android 地图见 **§7.10** |
+| 商家 App | `com.mlexpress.merchants` | EAS **2.5.7 (27)**；原生 REST 走 `mlexpress-merchants.com/__sb/` |
+| 骑手 App | `com.mlexpress.courier` | EAS **2.5.2 (89)**；原生 REST 走 `admin-market-link-express.com/__sb/`；沿路导航见 **§9.7** |
 | Inventory 原生 | 同上 Admin 域 `/__sb/` | `nativeSupabaseUrl.ts`；**必须尾斜杠** |
 | Supabase 上游 | `uopkyuluxnrewvlmutam.supabase.co` | 全端共用同一项目；缅甸客户端勿直连 |
 | Cloudflare 备份 | `ml-supabase-proxy.huangdelun16.workers.dev` | 仅诊断/备份；**生产 Admin 勿拨其 WS** |
@@ -366,10 +366,10 @@ App / 浏览器
 | **`/`（仓库根）** | Web | **管理后台**：订单、用户、财务、跟踪、告警、合伙店铺、报表、跨境物流 | CRA + TS + React Router **v6** | **2.2.4** | Netlify（根目录） |
 | **`ml-express-client-web/`** | Web | **会员端网站**：首页、商城、购物车、账户、Support | CRA + TS + React Router **v7** | **0.1.0** | Netlify |
 | **`ml-express-merchant-web/`** | Web | **商家端网站**：门店订单/商品/对账 | CRA + TS + React Router **v7** | **0.1.0** | Netlify |
-| **`ml-express-client/`** | Mobile | **会员 App** `com.mlexpress.client` | Expo SDK 57 / RN 0.86 | **2.8.6 (81)** | EAS |
-| **`ml-express-merchant-app/`** | Mobile | **商家 App** `com.mlexpress.merchants` | Expo SDK 57 / RN 0.86 | **2.5.5 (25)** | EAS |
-| **`ml-express-mobile-app/`** | Mobile | **骑手/员工端** `com.mlexpress.courier` | Expo SDK 57 / RN 0.86 | **2.5.1 (88)** | EAS |
-| **`ml-express-inventory-app/`** | Mobile | **中转站库存 App** `com.mlexpress.inventory` | Expo SDK 57 + Supabase Auth JWT + `/__sb` + 蓝牙打印 | **2.2.7 (48)** | EAS |
+| **`ml-express-client/`** | Mobile | **会员 App** `com.mlexpress.client` | Expo SDK 58 / RN 0.88 | **2.8.7 (82)** | EAS |
+| **`ml-express-merchant-app/`** | Mobile | **商家 App** `com.mlexpress.merchants` | Expo SDK 58 / RN 0.88 | **2.5.7 (27)** | EAS |
+| **`ml-express-mobile-app/`** | Mobile | **骑手/员工端** `com.mlexpress.courier` | Expo SDK 58 / RN 0.88 | **2.5.2 (89)** | EAS |
+| **`ml-express-inventory-app/`** | Mobile | **中转站库存 App** `com.mlexpress.inventory` | Expo SDK 58 + Supabase Auth JWT + `/__sb` + 蓝牙打印 | **2.4.0 (61)** | EAS |
 | **`shared/`** | 共享源 | 跨端纯逻辑单一源 | TS | — | sync 进各 app |
 | **`netlify/`** | 服务端 | Functions + Edge `supabase-bff` | Node | — | `/__sb` |
 | **`cloudflare/supabase-proxy/`** | 边缘 | Worker 备份代理 | JS | — | `deploy:supabase-proxy` |
@@ -456,7 +456,7 @@ App / 浏览器
 | **状态** | `AppContext`、`CartContext`、`LoadingContext` |
 | **业务层** | `supabase.ts` + `clientApi/`、`DatabaseService.ts`（SQLite 缓存）、`notificationService.ts`、`appUpdateService.ts` |
 | **工具** | `mediaAccess.ts`（Android Photo Picker，无 READ_MEDIA 权限）、`appUpdate.ts` |
-| **技术** | Expo SDK 57 / RN 0.86.3 / React 19.2.3（四端对齐，见 §3.2） |
+| **技术** | Expo SDK 58 / RN 0.88.0 / React 19.3.0（四端对齐，见 §3.2） |
 | **认证** | `users` `user_type='customer'` → `AsyncStorage`；支持游客；旧 merchant session 由 `AppContext` 清掉并提示用商家 App |
 | **Deep link** | `ml-express-client://`；关联域 `mlexpress.com` |
 | **Google Play** | `blockedPermissions` 屏蔽 READ_MEDIA_*；选图走系统 Photo Picker |
@@ -476,8 +476,8 @@ App / 浏览器
 | **业务层** | `supabase.ts`（barrel）+ `merchantApi/`；登录 `merchantAuthService` |
 | **体验** | `FeedbackService` + `GlobalToast`：非确认提示走 Toast；`Alert.alert` 仅确认/破坏性操作；生产 `installProductionConsoleGate`（**无 Sentry**，勿擅自加） |
 | **共享** | `src/services/_shared/`（含 `productReview.ts`） |
-| **技术** | Expo SDK 57 / RN 0.86.3 / React 19.2.3（四端对齐，见 §3.2） |
-| **部署** | EAS projectId `0c1336bd-…`；版本见 §20（app.json **2.5.5 (25)**）；进行中订单 / 聊天未读走 REST 轮询（§8.9） |
+| **技术** | Expo SDK 58 / RN 0.88.0 / React 19.3.0（四端对齐，见 §3.2） |
+| **部署** | EAS projectId `0c1336bd-…`；版本见 §20（app.json **2.5.7 (27)**）；进行中订单 / 聊天未读走 REST 轮询（§8.9） |
 
 ### 3.1.6 骑手/员工 App（`ml-express-mobile-app/`）
 
@@ -491,8 +491,8 @@ App / 浏览器
 | **扫码主路径** | `scanCodeHelpers` + `findPackageByScanCode`；取件扫包裹码、送达扫 `STORE_`；地图进详情 `openScan` |
 | **认证** | `admin_accounts` + Netlify `admin-password`（**无客户端明文密码兜底**）+ `ensure-courier-auth` |
 | **导航** | Stack + 双 Tab：Admin（Dashboard/Map/Scan/Profile）vs Courier（MyTasks/Map/Scan/Profile） |
-| **技术** | Expo SDK 57 / RN 0.86.3 / React 19.2.3（四端对齐，见 §3.2） |
-| **部署** | EAS projectId `9831d961-…`；`build:aab`；版本 **2.5.1 (88)**；新单 REST 轮询（§9.11） |
+| **技术** | Expo SDK 58 / RN 0.88.0 / React 19.3.0（四端对齐，见 §3.2） |
+| **部署** | EAS projectId `9831d961-…`；版本 **2.5.2 (89)**；新单 REST 轮询（§9.11）；沿路导航（§9.7） |
 
 ### 3.1.7 Inventory 中转站 App（`ml-express-inventory-app/`）
 
@@ -504,7 +504,7 @@ App / 浏览器
 | **网络** | 生产 REST/Auth/Storage：`https://admin-market-link-express.com/__sb/`（§2.1）；写操作必须店铺 JWT |
 | **数据** | **在线专用**：`inventory_*` 表 + RPC 幂等事务；45s 内存缓存（`inventoryCloudStore`） |
 | **写入守卫** | `withInventoryCloudWrite` + fetch 拦截器（§10.12）；禁止 anon 写 |
-| **技术** | Expo SDK 57 / RN 0.86.3 / React 19.2.3；`runtimeVersion.policy: appVersion`（见 §3.2） |
+| **技术** | Expo SDK 58 / RN 0.88.0 / React 19.3.0；`runtimeVersion.policy: appVersion`（见 §3.2） |
 | **不写 shared** | `sync:shared` 为空操作 |
 | **测试** | `vitest`（`npm test`）；A 基本完成；B 到站三步已落地，仍需现场回归 |
 | **详细** | §10.2 A/B、§10.12 JWT/三步、§10.4 屏幕、§10.7 区域可见性 |
@@ -536,47 +536,27 @@ App / 浏览器
 | **脚本** | `scripts/ci-typecheck.mjs` + `typecheck-baselines.json` |
 | **其它** | `scripts/` 含密码迁移、图标同步等运维脚本 |
 
-### 3.2 Expo 四端原生架构（SDK 57）
+### 3.2 Expo 四端原生架构（SDK 58）
 
-四个 Expo App **必须同 SDK**，否则 iPhone **Expo Go** 扫错版本会打不开。2026-09-06 已全仓对齐：
+四个 Expo App 的 `package.json` 现为 **Expo `^58.0.0`、React Native `0.88.0`、React `19.3.0`、`react-native-svg` `15.16.0`**。下面的版本锚点以各目录 `app.json` 为准（2026-11-20）。
 
 | App | 目录 | Expo | React Native | React | `react-native-svg` | 版本锚点 |
 |-----|------|------|--------------|-------|--------------------|----------|
-| Inventory | `ml-express-inventory-app/` | **~57.0.20** | **0.86.3** | **19.2.3** | **15.15.4** | 2.2.7 (48) |
-| 商家 App | `ml-express-merchant-app/` | **~57.0.20** | **0.86.3** | **19.2.3** | **15.15.4** | 2.5.5 (25) |
-| 会员 App | `ml-express-client/` | **~57.0.20** | **0.86.3** | **19.2.3** | **15.15.4** | 2.8.6 (81) |
-| 骑手 STAFF | `ml-express-mobile-app/` | **~57.0.20** | **0.86.3** | **19.2.3** | **15.15.4** | 2.5.1 (88) |
+| Inventory | `ml-express-inventory-app/` | **^58.0.0** | **0.88.0** | **19.3.0** | **15.16.0** | 2.4.0 (61) |
+| 商家 App | `ml-express-merchant-app/` | **^58.0.0** | **0.88.0** | **19.3.0** | **15.16.0** | 2.5.7 (27) |
+| 会员 App | `ml-express-client/` | **^58.0.0** | **0.88.0** | **19.3.0** | **15.16.0** | 2.8.7 (82) |
+| 骑手 STAFF | `ml-express-mobile-app/` | **^58.0.0** | **0.88.0** | **19.3.0** | **15.16.0** | 2.5.2 (89) |
 
-**官方升级（勿绕开）**
-
-```bash
-npx expo install expo@~57.0.20 --fix
-npx expo-doctor
-```
-
-❌ 不要单独 `npm install expo@^57.0.0`（会漏掉 RN / 插件对齐）。  
-`babel-preset-expo` **~57.0.0** 放 **devDependencies**，不要塞进 `dependencies`。
-
-**SDK 57 硬约束（已踩过）**
-
-| 项 | 做法 |
-|----|------|
-| **新架构** | SDK 55+ **强制** New Architecture。骑手端原来的 `newArchEnabled: false` **已删除**，勿加回。 |
-| **启动页** | 禁止顶层 `expo.splash`。改用 `expo-splash-screen` 插件，并设 `enableFullScreenImage_legacy: true`。 |
-| **签名板 / svg** | `react-native-svg` 必须 **15.15.4+**（去掉 `import { Buffer } from 'buffer'`）。更旧版本会让 Inventory 签名板打不开。 |
-| **插件清单** | 动态 `app.config.js` **不能**自动写插件。手写进各 `app.json`：`expo-secure-store` / `expo-sharing` / `expo-splash-screen` / `expo-status-bar` / `expo-asset` / `expo-font` 等。骑手端若声明了 `expo-asset` 插件但没装包，config 会炸。 |
-| **TypeScript** | Expo 57 基线 `lib: ["DOM","ESNext"]`。会员/商家 **不要**用 `tsconfig.lib: ["es2017"]` 覆盖掉。缺 `global` / `NodeJS.Timeout` 时补 `src/types/rn-globals.d.ts`，或把 `NodeJS.Timeout` 改成 `ReturnType<typeof setTimeout>`、`global` 改 `globalThis`。 |
-| **样式类型** | RN 0.86 类型里没有 `StyleSheet.absoluteFillObject`。展开处写显式 `position/top/right/bottom/left`；`style={}` 处用 `StyleSheet.absoluteFill`。 |
-| **Expo Go** | 手机必须装 **SDK 57** 的 Expo Go。升完后停旧 Metro，各目录 `npx expo start` 再扫码。蓝牙打印 **不在** Expo Go 里。 |
+商家 Android 打包还踩过 AGP 9：Gradle **9.4.1**，`android.newDsl=false`，`android.disallowKotlinSourceSets=false`，`android.builtInKotlin=false`，并打开 `buildConfig`。这些写在商家 `android/gradle.properties` 和根 `android/build.gradle`，不要为了“对齐新 DSL”删掉。
 
 **原生工程 vs managed**
 
 | App | 仓库里的 `android/` `ios/` | 升号 / 打商店包 |
 |-----|---------------------------|-----------------|
-| 会员 / 商家 | **已提交**（CNG）。EAS **不以** `app.json` 版本为准，以 Gradle / Info.plist / pbxproj 为准 | 升 SDK 后商店 / EAS 正式包必须重打。打商店包前建议 `npx expo prebuild --clean` |
-| 骑手 / Inventory | **managed**（无提交的原生工程） | 改 `app.json` 即可；Inventory `runtimeVersion.policy: appVersion` |
+| 会员 / 商家 | **已提交**（CNG）。EAS **不以** `app.json` 版本为准，以 Gradle / Info.plist / pbxproj 为准 | 打商店包前先改原生版本号。商家 MainApplication 用 `ExpoReactHostFactory` |
+| 骑手 / Inventory | **managed**（无提交的原生工程） | 改 `app.json` 即可。骑手 `eas.json` 的 `appVersionSource` 是 `local` |
 
-`expo-doctor` 仍可能报本地 `eas-cli` 过旧、会员/商家已提交 `android/`/`ios/` 与 CNG 不同步——这是旧债，**不要擅自删原生目录**。
+`expo-doctor` 仍可能报本地 `eas-cli` 过旧、会员/商家已提交 `android/`/`ios/` 与 CNG 不同步——这是旧债，**不要擅自删原生目录**。打商店包用 `npx --yes eas-cli@27.4.1`，不要为了提示去升 CLI。
 
 **目录差异（改代码时别走错）**
 
@@ -591,7 +571,7 @@ npx expo-doctor
 npx expo start
 ```
 
-用 **SDK 57 Expo Go** 扫码。商店 / TestFlight / APK 必须重新 `eas build`，热更带不上原生层（svg / splash / 新架构）。
+商店 / TestFlight / AAB 必须重新 `eas build`。Expo Go 打不开后台定位和蓝牙打印。骑手后台定位说明写在 `app.json` 的 `ios.infoPlist`，要打进原生包后才会生效。
 
 ---
 
@@ -948,8 +928,8 @@ cd ml-express-merchant-web && npm run deploy:netlify
 | 项 | 值 |
 |----|-----|
 | 包名 | `com.mlexpress.client` |
-| 版本 | **2.8.6**（iOS build **81** / Android versionCode **81**） |
-| 技术 | Expo SDK 57 + RN 0.86.3 + React 19.2.3 + React Navigation 6（见 §3.2） |
+| 版本 | **2.8.7**（iOS build **82** / Android versionCode **82**） |
+| 技术 | Expo SDK 58 + RN 0.88.0 + React 19.3.0 + React Navigation 6（见 §3.2） |
 | Deep link | `ml-express-client://`、`https://mlexpress.com` |
 | EAS | projectId `80b0873d-1d76-429e-8c79-738a817d8a15` |
 
@@ -1129,7 +1109,7 @@ EAS `apk` profile 必须 `"environment": "production"`，才会带上这些 Secr
 |----|-----|
 | 包名 | `com.mlexpress.merchants` |
 | 显示名 | MARKET LINK MERCHANT |
-| 版本 | **2.5.5**（iOS build **25** / Android versionCode **25**） |
+| 版本 | **2.5.7**（iOS build **27** / Android versionCode **27**） |
 | Scheme | `ml-express-merchants://` |
 | EAS | projectId `0c1336bd-…` |
 
@@ -1150,7 +1130,7 @@ EAS `apk` profile 必须 `"environment": "production"`，才会带上这些 Secr
 
 ### 8.3 架构
 
-Expo SDK 57 + RN 0.86.3 + Navigation 6 + `supabase.ts`（barrel）+ `merchantApi/` + SQLite 缓存 + `_shared/`（原生栈见 §3.2）。生产 REST 走 `https://mlexpress-merchants.com/__sb/`（`merchantApi/nativeSupabaseUrl.ts`）。
+Expo SDK 58 + RN 0.88.0 + Navigation 6 + `supabase.ts`（barrel）+ `merchantApi/` + SQLite 缓存 + `_shared/`（原生栈见 §3.2）。生产 REST 走 `https://mlexpress-merchants.com/__sb/`（`merchantApi/nativeSupabaseUrl.ts`）。
 
 ```
 src/services/
@@ -1224,8 +1204,8 @@ Realtime 过不了 Netlify `/__sb`。商家 App 前台约 12s / 后台约 30s �
 |----|-----|
 | 包名 | `com.mlexpress.courier` |
 | 显示名 | MARKET LINK STAFF |
-| 版本 | **2.5.1**（iOS build **88** / Android versionCode **88**） |
-| 技术 | Expo SDK 57 + RN 0.86.3 + React 19.2.3（见 §3.2） |
+| 版本 | **2.5.2**（iOS build **89** / Android versionCode **89**） |
+| 技术 | Expo SDK 58 + RN 0.88.0 + React 19.3.0（见 §3.2） |
 | Scheme | `ml-express-staff://` |
 | EAS | projectId `9831d961-…` |
 
@@ -1243,22 +1223,26 @@ ml-express-mobile-app/
 │   ├── PackageDetailScreen.tsx / ScanScreen / ScannerScreen
 │   ├── Dashboard / Profile / Settings / Finance* / Courier* / PackageManagement…
 │   └── …
-├── navigation/              # lazyScreens.tsx, navigationRef.ts
+├── navigation/              # lazyScreens.tsx、navigationRef.ts、courierTabBarStyle.ts、CourierTabItem.tsx
 ├── services/
-│   ├── supabase.ts          # barrel：业务 API + re-export staffApi
+│   ├── supabase.ts          # barrel：业务 API + re-export staffApi；离线同步 syncOfflineUpdates
 │   ├── staffApi/
 │   │   ├── supabaseClient.ts
 │   │   ├── nativeSupabaseUrl.ts     # 生产 /__sb/（Admin 域）
 │   │   ├── types.ts
 │   │   └── adminAccountService.ts   # 登录 / admin-password
 │   ├── locationService.ts / routingService.ts / notificationService.ts
+│   ├── cacheService.ts              # 离线队列；失败写入 lastError
 │   ├── courierNewOrderMonitor.ts    # 新单 REST 轮询（Realtime 过不了 Netlify）
 │   ├── feedbackService.ts / toastService.ts / LoggerService.ts / errorService.ts
 │   └── _shared/             # sync 自 /shared（勿手改）
-├── components/              # GlobalToast、MyTaskPackageCard、RoleGuardScreen、InAppNavigationModal…
+├── components/              # GlobalToast、MyTaskPackageCard、RoleGuardScreen、InAppNavigationModal、SyncIndicator…
 ├── utils/
 │   ├── staffWorkspace.ts    # 工作区 admin|courier + 角色能力
 │   ├── scanCodeHelpers.ts   # 扫码分类 / STORE_ / 匹配包裹
+│   ├── scanStop.ts          # 扫码被拦住时的原因和下一步
+│   ├── courierTaskDistance.ts  # 距离排序、今天/待取/配送中筛选
+│   ├── riderActionCopy.ts
 │   └── packageStatusNormalize.ts、i18n.ts…
 ├── contexts/ AppContext.tsx
 ├── constants/               # courierOnline.ts、packageStatus.ts
@@ -1289,23 +1273,30 @@ ml-express-mobile-app/
 
 Stack：Login → LocationDisclosure → Main(Tabs) → PackageDetail、DeliveryHistory、PackageManagement、CourierManagement、FinanceManagement、PerformanceAnalytics、Settings、MapView…
 
+骑手 Tab 的页面是 `CourierHomeScreen`（路由名仍是 `MyTasks`）。右上角铃铛只在这一份列表里切换「今天 / 全部」，不要再挂第二套任务页。`screens/MyTasksScreen.tsx` 仍在仓库里，当前导航没有单独注册它。
+
+会话：`current_session_id` 和服务器不一致时，这台手机会把本机会话写回去，不清理登录、不强制重进。主动退出仍在账号页。
+
 ### 9.6 扫码 / 取件 / 送达主路径
 
 | 步骤 | 实现要点 |
 |------|----------|
+| 入口 | 智能扫码 `ScanScreen`；任务详情和包裹详情里的相机。扫到后先卸下 `CameraView`，再执行下一步，避免确认窗被相机盖住 |
 | 分类 | `classifyScanCode`：`package` / `transfer` / `store`（`STORE_`）/ `unknown` |
-| 查单 | `packageService.findPackageByScanCode`（精确，防抖） |
-| 取件 | 详情内扫包裹码 / 寄件码；成功后「去配送」 |
-| 送达 | 扫门店 `STORE_{storeId}_…`；`parseStoreReceiveCode` |
+| 查单 | `packageService.findPackageByScanCode`（精确） |
+| 取件 | 待取件扫到本单码后直接取件，不再多问一次 |
+| 送达 | 扫门店 `STORE_{storeId}_…`；距离送达点超过约 200 米不能记送达 |
+| 被拦住 | `explainScanStop`：写明原因，并给出再扫一次；送达阶段还可改拍照送达。智能扫码距离过远时改为打开详情 |
 | 地图入口 | 进 `PackageDetail` 并带 `openScan` 自动开扫 |
 | 匹配 | `scanMatchesPackage`（id / sender_code / transfer_code / store_receive_code） |
 
 ### 9.7 定位、地图与省电
 
 - 前台：`locationService` 默认 **Balanced**；地图/任务 **离屏停** `watchPosition`。
-- 后台：`expo-task-manager` 上报 `courier_locations`；idle / 在途降频。
-- MapView：仅 `mapFocused && showMapPreview`（或导航弹层可见）时挂载；导航 Map **关 `showsTraffic`**。
-- 应用内导航：`InAppNavigationModal` + `routingService` / `routeNavigationSession`。
+- 后台：`expo-task-manager` 上报 `courier_locations`。`app.json` 已写三段 `NSLocation*UsageDescription`。开发包或 Expo Go 的 Info.plist 里没有这些键时，启动后台追踪会失败；正式包打进去之后才生效。缺键时记警告，不要弹全屏红错。
+- 地图页：列表、搜索和卡片用与任务页同一套深色（`#0f172a` / `#152033`）。底图仍是 Google `MapView`，不要再盖 OSM 瓦片（§7.10）。
+- 应用内导航：`InAppNavigationModal`。`routingService.computeDrivingRoute` 先试 Google Directions，失败再试 OSRM 街道路线，最后才画直线。`steps` 里是转弯点；`pickUpcomingStep` 给出下一路口和剩余距离。外部地图按钮是备用。
+- 任务和地图上的订单都按 `sortCourierTasksByDistance` 排，待取件用商家坐标，配送中用客户坐标。
 
 ### 9.8 反馈、日志与监控
 
@@ -1313,26 +1304,31 @@ Stack：Login → LocationDisclosure → Main(Tabs) → PackageDetail、Delivery
 |------|------|
 | `toastService` + `GlobalToast` + `Toast` | 全局轻提示 |
 | `feedbackService` | Toast + 触觉统一入口 |
-| `Alert.alert` | **仅**确认/破坏性操作 |
+| `Alert.alert` | **仅**确认/破坏性操作，以及扫码被拦住后的下一步 |
+| `SyncIndicator` | 顶栏列出还没传上去的操作。无 `lastError` 是待上传；有 `lastError` 写明网络中断、状态没写上或照片没传上。成功后从队列删除 |
 | `LoggerService` + `installProductionConsoleGate`（`index.ts`） | 生产压制 `console.log/info`；错误脱敏 → Sentry |
 | `@sentry/react-native`（`instrument.ts`） | 崩溃/异常 |
 
-### 9.9 我的任务性能
+### 9.9 我的任务
 
-- `MyTasksScreen`：`SectionList` 虚拟化（非全量 `ScrollView`）。
-- 卡片：`components/MyTaskPackageCard.tsx` 独立渲染，减列表重绘。
-- 样式：`screens/myTasks/myTasksScreenStyles.ts`（与 Map 样式拆分同类手法）。
+- 唯一任务列表在 `CourierHomeScreen`。筛选：全部、今天、待取、配送中。默认近的在前。顶栏随列表滚走并淡出。
+- `MyTasksScreen` 的按日期分组不是当前入口。
+- 卡片距离文案用 `formatCourierDistance`。
+- 地图页订单用同一套距离排序；正在靠近的那一单仍排在最前。
 
 ### 9.10 特性速记 & 构建
 
 - City 配送主数据：`packages`、`couriers`、`courier_locations`、`delivery_stores`（与 Inventory `inventory_*` 隔离）。
-- 缓存：`cacheService` + 列表缓存键（见 `supabase.ts`）。
+- 缓存：`cacheService` 离线队列。失败用 `recordFailure` 写 `lastError`，不要只加 `retryCount`。
 
 ```bash
 cd ml-express-mobile-app && npm install && npx expo start
-npx tsc --noEmit
-npm run build:aab   # Android AAB 生产包
+npx --yes eas-cli@27.4.1 build --platform ios --profile production --non-interactive
+npx --yes eas-cli@27.4.1 build --platform android --profile production --non-interactive
+npx --yes eas-cli@27.4.1 submit --platform ios --latest --non-interactive --profile production
 ```
+
+TestFlight：`https://appstoreconnect.apple.com/apps/6758951062/testflight/ios`。已提交的包是 **2.5.2（89）**。
 
 ### 9.11 新单 REST 轮询
 
@@ -1368,8 +1364,8 @@ Realtime WS 不能经 Netlify rewrite 升级。骑手新单靠：
 |----|-----|
 | 包名 | iOS/Android `com.mlexpress.inventory` |
 | App Store 名 | **ML Inventory** |
-| 版本 | **2.2.7**（iOS build **48** / Android versionCode **48**） |
-| 技术 | Expo SDK 57 + RN 0.86.3 + React 19.2.3（见 §3.2）；`runtimeVersion.policy: appVersion` |
+| 版本 | **2.4.0**（iOS build **61** / Android versionCode **61**） |
+| 技术 | Expo SDK 58 + RN 0.88.0 + React 19.3.0（见 §3.2）；`runtimeVersion.policy: appVersion` |
 | 登录 | Edge Function `inventory-store-login` → Supabase Auth JWT |
 | JWT claims | `inventory_store_code`、`inventory_hub_code` 等 |
 | 数据策略 | **Supabase `inventory_*` 是唯一业务数据源；必须联网，不提供离线队列** |
@@ -2068,7 +2064,7 @@ Cloudflare Worker 备份：仓库根 `npm run deploy:supabase-proxy`（`cloudfla
 
 Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.json`；`appVersionSource: local`（版本以 `app.json` 为准）；`runtimeVersion.policy: appVersion`。
 
-四端原生栈已对齐 **Expo SDK 57**（见 §3.2）。升 SDK 后商店 / EAS 正式包必须重打。
+四端原生栈现为 **Expo SDK 58 / RN 0.88**（见 §3.2）。升 SDK 后商店 / EAS 正式包必须重打。
 
 **会员 App / 商家 App** 已提交 `android/` + `ios/`：EAS 用原生 versionCode / CFBundleVersion，**不以** `app.json` 为准。升号见 §7.8。升 SDK 后打商店包前建议 `npx expo prebuild --clean`。**不要擅自删除**已提交的原生目录。
 
@@ -2338,14 +2334,14 @@ Realtime 过不了 Netlify。商家看 `MerchantOrderContext` / AppContext 进�
 | 项目 | 版本 | Build / Code | 备注 |
 |------|------|--------------|------|
 | 管理后台（根） | **2.2.4** | — | `package.json`；生产域 `admin-market-link-express.com` |
-| ml-express-client | **2.8.6** | **81** | `app.json` **且** 原生 `android/` `ios/`；Android 地图 Cloud Console 见 **§7.10** |
-| ml-express-merchant-app | **2.5.5** | **25** | 以 `app.json` 为准（`package.json` 可能滞后）；有提交的 `android/`/`ios/` |
-| ml-express-mobile-app | **2.5.1** | **88** | STAFF 骑手端；规划路线走 Google 底图（§7.10） |
-| ml-express-inventory-app | **2.2.7** | **48** | JWT + `/__sb`；到站三步；客户编码计费 |
+| ml-express-client | **2.8.7** | **82** | `app.json` **且** 原生 `android/` `ios/`；Android 地图 Cloud Console 见 **§7.10** |
+| ml-express-merchant-app | **2.5.7** | **27** | `app.json` **且** 原生 `android/` `ios/`；AGP 9 见 §3.2 |
+| ml-express-mobile-app | **2.5.2** | **89** | STAFF 骑手端；沿路导航与下一路口见 **§9.7**；TestFlight app id `6758951062` |
+| ml-express-inventory-app | **2.4.0** | **61** | JWT + `/__sb`；到站可逐单扫码入库；TestFlight app id `6782287070` |
 | ml-express-client-web | **0.1.0** | — | `market-link-express.com` |
 | ml-express-merchant-web | **0.1.0** | — | `mlexpress-merchants.com` |
 
-各 Expo App 各自 `eas.json`；Inventory 使用 `appVersionSource: local`。四端均为 **Expo SDK 57 / RN 0.86.3**（§3.2）。
+各 Expo App 各自 `eas.json`；骑手和 Inventory 使用 `appVersionSource: local`。四端 `package.json` 为 **Expo ^58 / RN 0.88.0 / React 19.3.0**（§3.2）。
 
 功能分支示例：`cursor/client-merchant-order-and-web`。
 
@@ -2425,7 +2421,7 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 3. **扫码主路径**：取件扫包裹码，送达扫 `STORE_`；地图 → 详情 `openScan`。
 4. **体验**：Toast 统一非确认提示；`MyTasks` SectionList；地图离屏停定位。
 5. **生产**：console 门禁 + `LoggerService` + Sentry。
-6. 版本锚点：**2.5.1 (88)**；Expo SDK 57（§3.2）；详述见 **§9**、**§9.11**。
+6. 版本锚点：**2.5.2 (89)**；Expo SDK 58（§3.2）；详述见 **§9**、**§9.11**。
 
 ### 22.4 Inventory 决策快照
 
@@ -2434,7 +2430,7 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 - **签收锁汇率**：默认付 MMK，可切 CNY；锁写进 `item.note`。明确选了人民币的已签收才进人民币收入；旧单和缅币签收进缅币。总览待入账只出现在人民币账。已付车费只记缅币。不要把两币加进一个总数。见文首项目地图、**§10.13**、**§11.5**。
 - 生产 REST 必须店铺 JWT + `/__sb/`；写走 `withInventoryCloudWrite`。
 - 读不到 `delivery_stores` 行 ≠ 店铺停用。
-- 在线专用、不写 `/shared`；Expo SDK 57（§3.2）；详述见 **§10.2**、**§10.12**。
+- 在线专用、不写 `/shared`；Expo SDK 58（§3.2）；详述见 **§10.2**、**§10.12**。到站窗口可逐单扫码入库，扫码层必须嵌在已有 Modal 内。
 
 ### 22.5 City 实时与订单查询快照（2026-08-28）
 
@@ -2442,7 +2438,7 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 2. 会员「我的订单」必须拆查 `customer_id` / description / email / **收发件人电话**；不要拼带 `[]` `.` `+` 的 `.or()`。
 3. 会员出包有原生工程，versionCode 改三处：`app.json` + Gradle + Info.plist/pbxproj。
 4. 商家 Web 登录仍是客户端比对密码；商家 App 走 `merchant-password`。不要在未授权时改登录。
-5. 版本锚点：会员 **2.8.6 (81)**、骑手 **2.5.1 (88)**、商家 App **2.5.5 (25)**、Inventory **2.2.7 (48)**。四端 Expo **SDK 57**（§3.2）。会员 Android 地图 Cloud Console 见 **§7.10**。
+5. 版本锚点：会员 **2.8.7 (82)**、骑手 **2.5.2 (89)**、商家 App **2.5.7 (27)**、Inventory **2.4.0 (61)**。四端 Expo **SDK 58**（§3.2）。会员 Android 地图 Cloud Console 见 **§7.10**。
 
 ### 22.6 改代码入口（最短路径）
 
@@ -2502,12 +2498,12 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 
 ### 22.8 Expo 原生栈快照（2026-09-06）
 
-1. 四端同栈：**Expo ~57.0.20 / RN 0.86.3 / React 19.2.3 / react-native-svg 15.15.4**。
+1. 四端同栈：**Expo ^58.0.0 / RN 0.88.0 / React 19.3.0 / react-native-svg 15.16.0**。以各目录 `package.json` 为准。
 2. 升级只跑 `npx expo install expo@~57.0.20 --fix`，勿单独装 `expo@^57`。
 3. 顶层 `splash` 禁用，用 `expo-splash-screen` 插件 + `enableFullScreenImage_legacy`。
 4. New Architecture 强制；勿把骑手 `newArchEnabled: false` 加回。
 5. 会员/商家有提交的 `android/`/`ios/`，EAS 看原生 versionCode；升 SDK 后商店包必须重打，建议 `prebuild --clean`。
-6. Expo Go 必须 SDK 57；蓝牙打印不在 Go 里。详述 **§3.2**。
+6. 蓝牙打印不在 Expo Go 里。详述 **§3.2**。
 
 ---
 

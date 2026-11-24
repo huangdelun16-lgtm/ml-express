@@ -212,6 +212,12 @@ export type InventoryCustomerExpressItem = {
   weight: string;
   weightKg: number;
   packWeightKg?: number;
+  /** 这一件的规格。多个入库明细行通常为空。 */
+  spec?: string;
+  /** 包裹本体规格。体积重量按这一包算。 */
+  packSpec?: string;
+  chargeBasis?: 'volume' | 'weight' | '';
+  chargeWeightKg?: number;
   qty: number;
   fee: number;
   quoteCny?: number;
@@ -1481,6 +1487,7 @@ export async function submitCrossBorderStockIn(body: {
   customerCode?: string;
   inboundDate: string;
   quoteCny?: string;
+  quoteManual?: boolean;
   chargeBasis?: 'volume' | 'weight';
   pay: 'cod' | 'prepaid';
   note?: string;
@@ -1829,6 +1836,7 @@ export async function saveAdminExportCost(input: {
   mmkPerCny?: number | null;
   tripNumber?: string;
   storeCode?: string;
+  packBarcode?: string;
 }): Promise<void> {
   const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-export-cost', {
     method: 'POST',
@@ -1838,6 +1846,17 @@ export async function saveAdminExportCost(input: {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || `保存失败 (${response.status})`);
+}
+
+export async function voidAdminExportCost(id: string): Promise<void> {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-export-cost', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'void', id }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `作废失败 (${response.status})`);
 }
 
 export type PendingExportLine = {

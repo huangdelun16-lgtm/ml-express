@@ -26,6 +26,8 @@ export type InboundInvoiceData = {
   packaging?: string;
   spec?: string;
   weight?: string;
+  /** 体积重量比实际重量大时才有 */
+  volumetricWeight?: string;
   /** 多个入库显示整包总重量，单个入库显示这一件的重量 */
   weightKind?: 'single' | 'package';
   totalFee?: string;
@@ -146,6 +148,9 @@ export function InboundInvoiceContent({
           label={data.weightKind === 'package' ? t.invoice.batchTotalWeight : t.invoice.weight}
           value={data.weight}
         />
+      ) : null}
+      {data.volumetricWeight ? (
+        <InvoiceRow label={t.invoice.volumetricWeight} value={data.volumetricWeight} />
       ) : null}
       <InvoiceRow label={t.invoice.qty} value={`${data.qty} ${stockUnitLabel()}`} />
       {isFree ? (

@@ -76,6 +76,45 @@ test('多个入库合成一行，包装壳不出现，件数是订单条数', ()
   assert.equal(items[0].id, 'a');
 });
 
+test('多个入库的尺寸在包装壳上，不在每一件快递单上', () => {
+  const shell = row({
+    id: 'shell',
+    barcode: 'RUI26MSE20001',
+    weight: '12 Kg',
+    updated: '2026-11-10T03:00:00Z',
+  });
+  shell.spec = '40 x 30 x 20 cm';
+  const first = row({
+    id: 'a',
+    barcode: 'MSE1(2-1)',
+    input: 'AAA',
+    qty: 0,
+    updated: '2026-11-09T00:00:00Z',
+  });
+  const second = row({
+    id: 'b',
+    barcode: 'MSE1(2-2)',
+    input: 'BBB',
+    qty: 0,
+    updated: '2026-11-08T00:00:00Z',
+  });
+  const items = collapseExpressList({
+    pageRows: [shell, first, second],
+    relatedRows: [],
+    packByItemBarcode: new Map([
+      ['MSE1(2-1)', 'RUI26MSE20001'],
+      ['MSE1(2-2)', 'RUI26MSE20001'],
+    ]),
+    exceptionStatus: none,
+    searching: false,
+  });
+  assert.equal(items.length, 1);
+  assert.equal(items[0].spec, '40 x 30 x 20 cm');
+  assert.equal(items[0].weight, '12 Kg');
+  assert.equal(first.spec, '');
+  assert.equal(second.spec, '');
+});
+
 test('包装壳在这一页、订单在关联行里时，仍然合成一行', () => {
   const shell = row({ id: 'shell', barcode: 'RUI26MSE20001', weight: '10 Kg', updated: '2026-11-10T03:00:00Z' });
   const line = row({

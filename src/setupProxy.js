@@ -594,18 +594,28 @@ function localExportCostList(req, res, next) {
         'fx_mmk_per_cny',
         'total_mmk',
         'trip_number',
+        'pack_barcode',
         'store_code',
         'created_by',
         'created_at',
       ].join(',');
-      const data = await proxyGetJson(
-        `/__sb/rest/v1/inventory_export_costs?select=${select}&order=created_at.desc&limit=500`,
-        {
-          apikey: serviceRole,
-          authorization: `Bearer ${serviceRole}`,
-          accept: 'application/json',
-        },
-      );
+      const savedSelect = select;
+      const savedUrl = `/__sb/rest/v1/inventory_export_costs?select=${savedSelect}&voided_at=is.null&order=created_at.desc&limit=500`;
+      const savedHeaders = {
+        apikey: serviceRole,
+        authorization: `Bearer ${serviceRole}`,
+        accept: 'application/json',
+      };
+      let data;
+      try {
+        data = await proxyGetJson(savedUrl, savedHeaders);
+      } catch (savedError) {
+        const legacySelect = savedSelect.replace(',pack_barcode', '');
+        data = await proxyGetJson(
+          `/__sb/rest/v1/inventory_export_costs?select=${legacySelect}&order=created_at.desc&limit=500`,
+          savedHeaders,
+        );
+      }
       const scope = parseFinancePeriodQuery(req.query || {});
       const headers = serviceHeaders(serviceRole);
       const warnings = [];
@@ -636,7 +646,7 @@ function localExportCostList(req, res, next) {
             '&truck_loaded_at=not.is.null',
             headers,
           ),
-          proxyGetPages('inventory_export_costs', 'subject_kind,subject_key', '', headers),
+          proxyGetPages('inventory_export_costs', 'subject_kind,subject_key', '&voided_at=is.null', headers),
           proxyGetPages('inventory_packed_shipments', 'id,bundle_barcode', '', headers),
           proxyGetPages('inventory_packed_shipment_items', 'pack_id,item_id,item_barcode', '', headers),
         ]);

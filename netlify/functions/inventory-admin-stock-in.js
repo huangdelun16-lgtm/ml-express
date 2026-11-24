@@ -9,6 +9,12 @@ const { verifyAdminToken } = require('./verify-admin');
 const { writeAdminStockIn } = require('./utils/adminWebStockIn');
 const { getAdminTokenFromEvent } = require('./utils/adminToken');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
+const { indexCnyPerKg, lookupCnyPerKg } = require('./utils/inventoryCustomerAggregate');
+const {
+  sanitizeDecimalInput: sanitizeDecimal,
+  normalizeSpec,
+  volumetricKgFromSpec,
+} = require('../../src/utils/volumetricWeightCore');
 
 const YANGON = 'Asia/Yangon';
 
@@ -75,27 +81,65 @@ function inboundIso(ymd) {
   return `${day}T${clock.hour}:${clock.minute}:${clock.second}.000+06:30`;
 }
 
-function volumetricKgFromSpec(spec) {
-  const match = String(spec || '').trim().match(/^(\S+)\s*x\s*(\S+)\s*x\s*(\S+)\s*cm$/i);
-  if (!match) return 0;
-  const a = Number(match[1]);
-  const b = Number(match[2]);
-  const c = Number(match[3]);
-  if (!(a > 0) || !(b > 0) || !(c > 0)) return 0;
-  const kg = Math.round(((a * b * c) / 6000) * 100) / 100;
-  return kg > 0 ? kg : 0;
+function formatChargeKg(kg) {
+  const rounded = Math.round(Number(kg) * 100) / 100;
+  return Number.isFinite(rounded) && rounded > 0 ? String(rounded) : '';
 }
 
-function quoteNote(body) {
+function formatCny(amount) {
+  if (!Number.isFinite(amount)) return '';
+  if (Math.abs(amount - Math.round(amount)) < 1e-9) return String(Math.round(amount));
+  return String(Number(amount.toFixed(4)));
+}
+
+function chargeKgOf(body) {
+  const actualKg = Number(sanitizeDecimal(body.weightKg));
+  const volumeKg = volumetricKgFromSpec(body.spec);
+  if (body.chargeBasis === 'volume' && volumeKg > 0) return volumeKg;
+  return Number.isFinite(actualKg) && actualKg > 0 ? actualKg : 0;
+}
+
+function quoteNote(body, quoteCny) {
   const parts = [];
-  const quote = String(body.quoteCny || '').trim();
+  const quote = String(quoteCny || '').trim();
   if (quote) parts.push(`报价 ${quote} CNY`);
-  parts.push(body.chargeBasis === 'volume' ? '收费体积' : '收费重量');
+  const chargeKg = chargeKgOf(body);
+  const tag = body.chargeBasis === 'volume' ? '收费体积' : '收费重量';
+  const kgText = formatChargeKg(chargeKg);
+  parts.push(kgText ? `${tag} ${kgText} Kg` : tag);
   if (body.pay === 'cod') parts.push('到付');
   if (body.pay === 'prepaid') parts.push('预付');
   const note = String(body.note || '').trim();
   if (note) parts.push(note);
   return parts.join(' · ');
+}
+
+async function officialQuoteCny(supabase, body) {
+  if (body.quoteManual === true) {
+    const manual = Number(sanitizeDecimal(body.quoteCny));
+    return Number.isFinite(manual) && manual >= 0 ? formatCny(manual) : '';
+  }
+  const storeId = String(body.storeId || '').trim();
+  const { data: store, error } = await supabase
+    .from('delivery_stores')
+    .select('store_code')
+    .eq('id', storeId)
+    .maybeSingle();
+  if (error || !store) return '';
+  const { data: rows, error: rateError } = await supabase
+    .from('system_settings')
+    .select('settings_key, settings_value')
+    .like('settings_key', 'pricing.cross_border%cny_per_kg');
+  if (rateError) return '';
+  const unit = lookupCnyPerKg(
+    { cnyPerKg: indexCnyPerKg(rows) },
+    store.store_code,
+    body.destination,
+    body.customerCode,
+  );
+  const chargeKg = chargeKgOf(body);
+  if (unit == null || !(chargeKg > 0)) return '';
+  return formatCny(Number(unit) * chargeKg);
 }
 
 async function barcodeTaken(supabase, barcode) {
@@ -205,11 +249,14 @@ async function executeStockIn(supabase, body, operator) {
   if (!recipientName) return fail(400, '请填写客户姓名');
   if (!recipientPhone) return fail(400, '请填写手机号码');
   if (!pay) return fail(400, '请选择到付或预付');
+  body.spec = normalizeSpec(body.spec);
+  body.weightKg = sanitizeDecimal(body.weightKg);
   if (body.chargeBasis === 'volume' && !(volumetricKgFromSpec(body.spec) > 0)) {
     return fail(400, '按体积重量收费时，请先填写长、宽、高');
   }
 
-  const note = quoteNote(body);
+  const quoteCny = await officialQuoteCny(supabase, body);
+  const note = quoteNote(body, quoteCny);
   const inboundAt = inboundIso(body.inboundDate);
   const payload = {
     mode,
@@ -222,6 +269,8 @@ async function executeStockIn(supabase, body, operator) {
     customer_code: String(body.customerCode || '').trim().toUpperCase(),
     inbound_at: inboundAt,
     note,
+    charge_basis: body.chargeBasis === 'volume' ? 'volume' : 'weight',
+    charge_weight_kg: chargeKgOf(body),
     detail_address: String(body.detailAddress || '').trim(),
     packaging: '',
     spec: String(body.spec || '').trim(),

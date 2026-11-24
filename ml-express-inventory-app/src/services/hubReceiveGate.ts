@@ -10,9 +10,25 @@ export type HubCloudGateResult =
 /** 连续扫码入库时复用最近一次校验，避免每次点击都探测网络 + 刷新 JWT */
 const GATE_OK_TTL_MS = 45_000;
 let lastGateOkAt = 0;
+/** 同一次扫码窗口里不再每次写入都登录。写入真的失败时清掉，下一次再登录。 */
+let hubScanAuthReadyUntil = 0;
+
+export function markHubScanAuthReady(): void {
+  hubScanAuthReadyUntil = Date.now() + 10 * 60 * 1000;
+  lastGateOkAt = Date.now();
+}
+
+export function clearHubScanAuthReady(): void {
+  hubScanAuthReadyUntil = 0;
+}
+
+export function hubScanAuthIsFresh(): boolean {
+  return hubScanAuthReadyUntil > Date.now();
+}
 
 export function invalidateHubReceiveCloudGate(): void {
   lastGateOkAt = 0;
+  hubScanAuthReadyUntil = 0;
 }
 
 /** 到站签收前：必须能连上云端追踪（弱网时快速失败） */

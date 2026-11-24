@@ -146,6 +146,11 @@ function rowToItem(row: CloudStoreItemRow): InventoryItem {
     packed_at: row.packed_at ?? '', packed_bundle_barcode: row.packed_bundle_barcode,
     hub_transit_released_at: row.hub_transit_released_at ?? '',
     hub_transit_shipped_at: row.hub_transit_shipped_at ?? '',
+    charge_basis: row.charge_basis === 'volume' || row.charge_basis === 'weight' ? row.charge_basis : '',
+    charge_weight_kg:
+      row.charge_weight_kg != null && Number(row.charge_weight_kg) > 0
+        ? Number(row.charge_weight_kg)
+        : undefined,
     created_at: row.created_at, updated_at: row.updated_at,
   };
 }

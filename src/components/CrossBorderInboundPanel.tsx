@@ -14,7 +14,7 @@ import {
   type RouteRateSetting,
 } from '../utils/crossBorderRoutePricing';
 import { yangonTodayYmd } from '../utils/yangonFinancePeriod';
-import { preferredChargeBasis, volumetricFormula, volumetricWeightKg } from '../utils/volumetricWeight';
+import { preferredChargeBasis, sanitizeDecimalInput, volumetricFormula, volumetricWeightKg } from '../utils/volumetricWeight';
 import {
   fetchCrossBorderRegisteredCustomers,
   submitCrossBorderStockIn,
@@ -226,7 +226,29 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
       setError(isEn ? 'Choose COD or prepaid.' : '请选择到付或预付。');
       return;
     }
-    if (chargeBasis === 'volume' && !(volumetricKg && volumetricKg > 0)) {
+    const basis: ChargeBasis = !chargeManual && autoBasis ? autoBasis : chargeBasis;
+    const kg = basis === 'volume' ? volumetricKg ?? 0 : Number(weightKg) || 0;
+    const spec = [specL, specW, specH].some((part) => part.trim())
+      ? `${specL.trim() || '0'} x ${specW.trim() || '0'} x ${specH.trim() || '0'} cm`
+      : '';
+    let quote = quoteCny.trim();
+    if (!quoteManual) {
+      const store = activeStores.find((item) => item.id === storeId);
+      const origin = normalizeRouteHubCode(store?.store_code || '');
+      const dest = normalizeRouteHubCode(destination);
+      const unit = origin && dest
+        ? resolveRouteUnitQuote({
+            settings: routeSettings,
+            origin,
+            destination: dest,
+            customerCode,
+            history: fxHistory,
+            liveRate,
+          })
+        : { cnyPerKg: null };
+      quote = unit.cnyPerKg != null && kg > 0 ? formatCnyInput(unit.cnyPerKg * kg) : '';
+    }
+    if (basis === 'volume' && !(volumetricKg && volumetricKg > 0)) {
       setError(isEn ? 'Enter length, width and height to charge by volume.' : '按体积重量收费时，请先填写长、宽、高。');
       return;
     }
@@ -240,15 +262,14 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
         recipientPhone,
         customerCode,
         inboundDate,
-        quoteCny,
-        chargeBasis,
+        quoteCny: quote,
+        quoteManual,
+        chargeBasis: basis,
         pay,
         note,
         detailAddress,
         weightKg,
-        spec: [specL, specW, specH].some((part) => part.trim())
-          ? `${specL.trim() || '0'} x ${specW.trim() || '0'} x ${specH.trim() || '0'} cm`
-          : '',
+        spec,
         qty: Number(qty) || 1,
         expressCode,
         itemName,
@@ -558,21 +579,21 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
             <label className="cbl-inbound-field">
               <span>{isEn ? 'Length' : '长'}</span>
               <div className="cbl-inbound-affix">
-                <input value={specL} onChange={(event) => { setChargeManual(false); setSpecL(event.target.value.replace(/[^\d.]/g, '')); }} inputMode="decimal" placeholder="0" />
+                <input value={specL} onChange={(event) => { setChargeManual(false); setSpecL(sanitizeDecimalInput(event.target.value)); }} inputMode="decimal" placeholder="0" />
                 <b>cm</b>
               </div>
             </label>
             <label className="cbl-inbound-field">
               <span>{isEn ? 'Width' : '宽'}</span>
               <div className="cbl-inbound-affix">
-                <input value={specW} onChange={(event) => { setChargeManual(false); setSpecW(event.target.value.replace(/[^\d.]/g, '')); }} inputMode="decimal" placeholder="0" />
+                <input value={specW} onChange={(event) => { setChargeManual(false); setSpecW(sanitizeDecimalInput(event.target.value)); }} inputMode="decimal" placeholder="0" />
                 <b>cm</b>
               </div>
             </label>
             <label className="cbl-inbound-field">
               <span>{isEn ? 'Height' : '高'}</span>
               <div className="cbl-inbound-affix">
-                <input value={specH} onChange={(event) => { setChargeManual(false); setSpecH(event.target.value.replace(/[^\d.]/g, '')); }} inputMode="decimal" placeholder="0" />
+                <input value={specH} onChange={(event) => { setChargeManual(false); setSpecH(sanitizeDecimalInput(event.target.value)); }} inputMode="decimal" placeholder="0" />
                 <b>cm</b>
               </div>
             </label>
@@ -582,8 +603,15 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
                 <strong>{volumetricKg ? `${volumetricKg} Kg` : '—'}</strong>
               </div>
               <em>
-                {volumetricFormula(specL, specW, specH) ||
-                  (isEn ? 'Enter length, width and height' : '填完长、宽、高后自动算出')}
+                {mode === 'batch'
+                  ? isEn
+                    ? 'One size for the whole package. Compared with the package weight.'
+                    : '按这一包的长宽高算一次。比整包重量大就按体积重量收这一笔。'
+                  : volumetricFormula(specL, specW, specH) ||
+                    (isEn ? 'Enter length, width and height' : '填完长、宽、高后自动算出')}
+                {mode === 'batch' && volumetricFormula(specL, specW, specH)
+                  ? ` · ${volumetricFormula(specL, specW, specH)}`
+                  : ''}
               </em>
             </div>
           </div>
@@ -591,7 +619,7 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
             <label className="cbl-inbound-field">
               <span>{mode === 'single' ? (isEn ? 'Weight' : '重量') : isEn ? 'Package weight' : '整包重量'}</span>
               <div className="cbl-inbound-affix">
-                <input value={weightKg} onChange={(event) => { setChargeManual(false); setWeightKg(event.target.value); }} inputMode="decimal" placeholder="0" />
+                <input value={weightKg} onChange={(event) => { setChargeManual(false); setWeightKg(sanitizeDecimalInput(event.target.value)); }} inputMode="decimal" placeholder="0" />
                 <b>Kg</b>
               </div>
             </label>
@@ -656,7 +684,7 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
                   value={quoteCny}
                   onChange={(event) => {
                     setQuoteManual(true);
-                    setQuoteCny(event.target.value);
+                    setQuoteCny(sanitizeDecimalInput(event.target.value));
                   }}
                   inputMode="decimal"
                   placeholder={pay ? '0' : isEn ? 'After payment' : '选付款后算出'}

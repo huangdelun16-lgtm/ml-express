@@ -4,6 +4,7 @@ import {
   volumetricFormula,
   volumetricWeightFromSpec,
   volumetricWeightKg,
+  heavierVolumetricKg,
 } from './volumetricWeight';
 
 describe('volumetric weight', () => {
@@ -27,5 +28,10 @@ describe('volumetric weight', () => {
     expect(preferredChargeBasis(1, 1)).toBe('weight');
     expect(preferredChargeBasis(null, 1)).toBeNull();
     expect(preferredChargeBasis(1.5, 0)).toBeNull();
+  });
+
+  it('shows volumetric weight on an invoice only when it is heavier', () => {
+    expect(heavierVolumetricKg('30 x 20 x 15 cm', '1 Kg')).toBe(1.5);
+    expect(heavierVolumetricKg('30 x 20 x 15 cm', '2 Kg')).toBeNull();
   });
 });

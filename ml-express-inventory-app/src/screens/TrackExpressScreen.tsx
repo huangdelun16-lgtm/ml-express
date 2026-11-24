@@ -253,7 +253,9 @@ function TrackResultPanel({
   const inboundNo = detail.barcode?.trim() || '';
   const primaryCode = expressNo || inboundNo;
   const extraCode = expressNo && inboundNo && expressNo !== inboundNo ? inboundNo : '';
-  const specLine = [detail.spec, detail.packaging].map((part) => part?.trim()).filter(Boolean).join(' · ');
+  const specLine = [detail.spec?.trim() || detail.pack?.spec?.trim() || parentPack?.spec?.trim(), detail.packaging?.trim()]
+    .filter(Boolean)
+    .join(' · ');
   const listedPack = detail.pack ?? parentPack;
 
   const movementTypeLabel = (type: string) => {

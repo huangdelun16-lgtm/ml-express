@@ -31,6 +31,8 @@ import {
 } from '../utils/packagingStockInDisplay';
 import {
   buildUnsignedCustomerInvoice,
+  customerListedChargeKg,
+  formatCustomerChargeKgText,
   formatUnsignedInvoiceFee,
   formatUnsignedInvoiceQuote,
   formatUnsignedInvoiceUnitPrice,
@@ -39,6 +41,7 @@ import {
   isUnsignedExpressItem,
   readUnsignedQuoteCny,
   packagingBatchSelectionIds,
+  packagingListedChargeText,
   settleUnsignedInvoice,
   type UnsignedCustomerInvoice,
   type UnsignedInvoiceOrderGroup,
@@ -724,6 +727,7 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                       <th>{isEn ? 'Origin' : '始发地'}</th>
                       <th>{isEn ? 'Destination' : '目的地'}</th>
                       <th>{isEn ? 'Weight' : '重量'}</th>
+                      <th>{isEn ? 'Charge kg' : '收费公斤'}</th>
                       <th>{isEn ? 'Qty' : '数量'}</th>
                       <th className="cbl-col-num">{isEn ? 'Fee' : '费用'}</th>
                       <th>{isEn ? 'Payment' : '付款状态'}</th>
@@ -746,7 +750,7 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                         <Fragment key={group.type === 'single' ? group.item.id : `pack:${group.base}`}>
                           {group.type === 'packaging' ? (
                             <tr className="cbl-packaging-group-head">
-                              <td colSpan={14}>
+                              <td colSpan={15}>
                                 {isEn
                                   ? `Multiple inbound · ${group.base} · ${group.items.length}/${group.declaredTotal} parcels · one total fee`
                                   : `多个入库 · ${group.base} · ${group.items.length}/${group.declaredTotal} 件 · 总费用只计一次`}
@@ -810,6 +814,11 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
                                 {group.type === 'packaging'
                                   ? packagingFeeRowWeight(item, group.items)
                                   : item.weight}
+                              </td>
+                              <td>
+                                {group.type === 'packaging'
+                                  ? packagingListedChargeText(item, group.items)
+                                  : formatCustomerChargeKgText(customerListedChargeKg(item))}
                               </td>
                               <td className="cbl-col-num">{item.qty}</td>
                               <td className="cbl-col-num cbl-col-fee">
@@ -889,18 +898,19 @@ const CustomerExpressItemsModal: React.FC<Props> = ({
 
 function orderMeasure(group: UnsignedInvoiceOrderGroup, isEn: boolean): string {
   const weight = formatUnsignedInvoiceWeight(group.weightKg) || '—';
+  const pricedKg = group.chargeKg != null && group.chargeKg > 0 ? group.chargeKg : group.weightKg;
   const unitPrice =
     group.unitCnyPerKg && group.unitCnyPerKg > 0
       ? formatUnsignedInvoiceUnitPrice(group.unitCnyPerKg, 1)
-      : formatUnsignedInvoiceUnitPrice(group.quoteCny, group.weightKg);
+      : formatUnsignedInvoiceUnitPrice(group.quoteCny, pricedKg);
   const priceLabel = isEn ? 'Price' : '定价';
   const price = unitPrice ? `${priceLabel} ${unitPrice}` : '';
-  if (group.kind === 'packaging') {
-    const weightLabel = isEn ? 'Package weight' : '包裹总重';
-    return price ? `${weightLabel} ${weight} · ${price}` : `${weightLabel} ${weight}`;
-  }
-  const weightLabel = isEn ? 'Weight' : '重量';
-  return price ? `${weightLabel} ${weight} · ${price}` : `${weightLabel} ${weight}`;
+  const volume =
+    group.volumetricKg != null && group.volumetricKg > group.weightKg
+      ? `${isEn ? 'Volumetric weight' : '体积重量'} ${formatUnsignedInvoiceWeight(group.volumetricKg)}`
+      : '';
+  const weightLabel = group.kind === 'packaging' ? (isEn ? 'Package weight' : '包裹总重') : isEn ? 'Weight' : '重量';
+  return [ `${weightLabel} ${weight}`, volume, price ].filter(Boolean).join(' · ');
 }
 
 function UnsignedInvoicePreview({

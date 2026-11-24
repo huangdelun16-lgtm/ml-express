@@ -4,6 +4,26 @@ function fail(error) {
   if (error) throw new Error(error.message || '入库失败');
 }
 
+function chargeColumns(payload) {
+  const basis = payload.charge_basis === 'volume' || payload.charge_basis === 'weight'
+    ? payload.charge_basis
+    : '';
+  const kg = Number(payload.charge_weight_kg);
+  return {
+    charge_basis: basis,
+    charge_weight_kg: Number.isFinite(kg) && kg > 0 ? kg : null,
+  };
+}
+
+async function insertStoreItem(supabase, row) {
+  const first = await supabase.from('inventory_store_items').insert(row).select('id').single();
+  if (!first.error || !/charge_basis|charge_weight_kg/i.test(first.error.message || '')) return first;
+  const plain = { ...row };
+  delete plain.charge_basis;
+  delete plain.charge_weight_kg;
+  return supabase.from('inventory_store_items').insert(plain).select('id').single();
+}
+
 /**
  * 写入和 Inventory App 同一批表，不依赖额外的数据库函数。
  * 调用方须使用 service role。
@@ -41,8 +61,9 @@ async function writeAdminStockIn(supabase, payload) {
       final_destination: payload.destination,
       created_at: now,
       updated_at: now,
+      ...chargeColumns(payload),
     };
-    const inserted = await supabase.from('inventory_store_items').insert(item).select('id').single();
+    const inserted = await insertStoreItem(supabase, item);
     fail(inserted.error);
     const movement = await supabase.from('inventory_stock_movements').insert({
       id: randomUUID(),
@@ -78,7 +99,7 @@ async function writeAdminStockIn(supabase, payload) {
   const lines = payload.lines || [];
   const bundleId = randomUUID();
   const packId = randomUUID();
-  const bundleRow = await supabase.from('inventory_store_items').insert({
+  const bundleRow = await insertStoreItem(supabase, {
     id: bundleId,
     barcode: bundle.barcode,
     input_barcode: '',
@@ -95,7 +116,8 @@ async function writeAdminStockIn(supabase, payload) {
     final_destination: payload.destination,
     created_at: now,
     updated_at: now,
-  }).select('id').single();
+    ...chargeColumns(payload),
+  });
   fail(bundleRow.error);
 
   const packRow = await supabase.from('inventory_packed_shipments').insert({
@@ -119,7 +141,7 @@ async function writeAdminStockIn(supabase, payload) {
   try {
     for (const line of lines) {
       const itemId = randomUUID();
-      const itemRow = await supabase.from('inventory_store_items').insert({
+      const itemRow = await insertStoreItem(supabase, {
         id: itemId,
         barcode: line.barcode,
         input_barcode: line.input_barcode || '',
@@ -138,7 +160,7 @@ async function writeAdminStockIn(supabase, payload) {
         packed_bundle_barcode: bundle.barcode,
         created_at: now,
         updated_at: now,
-      }).select('id').single();
+      });
       fail(itemRow.error);
       lineIds.push(itemId);
 

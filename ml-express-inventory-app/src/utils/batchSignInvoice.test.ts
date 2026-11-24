@@ -67,7 +67,36 @@ describe('buildBatchSignInvoice', () => {
       },
     ]);
     expect(model.lines[0].weightKg).toBe(1.5);
-    expect(model.totalWeightKg).toBe(1.5);
+    expect(model.lines[0].actualWeightKg).toBe(0.8);
+    expect(model.lines[0].volumetricKg).toBe(1.5);
+    expect(model.totalWeightKg).toBe(0.8);
+  });
+
+  it('does not add the outer package volume onto every piece', () => {
+    const model = buildBatchSignInvoice([
+      {
+        id: 'a',
+        barcode: 'MDY001',
+        input_barcode: 'E1',
+        weight: '5 Kg',
+        spec: '45 x 40 x 29 cm',
+        charge_basis: 'volume',
+        pack: { spec: '100 x 80 x 52 cm', weight: '80 Kg' },
+      },
+      {
+        id: 'b',
+        barcode: 'MDY002',
+        input_barcode: 'E2',
+        weight: '4 Kg',
+        spec: '',
+        charge_basis: 'weight',
+        pack: { spec: '100 x 80 x 52 cm', weight: '80 Kg' },
+      },
+    ]);
+    expect(model.lines[0].weightKg).toBe(8.7);
+    expect(model.lines[0].actualWeightKg).toBe(5);
+    expect(model.lines[1].weightKg).toBe(4);
+    expect(model.totalWeightKg).toBe(9);
   });
 
   it('collapses packaging inbound to one line with joined express nos and pack totals', () => {

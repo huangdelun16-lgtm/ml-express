@@ -753,6 +753,38 @@ export async function confirmOrderHubReceived(
   return applyOrderHubReceived(order, store, hubCode, knownPkg);
 }
 
+/** 一单的到站、库存和入库流水。函数还没部署时返回 fallback，走原来的多次写入。 */
+export async function tryHubScanInboundOne(params: {
+  orderId: string;
+  packBarcode: string;
+  orderBarcode: string;
+  hubCode: string;
+  operator: string;
+}): Promise<'done' | 'fallback'> {
+  if (!isSupabaseConfigured()) return 'fallback';
+  const { data, error } = await withInventoryCloudWrite(async () =>
+    supabase.rpc('inventory_hub_scan_inbound_one', {
+      p_operation_id: inventoryOperationId(
+        'hub-deliver',
+        `${params.packBarcode.trim().toUpperCase()}:${params.orderBarcode.trim().toUpperCase()}`,
+      ),
+      p_order_id: params.orderId,
+      p_hub_code: params.hubCode.trim().toUpperCase(),
+      p_operator: params.operator,
+    }),
+  );
+  if (error) {
+    const message = String(error.message || '');
+    if (/could not find the function|schema cache|PGRST202|inventory_hub_scan_inbound_one/i.test(message)) {
+      return 'fallback';
+    }
+    throw new Error(message);
+  }
+  const reason = String((data as { reason?: string } | null)?.reason || '');
+  if (reason === 'transit') return 'fallback';
+  return 'done';
+}
+
 /** 在收单列表中直接确认订单已在快递包内 */
 export async function confirmOrderInPackById(
   orderId: string,

@@ -60,6 +60,7 @@ type Props = {
   onScanInbound: (code: string) => Promise<{ ok: boolean; message: string; done: boolean }>;
   onScanSessionBegin: () => Promise<{ ok: true; pending: number } | { ok: false; message: string }>;
   onScanSessionEnd: () => void;
+  scanUploadLeft?: number;
   onBatchInbound: () => void;
   onPayTransportFee: () => void;
   onReleaseTransit: () => void;
@@ -89,6 +90,7 @@ export default function HubReceiveOrdersModal({
   onScanInbound,
   onScanSessionBegin,
   onScanSessionEnd,
+  scanUploadLeft = 0,
   onBatchInbound,
   onPayTransportFee,
   onReleaseTransit,
@@ -375,6 +377,9 @@ export default function HubReceiveOrdersModal({
                 <Text style={styles.feedbackOkText}>{successText}</Text>
               </View>
             ) : null}
+            {scanUploadLeft > 0 ? (
+              <Text style={styles.feedbackOkText}>{fmt(t.hubReceive.scanInboundUploading, { count: scanUploadLeft })}</Text>
+            ) : null}
 
             {showConfirmPack ? (
               <>
@@ -474,7 +479,14 @@ export default function HubReceiveOrdersModal({
               busy={Boolean(confirmingOrderId) || batchInbounding}
               scannedCount={scanCount}
               title={t.hubReceive.scanInboundTitle}
-              subtitle={scanHint || t.hubReceive.scanInboundSubtitle}
+              subtitle={
+                [
+                  scanHint || t.hubReceive.scanInboundSubtitle,
+                  scanUploadLeft > 0 ? fmt(t.hubReceive.scanInboundUploading, { count: scanUploadLeft }) : '',
+                ]
+                  .filter(Boolean)
+                  .join('\n')
+              }
               hintTone={scanTone}
               onClose={closeScan}
               onScanned={handleScanned}

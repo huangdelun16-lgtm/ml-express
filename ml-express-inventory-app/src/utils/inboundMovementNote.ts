@@ -15,17 +15,37 @@ export type ChargeBasis = 'volume' | 'weight';
 
 const CHARGE_VOLUME_NOTE = '收费体积';
 const CHARGE_WEIGHT_NOTE = '收费重量';
+const CHARGE_PART =
+  /^(收费体积|收费重量|体积重量|按重量)(?:\s+([\d.]+)\s*Kg)?$/i;
 
-/** 写入入库流水的中文标记。界面语言不要写进 note。 */
-export function chargeBasisNote(basis: ChargeBasis): string {
-  return basis === 'volume' ? CHARGE_VOLUME_NOTE : CHARGE_WEIGHT_NOTE;
+function formatChargeKg(kg: number): string {
+  const rounded = Math.round(kg * 100) / 100;
+  if (!Number.isFinite(rounded) || rounded <= 0) return '';
+  return String(rounded);
+}
+
+/** 写入入库流水。带上当时的收费公斤，实际重量仍单独存在货物重量里。 */
+export function chargeBasisNote(basis: ChargeBasis, chargeKg?: number | null): string {
+  const tag = basis === 'volume' ? CHARGE_VOLUME_NOTE : CHARGE_WEIGHT_NOTE;
+  const kg = formatChargeKg(Number(chargeKg));
+  return kg ? `${tag} ${kg} Kg` : tag;
 }
 
 export function parseChargeBasis(raw: string | undefined): ChargeBasis | undefined {
+  return parseChargePart(raw)?.basis;
+}
+
+export function parseChargePart(
+  raw: string | undefined,
+): { basis: ChargeBasis; chargeKg?: number } | undefined {
   const text = String(raw || '').trim();
-  if (text === CHARGE_VOLUME_NOTE || text === '体积重量') return 'volume';
-  if (text === CHARGE_WEIGHT_NOTE || text === '收费重量' || text === '按重量') return 'weight';
-  return undefined;
+  const match = text.match(CHARGE_PART);
+  if (!match) return undefined;
+  const label = match[1];
+  const basis: ChargeBasis =
+    label === CHARGE_VOLUME_NOTE || label === '体积重量' ? 'volume' : 'weight';
+  const kg = Number(match[2]);
+  return Number.isFinite(kg) && kg > 0 ? { basis, chargeKg: kg } : { basis };
 }
 
 /** 付款方式归一化为中文业务标签（到付 / 预付） */
@@ -54,6 +74,7 @@ export function parseInboundMovementNote(note: string): {
   let quoteCny: string | undefined;
   let paymentLabel: string | undefined;
   let chargeBasis: ChargeBasis | undefined;
+  let chargeKg: number | undefined;
   const userParts: string[] = [];
 
   for (const part of parts) {
@@ -70,9 +91,10 @@ export function parseInboundMovementNote(note: string): {
     if (isFxLockNotePart(part)) {
       continue;
     }
-    const basis = parseChargeBasis(part);
-    if (basis) {
-      chargeBasis = basis;
+    const charge = parseChargePart(part);
+    if (charge) {
+      chargeBasis = charge.basis;
+      if (charge.chargeKg != null) chargeKg = charge.chargeKg;
       continue;
     }
     const normalized = normalizePaymentLabel(part);
@@ -89,6 +111,7 @@ export function parseInboundMovementNote(note: string): {
     quoteCny,
     paymentLabel,
     chargeBasis,
+    chargeKg,
     userNote: userParts.length ? userParts.join(' · ') : undefined,
     fxLock: fxLock ?? undefined,
   };
@@ -184,20 +207,22 @@ export const HUB_RECEIVE_INBOUND_NOTE_RE =
 
 export function pickInboundFeeFields(
   ...notes: Array<string | null | undefined>
-): { totalFee?: string; quoteCny?: string; paymentLabel?: string; chargeBasis?: ChargeBasis } {
+): { totalFee?: string; quoteCny?: string; paymentLabel?: string; chargeBasis?: ChargeBasis; chargeKg?: number } {
   let totalFee: string | undefined;
   let quoteCny: string | undefined;
   let paymentLabel: string | undefined;
   let chargeBasis: ChargeBasis | undefined;
+  let chargeKg: number | undefined;
   for (const note of notes) {
     const parsed = parseInboundMovementNote(String(note || ''));
     if (!totalFee && parsed.totalFee?.trim()) totalFee = parsed.totalFee.trim();
     if (!quoteCny && parsed.quoteCny?.trim()) quoteCny = parsed.quoteCny.trim();
     if (!paymentLabel && parsed.paymentLabel) paymentLabel = parsed.paymentLabel;
     if (!chargeBasis && parsed.chargeBasis) chargeBasis = parsed.chargeBasis;
-    if (totalFee && quoteCny && paymentLabel && chargeBasis) break;
+    if (chargeKg == null && parsed.chargeKg != null) chargeKg = parsed.chargeKg;
+    if (totalFee && quoteCny && paymentLabel && chargeBasis && chargeKg != null) break;
   }
-  return { totalFee, quoteCny, paymentLabel, chargeBasis };
+  return { totalFee, quoteCny, paymentLabel, chargeBasis, chargeKg };
 }
 
 /** 发票/详情用发站那条入库（带总费用），不要用后补的「到站交付确认」 */

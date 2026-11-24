@@ -228,17 +228,18 @@ function exportCostPackBarcode(row, index) {
   if (!index) return '';
   const display = text(row.display_barcode).toUpperCase();
   const key = text(row.subject_key).toUpperCase();
+  const direct = [key, display].find((code) => isPackageBarcode(code)) || '';
   if (text(row.subject_kind) === 'package') {
-    return index.byBase.get(key) || index.byBase.get(display) || index.byCode.get(display) || '';
+    return index.byBase.get(key) || index.byBase.get(display) || index.byCode.get(display) || direct;
   }
-  return index.byCode.get(display) || index.byCode.get(key) || '';
+  return index.byCode.get(display) || index.byCode.get(key) || direct;
 }
 
 function annotateExportCostsWithPackBarcode(costs, items) {
   const index = indexPackBarcodes(items);
   return (costs || []).map((row) => ({
     ...row,
-    pack_barcode: exportCostPackBarcode(row, index),
+    pack_barcode: text(row.pack_barcode) || exportCostPackBarcode(row, index),
   }));
 }
 
@@ -400,7 +401,13 @@ async function loadPendingExportCosts(supabase, queryText) {
   ]);
   const items = applyPackLinks(rawItems, membership.lines, membership.shipments);
   let saved = [];
-  const savedResult = await supabase.from('inventory_export_costs').select('subject_kind, subject_key');
+  let savedResult = await supabase
+    .from('inventory_export_costs')
+    .select('subject_kind, subject_key')
+    .is('voided_at', null);
+  if (savedResult.error && /voided_at/i.test(savedResult.error.message || '')) {
+    savedResult = await supabase.from('inventory_export_costs').select('subject_kind, subject_key');
+  }
   if (!savedResult.error) saved = savedResult.data || [];
   return {
     pendingExport: assemblePendingExportCosts(items, trips || [], saved, queryText),
@@ -566,6 +573,7 @@ function settleAdminExportCost(input) {
     fx_mmk_per_cny: fx,
     total_mmk: totalMmk,
     trip_number: text(input.tripNumber).toUpperCase().slice(0, 40),
+    pack_barcode: text(input.packBarcode).toUpperCase().slice(0, 80),
     store_code: text(input.storeCode).toUpperCase().slice(0, 40) || 'HQ',
     created_by: text(input.createdBy).slice(0, 80) || 'admin',
   };

@@ -163,6 +163,13 @@ function groupWeightLabel(lines, shells) {
   return totalWeightLabel(lines) || totalWeightLabel(shells || []);
 }
 
+/** 多个入库的长宽高写在包装壳上，每一件快递单自己的规格是空的。 */
+function groupSpec(lines, shells) {
+  const shellSpec = (shells || []).map((row) => text(row.spec)).find(Boolean);
+  if (shellSpec) return shellSpec;
+  return lines.map((row) => text(row.spec)).find(Boolean) || '';
+}
+
 function mapExpressGroup(lines, packBarcode, exceptionStatus, shells) {
   const ordered = lines.slice().sort((a, b) => {
     const left = parsePackagingLine(a.barcode);
@@ -182,7 +189,7 @@ function mapExpressGroup(lines, packBarcode, exceptionStatus, shells) {
     expressBarcode: uniqueLines(ordered.map((row) => row.input_barcode)).join('\n'),
     inboundBarcode: uniqueLines(ordered.map((row) => row.barcode)).join('\n'),
     destination: ordered.map((row) => text(row.final_destination)).find(Boolean) || '',
-    spec: ordered.map((row) => text(row.spec)).find(Boolean) || '',
+    spec: groupSpec(ordered, shells),
     unit: ordered.map((row) => text(row.unit)).find(Boolean) || '',
     weight: groupWeightLabel(ordered, shells),
     qty: ordered.length,

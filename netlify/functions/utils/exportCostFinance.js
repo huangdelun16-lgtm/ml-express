@@ -69,6 +69,7 @@ function selectExportCostRows(rows, scope = {}) {
   const fromMs = range && range.fromIso ? Date.parse(range.fromIso) : NaN;
   const toMs = range && range.toExclusiveIso ? Date.parse(range.toExclusiveIso) : NaN;
   const exportCosts = (rows || []).filter((row) => {
+    if (row.voided_at) return false;
     const code = String(row.store_code || '').trim().toUpperCase();
     if (storeCode && code !== storeCode) return false;
     if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return true;
@@ -100,6 +101,7 @@ function appendExportCosts(finance, rows, stores, opts = {}) {
   for (const row of rows || []) {
     const code = String(row.store_code || '').trim().toUpperCase();
     if (storeCode && code !== storeCode) continue;
+    if (row.voided_at) continue;
     if (!exportCostInPeriod(row.created_at, range)) continue;
     const mapped = mapExportCostEntry(row, names.get(code) || code);
     entries.push(mapped);
@@ -120,19 +122,29 @@ function appendExportCosts(finance, rows, stores, opts = {}) {
 }
 
 async function loadExportCostRows(supabase, warnings) {
-  const { data, error } = await supabase
+  const columns =
+    'id, display_barcode, subject_key, customer_name, leg_destination, weight_kg, unit_price_cny, total_cny, pay_currency, fx_mmk_per_cny, total_mmk, trip_number, store_code, created_at, voided_at';
+  let result = await supabase
     .from('inventory_export_costs')
-    .select(
-      'id, display_barcode, subject_key, customer_name, leg_destination, weight_kg, unit_price_cny, total_cny, pay_currency, fx_mmk_per_cny, total_mmk, trip_number, store_code, created_at',
-    )
+    .select(columns)
+    .is('voided_at', null)
     .order('created_at', { ascending: false })
     .limit(500);
-  if (error) {
-    const message = String(error.message || error);
+  if (result.error && /voided_at/i.test(result.error.message || '')) {
+    result = await supabase
+      .from('inventory_export_costs')
+      .select(
+        'id, display_barcode, subject_key, customer_name, leg_destination, weight_kg, unit_price_cny, total_cny, pay_currency, fx_mmk_per_cny, total_mmk, trip_number, store_code, created_at',
+      )
+      .order('created_at', { ascending: false })
+      .limit(500);
+  }
+  if (result.error) {
+    const message = String(result.error.message || result.error);
     if (!/does not exist|schema cache/i.test(message)) warnings.push(message);
     return [];
   }
-  return data || [];
+  return result.data || [];
 }
 
 module.exports = {

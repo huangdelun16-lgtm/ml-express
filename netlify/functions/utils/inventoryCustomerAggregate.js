@@ -398,6 +398,10 @@ function buildExpressItemRow(item, inbound, trackingNote) {
     weight: String(item.weight || '').trim() || '—',
     weightKg: parseWeightKg(item.weight),
     packWeightKg: 0,
+    spec: String(item.spec || '').trim(),
+    packSpec: '',
+    chargeBasis: item.charge_basis === 'volume' || item.charge_basis === 'weight' ? item.charge_basis : '',
+    chargeWeightKg: Number(item.charge_weight_kg) > 0 ? Number(item.charge_weight_kg) : 0,
     qty,
     fee,
     quoteCny,
@@ -417,17 +421,27 @@ function buildExpressItemRow(item, inbound, trackingNote) {
   };
 }
 
+const CUSTOMER_EXPRESS_COLUMNS =
+  'id, barcode, input_barcode, name, spec, weight, qty_on_hand, recipient_name, final_destination, owner_store_code, updated_at, packed_at, packed_bundle_barcode, hub_arrived_at, customer_signed_at, hub_transit_released_at, hub_transit_shipped_at, note';
+
+function loadCustomerExpressItems(supabase) {
+  const run = (columns) =>
+    supabase
+      .from('inventory_store_items')
+      .select(columns)
+      .not('barcode', 'ilike', 'PKG%')
+      .order('updated_at', { ascending: false })
+      .limit(2500);
+  return run(`${CUSTOMER_EXPRESS_COLUMNS.replace(', note', ', charge_basis, charge_weight_kg, note')}`).then((first) => {
+    if (!first.error || !/charge_basis|charge_weight_kg/i.test(first.error.message || '')) return first;
+    return run(CUSTOMER_EXPRESS_COLUMNS);
+  });
+}
+
 async function loadExpressItemsDataset(supabase) {
   const warnings = [];
 
-  const { data: items, error: itemsErr } = await supabase
-    .from('inventory_store_items')
-    .select(
-      'id, barcode, input_barcode, name, weight, qty_on_hand, recipient_name, final_destination, owner_store_code, updated_at, packed_at, packed_bundle_barcode, hub_arrived_at, customer_signed_at, hub_transit_released_at, hub_transit_shipped_at, note',
-    )
-    .not('barcode', 'ilike', 'PKG%')
-    .order('updated_at', { ascending: false })
-    .limit(2500);
+  const { data: items, error: itemsErr } = await loadCustomerExpressItems(supabase);
 
   if (itemsErr) {
     warnings.push(`快递明细读取失败：${itemsErr.message}`);
@@ -553,9 +567,12 @@ function attachTripNumbers(rows, tripByPack) {
 /** 多个入库的总重在包裹本体上，明细行重量是空的。按包装号抄一次，不摊到每一件。 */
 async function attachPackWeights(supabase, rows, warnings) {
   const weightByBarcode = {};
+  const specByBarcode = {};
   for (const row of rows) {
     const code = String(row.inboundBarcode || '').trim().toUpperCase();
-    if (code && row.weightKg > 0) weightByBarcode[code] = row.weightKg;
+    if (!code) continue;
+    if (row.weightKg > 0) weightByBarcode[code] = row.weightKg;
+    if (row.spec) specByBarcode[code] = row.spec;
   }
 
   const wanted = [
@@ -565,12 +582,12 @@ async function attachPackWeights(supabase, rows, warnings) {
         .filter(Boolean),
     ),
   ];
-  const missing = wanted.filter((code) => !(weightByBarcode[code] > 0));
+  const missing = wanted.filter((code) => !(weightByBarcode[code] > 0) || !specByBarcode[code]);
   for (let i = 0; i < missing.length; i += 100) {
     const chunk = missing.slice(i, i + 100);
     const { data, error } = await supabase
       .from('inventory_store_items')
-      .select('barcode, weight')
+      .select('barcode, weight, spec')
       .in('barcode', chunk);
     if (error) {
       warnings.push(`包裹重量读取失败：${error.message}`);
@@ -580,12 +597,15 @@ async function attachPackWeights(supabase, rows, warnings) {
       const code = String(item.barcode || '').trim().toUpperCase();
       const kg = parseWeightKg(item.weight);
       if (code && kg > 0) weightByBarcode[code] = kg;
+      const spec = String(item.spec || '').trim();
+      if (code && spec) specByBarcode[code] = spec;
     }
   }
 
   for (const row of rows) {
     const pack = String(row.packedBundleBarcode || '').trim().toUpperCase();
     row.packWeightKg = pack && weightByBarcode[pack] > 0 ? weightByBarcode[pack] : 0;
+    row.packSpec = pack && specByBarcode[pack] ? specByBarcode[pack] : '';
   }
 }
 
@@ -945,6 +965,8 @@ module.exports = {
   fetchCustomerItems,
   fetchPeriodSignedIncome,
   purgeStaleUnregisteredCustomers,
+  indexCnyPerKg,
+  lookupCnyPerKg,
   customerKey,
   aggregateCustomerSummaries,
   applyPackFeeDedup,

@@ -2,6 +2,7 @@ import {
   groupCustomerExpressItems,
   parsePackagingStockInLineBarcode,
 } from './packagingStockInDisplay';
+import { heavierVolumetricFromSpec } from './volumetricWeight';
 
 export type UnsignedInvoiceSource = {
   id: string;
@@ -26,6 +27,14 @@ export type UnsignedInvoiceSource = {
   tripNumber?: string | null;
   /** 客户定价窗口里的人民币/公斤。发票「定价」用这个，不把整包总价当成单价。 */
   unitCnyPerKg?: number | null;
+  /** 这一件自己的规格。多个入库的明细行通常是空的。 */
+  spec?: string;
+  /** 多个入库包裹本体的规格。体积重量按这一包算一次。 */
+  packSpec?: string;
+  /** 入库时记下的收费方式。没记下时，体积更大就按体积公斤收费。 */
+  chargeBasis?: 'volume' | 'weight' | '';
+  /** 入库时记下的收费公斤。 */
+  chargeWeightKg?: number;
 };
 
 export type UnsignedInvoiceOrderGroup = {
@@ -37,6 +46,10 @@ export type UnsignedInvoiceOrderGroup = {
   quoteCny: number;
   /** 每公斤人民币。多个入库的重量在包裹上，单价仍要单独写出来。 */
   unitCnyPerKg?: number;
+  /** 体积重量比这一行的实际重量大时才有。发票多写一行，不改实际重量。 */
+  volumetricKg?: number;
+  /** 用来乘单价的公斤。只在和实际重量不同时带上。 */
+  chargeKg?: number;
 };
 
 export type UnsignedCustomerInvoice = {
@@ -100,9 +113,81 @@ function groupWeightKg(items: UnsignedInvoiceSource[]): number {
   return positive.reduce((sum, kg) => sum + kg, 0);
 }
 
-function chargeQuoteCny(unitCnyPerKg: number, weightKg: number, storedQuote: number): number {
-  if (unitCnyPerKg > 0 && weightKg > 0) return unitCnyPerKg * weightKg;
+function roundCny(amount: number): number {
+  return Math.round(amount * 100) / 100;
+}
+
+function noteCharge(item: UnsignedInvoiceSource): { basis?: 'volume' | 'weight'; kg?: number } {
+  const text = String(item.inboundNote || '');
+  const match = text.match(/收费(体积|重量)\s+([\d.]+)\s*Kg/i);
+  if (match) {
+    const kg = Number(match[2]);
+    return {
+      basis: match[1] === '体积' ? 'volume' : 'weight',
+      ...(Number.isFinite(kg) && kg > 0 ? { kg } : {}),
+    };
+  }
+  if (/收费体积/.test(text)) return { basis: 'volume' };
+  if (/收费重量/.test(text)) return { basis: 'weight' };
+  return {};
+}
+
+/** 有单价时按收费公斤算。体积更大，或入库记了按体积，就不用秤上的重量。 */
+function billableKg(
+  actualKg: number,
+  volumetricKg: number | undefined,
+  items: UnsignedInvoiceSource[],
+): number {
+  const noted = items.map(noteCharge);
+  const basis =
+    items.map((item) => item.chargeBasis).find((value) => value === 'volume' || value === 'weight') ||
+    noted.map((row) => row.basis).find((value) => value === 'volume' || value === 'weight');
+  if (basis === 'weight') return actualKg;
+  const stored = items
+    .map((item) => Number(item.chargeWeightKg))
+    .find((kg) => Number.isFinite(kg) && kg > 0);
+  const notedKg = noted.map((row) => row.kg).find((kg) => kg != null && kg > 0);
+  if (basis === 'volume') {
+    if (stored != null && stored > 0) return stored;
+    if (notedKg != null && notedKg > 0) return notedKg;
+  }
+  if (volumetricKg != null && volumetricKg > actualKg) return volumetricKg;
+  return actualKg;
+}
+
+function chargeQuoteCny(unitCnyPerKg: number, chargeKg: number, storedQuote: number): number {
+  if (unitCnyPerKg > 0 && chargeKg > 0) return roundCny(unitCnyPerKg * chargeKg);
   return storedQuote > 0 ? storedQuote : 0;
+}
+
+export function formatCustomerChargeKgText(kg: number): string {
+  if (!(kg > 0)) return '—';
+  const n = Math.round(kg * 100) / 100;
+  return `${n % 1 === 0 ? String(n) : String(n)} Kg`;
+}
+
+/** 客户名单上用来收费的公斤。多个入库按整包算一次。 */
+export function customerListedChargeKg(
+  item: UnsignedInvoiceSource,
+  siblings: UnsignedInvoiceSource[] = [],
+): number {
+  const group = siblings.length ? siblings : [item];
+  const pack = Math.max(0, ...group.map((row) => Number(row.packWeightKg) || 0));
+  const actual = pack > 0 ? pack : item.weightKg > 0 ? item.weightKg : 0;
+  const spec = pack > 0
+    ? group.map((row) => String(row.packSpec || '').trim()).find(Boolean) || ''
+    : String(item.spec || '').trim();
+  return billableKg(actual, volumetricKgFor(spec, actual), group);
+}
+
+/** 多个入库只在记下费用的那一行写出收费公斤。 */
+export function packagingListedChargeText(
+  item: UnsignedInvoiceSource,
+  siblings: UnsignedInvoiceSource[],
+): string {
+  const carries = (Number(item.fee) || 0) > 0 || (Number(item.quoteCny) || 0) > 0;
+  if (!carries) return '—';
+  return formatCustomerChargeKgText(customerListedChargeKg(item, siblings));
 }
 
 function groupUnitCny(items: UnsignedInvoiceSource[]): number {
@@ -111,6 +196,22 @@ function groupUnitCny(items: UnsignedInvoiceSource[]): number {
     if (Number.isFinite(n) && n > 0) return n;
   }
   return 0;
+}
+
+function readSpec(items: UnsignedInvoiceSource[], packaged: boolean): string {
+  if (packaged) {
+    for (const item of items) {
+      const spec = String(item.packSpec || item.spec || '').trim();
+      if (spec) return spec;
+    }
+    return '';
+  }
+  return String(items[0]?.spec || '').trim();
+}
+
+function volumetricKgFor(spec: string, actualKg: number): number | undefined {
+  if (!(actualKg > 0) || !spec) return undefined;
+  return heavierVolumetricFromSpec(spec, String(actualKg))?.kg;
 }
 
 function readPackWeightKg(items: UnsignedInvoiceSource[]): number {
@@ -196,13 +297,17 @@ export function buildUnsignedCustomerInvoice(
       packCodes.push(item.packedBundleBarcode);
       const unitCnyPerKg = groupUnitCny([item]);
       const weightKg = item.weightKg > 0 ? item.weightKg : 0;
-      const quoteCny = chargeQuoteCny(unitCnyPerKg, weightKg, readUnsignedQuoteCny(item));
+      const volumetricKg = volumetricKgFor(readSpec([item], false), weightKg);
+      const chargeKg = billableKg(weightKg, volumetricKg, [item]);
+      const quoteCny = chargeQuoteCny(unitCnyPerKg, chargeKg, readUnsignedQuoteCny(item));
       orderGroups.push({
         kind: 'single',
         expressNos: uniqueLabels([item.expressBarcode]),
         weightKg,
         quoteCny,
         ...(unitCnyPerKg > 0 ? { unitCnyPerKg } : {}),
+        ...(volumetricKg != null ? { volumetricKg } : {}),
+        ...(chargeKg > 0 && chargeKg !== weightKg ? { chargeKg } : {}),
       });
       weightParts.push(weightKg);
       totalQuoteCny += quoteCny;
@@ -215,14 +320,22 @@ export function buildUnsignedCustomerInvoice(
     pickedItems.push(...picked);
     packCodes.push(...group.items.map((item) => item.packedBundleBarcode));
     const weightKg = packagingWeightKg(group.items, items);
+    const volumetricKg = volumetricKgFor(readSpec(group.items, true), weightKg);
     const unitCnyPerKg = groupUnitCny(group.items);
-    const quoteCny = chargeQuoteCny(unitCnyPerKg, weightKg, packagingQuoteCny(group.items, picked));
+    const chargeKg = billableKg(weightKg, volumetricKg, group.items);
+    const quoteCny = chargeQuoteCny(
+      unitCnyPerKg,
+      chargeKg,
+      packagingQuoteCny(group.items, picked),
+    );
     orderGroups.push({
       kind: 'packaging',
       expressNos: uniqueLabels(picked.map((item) => item.expressBarcode)),
       weightKg,
       quoteCny,
       ...(unitCnyPerKg > 0 ? { unitCnyPerKg } : {}),
+      ...(volumetricKg != null ? { volumetricKg } : {}),
+      ...(chargeKg > 0 && chargeKg !== weightKg ? { chargeKg } : {}),
     });
     weightParts.push(weightKg);
     totalQuoteCny += quoteCny;

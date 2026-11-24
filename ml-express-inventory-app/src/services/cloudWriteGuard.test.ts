@@ -8,6 +8,9 @@ vi.mock('./authService', () => ({
 
 vi.mock('./hubReceiveGate', () => ({
   invalidateHubReceiveCloudGate: vi.fn(),
+  hubScanAuthIsFresh: vi.fn(() => false),
+  clearHubScanAuthReady: vi.fn(),
+  markHubScanAuthReady: vi.fn(),
 }));
 
 describe('cloudWriteGuard', () => {
@@ -24,5 +27,17 @@ describe('cloudWriteGuard', () => {
     expect(bindInventoryCloudSession).toHaveBeenCalledTimes(2);
     expect(refreshInventoryCloudSession).toHaveBeenCalledTimes(1);
     expect(refreshInventoryCloudSession).toHaveBeenCalledWith({ force: true });
+  });
+
+  it('does not log in again while the scan session is still signed in', async () => {
+    const gate = await import('./hubReceiveGate');
+    vi.mocked(gate.hubScanAuthIsFresh).mockReturnValue(true);
+    const { withInventoryCloudWrite } = await import('./cloudWriteGuard');
+    const { bindInventoryCloudSession } = await import('./authService');
+    vi.mocked(bindInventoryCloudSession).mockClear();
+    const fn = vi.fn().mockResolvedValue('ok');
+    await expect(withInventoryCloudWrite(fn)).resolves.toBe('ok');
+    expect(bindInventoryCloudSession).not.toHaveBeenCalled();
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 });

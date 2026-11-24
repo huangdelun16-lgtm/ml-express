@@ -48,6 +48,10 @@ export type BatchSignInvoiceLine = {
   route: BatchSignInvoiceRoute | null;
   /** 客户定价窗口里定死的人民币/公斤。还没查到时为空。 */
   cnyPerKg?: number | null;
+  /** 秤上的实际重量。体积更大时，发票的重量行用这个，不用收费公斤。 */
+  actualWeightKg?: number;
+  /** 体积重量比实际重量大时才有。 */
+  volumetricKg?: number;
 };
 
 export type InvoiceRateLookup = {
@@ -96,14 +100,31 @@ function packBelongsToGroup(
   return packIds.every((id) => groupIds.has(id));
 }
 
-function billedWeightKg(group: BatchSignInvoiceSource[], actualKg: number): number {
+function billedWeightKg(
+  group: BatchSignInvoiceSource[],
+  actualKg: number,
+  spec: string | null | undefined,
+): number {
   const basis = group.map((row) => row.charge_basis).find((value) => value === 'volume' || value === 'weight');
   if (basis !== 'volume') return actualKg;
-  for (const row of group) {
-    const vol = volumetricWeightFromSpec(row.pack?.spec || row.spec || '');
-    if (vol != null && vol > 0) return vol;
+  const vol = volumetricWeightFromSpec(spec || '');
+  return vol != null && vol > 0 ? vol : actualKg;
+}
+
+/** 纸上「重量」那一行。总重量加的是这个数，不再加整包体积。 */
+function shownWeightKg(line: { weightKg: number; actualWeightKg?: number }): number {
+  return line.actualWeightKg != null && line.actualWeightKg > 0 ? line.actualWeightKg : line.weightKg;
+}
+
+function chargeDisplay(actualKg: number, spec: string | null | undefined): {
+  actualWeightKg?: number;
+  volumetricKg?: number;
+} {
+  const vol = volumetricWeightFromSpec(spec || '');
+  if (vol != null && actualKg > 0 && vol > actualKg) {
+    return { actualWeightKg: actualKg, volumetricKg: vol };
   }
-  return actualKg;
+  return {};
 }
 
 function packagingWeightKg(group: BatchSignInvoiceSource[]): number {
@@ -280,29 +301,34 @@ export function buildBatchSignInvoice(
     if (money.missingRate) missingRate = true;
 
     if (!base) {
+      const actualKg = parseWeightKg(row.weight ?? '');
       const expressNos = uniqueExpressNos([row.input_barcode]);
       lines.push({
         kind: 'single',
         expressNos,
-        weightKg: billedWeightKg(group, parseWeightKg(row.weight ?? '')),
+        weightKg: billedWeightKg(group, actualKg, row.spec),
         feeMmk: money.mmk,
         route: routeFromGroup(group),
+        ...chargeDisplay(actualKg, row.spec),
       });
       continue;
     }
 
+    const actualKg = packagingWeightKg(group);
+    const spec = group.map((item) => item.pack?.spec || item.spec || '').find((value) => value.trim());
     lines.push({
       kind: 'packaging',
       expressNos: packagingExpressNos(group),
-      weightKg: billedWeightKg(group, packagingWeightKg(group)),
+      weightKg: billedWeightKg(group, actualKg, spec),
       feeMmk: money.mmk,
       route: routeFromGroup(group),
+      ...chargeDisplay(actualKg, spec),
     });
   }
 
   return {
     lines,
-    totalWeightKg: lines.reduce((sum, line) => sum + line.weightKg, 0),
+    totalWeightKg: lines.reduce((sum, line) => sum + shownWeightKg(line), 0),
     totalFeeMmk: lines.reduce((sum, line) => sum + line.feeMmk, 0),
     totalFeeCny: sawQuote ? totalFeeCny : null,
     rate: rate != null && rate > 0 ? rate : null,

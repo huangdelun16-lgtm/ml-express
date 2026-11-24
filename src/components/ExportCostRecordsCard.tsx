@@ -4,6 +4,7 @@ import { formatCnyAmount } from '../utils/crossBorderFx';
 import {
   fetchExportCostRecords,
   saveAdminExportCost,
+  voidAdminExportCost,
   type ExportCostRecord,
   type FinancePeriodParams,
   type InventoryTransitStore,
@@ -107,6 +108,8 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
   const [fx, setFx] = useState('');
   const [savingKey, setSavingKey] = useState('');
   const [saveNotice, setSaveNotice] = useState<{ ok: boolean; title: string; text: string } | null>(null);
+  const [voidTarget, setVoidTarget] = useState<ExportCostRecord | null>(null);
+  const [voiding, setVoiding] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const [batchLeg, setBatchLeg] = useState<'MSE' | 'LSO' | ''>('');
   const [batchPrice, setBatchPrice] = useState('');
@@ -264,6 +267,7 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
             mmkPerCny: batchCurrency === 'MMK' ? Number(batchFx) : null,
             tripNumber: row.tripNumber,
             storeCode: row.ownerStoreCode,
+            packBarcode: row.packBarcode,
           });
           done.push(row.key);
         } catch (err: unknown) {
@@ -300,6 +304,33 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
     })();
   };
 
+  const confirmVoid = () => {
+    if (!voidTarget || voiding) return;
+    const id = voidTarget.id;
+    setVoiding(true);
+    void voidAdminExportCost(id)
+      .then(() => {
+        setVoidTarget(null);
+        setRetryTick((n) => n + 1);
+        setSaveNotice({
+          ok: true,
+          title: isEn ? 'Voided' : '已作废',
+          text: isEn
+            ? 'This export cost left the period total. Fill it again from the list above.'
+            : '这笔出口成本不再计入本期。可以在上面的待填里重新记一笔。',
+        });
+      })
+      .catch((err: unknown) => {
+        const raw = err instanceof Error ? err.message : '';
+        setSaveNotice({
+          ok: false,
+          title: isEn ? 'Not voided' : '作废失败',
+          text: raw || (isEn ? 'Could not void this row.' : '作废没有完成，请再试一次。'),
+        });
+      })
+      .finally(() => setVoiding(false));
+  };
+
   return (
     <section className="cbl-card cbl-export-cost">
       <div className="cbl-card__head">
@@ -307,8 +338,8 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
           <h2 className="cbl-card__title">{isEn ? 'Export cost' : '出口成本'}</h2>
           <p className="cbl-card-hint cbl-card-hint--in-head">
             {isEn
-              ? 'Fill missing costs in the Inventory App. Saved rows stay here and cannot be edited.'
-              : '还没填的单在上面。库存 App 填好之后，会出现在下面已保存的记录里，添加之后不能改。'}
+              ? 'Unfilled orders are above. A saved row can be voided and filled again. The old amount leaves this period and is not edited.'
+              : '还没填的单在上面。已保存的记录可以作废，作废后回到待填再记一笔。原来的金额不再计入，数字本身不会被改写。'}
           </p>
         </div>
         <input
@@ -546,6 +577,7 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
                                       mmkPerCny: currency === 'MMK' ? Number(fx) : null,
                                       tripNumber: row.tripNumber,
                                       storeCode: row.ownerStoreCode,
+                                      packBarcode: row.packBarcode,
                                     })
                                       .then(() => {
                                         setOpenKey('');
@@ -656,6 +688,7 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
                   <th>{isEn ? 'Time' : '时间'}</th>
                   <th>{isEn ? 'Type' : '类型'}</th>
                   <th>{isEn ? 'Order' : '单号'}</th>
+                  <th>{isEn ? 'Pack no.' : '包装号'}</th>
                   <th>{isEn ? 'Customer' : '客户'}</th>
                   <th>{isEn ? 'Route' : '路线'}</th>
                   <th>{isEn ? 'Weight' : '重量'}</th>
@@ -663,6 +696,7 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
                   <th>{isEn ? 'Total' : '合计'}</th>
                   <th>{isEn ? 'Trip' : '车次'}</th>
                   <th>{isEn ? 'Station' : '站点'}</th>
+                  <th>{isEn ? 'Void' : '作废'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -673,6 +707,7 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
                       <td className="cbl-dim">{whenLabel(row.created_at)}</td>
                       <td>{kindLabel(row.subject_kind, isEn)}</td>
                       <td className="cbl-code">{row.display_barcode || '—'}</td>
+                      <td className="cbl-code">{row.pack_barcode?.trim() || '—'}</td>
                       <td>{row.customer_name || '—'}</td>
                       <td>
                         {legLabel(row.leg_origin || 'RUI')} → {legLabel(row.leg_destination)}
@@ -690,6 +725,16 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
                         <span className="cbl-code">{row.store_code || '—'}</span>
                         {station ? <span className="cbl-dim"> · {station}</span> : null}
                       </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="cbl-btn cbl-btn--ghost cbl-btn--sm"
+                          disabled={voiding}
+                          onClick={() => setVoidTarget(row)}
+                        >
+                          {isEn ? 'Void' : '作废'}
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -698,6 +743,31 @@ const ExportCostRecordsCard: FC<Props> = ({ isEn, period, stores, rate, onTotal 
           </div>
         )}
       </div>
+      {voidTarget ? (
+        <div className="admin-modal-scrim" role="presentation" onClick={() => { if (!voiding) setVoidTarget(null); }}>
+          <div
+            className="admin-modal cbl-export-notice"
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2>{isEn ? 'Void this export cost?' : '作废这笔出口成本？'}</h2>
+            <p>
+              {isEn
+                ? `${voidTarget.display_barcode || 'This order'} leaves the period total. The saved numbers stay as history and are not edited. You can fill it again.`
+                : `${voidTarget.display_barcode || '这一单'}不再计入本期。原来的数字留着，不会被改写。之后可以重新记一笔。`}
+            </p>
+            <div className="admin-modal__actions">
+              <button type="button" className="cbl-btn cbl-btn--ghost" disabled={voiding} onClick={() => setVoidTarget(null)}>
+                {isEn ? 'Cancel' : '取消'}
+              </button>
+              <button type="button" className="cbl-btn cbl-btn--primary" disabled={voiding} onClick={confirmVoid}>
+                {voiding ? (isEn ? 'Voiding…' : '作废中…') : isEn ? 'Void' : '作废'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {saveNotice ? (
         <div className="admin-modal-scrim" role="presentation" onClick={() => setSaveNotice(null)}>
           <div

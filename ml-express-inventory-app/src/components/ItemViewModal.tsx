@@ -25,6 +25,8 @@ import { exceptionTargetFromItem } from '../utils/inventoryException';
 import { canMarkCustomerSigned, isDestinationHubViewer } from '../utils/customerSign';
 import type { ArrivalNotifyTarget } from '../utils/arrivalNotify';
 import { invoiceDisplayWeight, resolvePackagingStockInItemLabel } from '../utils/packItemSequence';
+import { isPackagingStockInLineBarcode } from '../utils/inboundBarcode';
+import { heavierVolumetricKg } from '../utils/volumetricWeight';
 import { fetchCrossBorderFxRate } from '../utils/crossBorderFx';
 import { pickNotesFxLock } from '../utils/inboundMovementNote';
 
@@ -59,9 +61,20 @@ function mapDetailToInvoice(
         inboundMovementNote: detail.inbound_movement_note,
         pack: detail.pack,
       });
+      const packageMeasure = shown?.kind === 'package';
+      const packagingPiece = packageMeasure || isPackagingStockInLineBarcode(detail.barcode);
+      const spec = packagingPiece
+        ? detail.pack?.spec?.trim() || detail.spec?.trim() || undefined
+        : detail.spec?.trim() || undefined;
+      const actualWeight = packageMeasure
+        ? shown?.value || detail.pack?.weight || detail.weight
+        : shown?.value || detail.weight;
+      const volumetric = heavierVolumetricKg(spec, actualWeight);
       return {
         weight: shown?.value,
         weightKind: shown?.kind,
+        volumetricWeight: volumetric != null ? `${volumetric} Kg` : undefined,
+        spec,
       };
     })(),
     totalFee: detail.total_fee,

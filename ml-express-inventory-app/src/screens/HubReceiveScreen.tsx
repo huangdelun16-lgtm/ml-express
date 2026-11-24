@@ -153,6 +153,7 @@ export default function HubReceiveScreen({
         onScanInbound={flow.handleScanInbound}
         onScanSessionBegin={flow.beginScanInbound}
         onScanSessionEnd={flow.finishScanInbound}
+        scanUploadLeft={flow.scanUploadLeft}
         onBatchInbound={() => void flow.handleBatchInbound()}
         onPayTransportFee={flow.handlePayTransportFee}
         onReleaseTransit={() => void flow.handleReleaseTransit()}

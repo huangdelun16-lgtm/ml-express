@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import CblTablePagination from './CblTablePagination';
-import { volumetricWeightFromSpec } from '../utils/volumetricWeight';
+import { heavierVolumetricFromSpec } from '../utils/volumetricWeight';
 import {
   fetchExpressDetail,
   fetchExpressDetails,
@@ -72,7 +72,8 @@ function noteParts(value?: string): string[] {
 }
 
 function DetailGrid({ row, isEn }: { row: ExpressDetailRow; isEn: boolean }) {
-  const volumetric = volumetricWeightFromSpec(row.spec);
+  const volumetric = heavierVolumetricFromSpec(row.spec, row.weight);
+  const chargeKg = String(row.inboundNote || row.note || '').match(/收费(?:体积|重量)\s+([\d.]+)\s*Kg/i);
   const expressLines = textLines(row.expressBarcode);
   const inboundLines = textLines(row.inboundBarcode);
   const lineCount = Math.max(expressLines.length, inboundLines.length, 1);
@@ -88,6 +89,7 @@ function DetailGrid({ row, isEn }: { row: ExpressDetailRow; isEn: boolean }) {
     [isEn ? 'Spec' : '规格', row.spec || ''],
     [isEn ? 'Unit' : '单位', unitIsPieceCount ? '' : unit],
     [isEn ? 'Actual weight' : '重量', row.weight || ''],
+    [isEn ? 'Chargeable kg' : '收费公斤', chargeKg ? `${chargeKg[1]} Kg` : ''],
     [isEn ? 'Volumetric weight' : '体积重量', volumetric ? `${volumetric.kg} Kg · ${volumetric.formula}` : ''],
     [isEn ? 'Packaging' : '包装', row.packaging || ''],
     [isEn ? 'Station' : '入库站', row.inboundStore || row.ownerStoreCode || ''],

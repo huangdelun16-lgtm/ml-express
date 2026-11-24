@@ -15,6 +15,7 @@ const { verifyAdminToken } = require('./verify-admin');
 const { getAdminTokenFromEvent } = require('./utils/adminToken');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 const { aggregateFinanceForTransitStores } = require('./utils/inventoryFinanceAggregate');
+const { enrichSignedInvoiceMeasures } = require('./utils/signedInvoiceVolumetric');
 const { selectExportCostRows } = require('./utils/exportCostFinance');
 const {
   loadHqTodoCounts,
@@ -1264,7 +1265,7 @@ async function handleAll(supabase, packStatus, warnings, financePagination, fina
 }
 
 const SIGNED_INVOICE_COLUMNS =
-  'id, invoice_no, issued_on, customer_name, phone, trip_label, piece_count, total_fee_cny, total_fee_mmk, document, signed_at, store_code';
+  'id, invoice_no, issued_on, customer_name, phone, trip_label, piece_count, total_fee_cny, total_fee_mmk, document, item_ids, signed_at, store_code';
 
 function missingInvoiceTable(error) {
   return /does not exist|schema cache/i.test(String(error?.message || ''));
@@ -1307,8 +1308,9 @@ async function handleSignedInvoices(supabase, warnings, params) {
       .order('invoice_no', { ascending: false })
       .range(range.from, range.to);
     if (error) throw error;
+    const invoices = await enrichSignedInvoiceMeasures(supabase, data || []);
     return {
-      invoices: data || [],
+      invoices,
       total: count || 0,
       page: query.page,
       pageSize: query.pageSize,
@@ -1507,13 +1509,24 @@ async function handleExpressDetails(supabase, query) {
 }
 
 async function handleExportCosts(supabase, warnings, financeScope, queryText) {
-  const { data, error } = await supabase
+  const savedColumns =
+    'id, subject_kind, subject_key, display_barcode, customer_name, final_destination, leg_origin, leg_destination, weight_kg, unit_price_cny, total_cny, pay_currency, fx_mmk_per_cny, total_mmk, trip_number, pack_barcode, store_code, created_by, created_at';
+  let loaded = await supabase
     .from('inventory_export_costs')
-    .select(
-      'id, subject_kind, subject_key, display_barcode, customer_name, final_destination, leg_origin, leg_destination, weight_kg, unit_price_cny, total_cny, pay_currency, fx_mmk_per_cny, total_mmk, trip_number, store_code, created_by, created_at',
-    )
+    .select(savedColumns)
+    .is('voided_at', null)
     .order('created_at', { ascending: false })
     .limit(500);
+  if (loaded.error && /voided_at|pack_barcode/i.test(loaded.error.message || '')) {
+    loaded = await supabase
+      .from('inventory_export_costs')
+      .select(
+        'id, subject_kind, subject_key, display_barcode, customer_name, final_destination, leg_origin, leg_destination, weight_kg, unit_price_cny, total_cny, pay_currency, fx_mmk_per_cny, total_mmk, trip_number, store_code, created_by, created_at',
+      )
+      .order('created_at', { ascending: false })
+      .limit(500);
+  }
+  const { data, error } = loaded;
   let saved = { exportCosts: [], totalCny: 0, totalMmk: 0 };
   if (error) {
     const missing = /does not exist|schema cache/i.test(error.message || '');

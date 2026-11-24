@@ -195,6 +195,7 @@ function OrderTable({
     lineWeight: t.invoice.lineWeight,
     packMeasure: t.invoice.packMeasure,
     packWeight: t.invoice.packWeight,
+    volumetric: t.invoice.volumetricLine,
   });
   return (
     <View style={styles.table}>
@@ -389,6 +390,7 @@ export default function BatchSignInvoiceModal({
       lineWeight: t.invoice.lineWeight,
       packMeasure: t.invoice.packMeasure,
       packWeight: t.invoice.packWeight,
+      volumetric: t.invoice.volumetricLine,
     };
     return {
       itemIds: signedItemIds,
@@ -424,6 +426,8 @@ export default function BatchSignInvoiceModal({
           kind: line.kind,
           expressNos: line.expressNos,
           weightKg: line.weightKg,
+          actualWeightKg: line.actualWeightKg,
+          volumetricKg: line.volumetricKg,
           cnyPerKg: line.cnyPerKg,
           title: line.kind === 'packaging' ? t.invoice.orderNos : t.invoice.expressNo,
         })),

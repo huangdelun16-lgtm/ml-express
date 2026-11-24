@@ -340,7 +340,7 @@ export default function StockInScreen({ route, navigation }: Props) {
   const buildNote = () => {
     const parts: string[] = [];
     if (totalFee.trim()) parts.push(`报价 ${totalFee.trim()} CNY`);
-    parts.push(chargeBasisNote(chargeBasis));
+    parts.push(chargeBasisNote(chargeBasis, chargeKg));
     if (payCod) parts.push('到付');
     if (payPrepaid) parts.push('预付');
     if (note.trim()) parts.push(note.trim());

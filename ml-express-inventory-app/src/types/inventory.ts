@@ -12,6 +12,10 @@ export interface InventoryItem {
   spec: string;
   unit: string;
   weight: string;
+  /** 入库时记下的收费方式。空表示还只有备注句子。 */
+  charge_basis?: 'volume' | 'weight' | '';
+  /** 用来收费的公斤。秤上的实际重量仍在 weight。 */
+  charge_weight_kg?: number;
   qty_on_hand: number;
   min_qty: number;
   note: string;
@@ -183,8 +187,6 @@ export interface InventoryItemDetail extends InventoryItem {
   /** 入库时报的人民币。签收前还没有缅币。 */
   quote_cny?: string;
   payment_label?: string;
-  /** 入库时选的收费方式。体积重量或实际重量。 */
-  charge_basis?: 'volume' | 'weight';
   inbound_note?: string;
   /** 入库流水原始 note（含「 · 打包入 」等系统段，用于识别多个入库） */
   inbound_movement_note?: string;

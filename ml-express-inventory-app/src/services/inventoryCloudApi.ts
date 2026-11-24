@@ -37,6 +37,8 @@ export type CloudStoreItemRow = {
   packed_bundle_barcode: string;
   hub_transit_released_at: string | null;
   hub_transit_shipped_at: string | null;
+  charge_basis?: string | null;
+  charge_weight_kg?: number | string | null;
   created_at: string;
   updated_at: string;
 };
@@ -94,7 +96,7 @@ export type CloudPackRow = {
 };
 
 const STORE_ITEM_COLUMNS =
-  'id, barcode, input_barcode, name, spec, unit, weight, qty_on_hand, min_qty, note, owner_store_id, owner_store_code, recipient_name, final_destination, delivery_hub_code, hub_arrived_at, arrival_notified_at, customer_signed_at, customer_sign_phone, customer_sign_pickup_type, customer_sign_proxy_name, customer_signature_data, customer_signed_by_operator, packed_at, packed_bundle_barcode, hub_transit_released_at, hub_transit_shipped_at, created_at, updated_at';
+  'id, barcode, input_barcode, name, spec, unit, weight, qty_on_hand, min_qty, note, owner_store_id, owner_store_code, recipient_name, final_destination, delivery_hub_code, hub_arrived_at, arrival_notified_at, customer_signed_at, customer_sign_phone, customer_sign_pickup_type, customer_sign_proxy_name, customer_signature_data, customer_signed_by_operator, packed_at, packed_bundle_barcode, hub_transit_released_at, hub_transit_shipped_at, charge_basis, charge_weight_kg, created_at, updated_at';
 function cloudErrorMessage(error: unknown): string {
   return error instanceof Error
     ? error.message
@@ -109,6 +111,10 @@ export function isMissingDeliveryHubColumnError(error: unknown): boolean {
   return /delivery_hub_code/i.test(cloudErrorMessage(error));
 }
 
+export function isMissingChargeColumnError(error: unknown): boolean {
+  return /charge_basis|charge_weight_kg/i.test(cloudErrorMessage(error));
+}
+
 function storeItemSelectColumns(error?: unknown): string {
   let columns = STORE_ITEM_COLUMNS;
   if (error && isMissingArrivalNotifiedColumnError(error)) {
@@ -116,6 +122,9 @@ function storeItemSelectColumns(error?: unknown): string {
   }
   if (error && isMissingDeliveryHubColumnError(error)) {
     columns = columns.replace(', delivery_hub_code', '');
+  }
+  if (error && isMissingChargeColumnError(error)) {
+    columns = columns.replace(', charge_basis, charge_weight_kg', '');
   }
   return columns;
 }
@@ -242,6 +251,11 @@ function rowToCloudItem(row: Record<string, unknown>): CloudStoreItemRow {
     hub_transit_shipped_at: row.hub_transit_shipped_at
       ? String(row.hub_transit_shipped_at)
       : null,
+    charge_basis: row.charge_basis ? String(row.charge_basis) : null,
+    charge_weight_kg:
+      row.charge_weight_kg == null || row.charge_weight_kg === ''
+        ? null
+        : Number(row.charge_weight_kg),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   };
@@ -533,7 +547,11 @@ export async function fetchCloudStoreItems(
     );
   } catch (error) {
     selectError = error;
-    if (!isMissingArrivalNotifiedColumnError(error) && !isMissingDeliveryHubColumnError(error)) {
+    if (
+      !isMissingArrivalNotifiedColumnError(error) &&
+      !isMissingDeliveryHubColumnError(error) &&
+      !isMissingChargeColumnError(error)
+    ) {
       throw error;
     }
     columns = storeItemSelectColumns(error);
@@ -551,7 +569,8 @@ export async function fetchCloudStoreItems(
       );
       if (
         !isMissingArrivalNotifiedColumnError(combined) &&
-        !isMissingDeliveryHubColumnError(combined)
+        !isMissingDeliveryHubColumnError(combined) &&
+        !isMissingChargeColumnError(combined)
       ) {
         throw retryError;
       }

@@ -81,6 +81,9 @@ describe('parseInboundMovementNote', () => {
   it('keeps the charge basis out of the customer remark', () => {
     const parsed = parseInboundMovementNote('报价 60 CNY · 收费体积 · 到付 · 易碎');
     expect(parsed.chargeBasis).toBe('volume');
+    expect(parsed.chargeKg).toBeUndefined();
+    expect(customerFacingInboundNote('报价 60 CNY · 收费体积 1.5 Kg · 到付 · 易碎')).toBe('易碎');
+    expect(parseInboundMovementNote('报价 60 CNY · 收费体积 1.5 Kg · 到付').chargeKg).toBe(1.5);
     expect(parsed.quoteCny).toBe('60');
     expect(parsed.paymentLabel).toBe('到付');
     expect(parsed.userNote).toBe('易碎');

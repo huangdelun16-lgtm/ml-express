@@ -1,5 +1,6 @@
 import {
   buildUnsignedCustomerInvoice,
+  customerListedChargeKg,
   formatInvoiceDocumentNo,
   formatUnsignedInvoiceFee,
   formatUnsignedInvoiceQuote,
@@ -8,6 +9,7 @@ import {
   formatUnsignedInvoiceWeight,
   isUnsignedExpressItem,
   packagingBatchSelectionIds,
+  packagingListedChargeText,
   settleUnsignedInvoice,
   type UnsignedInvoiceSource,
 } from './customerUnsignedInvoice';
@@ -309,5 +311,125 @@ describe('customerUnsignedInvoice', () => {
       feeMmk: 0,
       missingRate: false,
     });
+  });
+
+  it('adds volumetric kg only when the spec is heavier than the actual weight', () => {
+    const invoice = buildUnsignedCustomerInvoice(
+      [
+        row({
+          id: 'light',
+          inboundBarcode: 'SOLO-1',
+          expressBarcode: 'E1',
+          weightKg: 0.8,
+          spec: '30 x 20 x 15 cm',
+        }),
+        row({
+          id: 'heavy',
+          inboundBarcode: 'SOLO-2',
+          expressBarcode: 'E2',
+          weightKg: 2,
+          spec: '30 x 20 x 15 cm',
+        }),
+        row({
+          id: 'pack',
+          inboundBarcode: 'MDY1(2-1)',
+          expressBarcode: 'P1',
+          weightKg: 0,
+          packWeightKg: 1,
+          packSpec: '40 x 30 x 20 cm',
+        }),
+      ],
+      ['light', 'heavy', 'pack'],
+    );
+    expect(invoice.groups.map((group) => group.volumetricKg ?? null)).toEqual([1.5, null, 4]);
+    expect(invoice.groups.map((group) => group.weightKg)).toEqual([0.8, 2, 1]);
+  });
+
+  it('multiplies the per-kg price by the chargeable kilograms', () => {
+    const light = buildUnsignedCustomerInvoice(
+      [
+        row({
+          id: 'light',
+          inboundBarcode: 'SOLO-1',
+          expressBarcode: 'E1',
+          weightKg: 0.8,
+          spec: '30 x 20 x 15 cm',
+          unitCnyPerKg: 40,
+          quoteCny: 32,
+        }),
+      ],
+      ['light'],
+    );
+    expect(light.groups[0].weightKg).toBe(0.8);
+    expect(light.groups[0].volumetricKg).toBe(1.5);
+    expect(light.groups[0].chargeKg).toBe(1.5);
+    expect(light.groups[0].quoteCny).toBe(60);
+    expect(light.totalWeightKg).toBe(0.8);
+    expect(light.totalQuoteCny).toBe(60);
+
+    const pack = buildUnsignedCustomerInvoice(
+      [
+        row({
+          id: 'p1',
+          inboundBarcode: 'MDY1(2-1)',
+          expressBarcode: 'P1',
+          weightKg: 0,
+          packWeightKg: 1,
+          packSpec: '40 x 30 x 20 cm',
+          unitCnyPerKg: 40,
+        }),
+      ],
+      ['p1'],
+    );
+    expect(pack.groups[0].weightKg).toBe(1);
+    expect(pack.groups[0].quoteCny).toBe(160);
+    expect(pack.totalWeightKg).toBe(1);
+
+    const byWeight = buildUnsignedCustomerInvoice(
+      [
+        row({
+          id: 'scale',
+          inboundBarcode: 'SOLO-3',
+          expressBarcode: 'E3',
+          weightKg: 0.8,
+          spec: '30 x 20 x 15 cm',
+          unitCnyPerKg: 40,
+          chargeBasis: 'weight',
+        }),
+      ],
+      ['scale'],
+    );
+    expect(byWeight.groups[0].quoteCny).toBe(32);
+    expect(byWeight.groups[0].chargeKg).toBeUndefined();
+    expect(byWeight.totalWeightKg).toBe(0.8);
+  });
+
+  it('shows chargeable kilograms on the customer list before the invoice opens', () => {
+    expect(customerListedChargeKg(row({
+      id: 'light',
+      inboundBarcode: 'SOLO-1',
+      weightKg: 0.8,
+      spec: '30 x 20 x 15 cm',
+    }))).toBe(1.5);
+    const pieces = [
+      row({
+        id: 'p1',
+        inboundBarcode: 'MDY1(2-1)',
+        weightKg: 0,
+        packWeightKg: 1,
+        packSpec: '40 x 30 x 20 cm',
+        fee: 10,
+      }),
+      row({
+        id: 'p2',
+        inboundBarcode: 'MDY1(2-2)',
+        weightKg: 0,
+        packWeightKg: 1,
+        packSpec: '40 x 30 x 20 cm',
+        fee: 0,
+      }),
+    ];
+    expect(packagingListedChargeText(pieces[0], pieces)).toBe('4 Kg');
+    expect(packagingListedChargeText(pieces[1], pieces)).toBe('—');
   });
 });

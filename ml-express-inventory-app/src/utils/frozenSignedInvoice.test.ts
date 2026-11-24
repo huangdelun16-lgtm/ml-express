@@ -36,6 +36,32 @@ describe('invoiceLineMeasure', () => {
       ),
     ).toBe('包裹总重 75 Kg · 定价 ¥40/Kg');
   });
+
+  it('writes volumetric weight only when it is heavier than the actual weight', () => {
+    const withVolume = {
+      ...templates,
+      volumetric: '体积重量 {weight}',
+    };
+    expect(
+      invoiceLineMeasure(
+        {
+          kind: 'single',
+          expressNos: ['A'],
+          weightKg: 1.5,
+          actualWeightKg: 0.8,
+          volumetricKg: 1.5,
+          cnyPerKg: 40,
+        },
+        withVolume,
+      ),
+    ).toBe('重量 0.8 Kg · 定价 ¥40/Kg · 体积重量 1.5 Kg');
+    expect(
+      invoiceLineMeasure(
+        { kind: 'single', expressNos: ['A'], weightKg: 2, cnyPerKg: 40 },
+        withVolume,
+      ),
+    ).toBe('重量 2 Kg · 定价 ¥40/Kg');
+  });
 });
 
 describe('buildFrozenSignedInvoiceDocument', () => {

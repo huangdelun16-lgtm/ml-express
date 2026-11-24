@@ -401,18 +401,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     }
   };
 
-  /** 财务/Admin 只认中文业务标签；多语言 UI 文案勿写入 note */
-  const buildLineNote = () => {
-    const parts: string[] = [];
-    if (totalFee.trim()) parts.push(`报价 ${totalFee.trim()} CNY`);
-    parts.push(chargeBasisNote(chargeBasis));
-    if (payCod) parts.push('到付');
-    if (payPrepaid) parts.push('预付');
-    if (batchNote.trim()) parts.push(batchNote.trim());
-    parts.push(`${t.packagingStockIn.packDateLabel} ${packDate}`);
-    return parts.join(' · ');
-  };
-
+  /** 财务/Admin 只认中文业务标签；保存时按整包体积和整包重量再比一次。 */
   const submit = async () => {
     if (loading) return;
     if (!batchDestination.trim()) {
@@ -432,13 +421,39 @@ export default function PackagingStockInScreen({ navigation }: Props) {
       return;
     }
 
+    const basis = !chargeManual && autoBasis ? autoBasis : chargeBasis;
+    const kg = basis === 'volume' ? volumetricKg ?? 0 : Number(batchWeightN.trim()) || 0;
+
     setLoading(true);
     try {
       if (!store) throw new Error(t.common.loginStoreFirst);
 
+      let feeText = totalFee.trim();
+      if (!totalFeeManual) {
+        const originHub = hubCode ?? resolveStoreHubCode(store);
+        const destForQuote = normalizePackDestination(batchDestination);
+        const quoted = await fetchCrossBorderRoutePerKg(originHub, destForQuote, customerCode);
+        const cny = quoteCnyForEditedWeight({
+          cnyPerKg: quoted.cnyPerKg,
+          perKgMmk: quoted.perKg,
+          mmkPerCny: quoted.mmkPerCny,
+          weightKg: kg,
+        });
+        feeText = cny == null ? '' : formatCnyInput(cny);
+      }
+
       const dest = normalizePackDestination(batchDestination);
       const inboundAt = inboundDateToIso(packDate);
-      const lineNote = buildLineNote();
+      const lineNote = [
+        feeText ? `报价 ${feeText} CNY` : '',
+        chargeBasisNote(basis, kg),
+        payCod ? '到付' : '',
+        payPrepaid ? '预付' : '',
+        batchNote.trim(),
+        `${t.packagingStockIn.packDateLabel} ${packDate}`,
+      ]
+        .filter(Boolean)
+        .join(' · ');
       const barcodeAt = inboundBarcodeTimestampFromPackDate(packDate);
       const lineBarcodes = await generatePackagingStockInLineBarcodes(
         dest,
@@ -480,7 +495,8 @@ export default function PackagingStockInScreen({ navigation }: Props) {
               weight: batchWeightStr,
               note: [
                 '多个入库',
-                totalFee.trim() ? `报价 ${totalFee.trim()} CNY` : '',
+                feeText ? `报价 ${feeText} CNY` : '',
+                chargeBasisNote(basis, kg),
                 recipientPhone.trim(),
               ]
                 .filter(Boolean)
@@ -673,6 +689,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
                 }}
               />
               <VolumetricWeightLine l={specL} w={specW} h={specH} />
+              <Text style={styles.pieceSummary}>{t.packagingStockIn.packChargeHint}</Text>
               <LockedSuffixField
                 label={t.packagingStockIn.batchWeightLabel}
                 value={batchWeightN}

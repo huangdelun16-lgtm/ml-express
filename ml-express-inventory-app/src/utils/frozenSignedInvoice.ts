@@ -7,6 +7,10 @@ export type FrozenInvoiceLineInput = {
   expressNos: string[];
   weightKg: number;
   cnyPerKg?: number | null;
+  /** 秤上的实际重量。有体积重量行时，重量行写这个。 */
+  actualWeightKg?: number;
+  /** 只在比实际重量大时带上。 */
+  volumetricKg?: number;
 };
 
 export type FrozenSignedInvoiceLine = {
@@ -52,10 +56,13 @@ type MeasureTemplates = {
   lineWeight: string;
   packMeasure: string;
   packWeight: string;
+  volumetric?: string;
 };
 
 export function invoiceLineMeasure(line: FrozenInvoiceLineInput, templates: MeasureTemplates): string {
-  const weightText = formatInvoiceWeight(line.weightKg);
+  const displayKg =
+    line.actualWeightKg != null && line.actualWeightKg > 0 ? line.actualWeightKg : line.weightKg;
+  const weightText = formatInvoiceWeight(displayKg);
   if (!weightText) return '';
   const unitPrice =
     line.cnyPerKg != null && line.cnyPerKg >= 0 ? formatInvoiceUnitPrice(line.cnyPerKg) : '';
@@ -66,7 +73,11 @@ export function invoiceLineMeasure(line: FrozenInvoiceLineInput, templates: Meas
     : line.kind === 'packaging'
       ? templates.packWeight
       : templates.lineWeight;
-  return fmt(template, { weight: weightText, price: unitPrice });
+  const text = fmt(template, { weight: weightText, price: unitPrice });
+  if (!templates.volumetric || line.volumetricKg == null || !(line.volumetricKg > displayKg)) return text;
+  const volumetricText = formatInvoiceWeight(line.volumetricKg);
+  if (!volumetricText) return text;
+  return `${text} · ${fmt(templates.volumetric, { weight: volumetricText })}`;
 }
 
 export function buildFrozenSignedInvoiceDocument(input: {

@@ -781,7 +781,11 @@ function buildItemDetail(
     total_fee: feeFields.totalFee,
     quote_cny: feeFields.quoteCny,
     payment_label: feeFields.paymentLabel,
-    charge_basis: feeFields.chargeBasis,
+    charge_basis:
+      item.charge_basis === 'volume' || item.charge_basis === 'weight'
+        ? item.charge_basis
+        : feeFields.chargeBasis,
+    charge_weight_kg: item.charge_weight_kg ?? feeFields.chargeKg,
     sign_receipt: signReceipt,
     pack,
   };

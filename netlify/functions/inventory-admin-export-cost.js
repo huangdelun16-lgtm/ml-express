@@ -47,9 +47,33 @@ exports.handler = async (event) => {
     return { statusCode: 500, headers, body: JSON.stringify({ error: '缺少 SUPABASE_SERVICE_ROLE_KEY 配置' }) };
   }
 
+  const body = parseBody(event);
+  if (body.action === 'void') {
+    const id = String(body.id || '').trim();
+    if (!id) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: '缺少要作废的记录' }) };
+    }
+    const supabase = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await supabase
+      .from('inventory_export_costs')
+      .update({ voided_at: new Date().toISOString() })
+      .eq('id', id)
+      .is('voided_at', null)
+      .select('id')
+      .maybeSingle();
+    if (error) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: error.message }) };
+    }
+    if (!data) {
+      return { statusCode: 404, headers, body: JSON.stringify({ error: '这笔记不到了，或已经作废' }) };
+    }
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, id: data.id }) };
+  }
+
   let row;
   try {
-    const body = parseBody(event);
     row = settleAdminExportCost({
       ...body,
       createdBy: auth.user?.employee_name || auth.user?.username || 'admin',
@@ -66,6 +90,7 @@ exports.handler = async (event) => {
     .select('id')
     .eq('subject_kind', row.subject_kind)
     .eq('subject_key', row.subject_key)
+    .is('voided_at', null)
     .maybeSingle();
   if (findErr) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: findErr.message }) };

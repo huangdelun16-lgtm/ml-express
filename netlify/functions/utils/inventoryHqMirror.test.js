@@ -111,6 +111,11 @@ test('pending export keeps stocked singles and multi-inbound packs, then drops s
     [{ barcode: 'MDY120000050826(2-1)', packed_bundle_barcode: 'RUI26MDY20001' }],
   );
   assert.equal(annotated[0].pack_barcode, 'RUI26MDY20001');
+  const alreadyPack = annotateExportCostsWithPackBarcode(
+    [{ subject_kind: 'package', subject_key: 'RUI26MDY20001', display_barcode: 'RUI26MDY20001' }],
+    [],
+  );
+  assert.equal(alreadyPack[0].pack_barcode, 'RUI26MDY20001');
 
   const linked = applyPackLinks(
     [
