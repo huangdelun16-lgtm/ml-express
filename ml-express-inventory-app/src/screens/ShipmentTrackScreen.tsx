@@ -12,7 +12,7 @@ import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/Col
 import ScrollPositionRail from '../components/ScrollPositionRail';
 import TripPackagesModal from '../components/TripPackagesModal';
 import { useAuth } from '../contexts/AuthContext';
-import { getPkgStatusLabel, useTranslation } from '../i18n';
+import { getPkgStatusLabel, resolveAppError, useTranslation } from '../i18n';
 import {
   listInboundPackages,
   listOutboundPackagesFromOrigin,
@@ -25,8 +25,10 @@ import {
   effectivePkgTrackingStatus,
   isActiveInboundTrackingPack,
   isActiveOutboundTrackingPack,
+  slowestTripStatus,
 } from '../utils/shipmentTrackVisibility';
-import { splitOutboundByTrip, type TruckTripSummary } from '../utils/truckTripGroups';
+import { parseTripTransportFee } from '../utils/tripTransportFee';
+import { outboundTrackRowCount, splitOutboundByTrip, type TruckTripSummary } from '../utils/truckTripGroups';
 
 type Tab = 'inbound' | 'outbound';
 
@@ -67,6 +69,9 @@ function PackTrackCard({ item, onPress }: { item: PkgTrackingDetail; onPress?: (
           {item.hub_received_by_store_code}
         </Text>
       ) : null}
+      {parseTripTransportFee(item.transport_fee) <= 0 ? (
+        <Text style={styles.feeMissing}>{t.shipmentTrack.feeMissing}</Text>
+      ) : null}
     </View>
   );
 
@@ -83,7 +88,7 @@ function TripTrackCard({ trip, onPress }: { trip: TruckTripSummary; onPress: () 
       <View style={[styles.card, styles.tripCard]}>
         <View style={styles.cardTop}>
           <Text style={styles.tripNumber}>{trip.tripNumber}</Text>
-          <Text style={styles.status}>{getPkgStatusLabel(t, trip.packages[0]?.status ?? 'in_transit')}</Text>
+          <Text style={styles.status}>{getPkgStatusLabel(t, slowestTripStatus(trip.packages))}</Text>
         </View>
         <Text style={styles.route}>
           {fmt(t.shipmentTrack.tripCardRoute, {
@@ -95,10 +100,13 @@ function TripTrackCard({ trip, onPress }: { trip: TruckTripSummary; onPress: () 
           {trip.outboundDate
             ? fmt(t.shipmentTrack.tripCardDate, { date: formatDisplayDate(trip.outboundDate) })
             : ''}
-          {trip.transportFee
-            ? ` · ${fmt(t.shipmentTrack.tripCardFee, { fee: trip.transportFee })}`
+          {parseTripTransportFee(trip.transportFee) > 0
+            ? `${trip.outboundDate ? ' · ' : ''}${fmt(t.shipmentTrack.tripCardFee, { fee: trip.transportFee })}`
             : ''}
         </Text>
+        {parseTripTransportFee(trip.transportFee) <= 0 ? (
+          <Text style={styles.feeMissing}>{t.shipmentTrack.feeMissing}</Text>
+        ) : null}
         <Text style={styles.tripHint}>{t.shipmentTrack.tripCardHint}</Text>
       </View>
     </Pressable>
@@ -116,17 +124,23 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
   const [inbound, setInbound] = useState<PkgTrackingDetail[]>([]);
   const [outbound, setOutbound] = useState<PkgTrackingDetail[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [selectedTrip, setSelectedTrip] = useState<TruckTripSummary | null>(null);
 
   const load = useCallback(async () => {
     if (!store) return;
-    const [inList, outList] = await Promise.all([
-      listInboundPackages(hubCode),
-      listOutboundPackagesFromOrigin(store.storeCode),
-    ]);
-    setInbound(inList.filter((pack) => isActiveInboundTrackingPack(pack, hubCode)));
-    setOutbound(outList.filter((pack) => isActiveOutboundTrackingPack(pack)));
-  }, [store, hubCode]);
+    try {
+      const [inList, outList] = await Promise.all([
+        listInboundPackages(hubCode),
+        listOutboundPackagesFromOrigin(store.storeCode),
+      ]);
+      setInbound(inList.filter((pack) => isActiveInboundTrackingPack(pack, hubCode)));
+      setOutbound(outList.filter((pack) => isActiveOutboundTrackingPack(pack)));
+      setLoadError('');
+    } catch (error) {
+      setLoadError(resolveAppError(t, error) || t.shipmentTrack.loadFailed);
+    }
+  }, [store, hubCode, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -148,7 +162,7 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
   }, [outbound]);
 
   const inboundCount = inbound.length;
-  const outboundCount = outbound.length;
+  const outboundCount = outboundTrackRowCount(outbound);
 
   return (
     <View style={styles.root}>
@@ -204,17 +218,37 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
             refreshing={refreshing}
             onRefresh={async () => {
               setRefreshing(true);
-              await load();
-              setRefreshing(false);
+              try {
+                await load();
+              } finally {
+                setRefreshing(false);
+              }
             }}
           />
         }
+        ListHeaderComponent={
+          loadError ? (
+            <View style={styles.inlineError}>
+              <Text style={styles.errorText}>{loadError}</Text>
+              <Pressable
+                style={styles.retryBtn}
+                onPress={() => void load()}
+                accessibilityRole="button"
+                accessibilityLabel={t.common.retry}
+              >
+                <Text style={styles.retryBtnText}>{t.common.retry}</Text>
+              </Pressable>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
-          <Text style={styles.empty}>
-            {tab === 'inbound'
-              ? fmt(t.shipmentTrack.emptyInbound, { hub: regionDisplayLabel(hubCode) })
-              : t.shipmentTrack.emptyOutbound}
-          </Text>
+          loadError ? null : (
+            <Text style={styles.empty}>
+              {tab === 'inbound'
+                ? fmt(t.shipmentTrack.emptyInbound, { hub: regionDisplayLabel(hubCode) })
+                : t.shipmentTrack.emptyOutbound}
+            </Text>
+          )
         }
         renderItem={({ item }) => {
           if (tab === 'inbound') {
@@ -283,6 +317,26 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: 16, paddingBottom: 24 },
   emptyList: { flexGrow: 1, paddingHorizontal: 16 },
   empty: { color: '#64748b', textAlign: 'center', marginTop: 48, lineHeight: 22 },
+  inlineError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(248,113,113,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(248,113,113,0.28)',
+  },
+  errorText: { color: '#fca5a5', flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  retryBtn: {
+    backgroundColor: '#7f1d1d',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  retryBtnText: { color: '#fecaca', fontSize: 12, fontWeight: '800' },
+  feeMissing: { color: '#fcd34d', fontSize: 12, marginTop: 6, fontWeight: '800' },
   card: {
     backgroundColor: '#1e293b',
     borderRadius: 12,

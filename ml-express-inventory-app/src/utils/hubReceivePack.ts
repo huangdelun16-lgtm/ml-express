@@ -155,6 +155,19 @@ export function matchScanInboundOrder(
   return { ok: false, reason: 'notThisHub', barcode: found.order_barcode || code };
 }
 
+/** 扫码先在手机上标成已入库；上传失败时把这一单和计数退回扫之前 */
+export function revertOptimisticHubInbound(
+  pack: PkgTrackingDetail,
+  orderId: string,
+  snapshot: PkgTrackingDetail['orders'][number],
+): PkgTrackingDetail {
+  return {
+    ...pack,
+    orders: pack.orders.map((order) => (order.id === orderId ? snapshot : order)),
+    received_order_count: Math.max(0, pack.received_order_count - 1),
+  };
+}
+
 export function resolveHubReceiveStep(pack: PkgTrackingDetail, hubCode: string): HubReceiveStep {
   if (pack.status === 'in_transit') return 1;
   if (countPendingPackInboundOrders(pack, hubCode) > 0) return 2;

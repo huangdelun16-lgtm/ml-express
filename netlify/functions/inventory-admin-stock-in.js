@@ -6,7 +6,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { randomUUID } = require('crypto');
 const { verifyAdminToken } = require('./verify-admin');
-const { writeAdminStockIn } = require('./utils/adminWebStockIn');
+const { writeAdminStockIn, writeBundleSingles } = require('./utils/adminWebStockIn');
 const { getAdminTokenFromEvent } = require('./utils/adminToken');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 const { indexCnyPerKg, lookupCnyPerKg } = require('./utils/inventoryCustomerAggregate');
@@ -236,7 +236,13 @@ async function executeStockIn(supabase, body, operator) {
     err.statusCode = status;
     throw err;
   };
-  const mode = body.mode === 'batch' ? 'batch' : body.mode === 'single' ? 'single' : '';
+  const mode = body.mode === 'bundle_singles'
+    ? 'bundle_singles'
+    : body.mode === 'batch'
+      ? 'batch'
+      : body.mode === 'single'
+        ? 'single'
+        : '';
   const storeId = String(body.storeId || '').trim();
   const destination = String(body.destination || '').trim().toUpperCase();
   const recipientName = String(body.recipientName || '').trim();
@@ -249,6 +255,79 @@ async function executeStockIn(supabase, body, operator) {
   if (!recipientName) return fail(400, '请填写客户姓名');
   if (!recipientPhone) return fail(400, '请填写手机号码');
   if (!pay) return fail(400, '请选择到付或预付');
+  if (mode === 'bundle_singles') {
+    const rawOrders = Array.isArray(body.orders) ? body.orders : [];
+    if (rawOrders.length < 2) return fail(400, '打成一包至少要两单');
+    const prepared = [];
+    for (const raw of rawOrders) {
+      const orderBody = {
+        ...body,
+        ...raw,
+        spec: normalizeSpec(raw.spec),
+        weightKg: sanitizeDecimal(raw.weightKg),
+        chargeBasis: raw.chargeBasis === 'volume' ? 'volume' : 'weight',
+        pay,
+      };
+      const weight = String(orderBody.weightKg || '').trim();
+      const weightN = Number(weight);
+      if (!weight || !Number.isFinite(weightN) || weightN <= 0) return fail(400, '每一单都要填写重量');
+      if (orderBody.chargeBasis === 'volume' && !(volumetricKgFromSpec(orderBody.spec) > 0)) {
+        return fail(400, '按体积重量收费的那一单，请先填写长、宽、高');
+      }
+      if (!String(orderBody.destination || '').trim()) return fail(400, '每一单都要有目的地');
+      if (!String(orderBody.recipientName || '').trim()) return fail(400, '每一单都要有客户姓名');
+      const quoteCny = await officialQuoteCny(supabase, orderBody);
+      const qty = Math.max(1, Math.round(Number(orderBody.qty) || 1));
+      const barcode = await uniqueInboundBarcode(supabase, orderBody.destination);
+      prepared.push({
+        barcode,
+        input_barcode: String(orderBody.expressCode || '').trim(),
+        name: String(orderBody.itemName || '').trim() || String(orderBody.expressCode || '').trim() || barcode,
+        spec: orderBody.spec,
+        unit: `${qty} Pcs`,
+        weight: `${weight} Kg`,
+        qty,
+        note: quoteNote(orderBody, quoteCny),
+        recipient_name: String(orderBody.recipientName || '').trim(),
+        recipient_phone: String(orderBody.recipientPhone || '').trim(),
+        customer_code: String(orderBody.customerCode || '').trim().toUpperCase(),
+        destination: String(orderBody.destination || '').trim().toUpperCase(),
+        detail_address: String(orderBody.detailAddress || '').trim(),
+        charge_basis: orderBody.chargeBasis,
+        charge_weight_kg: chargeKgOf(orderBody),
+      });
+    }
+    const { data: store, error: storeError } = await supabase
+      .from('delivery_stores')
+      .select('store_code')
+      .eq('id', storeId)
+      .maybeSingle();
+    if (storeError || !store) return fail(400, '发出站点不存在');
+    const pieceCount = prepared.reduce((sum, order) => sum + order.qty, 0);
+    const packBarcode = await nextPackageBarcode(
+      supabase,
+      prepared[0].destination,
+      pieceCount,
+      store.store_code,
+    );
+    const data = await writeBundleSingles(supabase, {
+      store_id: storeId,
+      operator,
+      inbound_at: inboundIso(body.inboundDate),
+      bundle: {
+        barcode: packBarcode,
+        name: `${prepared[0].recipient_name} 的快递包`,
+        unit: `${pieceCount} Pcs`,
+        note: '打包壳，费用在各单上',
+      },
+      orders: prepared,
+    });
+    return {
+      mode: 'bundle_singles',
+      barcode: data.barcode || packBarcode,
+      lineBarcodes: Array.isArray(data.line_barcodes) ? data.line_barcodes : [],
+    };
+  }
   body.spec = normalizeSpec(body.spec);
   body.weightKg = sanitizeDecimal(body.weightKg);
   if (body.chargeBasis === 'volume' && !(volumetricKgFromSpec(body.spec) > 0)) {

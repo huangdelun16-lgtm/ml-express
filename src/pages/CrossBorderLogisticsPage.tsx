@@ -1249,6 +1249,7 @@ const CrossBorderLogisticsPage: FC = () => {
         pendingPackCount: overview.pendingPackCount ?? 0,
         pendingTruckLoadCount: overview.pendingTruckLoadCount ?? 0,
         pendingNotifyCount: overview.pendingNotifyCount ?? 0,
+        pendingFillTripFeeCount: overview.pendingFillTripFeeCount ?? 0,
         recentPacks: prev?.recentPacks ?? [],
         recentOrders: prev?.recentOrders ?? [],
         packStatusFilter: prev?.packStatusFilter ?? filter,
@@ -1869,6 +1870,15 @@ const CrossBorderLogisticsPage: FC = () => {
         tip: isEn ? 'Open finance for money still to collect' : '打开财务，看待入账',
         action: { kind: 'finance' },
         tone: pendingIn > 0 ? 'warn' : undefined,
+      },
+      {
+        id: 'fill-trip-fee',
+        label: isEn ? 'Fee not filled' : '待补车费',
+        value: String(data.pendingFillTripFeeCount ?? 0),
+        hint: isEn ? 'Arrived or signed trips' : '已到站或已签收的车次',
+        tip: isEn ? 'Open finance for trips that still need a fee' : '打开财务，看还没补车费的车次',
+        action: { kind: 'finance' },
+        tone: (data.pendingFillTripFeeCount ?? 0) > 0 ? 'alert' : undefined,
       },
       {
         id: 'unpaid-truck',

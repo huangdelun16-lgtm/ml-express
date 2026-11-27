@@ -586,6 +586,11 @@ export default function ScanScreen({ navigation }: any) {
         scanAgainLabel: copy.continueScan,
         dismissLabel: copy.ok,
         onScanAgain: resetScanState,
+        photoLabel: copy.photoDeliver,
+        onPhoto: () => {
+          resetScanState();
+          navigation.navigate('PackageDetail', { packageId: pkg.id, openPhoto: true });
+        },
         detailLabel: copy.viewDetail,
         onOpenDetail: () => openPackageDetail(pkg.id),
       });

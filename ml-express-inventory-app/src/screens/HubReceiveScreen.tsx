@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import CollapsingHomeHeader, { useCollapsingHomeScroll } from '../components/CollapsingHomeHeader';
 import ExceptionReportModal from '../components/ExceptionReportModal';
@@ -21,6 +21,7 @@ import { groupHubReceiveScanLines, type HubReceiveScanGroup } from '../utils/hub
 import { isPackageBarcode } from '../utils/packageNumber';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 import { colors, space } from '../theme';
+import TripFeeWorkModal from '../components/TripFeeWorkModal';
 
 export default function HubReceiveScreen({
   route,
@@ -32,6 +33,10 @@ export default function HubReceiveScreen({
   const { scrollY, onScroll } = useCollapsingHomeScroll();
   const [exceptionTarget, setExceptionTarget] = useState<ExceptionReportTarget | null>(null);
   const [signRequest, setSignRequest] = useState<CustomerSignFlowRequest | null>(null);
+  const [payTripsOpen, setPayTripsOpen] = useState(Boolean(route.params?.payTrips));
+  useEffect(() => {
+    if (route.params?.payTrips) setPayTripsOpen(true);
+  }, [route.params?.payTrips]);
   const scanGroups = useMemo(
     () => groupHubReceiveScanLines(flow.scanBasket),
     [flow.scanBasket],
@@ -81,6 +86,9 @@ export default function HubReceiveScreen({
       onScroll={onScroll}
       scrollEventThrottle={16}
     >
+      <Pressable style={styles.payTrips} onPress={() => setPayTripsOpen(true)}>
+        <Text style={styles.payTripsText}>支付多个车次的车费</Text>
+      </Pressable>
       <HubReceiveStatusPanels
         t={t}
         fmt={flow.fmt}
@@ -154,6 +162,7 @@ export default function HubReceiveScreen({
         onScanSessionBegin={flow.beginScanInbound}
         onScanSessionEnd={flow.finishScanInbound}
         scanUploadLeft={flow.scanUploadLeft}
+        scanUploadFailure={flow.scanUploadFailure}
         onBatchInbound={() => void flow.handleBatchInbound()}
         onPayTransportFee={flow.handlePayTransportFee}
         onReleaseTransit={() => void flow.handleReleaseTransit()}
@@ -185,6 +194,14 @@ export default function HubReceiveScreen({
         target={exceptionTarget}
         onClose={() => setExceptionTarget(null)}
       />
+      <TripFeeWorkModal
+        visible={payTripsOpen}
+        mode="pay"
+        store={store}
+        hubCode={flow.hubCode}
+        operator={flow.operator}
+        onClose={() => setPayTripsOpen(false)}
+      />
     </ScrollView>
     </View>
   );
@@ -194,6 +211,15 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { flex: 1 },
   content: { padding: space.lg, paddingBottom: 48 },
+  payTrips: {
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fbbf24',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  payTripsText: { color: '#fde68a', fontWeight: '800' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
   hint: { color: colors.muted },
 });

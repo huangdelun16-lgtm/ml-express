@@ -10,12 +10,14 @@ import {
   countPendingTruckLoads,
   countSignableItems,
   countUnpaidTripFees,
+  countUrgentFillFeeTrips,
   emptyHomeTodoCounts,
   normalizeTodoCount,
   settledCount,
   type HomeTodoCounts,
   type HomeTodoFeePack,
 } from '../utils/homeTodoQueue';
+import { listOriginFeeTrips } from '../utils/tripTransportFee';
 import { countUnnotifiedSignableItems } from '../utils/arrivalNotify';
 import { isMissingArrivalNotifiedColumnError, isMissingDeliveryHubColumnError } from './inventoryCloudApi';
 
@@ -241,6 +243,20 @@ async function countPackQueue(): Promise<number> {
   return countPendingPackItems(rows);
 }
 
+async function countOriginFillFeeTrips(storeCode: string): Promise<number> {
+  const origin = storeCode.trim().toUpperCase();
+  if (!origin) return 0;
+  const rows = await fetchAllPages<InboundPackRow>((from, to) =>
+    supabase
+      .from('inventory_pkg_tracking')
+      .select(INBOUND_PACK_COLUMNS)
+      .eq('origin_store_code', origin)
+      .not('truck_loaded_at', 'is', null)
+      .range(from, to),
+  );
+  return countUrgentFillFeeTrips(listOriginFeeTrips(rows));
+}
+
 async function countTruckLoadQueue(): Promise<number> {
   const packs = await fetchAllPages<{ bundle_barcode?: string | null; loaded_at?: string | null }>(
     (from, to) =>
@@ -288,6 +304,7 @@ export async function fetchHomeTodoCounts(params: {
     countPendingSignsAndNotify(params.store),
     countPackQueue(),
     countTruckLoadQueue(),
+    countOriginFillFeeTrips(params.store.storeCode),
   ]);
 
   counts.hubArrive = settledCount(results[0]);
@@ -302,5 +319,6 @@ export async function fetchHomeTodoCounts(params: {
   }
   counts.pack = settledCount(results[4]);
   counts.truckLoad = settledCount(results[5]);
+  counts.fillTripFee = settledCount(results[6]);
   return counts;
 }

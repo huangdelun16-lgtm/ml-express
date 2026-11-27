@@ -129,7 +129,9 @@ export interface Product {
   description?: string;
   price: number;
   original_price?: number;
+  brand?: string;
   image_url?: string;
+  gallery_image_urls?: string[];
   /** 商品详细介绍滚动图（纵向浏览） */
   detail_image_urls?: string[];
   /** 多规格 SKU；null 表示单一价格商品 */
@@ -968,10 +970,15 @@ export const deliveryStoreService = {
   }
 };
 
-function withPublicProductImages<T extends { image_url?: string; detail_image_urls?: string[] }>(row: T): T {
+function withPublicProductImages<T extends { image_url?: string; detail_image_urls?: string[]; gallery_image_urls?: string[] }>(row: T): T {
   return {
     ...row,
     image_url: row.image_url ? publicStorageUrl(row.image_url) || row.image_url : row.image_url,
+    gallery_image_urls: Array.isArray(row.gallery_image_urls)
+      ? row.gallery_image_urls
+          .map((url) => publicStorageUrl(url) || url)
+          .filter((url) => Boolean(url))
+      : row.gallery_image_urls,
     detail_image_urls: Array.isArray(row.detail_image_urls)
       ? row.detail_image_urls
           .map((url) => publicStorageUrl(url) || url)

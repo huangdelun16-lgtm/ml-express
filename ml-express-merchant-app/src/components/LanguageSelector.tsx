@@ -4,8 +4,8 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../contexts/AppContext';
 
 interface LanguageSelectorProps {
@@ -13,6 +13,7 @@ interface LanguageSelectorProps {
 }
 
 export default function LanguageSelector({ position = 'absolute' }: LanguageSelectorProps) {
+  const insets = useSafeAreaInsets();
   const { language, setLanguage } = useApp();
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
 
@@ -30,8 +31,8 @@ export default function LanguageSelector({ position = 'absolute' }: LanguageSele
     setShowLanguageMenu(false);
   };
 
-  const containerStyle = position === 'absolute' 
-    ? [styles.languageSelectorContainer, styles.absolutePosition]
+  const containerStyle = position === 'absolute'
+    ? [styles.languageSelectorContainer, styles.absolutePosition, { top: insets.top + 10 }]
     : styles.languageSelectorContainer;
 
   return (
@@ -83,33 +84,27 @@ const styles = StyleSheet.create({
   },
   absolutePosition: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 30,
-    right: 20,
+    right: 16,
   },
   languageSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 25,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
+    borderColor: 'rgba(148, 163, 184, 0.28)',
   },
   languageFlag: {
-    fontSize: 20,
+    fontSize: 16,
     marginRight: 6,
   },
   languageText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#ffffff',
-    marginRight: 8,
+    color: '#e2e8f0',
+    marginRight: 6,
   },
   languageArrow: {
     fontSize: 10,

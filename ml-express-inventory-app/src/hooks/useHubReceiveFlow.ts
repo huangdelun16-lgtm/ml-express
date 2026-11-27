@@ -44,6 +44,7 @@ import {
   listPendingPackInboundOrders,
   preferConfirmedHubReceivePack,
   matchScanInboundOrder,
+  revertOptimisticHubInbound,
 } from '../utils/hubReceivePack';
 import { collectArrivalNotifyTargets, type ArrivalNotifyTarget } from '../utils/arrivalNotify';
 import { resolveStoreHubCode } from '../utils/storeZone';
@@ -66,8 +67,10 @@ export function useHubReceiveFlow(openPackBarcode: string) {
   const scanInboundIdsRef = useRef(new Set<string>());
   const scanWriteChainRef = useRef(Promise.resolve());
   const scanUploadCountRef = useRef(0);
+  const scanUploadFailureSeqRef = useRef(0);
   const scanRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [scanUploadLeft, setScanUploadLeft] = useState(0);
+  const [scanUploadFailure, setScanUploadFailure] = useState<{ seq: number; message: string } | null>(null);
   const lastGateMessageRef = useRef('');
   const activePackRef = useRef<PkgTrackingDetail | null>(null);
   const [scanBusy, setScanBusy] = useState(false);
@@ -803,21 +806,28 @@ export function useHubReceiveFlow(openPackBarcode: string) {
     const job = scanWriteChainRef.current.then(async () => {
       try {
         const pack = activePackRef.current;
-        if (!store || !pack) return;
+        if (!store || !pack) {
+          throw new Error('hub-scan-upload-empty');
+        }
         const result = await inboundSingleOrder(orderId, pack, { notify: false, refresh: false });
-        if (result?.order) scanNotifyBufferRef.current.push(result.order);
+        if (!result?.order) {
+          throw new Error('hub-scan-upload-empty');
+        }
+        scanNotifyBufferRef.current.push(result.order);
       } catch (e: unknown) {
         scanInboundIdsRef.current.delete(orderId);
         const current = activePackRef.current;
-        if (current) {
-          const orders = current.orders.map((order) => (order.id === orderId ? snapshot : order));
-          rememberPack({
-            ...current,
-            orders,
-            received_order_count: Math.max(0, current.received_order_count - 1),
-          });
-        }
-        setError(explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e));
+        if (current) rememberPack(revertOptimisticHubInbound(current, orderId, snapshot));
+        const barcode = snapshot.express_barcode?.trim() || snapshot.order_barcode;
+        const emptyWrite = e instanceof Error && e.message === 'hub-scan-upload-empty';
+        const err = emptyWrite
+          ? t.hubReceive.scanInboundUploadEmpty
+          : explainCloudOperationFailure(t, e, 'hubReceive') ?? resolveAppError(t, e);
+        const message = fmt(t.hubReceive.scanInboundUploadFailed, { barcode, err });
+        setModalSuccess('');
+        setError(message);
+        scanUploadFailureSeqRef.current += 1;
+        setScanUploadFailure({ seq: scanUploadFailureSeqRef.current, message });
       } finally {
         scanUploadCountRef.current = Math.max(0, scanUploadCountRef.current - 1);
         setScanUploadLeft(scanUploadCountRef.current);
@@ -1092,6 +1102,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
     beginScanInbound,
     finishScanInbound,
     scanUploadLeft,
+    scanUploadFailure,
     handleBatchInbound,
     handlePayTransportFee,
     handleReleaseTransit,

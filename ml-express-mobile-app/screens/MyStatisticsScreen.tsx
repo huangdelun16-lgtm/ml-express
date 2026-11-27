@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,125 +6,81 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
-  Dimensions,
-  Platform,
   StatusBar,
-  ActivityIndicator
+  ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { packageService, supabase } from '../services/supabase';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { supabase } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
-
-const { width } = Dimensions.get('window');
+import { buildRiderStats, EMPTY_RIDER_STATS, type RiderStats } from '../utils/riderStats';
 
 export default function MyStatisticsScreen({ navigation }: any) {
   const { language } = useApp();
-  const [loading, setLoading] = useState(false);
+  const insets = useSafeAreaInsets();
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [currentUserName, setCurrentUserName] = useState('');
-  const [statistics, setStatistics] = useState({
-    today: { delivered: 0, picked: 0, delivering: 0 },
-    week: { delivered: 0, total: 0 },
-    month: { delivered: 0, total: 0 },
-    total: { delivered: 0, totalPackages: 0 },
-    avgDeliveryTime: 0,
-    rating: 5.0,
-    efficiency: 95,
-  });
+  const [statistics, setStatistics] = useState<RiderStats>(EMPTY_RIDER_STATS);
+
+  const zh = language === 'zh';
+  const my = language === 'my';
+  const copy = {
+    title: zh ? '我的统计' : my ? 'ကျွန်ုပ်၏ စာရင်း' : 'My Statistics',
+    courier: zh ? '骑手' : my ? 'ကောင်ရီယာ' : 'Courier',
+    today: zh ? '今日完成' : my ? 'ယနေ့' : 'Today',
+    week: zh ? '近 7 天' : my ? '၇ ရက်' : '7 days',
+    month: zh ? '近 30 天' : my ? '၃၀ ရက်' : '30 days',
+    delivered: zh ? '累计完成' : my ? 'စုစုပေါင်း' : 'Completed',
+    failed: zh ? '取消或失败' : my ? 'ပယ်ဖျက်/မအောင်မြင်' : 'Cancelled',
+    rate: zh ? '完成率' : my ? 'ပြီးမြောက်နှုန်း' : 'Completion',
+    active: zh ? '进行中' : my ? 'လုပ်ဆောင်နေဆဲ' : 'Active',
+    rateHint: zh ? '完成数 ÷ 已结束订单，不含还在送的单' : my ? 'ပြီးသွားသော အော်ဒါသာ တွက်သည်' : 'Finished orders only. Active orders are excluded.',
+    rating: zh ? '服务评分' : my ? 'အမှတ်' : 'Rating',
+    time: zh ? '取件到送达' : my ? 'ကောက်ယူမှ ပို့ဆောင်' : 'Pickup to drop-off',
+    noRating: zh ? '还没有评分' : my ? 'အမှတ်မရှိသေး' : 'No ratings yet',
+    noTime: zh ? '还算不出耗时' : my ? 'ကြာချိန် မတွက်နိုင်သေး' : 'Not enough trips',
+    minutes: zh ? '分钟' : my ? 'မိနစ်' : 'min',
+    underMinute: zh ? '不到 1 分钟' : my ? '၁ မိနစ်မပြည့်' : 'Under 1 min',
+    badges: zh ? '里程碑' : my ? 'မှတ်တိုင်' : 'Milestones',
+    reached: zh ? '已达成' : my ? 'ရောက်ပြီး' : 'Reached',
+    loadFailed: zh ? '统计加载失败，下拉重试' : my ? 'ဖွင့်မရပါ။ ပြန်ဆွဲပါ' : 'Could not load stats. Pull to retry.',
+    noAccount: zh ? '没有读到骑手账号，请重新登录' : my ? 'အကောင့်မတွေ့ပါ။ ပြန်ဝင်ပါ' : 'Courier account missing. Sign in again.',
+  };
+
+  const loadData = useCallback(async () => {
+    try {
+      setLoadError('');
+      const userName = (await AsyncStorage.getItem('currentUserName')) || '';
+      setCurrentUserName(userName);
+      if (!userName) {
+        setStatistics(EMPTY_RIDER_STATS);
+        setLoadError(copy.noAccount);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('packages')
+        .select('status,pickup_time,delivery_time,customer_rating')
+        .eq('courier', userName);
+      if (error) throw error;
+      setStatistics(buildRiderStats((data || []) as Parameters<typeof buildRiderStats>[0]));
+    } catch (error) {
+      console.error('加载统计数据失败:', error);
+      setLoadError(copy.loadFailed);
+    } finally {
+      setLoading(false);
+    }
+  }, [copy.noAccount, copy.loadFailed]);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [])
+    }, [loadData]),
   );
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const userName = await AsyncStorage.getItem('currentUserName') || '';
-      setCurrentUserName(userName);
-      
-      // 🚀 强制从数据库获取最新数据，确保实时性
-      const { data: allPackages, error } = await supabase
-        .from('packages')
-        .select('*')
-        .eq('courier', userName);
-      
-      if (error) throw error;
-
-      const myPackages = allPackages || [];
-      
-      // 精准匹配今日日期
-      const now = new Date();
-      const todayStr = now.toISOString().split('T')[0]; // "YYYY-MM-DD"
-      
-      const todayPackages = myPackages.filter(pkg => {
-        const createDate = pkg.create_time || pkg.created_at || '';
-        return createDate.includes(todayStr);
-      });
-
-      // 计算平均配送时间 (单位: 分钟)
-      const completedPackages = myPackages.filter(p => p.status === '已送达' && p.delivery_time && p.create_time);
-      const avgTime = completedPackages.length > 0 
-        ? completedPackages.reduce((sum, p) => {
-            const start = new Date(p.create_time).getTime();
-            const end = new Date(p.delivery_time).getTime();
-            return sum + (end - start) / (1000 * 60);
-          }, 0) / completedPackages.length
-        : 0;
-
-      // 获取评分
-      const ratings = myPackages.filter(p => p.customer_rating).map(p => p.customer_rating);
-      const avgRating = ratings.length > 0 
-        ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length 
-        : 5.0;
-
-      const stats = {
-        today: {
-          delivered: todayPackages.filter(p => p.status === '已送达').length,
-          picked: todayPackages.filter(p => p.status === '已取件').length,
-          delivering: todayPackages.filter(p => ['配送中', '配送进行中'].includes(p.status)).length,
-        },
-        week: {
-          delivered: myPackages.filter(p => {
-            const d = new Date(p.delivery_time || p.updated_at || '');
-            const weekAgo = new Date();
-            weekAgo.setDate(weekAgo.getDate() - 7);
-            return p.status === '已送达' && d >= weekAgo;
-          }).length,
-          total: myPackages.length,
-        },
-        month: {
-          delivered: myPackages.filter(p => {
-            const d = new Date(p.delivery_time || p.updated_at || '');
-            const monthAgo = new Date();
-            monthAgo.setMonth(monthAgo.getMonth() - 1);
-            return p.status === '已送达' && d >= monthAgo;
-          }).length,
-          total: myPackages.length,
-        },
-        total: {
-          delivered: myPackages.filter(p => p.status === '已送达').length,
-          totalPackages: myPackages.length,
-        },
-        avgDeliveryTime: Math.round(avgTime) || 25,
-        rating: avgRating,
-        efficiency: myPackages.length > 0 
-          ? Math.round((myPackages.filter(p => p.status === '已送达').length / myPackages.length) * 100) 
-          : 100,
-      };
-
-      setStatistics(stats);
-    } catch (error) {
-      console.error('加载统计数据失败:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -132,374 +88,221 @@ export default function MyStatisticsScreen({ navigation }: any) {
     setRefreshing(false);
   };
 
+  const finished = statistics.delivered + statistics.failed;
+  const completion = finished > 0 ? Math.round((statistics.delivered / finished) * 100) : null;
+  const timeLabel = statistics.avgMinutes == null
+    ? copy.noTime
+    : statistics.avgMinutes < 1
+      ? copy.underMinute
+      : `${Math.round(statistics.avgMinutes)} ${copy.minutes}`;
+  const ratingLabel = statistics.rating == null ? copy.noRating : statistics.rating.toFixed(1);
+
+  const milestones = [
+    {
+      title: zh ? '完成 100 单' : my ? 'အော်ဒါ ၁၀၀' : '100 deliveries',
+      progress: `${statistics.delivered}/100`,
+      unlocked: statistics.delivered >= 100,
+    },
+    {
+      title: zh ? '平均 30 分钟内' : my ? 'ပျမ်းမျှ ၃၀ မိနစ်' : 'Under 30 min',
+      progress: statistics.avgMinutes == null ? '—' : `${Math.max(1, Math.round(statistics.avgMinutes))} ${copy.minutes}`,
+      unlocked: statistics.delivered >= 10 && statistics.avgMinutes != null && statistics.avgMinutes < 30,
+    },
+    {
+      title: zh ? '评分 4.8 以上' : my ? 'အမှတ် ၄.၈' : 'Rating 4.8+',
+      progress: statistics.rating == null ? '—' : `${statistics.rating.toFixed(1)} · ${statistics.ratingCount}`,
+      unlocked: statistics.ratingCount >= 5 && statistics.rating != null && statistics.rating >= 4.8,
+    },
+    {
+      title: zh ? '结束的单全部送达' : my ? 'ပယ်ဖျက်မရှိ' : 'No failed finishes',
+      progress: completion == null ? '—' : `${completion}%`,
+      unlocked: finished >= 10 && completion === 100,
+    },
+  ];
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <LinearGradient
-        colors={['#0f172a', '#1e3a8a', '#334155']}
-        style={StyleSheet.absoluteFill}
-      />
-      
-      {/* 装饰圆形 */}
-      <View style={[styles.circle, { top: -100, right: -100, backgroundColor: 'rgba(59, 130, 246, 0.15)' }]} />
-      <View style={[styles.circle, { bottom: -50, left: -50, backgroundColor: 'rgba(30, 58, 138, 0.2)' }]} />
-
-      {/* 头部 */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={28} color="white" />
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconButton}>
+          <Ionicons name="chevron-back" size={22} color="#e2e8f0" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{language === 'zh' ? '我的统计' : 'My Statistics'}</Text>
-        <TouchableOpacity onPress={onRefresh} style={styles.refreshButton}>
-          <Ionicons name="refresh" size={22} color="white" />
+        <Text style={styles.headerTitle}>{copy.title}</Text>
+        <TouchableOpacity onPress={onRefresh} style={styles.iconButton}>
+          <Ionicons name="refresh" size={18} color="#e2e8f0" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.content}
+        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 24 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#94a3b8" />}
       >
-        {/* 用户信息卡片 */}
-        <View style={styles.userGlassCard}>
-          <View style={styles.userAvatarContainer}>
-            <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.userAvatar}>
-              <Text style={styles.userAvatarText}>{currentUserName.charAt(0)}</Text>
-            </LinearGradient>
-            <View style={styles.onlineBadge} />
+        <View style={styles.profileCard}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{(currentUserName || '?').charAt(0).toUpperCase()}</Text>
           </View>
-          <Text style={styles.userName}>{currentUserName}</Text>
-          <Text style={styles.userRole}>{language === 'zh' ? '官方认证骑手' : 'Certified Courier'}</Text>
-        </View>
-
-        {/* 累计数据 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📊 {language === 'zh' ? '历史累计数据' : 'Overall Performance'}</Text>
-          <View style={styles.totalStatsGlassCard}>
-            <View style={styles.totalStatItem}>
-              <Text style={styles.totalStatNumber}>{statistics.total.delivered}</Text>
-              <Text style={styles.totalStatLabel}>{language === 'zh' ? '累计完成' : 'Completed'}</Text>
-            </View>
-            <View style={styles.glassDivider} />
-            <View style={styles.totalStatItem}>
-              <Text style={styles.totalStatNumber}>{statistics.total.totalPackages}</Text>
-              <Text style={styles.totalStatLabel}>{language === 'zh' ? '接单总数' : 'Total Orders'}</Text>
-            </View>
-            <View style={styles.glassDivider} />
-            <View style={styles.totalStatItem}>
-              <Text style={[styles.totalStatNumber, {color: '#10b981'}]}>
-                {statistics.total.totalPackages > 0 
-                  ? Math.round((statistics.total.delivered / statistics.total.totalPackages) * 100) 
-                  : 0}%
-              </Text>
-              <Text style={styles.totalStatLabel}>{language === 'zh' ? '综合完成率' : 'Success Rate'}</Text>
-            </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.userName}>{currentUserName || '—'}</Text>
+            <Text style={styles.userRole}>{copy.courier}</Text>
           </View>
         </View>
 
-        {/* 绩效指标 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🎯 {language === 'zh' ? '核心绩效指标' : 'Performance Indicators'}</Text>
-          <View style={styles.performanceGlassCard}>
-            {[
-              { label: language === 'zh' ? '服务评分' : 'Service Rating', value: statistics.rating.toFixed(1), icon: 'star', color: '#fbbf24', percent: (statistics.rating / 5) * 100 },
-              { label: language === 'zh' ? '工作效率' : 'Work Efficiency', value: `${statistics.efficiency}%`, icon: 'flash', color: '#10b981', percent: statistics.efficiency },
-              { label: language === 'zh' ? '平均配送耗时' : 'Avg Time', value: `${statistics.avgDeliveryTime}min`, icon: 'time', color: '#60a5fa', percent: Math.max(0, 100 - (statistics.avgDeliveryTime / 60) * 100) },
-            ].map((item, index) => (
-              <View key={index} style={styles.performanceItem}>
-                <View style={styles.performanceHeader}>
-                  <View style={styles.performanceLabelGroup}>
-                    <Ionicons name={item.icon as any} size={16} color={item.color} />
-                    <Text style={styles.performanceLabelText}>{item.label}</Text>
-                  </View>
-                  <Text style={[styles.performanceValue, { color: item.color }]}>{item.value}</Text>
-                </View>
-                <View style={styles.progressBarBg}>
-                  <LinearGradient
-                    colors={[item.color, item.color + 'aa']}
-                    start={{x: 0, y: 0}}
-                    end={{x: 1, y: 0}}
-                    style={[styles.progressFill, { width: `${item.percent}%` }]}
-                  />
-                </View>
-              </View>
-            ))}
+        {loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}
+        {loading && statistics.delivered === 0 && statistics.active === 0 ? (
+          <ActivityIndicator style={{ marginVertical: 20 }} color="#7dd3fc" />
+        ) : null}
+
+        <View style={styles.periodRow}>
+          {[
+            { label: copy.today, value: statistics.today },
+            { label: copy.week, value: statistics.week },
+            { label: copy.month, value: statistics.month },
+          ].map((item) => (
+            <View key={item.label} style={styles.periodCard}>
+              <Text style={styles.periodValue}>{item.value}</Text>
+              <Text style={styles.periodLabel}>{item.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.sectionCard}>
+          <View style={styles.metricGrid}>
+            <Metric label={copy.delivered} value={String(statistics.delivered)} />
+            <Metric label={copy.failed} value={String(statistics.failed)} />
+            <Metric label={copy.active} value={String(statistics.active)} />
+            <Metric label={copy.rate} value={completion == null ? '—' : `${completion}%`} accent />
+          </View>
+          <Text style={styles.hint}>{copy.rateHint}</Text>
+        </View>
+
+        <View style={styles.sectionCard}>
+          <View style={styles.line}>
+            <Text style={styles.lineLabel}>{copy.rating}</Text>
+            <Text style={styles.lineValue}>{ratingLabel}</Text>
+          </View>
+          {statistics.rating != null ? (
+            <View style={styles.barBg}>
+              <View style={[styles.barFill, { width: `${Math.min(100, (statistics.rating / 5) * 100)}%`, backgroundColor: '#fbbf24' }]} />
+            </View>
+          ) : null}
+          <View style={[styles.line, { marginTop: 14 }]}>
+            <Text style={styles.lineLabel}>{copy.time}</Text>
+            <Text style={styles.lineValue}>{timeLabel}</Text>
           </View>
         </View>
 
-        {/* 成就徽章 */}
-        <View style={[styles.section, { marginBottom: 40 }]}>
-          <Text style={styles.sectionTitle}>🏅 {language === 'zh' ? '成就徽章' : 'Achievements'}</Text>
-          <View style={styles.achievementsGrid}>
-            {[
-              { icon: '🥇', title: '配送达人', desc: '100单配送', unlocked: statistics.total.delivered >= 100 },
-              { icon: '⚡', title: '闪电侠', desc: '准时高效', unlocked: statistics.avgDeliveryTime < 30 },
-              { icon: '⭐', title: '五星好评', desc: '零投诉', unlocked: statistics.rating >= 4.8 },
-              { icon: '🎯', title: '零失误', desc: '100%完成率', unlocked: statistics.efficiency >= 95 },
-            ].map((achievement, index) => (
-              <View 
-                key={index}
-                style={[
-                  styles.achievementCard,
-                  !achievement.unlocked && styles.achievementLocked
-                ]}
-              >
-                <View style={styles.achievementIconBg}>
-                  <Text style={styles.achievementIcon}>{achievement.icon}</Text>
-                </View>
-                <Text style={styles.achievementTitle}>{achievement.title}</Text>
-                <Text style={styles.achievementDesc}>{achievement.desc}</Text>
-                {achievement.unlocked && (
-                  <View style={styles.unlockedTag}>
-                    <Ionicons name="checkmark-circle" size={12} color="#10b981" />
-                    <Text style={styles.unlockedText}>已达成</Text>
-                  </View>
-                )}
-              </View>
-            ))}
-          </View>
+        <Text style={styles.sectionTitle}>{copy.badges}</Text>
+        <View style={styles.badgeGrid}>
+          {milestones.map((item) => (
+            <View key={item.title} style={[styles.badgeCard, !item.unlocked && styles.badgeLocked]}>
+              <Ionicons name={item.unlocked ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={item.unlocked ? '#5eead4' : '#64748b'} />
+              <Text style={styles.badgeTitle}>{item.title}</Text>
+              <Text style={styles.badgeProgress}>{item.unlocked ? copy.reached : item.progress}</Text>
+            </View>
+          ))}
         </View>
       </ScrollView>
     </View>
   );
 }
 
+function Metric({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <View style={styles.metric}>
+      <Text style={[styles.metricValue, accent && { color: '#5eead4' }]}>{value}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-  },
-  circle: {
-    position: 'absolute',
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-  },
+  container: { flex: 1, backgroundColor: '#0f172a' },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  backButton: {
-    width: 44,
-    height: 44,
+  iconButton: {
+    width: 40,
+    height: 40,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: '#1e293b',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  refreshButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  userGlassCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 28,
-    padding: 24,
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
+    borderColor: 'rgba(148, 163, 184, 0.28)',
   },
-  userAvatarContainer: {
-    position: 'relative',
-    marginBottom: 16,
-  },
-  userAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  userAvatarText: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  onlineBadge: {
-    position: 'absolute',
-    bottom: 5,
-    right: 5,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#10b981',
-    borderWidth: 2,
-    borderColor: '#1e3a8a',
-  },
-  userName: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  userRole: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.5)',
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#fff',
-    marginBottom: 16,
-  },
-  totalStatsGlassCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 24,
-    padding: 24,
+  headerTitle: { color: '#f8fafc', fontSize: 18, fontWeight: '700' },
+  content: { flex: 1, paddingHorizontal: 20 },
+  profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  totalStatItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  totalStatNumber: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  totalStatLabel: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.4)',
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  glassDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  performanceGlassCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    gap: 20,
-  },
-  performanceItem: {
-    gap: 10,
-  },
-  performanceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  performanceLabelGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  performanceLabelText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.7)',
-  },
-  performanceValue: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  progressBarBg: {
-    height: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  achievementsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 12,
+    backgroundColor: '#1e293b',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.22)',
   },
-  achievementCard: {
-    width: (width - 52) / 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 24,
-    padding: 20,
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#152033',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { color: '#7dd3fc', fontSize: 20, fontWeight: '800' },
+  userName: { color: '#f8fafc', fontSize: 18, fontWeight: '700' },
+  userRole: { color: '#94a3b8', fontSize: 13, fontWeight: '600', marginTop: 2 },
+  errorText: { color: '#fca5a5', fontSize: 13, fontWeight: '600', marginTop: 12 },
+  periodRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  periodCard: {
+    flex: 1,
+    backgroundColor: '#1e293b',
+    borderRadius: 18,
+    paddingVertical: 14,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(148, 163, 184, 0.22)',
   },
-  achievementLocked: {
-    opacity: 0.3,
+  periodValue: { color: '#f8fafc', fontSize: 22, fontWeight: '800' },
+  periodLabel: { color: '#94a3b8', fontSize: 12, fontWeight: '600', marginTop: 4 },
+  sectionCard: {
+    marginTop: 12,
+    backgroundColor: '#1e293b',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.22)',
   },
-  achievementIconBg: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  achievementIcon: {
-    fontSize: 28,
-  },
-  achievementTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#fff',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  achievementDesc: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.4)',
-    fontWeight: '600',
-    textAlign: 'center',
+  metricGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  metric: { width: '50%', paddingVertical: 8 },
+  metricValue: { color: '#f8fafc', fontSize: 20, fontWeight: '800' },
+  metricLabel: { color: '#94a3b8', fontSize: 12, fontWeight: '600', marginTop: 2 },
+  hint: { color: '#64748b', fontSize: 12, fontWeight: '600', marginTop: 6 },
+  line: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  lineLabel: { color: '#94a3b8', fontSize: 14, fontWeight: '700' },
+  lineValue: { color: '#f8fafc', fontSize: 15, fontWeight: '700' },
+  barBg: { height: 6, borderRadius: 3, backgroundColor: '#152033', marginTop: 8, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: 3 },
+  sectionTitle: { color: '#94a3b8', fontSize: 13, fontWeight: '700', marginTop: 18, marginBottom: 8, marginLeft: 4 },
+  badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  badgeCard: {
+    width: '48%',
+    backgroundColor: '#1e293b',
+    borderRadius: 16,
+    padding: 12,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.22)',
+    gap: 6,
   },
-  unlockedTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  unlockedText: {
-    fontSize: 10,
-    color: '#10b981',
-    fontWeight: '800',
-  },
+  badgeLocked: { opacity: 0.72 },
+  badgeTitle: { color: '#f8fafc', fontSize: 13, fontWeight: '700' },
+  badgeProgress: { color: '#94a3b8', fontSize: 12, fontWeight: '600' },
 });

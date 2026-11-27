@@ -121,6 +121,7 @@ function buildPendingExportBoard(items, options = {}) {
 
   const singles = [];
   const groups = new Map();
+  const packedGroups = new Map();
   for (const row of pending) {
     const parsed = parsePackagingLine(row.barcode);
     if (parsed) {
@@ -128,6 +129,13 @@ function buildPendingExportBoard(items, options = {}) {
       const list = groups.get(key) || [];
       list.push(row);
       groups.set(key, list);
+      continue;
+    }
+    const packCode = text(row.packed_bundle_barcode).toUpperCase();
+    if (packCode) {
+      const list = packedGroups.get(packCode) || [];
+      list.push(row);
+      packedGroups.set(packCode, list);
       continue;
     }
     const code = text(row.barcode).toUpperCase();
@@ -166,6 +174,43 @@ function buildPendingExportBoard(items, options = {}) {
       weightKg: packWeight > 0 ? packWeight : pieceWeight,
       tripNumber: lookupMap(
         [base, ...rows.flatMap((row) => [row.barcode, row.packed_bundle_barcode, `id:${row.id}`])],
+        options.tripByBarcode,
+      ),
+      ownerStoreCode: rows.map((row) => text(row.owner_store_code).toUpperCase()).find(Boolean) || '',
+    });
+  }
+
+  for (const [packCode, rows] of packedGroups) {
+    if (rows.length < 2) {
+      for (const row of rows) {
+        singles.push({
+          id: text(row.id),
+          barcode: text(row.input_barcode) || text(row.barcode),
+          packBarcode: packCode,
+          customer: text(row.recipient_name),
+          destination: text(row.final_destination),
+          weightKg: parseWeightKg(row.weight),
+          tripNumber: lookupMap(
+            [row.barcode, row.packed_bundle_barcode, `id:${row.id}`],
+            options.tripByBarcode,
+          ),
+          ownerStoreCode: text(row.owner_store_code).toUpperCase(),
+        });
+      }
+      continue;
+    }
+    packages.push({
+      base: packCode,
+      packBarcode: packCode,
+      customer: rows.map((row) => text(row.recipient_name)).find(Boolean) || '',
+      destination: rows.map((row) => text(row.final_destination)).find(Boolean) || '',
+      pieceCount: rows.length,
+      orderBarcodes: rows
+        .map((row) => text(row.input_barcode) || text(row.barcode))
+        .filter(Boolean),
+      weightKg: rows.reduce((sum, row) => sum + parseWeightKg(row.weight), 0),
+      tripNumber: lookupMap(
+        [packCode, ...rows.flatMap((row) => [row.barcode, row.packed_bundle_barcode, `id:${row.id}`])],
         options.tripByBarcode,
       ),
       ownerStoreCode: rows.map((row) => text(row.owner_store_code).toUpperCase()).find(Boolean) || '',
@@ -276,7 +321,7 @@ async function fetchPages(supabase, table, select, apply) {
 }
 
 async function loadHqTodoCounts(supabase) {
-  const counts = { pendingPack: 0, pendingTruckLoad: 0, pendingNotify: 0 };
+  const counts = { pendingPack: 0, pendingTruckLoad: 0, pendingNotify: 0, pendingFillTripFee: 0 };
   try {
     const items = await fetchPages(
       supabase,
@@ -341,6 +386,30 @@ async function loadHqTodoCounts(supabase) {
     counts.pendingNotify = countPendingNotify(rows);
   } catch (error) {
     console.warn('hq todo notify count skipped', error?.message || error);
+  }
+
+  try {
+    const rows = await fetchPages(
+      supabase,
+      'inventory_pkg_tracking',
+      'pack_barcode, trip_number, transport_fee, status',
+      (query) => query.in('status', ['hub_received', 'completed', 'split_at_hub']),
+    );
+    const seen = new Set();
+    let urgent = 0;
+    for (const row of rows) {
+      const fee = parseWeightKg(row.transport_fee);
+      if (fee > 0) continue;
+      const trip = text(row.trip_number).toUpperCase();
+      const pack = text(row.pack_barcode).toUpperCase();
+      const key = trip ? `trip:${trip}` : `pack:${pack}`;
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      urgent += 1;
+    }
+    counts.pendingFillTripFee = urgent;
+  } catch (error) {
+    console.warn('hq todo fill trip fee skipped', error?.message || error);
   }
 
   return counts;

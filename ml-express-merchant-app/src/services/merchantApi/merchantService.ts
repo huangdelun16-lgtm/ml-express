@@ -10,6 +10,18 @@ import {
   toDirectProductPatch,
 } from "../_shared/productReview";
 
+function missingBrandGalleryColumn(error: { message?: string; details?: string; code?: string } | null): boolean {
+  const message = `${error?.message || ""} ${error?.details || ""} ${error?.code || ""}`;
+  return /brand|gallery_image_urls/i.test(message) && /column|schema cache|does not exist|PGRST204/i.test(message);
+}
+
+function omitBrandGalleryColumns<T extends Record<string, unknown>>(row: T): T {
+  const next = { ...row };
+  delete next.brand;
+  delete next.gallery_image_urls;
+  return next;
+}
+
 // 商家服务 (外卖/零售)
 export const merchantService = {
   // 获取商店的所有商品
@@ -61,19 +73,23 @@ export const merchantService = {
         pending_update: _pu,
         ...rest
       } = product as Product;
-      const { data, error } = await supabase
-        .from("products")
-        .insert([
-          {
-            ...rest,
-            sales_count: 0,
-            listing_status: "pending" as const,
-            is_available: false,
-            pending_update: null,
-          },
-        ])
-        .select()
-        .single();
+      const insertRow = {
+        ...rest,
+        sales_count: 0,
+        listing_status: "pending" as const,
+        is_available: false,
+        pending_update: null,
+      };
+      let { data, error } = await supabase.from("products").insert([insertRow]).select().single();
+      if (error && missingBrandGalleryColumn(error)) {
+        const retry = await supabase
+          .from("products")
+          .insert([omitBrandGalleryColumns(insertRow)])
+          .select()
+          .single();
+        data = retry.data;
+        error = retry.error;
+      }
 
       if (error) throw error;
       return { success: true, data, pendingReview: true as const };
@@ -89,15 +105,26 @@ export const merchantService = {
       const { pending_update: _pu, ...safeUpdates } = updates as Partial<Product> & {
         pending_update?: unknown;
       };
-      const { data, error } = await supabase
+      const updateRow = {
+        ...safeUpdates,
+        updated_at: new Date().toISOString(),
+      };
+      let { data, error } = await supabase
         .from("products")
-        .update({
-          ...safeUpdates,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateRow)
         .eq("id", productId)
         .select()
         .single();
+      if (error && missingBrandGalleryColumn(error)) {
+        const retry = await supabase
+          .from("products")
+          .update(omitBrandGalleryColumns(updateRow))
+          .eq("id", productId)
+          .select()
+          .single();
+        data = retry.data;
+        error = retry.error;
+      }
 
       if (error) throw error;
       return { success: true, data };

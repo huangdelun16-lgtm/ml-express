@@ -23,6 +23,7 @@ import { myanmarTextCss } from '../utils/myanmarText';
 import { feedbackService } from '../services/FeedbackService';
 import { storeAvatarSrc } from '../utils/storeAvatar';
 import StorageImg from '../components/StorageImg';
+import { productGalleryUrls } from '../services/_shared/productReview';
 
 const PIECE_REMARK_LABELS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
 
@@ -53,6 +54,7 @@ const StoreProductsPage: React.FC = () => {
 
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedProductDetail, setSelectedProductDetail] = useState<Product | null>(null);
+  const [detailGalleryIndex, setDetailGalleryIndex] = useState(0);
   const [detailRemarks, setDetailRemarks] = useState<string[]>(['']);
   const [detailQty, setDetailQty] = useState(1);
   const [detailOpenedFromCart, setDetailOpenedFromCart] = useState(false);
@@ -95,6 +97,10 @@ const StoreProductsPage: React.FC = () => {
       setLoading(false);
     }
   }, [storeId, location.search]);
+
+  useEffect(() => {
+    setDetailGalleryIndex(0);
+  }, [selectedProductDetail?.id]);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('ml-express-customer');
@@ -1087,7 +1093,7 @@ const StoreProductsPage: React.FC = () => {
           >
             <div style={{ position: 'relative', height: 220, background: '#f1f5f9', flexShrink: 0 }}>
               <StorageImg
-                src={selectedProductDetail.image_url}
+                src={productGalleryUrls(selectedProductDetail)[detailGalleryIndex] || selectedProductDetail.image_url}
                 alt=""
                 style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                 fallback={
@@ -1124,7 +1130,31 @@ const StoreProductsPage: React.FC = () => {
             </div>
 
             <div ref={detailScrollRef} style={{ overflowY: 'auto', padding: '1.25rem 1.5rem', flex: 1 }}>
-              <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.35rem', fontWeight: 900, color: '#0f172a' }}>{selectedProductDetail.name}</h2>
+              <h2 style={{ margin: '0 0 0.35rem', fontSize: '1.35rem', fontWeight: 900, color: '#0f172a' }}>{selectedProductDetail.name}</h2>
+              {selectedProductDetail.brand ? (
+                <p style={{ margin: '0 0 0.65rem', color: '#64748b', fontWeight: 700 }}>{selectedProductDetail.brand}</p>
+              ) : null}
+              {productGalleryUrls(selectedProductDetail).length > 1 ? (
+                <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: '0.85rem' }}>
+                  {productGalleryUrls(selectedProductDetail).map((url, idx) => (
+                    <button
+                      key={`${url}-${idx}`}
+                      type="button"
+                      onClick={() => setDetailGalleryIndex(idx)}
+                      style={{
+                        padding: 0,
+                        border: idx === detailGalleryIndex ? '2px solid #10b981' : '2px solid transparent',
+                        borderRadius: 10,
+                        background: '#f1f5f9',
+                        cursor: 'pointer',
+                        flex: '0 0 auto',
+                      }}
+                    >
+                      <StorageImg src={url} alt="" style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 8, display: 'block' }} />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: '1rem', flexWrap: 'wrap', minHeight: '1.75rem' }}>
                 {productHasVariants(selectedProductDetail) && !selectedVariantId ? (
                   <span style={{ color: '#64748b', fontSize: '0.95rem', fontWeight: 600 }}>

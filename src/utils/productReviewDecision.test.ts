@@ -60,6 +60,23 @@ describe('productReviewDecision', () => {
     expect(payload.pending_update).toBeNull();
   });
 
+  it('merges brand and gallery photos when approving an edit', () => {
+    const payload = buildApproveUpdate(
+      {
+        ...editProduct,
+        pending_update: {
+          brand: 'Nike',
+          gallery_image_urls: ['https://img/1.jpg', 'https://img/2.jpg'],
+          image_url: 'https://img/1.jpg',
+        },
+      },
+      '2026-08-30T02:00:00.000Z',
+    );
+    expect(payload.brand).toBe('Nike');
+    expect(payload.gallery_image_urls).toEqual(['https://img/1.jpg', 'https://img/2.jpg']);
+    expect(payload.image_url).toBe('https://img/1.jpg');
+  });
+
   it('rejects a new listing without publishing', () => {
     const payload = buildRejectUpdate(newProduct, '2026-08-30T02:00:00.000Z', '图片模糊');
     expect(payload.listing_status).toBe('rejected');

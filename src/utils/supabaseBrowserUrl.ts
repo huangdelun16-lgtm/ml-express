@@ -118,6 +118,7 @@ function mapPublicImageList(urls: unknown): string[] | undefined {
 export function withPublicProductImages<
   T extends {
     image_url?: string | null;
+    gallery_image_urls?: string[] | null;
     detail_image_urls?: string[] | null;
     pending_update?: Record<string, unknown> | null;
   },
@@ -126,6 +127,7 @@ export function withPublicProductImages<
   return {
     ...row,
     image_url: row.image_url ? publicStorageUrl(row.image_url) : row.image_url,
+    gallery_image_urls: mapPublicImageList(row.gallery_image_urls) ?? row.gallery_image_urls,
     detail_image_urls: mapPublicImageList(row.detail_image_urls) ?? row.detail_image_urls,
     pending_update:
       pending && typeof pending === 'object'
@@ -135,6 +137,8 @@ export function withPublicProductImages<
               typeof pending.image_url === 'string'
                 ? publicStorageUrl(pending.image_url)
                 : pending.image_url,
+            gallery_image_urls:
+              mapPublicImageList(pending.gallery_image_urls) ?? pending.gallery_image_urls,
             detail_image_urls:
               mapPublicImageList(pending.detail_image_urls) ?? pending.detail_image_urls,
           }

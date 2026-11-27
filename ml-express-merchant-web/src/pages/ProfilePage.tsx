@@ -29,6 +29,8 @@ import type { StoreTypeLang } from "../services/_shared/merchantStoreTypes";
 import { autoPrepareProductImageForUpload } from "../utils/productImagePrepare";
 import ProductVariantsEditor from "../components/ProductVariantsEditor";
 import StorageImg from "../components/StorageImg";
+import ProductPhotoGrid from "../components/ProductPhotoGrid";
+import { MAX_PRODUCT_GALLERY_IMAGES, promoteGalleryCover } from "../services/_shared/productReview";
 import {
   defaultMerchantProductForm,
   merchantProductFormFromProduct,
@@ -406,7 +408,6 @@ const ProfilePage: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [showDetailImagesPanel, setShowDetailImagesPanel] = useState(false);
   const [isUploadingDetailImages, setIsUploadingDetailImages] = useState(false);
-  const productFileInputRef = useRef<HTMLInputElement>(null);
   const detailImagesFileInputRef = useRef<HTMLInputElement>(null);
 
   // 🚀 新增：店铺营业状态临时状态（用于保存前修改）
@@ -709,27 +710,52 @@ const ProfilePage: React.FC = () => {
     setShowAddEditProductModal(true);
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !currentUser?.id) return;
+  const handleImageUpload = async (files: File[]) => {
+    if (!files.length || !currentUser?.id) return;
+    const room = MAX_PRODUCT_GALLERY_IMAGES - productForm.gallery_image_urls.length;
+    if (room <= 0) {
+      feedbackService.notify(language === "zh" ? "最多上传 6 张图片" : "Up to 6 photos");
+      return;
+    }
+    const batch = files.slice(0, room);
+    if (files.length > room) {
+      feedbackService.notify(language === "zh" ? "最多上传 6 张图片" : "Up to 6 photos");
+    }
 
     try {
       setIsUploading(true);
-      const prepared = await autoPrepareProductImageForUpload(file);
-      const url = await merchantService.uploadProductImage(
-        currentUser.id,
-        prepared,
-      );
-      if (url) {
-        setProductForm((prev) => ({ ...prev, image_url: url }));
+      const uploadedUrls: string[] = [];
+      for (const file of batch) {
+        const prepared = await autoPrepareProductImageForUpload(file);
+        const url = await merchantService.uploadProductImage(currentUser.id, prepared);
+        if (url) uploadedUrls.push(url);
+      }
+      if (uploadedUrls.length > 0) {
+        setProductForm((prev) => {
+          const gallery = [...prev.gallery_image_urls, ...uploadedUrls].slice(0, MAX_PRODUCT_GALLERY_IMAGES);
+          return { ...prev, gallery_image_urls: gallery, image_url: gallery[0] || "" };
+        });
       }
     } catch (error) {
       LoggerService.error("图片上传失败:", error);
       feedbackService.notify("图片上传失败，请重试");
     } finally {
       setIsUploading(false);
-      if (productFileInputRef.current) productFileInputRef.current.value = "";
     }
+  };
+
+  const handleRemoveGalleryImage = (index: number) => {
+    setProductForm((prev) => {
+      const gallery = prev.gallery_image_urls.filter((_, i) => i !== index);
+      return { ...prev, gallery_image_urls: gallery, image_url: gallery[0] || "" };
+    });
+  };
+
+  const handleMakeCover = (index: number) => {
+    setProductForm((prev) => {
+      const gallery = promoteGalleryCover(prev.gallery_image_urls, index);
+      return { ...prev, gallery_image_urls: gallery, image_url: gallery[0] || "" };
+    });
   };
 
   const handleDetailImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -5420,59 +5446,14 @@ const ProfilePage: React.FC = () => {
                 gap: "1.5rem",
               }}
             >
-              {/* 图片上传区域 */}
-              <div 
-                onClick={() => productFileInputRef.current?.click()}
-                style={{
-                  width: "100%",
-                  aspectRatio: "16/9",
-                  background: "rgba(255,255,255,0.03)",
-                  borderRadius: "24px",
-                  border: "2px dashed rgba(255,255,255,0.1)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  overflow: "hidden",
-                  position: "relative",
-                }}
-              >
-                {productForm.image_url ? (
-                  <StorageImg
-                    src={productForm.image_url}
-                    alt="Preview"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                  />
-                ) : (
-                  <>
-                    <div
-                      style={{ fontSize: "1.75rem", marginBottom: "0.5rem" }}
-                    >
-                      📸
-                    </div>
-                    <div
-                      style={{
-                        color: "rgba(255,255,255,0.5)",
-                        fontWeight: "700",
-                      }}
-                    >
-                      {isUploading ? t.uploading : t.uploadImage}
-                    </div>
-                  </>
-                )}
-                <input 
-                  type="file" 
-                  ref={productFileInputRef} 
-                  onChange={handleImageUpload} 
-                  style={{ display: "none" }}
-                  accept="image/*"
-                />
-              </div>
+              <ProductPhotoGrid
+                urls={productForm.gallery_image_urls}
+                uploading={isUploading}
+                language={language}
+                onFiles={handleImageUpload}
+                onRemove={handleRemoveGalleryImage}
+                onMakeCover={handleMakeCover}
+              />
 
               <div>
                 <label
@@ -5493,6 +5474,37 @@ const ProfilePage: React.FC = () => {
                     setProductForm({ ...productForm, name: e.target.value })
                   }
                   placeholder="如：冰镇可乐 330ml"
+                  style={{
+                    width: "100%",
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    borderRadius: "14px",
+                    padding: "12px 16px",
+                    color: "white",
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    color: "rgba(255,255,255,0.6)",
+                    fontSize: "0.85rem",
+                    fontWeight: "700",
+                    marginBottom: "0.5rem",
+                    display: "block",
+                  }}
+                >
+                  {language === "zh" ? "品牌" : "Brand"}
+                </label>
+                <input
+                  type="text"
+                  value={productForm.brand}
+                  onChange={(e) =>
+                    setProductForm({ ...productForm, brand: e.target.value })
+                  }
+                  placeholder={language === "zh" ? "选填，例如 Nike" : "Optional"}
                   style={{
                     width: "100%",
                     background: "rgba(255,255,255,0.05)",

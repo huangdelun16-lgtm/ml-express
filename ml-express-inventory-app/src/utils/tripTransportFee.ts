@@ -116,6 +116,77 @@ export function isPrimaryTripFeePack(
   return group.primaryPackBarcode === code;
 }
 
+export type TripWorkStatus = 'in_transit' | 'arrived' | 'signed';
+
+export function tripWorkStatus(statuses: Array<string | null | undefined>): TripWorkStatus {
+  const values = statuses.map((status) => String(status ?? '').trim());
+  if (values.some((status) => status === 'completed' || status === 'split_at_hub')) return 'signed';
+  if (values.includes('hub_received')) return 'arrived';
+  return 'in_transit';
+}
+
+export type OriginFeeTrip = {
+  key: string;
+  tripNumber: string;
+  destination: string;
+  packCount: number;
+  primaryPackBarcode: string;
+  status: TripWorkStatus;
+  urgent: boolean;
+  fee: number;
+};
+
+/** 发站自己的车次。没填车费的都列出来；已到站或已签收的标成紧急。 */
+export function listOriginFeeTrips(
+  packs: Array<
+    TripFeePackRow & {
+      status?: string | null;
+    }
+  >,
+): OriginFeeTrip[] {
+  const buckets = new Map<string, TripFeePackRow[]>();
+  for (const pack of packs) {
+    const barcode = String(pack.pack_barcode ?? pack.bundle_barcode ?? '').trim().toUpperCase();
+    if (!barcode) continue;
+    const key = tripTransportGroupKey(pack.trip_number, barcode, pack);
+    const list = buckets.get(key) ?? [];
+    list.push(pack);
+    buckets.set(key, list);
+  }
+  const rows: OriginFeeTrip[] = [];
+  for (const [key, group] of buckets) {
+    const fee = group.reduce((max, pack) => Math.max(max, parseTripTransportFee(pack.transport_fee)), 0);
+    if (fee > 0) continue;
+    const status = tripWorkStatus(group.map((pack) => pack.status));
+    const codes = group
+      .map((pack) => String(pack.pack_barcode ?? pack.bundle_barcode ?? '').trim().toUpperCase())
+      .filter(Boolean)
+      .sort();
+    const destination = String(
+      group.find((pack) => pack.leg_destination_code || pack.destination_code)?.leg_destination_code
+        || group.find((pack) => pack.destination_code)?.destination_code
+        || '',
+    ).trim().toUpperCase();
+    rows.push({
+      key,
+      tripNumber: String(group.find((pack) => pack.trip_number)?.trip_number ?? '').trim().toUpperCase(),
+      destination,
+      packCount: codes.length,
+      primaryPackBarcode: codes[0] ?? '',
+      status,
+      urgent: status === 'arrived' || status === 'signed',
+      fee: 0,
+    });
+  }
+  const rank: Record<TripWorkStatus, number> = { signed: 0, arrived: 1, in_transit: 2 };
+  rows.sort((a, b) => rank[a.status] - rank[b.status] || a.tripNumber.localeCompare(b.tripNumber));
+  return rows;
+}
+
+export function countUrgentFillFeeTrips(trips: Array<{ urgent: boolean }>): number {
+  return trips.filter((trip) => trip.urgent).length;
+}
+
 export function isTripTransportFeePaid(
   packBarcodes: string[],
   paidBarcodes: Set<string>,

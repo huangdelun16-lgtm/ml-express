@@ -526,8 +526,10 @@ export const packageService = {
   /**
    * 同步离线更新
    */
-  async syncOfflineUpdates() {
-    const queue = await cacheService.getOfflineQueue();
+  async syncOfflineUpdates(onlyPackageId?: string) {
+    const queue = (await cacheService.getOfflineQueue()).filter(
+      (item) => !onlyPackageId || item.packageId === onlyPackageId,
+    );
     if (queue.length === 0) return;
 
     const netState = await NetInfo.fetch();

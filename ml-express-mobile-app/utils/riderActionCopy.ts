@@ -139,6 +139,21 @@ export function riderActionCopy(language: string) {
       'ဓာတ်ပုံ သိမ်းပြီးသော်လည်း အခြေအနေ မပြောင်းပါ။ ထပ်ကြိုးစားပါ။',
     ),
     deliveredTitle: tr3(language, '送达成功', 'Delivered', 'ပို့ဆောင်ပြီးပါပြီ'),
+    orderCompletedTitle: tr3(language, '订单已完成', 'Order completed', 'အော်ဒါ ပြီးပါပြီ'),
+    orderCompletedBody: (orderId: string) =>
+      tr3(
+        language,
+        `订单 ${orderId} 的送达照片已上传，这一单已完成。`,
+        `Photo for order ${orderId} is uploaded. This order is complete.`,
+        `အော်ဒါ ${orderId} ၏ ဓာတ်ပုံ တင်ပြီးပါပြီ။ ဤအော်ဒါ ပြီးပါပြီ။`,
+      ),
+    orderQueuedBody: (orderId: string) =>
+      tr3(
+        language,
+        `订单 ${orderId} 的照片先存在这台手机上，联网后会自动上传。`,
+        `Photo for order ${orderId} is saved on this phone and will upload when online.`,
+        `အော်ဒါ ${orderId} ၏ ဓာတ်ပုံကို ဖုန်းထဲသိမ်းထားသည်။ ကွန်ရက်ရလျှင် တင်မည်။`,
+      ),
     savedOfflineTitle: tr3(language, '已保存待同步', 'Saved offline', 'ချိတ်ဆက်မှုပြန်ရလျှင် တင်မည်'),
     proofSubmitted: tr3(language, '配送证明已提交', 'Delivery proof submitted', 'ပို့ဆောင်အထောက်အထား တင်ပြီးပါပြီ'),
     packageDelivered: tr3(language, '包裹已送达', 'Package delivered', 'ပါဆယ် ရောက်ရှိပြီးပါပြီ'),

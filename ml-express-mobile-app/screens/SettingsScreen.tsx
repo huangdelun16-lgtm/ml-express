@@ -10,24 +10,19 @@ import {
   Modal,
   TextInput,
   Switch,
-  Image,
-  Dimensions,
-  Platform,
   StatusBar,
-  ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase, adminAccountService } from '../services/supabase';
 import { feedbackService } from '../services/feedbackService';
 import { useApp } from '../contexts/AppContext';
 import { getPushRuntimeSummary } from '../services/notificationService';
 import AboutUsModal from '../components/AboutUsModal';
 import { getStaffVersionDisplay } from '../utils/appVersion';
-
-const { width, height } = Dimensions.get('window');
 
 const HOTLINE_NUMBERS = [
   { display: '(+95) 09788848928', tel: '+959788848928' },
@@ -38,6 +33,7 @@ const HOTLINE_NUMBERS = [
 
 export default function SettingsScreen({ navigation }: any) {
   const route = useRoute<any>();
+  const insets = useSafeAreaInsets();
   const { language, setLanguage: setAppLanguage, setThemeMode: setAppTheme, t } = useApp();
   const pushSummary = useMemo(() => getPushRuntimeSummary(), []);
   const runtimeDescription = useMemo(() => {
@@ -255,25 +251,25 @@ export default function SettingsScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <LinearGradient colors={['#0f172a', '#1e3a8a', '#334155']} style={StyleSheet.absoluteFill} />
-      
-      <View style={[styles.circle, { top: -100, right: -100, backgroundColor: 'rgba(59, 130, 246, 0.15)' }]} />
-      <View style={[styles.circle, { bottom: -50, left: -50, backgroundColor: 'rgba(30, 58, 138, 0.2)' }]} />
 
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
           accessibilityRole="button"
           accessibilityLabel={t.back}
         >
-          <Ionicons name="chevron-back" size={28} color="white" />
+          <Ionicons name="chevron-back" size={22} color="#e2e8f0" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{language === 'zh' ? '设置中心' : 'Settings'}</Text>
-        <View style={{ width: 44 }} />
+        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 24 }}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t.envSectionTitle}</Text>
           <View style={styles.sectionGlassCard}>
@@ -298,8 +294,8 @@ export default function SettingsScreen({ navigation }: any) {
                 <View key={itemIndex}>
                   <TouchableOpacity style={styles.settingItem} onPress={item.action} activeOpacity={0.7}>
                     <View style={styles.itemLeft}>
-                      <View style={[styles.iconContainer, { backgroundColor: item.color + '22' }]}>
-                        <Ionicons name={item.icon as any} size={22} color={item.color} />
+                      <View style={styles.iconContainer}>
+                        <Ionicons name={item.icon as any} size={20} color="#7dd3fc" />
                       </View>
                       <View style={styles.itemText}>
                         <Text style={styles.itemLabel}>{item.label}</Text>
@@ -500,59 +496,146 @@ export default function SettingsScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f172a' },
-  circle: { position: 'absolute', width: 300, height: 300, borderRadius: 150 },
-  header: { paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingHorizontal: 20, paddingBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  backButton: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  header: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: '#1e293b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.28)',
+  },
+  headerTitle: { color: '#f8fafc', fontSize: 18, fontWeight: '700' },
   content: { flex: 1, paddingHorizontal: 20 },
-  section: { marginTop: 24 },
-  sectionTitle: { fontSize: 13, fontWeight: '800', color: 'rgba(255,255,255,0.4)', marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 },
-  sectionGlassCard: { backgroundColor: 'rgba(255, 255, 255, 0.06)', borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' },
-  settingItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
+  section: { marginTop: 18 },
+  sectionTitle: { fontSize: 13, fontWeight: '700', color: '#94a3b8', marginBottom: 8, marginLeft: 4 },
+  sectionGlassCard: {
+    backgroundColor: '#1e293b',
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.22)',
+  },
+  settingItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14 },
   itemLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  iconContainer: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    backgroundColor: 'rgba(125, 211, 252, 0.12)',
+  },
   itemText: { flex: 1 },
-  itemLabel: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 2 },
-  itemSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: '600' },
-  glassDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginLeft: 68 },
-  footer: { alignItems: 'center', padding: 40 },
-  versionText: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.7)', marginBottom: 4 },
-  copyright: { fontSize: 11, color: 'rgba(255,255,255,0.1)', fontWeight: '600' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  glassModal: { width: '100%', backgroundColor: 'rgba(30, 41, 59, 0.98)', borderRadius: 32, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' },
-  modalHeader: { padding: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
-  modalTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center' },
-  modalBody: { padding: 24 },
-  inputWrapper: { marginBottom: 20 },
-  inputLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '700', marginBottom: 8, marginLeft: 4 },
-  textInput: { height: 56, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, paddingHorizontal: 16, color: '#fff', fontSize: 16, fontWeight: '600', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  submitBtn: { height: 56, borderRadius: 16, overflow: 'hidden', marginTop: 10 },
+  itemLabel: { fontSize: 15, fontWeight: '700', color: '#f8fafc', marginBottom: 2 },
+  itemSubtitle: { fontSize: 12, color: '#94a3b8', fontWeight: '600' },
+  glassDivider: { height: 1, backgroundColor: 'rgba(148, 163, 184, 0.16)', marginLeft: 62 },
+  footer: { alignItems: 'center', paddingTop: 28, paddingBottom: 12 },
+  versionText: { fontSize: 13, fontWeight: '700', color: '#94a3b8', marginBottom: 4 },
+  copyright: { fontSize: 11, color: '#64748b', fontWeight: '600' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.72)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  glassModal: {
+    width: '100%',
+    backgroundColor: '#152033',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.22)',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(148, 163, 184, 0.16)',
+  },
+  modalTitle: { color: '#f8fafc', fontSize: 17, fontWeight: '700' },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#1e293b',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBody: { padding: 18 },
+  inputWrapper: { marginBottom: 14 },
+  inputLabel: { color: '#94a3b8', fontSize: 13, fontWeight: '700', marginBottom: 8 },
+  textInput: {
+    height: 48,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    color: '#f8fafc',
+    fontSize: 16,
+    fontWeight: '600',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.28)',
+  },
+  submitBtn: { height: 48, borderRadius: 12, overflow: 'hidden', marginTop: 6 },
   btnGradient: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  optionItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.03)', marginBottom: 12, borderWidth: 1, borderColor: 'transparent' },
-  selectedOption: { backgroundColor: 'rgba(59, 130, 246, 0.1)', borderColor: 'rgba(59, 130, 246, 0.2)' },
-  optionLabel: { color: '#fff', fontSize: 16, fontWeight: '700', marginBottom: 2 },
-  optionSub: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '600' },
-  modalScroll: { padding: 24 },
-  helpBox: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  helpBoxTitle: { color: '#fff', fontSize: 16, fontWeight: '800', marginBottom: 8 },
-  helpBoxContent: { color: 'rgba(255,255,255,0.6)', fontSize: 14, lineHeight: 22, fontWeight: '600' },
-  contactSupportBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#3b82f6', height: 56, borderRadius: 16, marginTop: 10, marginBottom: 40 },
-  contactSupportText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  envBlock: { padding: 16 },
+  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  optionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#1e293b',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  selectedOption: { borderColor: 'rgba(125, 211, 252, 0.7)', backgroundColor: 'rgba(125, 211, 252, 0.08)' },
+  optionLabel: { color: '#f8fafc', fontSize: 16, fontWeight: '700', marginBottom: 2 },
+  optionSub: { color: '#94a3b8', fontSize: 12, fontWeight: '600' },
+  modalScroll: { padding: 18 },
+  helpBox: {
+    backgroundColor: '#1e293b',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.18)',
+  },
+  helpBoxTitle: { color: '#f8fafc', fontSize: 15, fontWeight: '700', marginBottom: 6 },
+  helpBoxContent: { color: '#94a3b8', fontSize: 14, lineHeight: 21, fontWeight: '600' },
+  contactSupportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#2563eb',
+    height: 48,
+    borderRadius: 12,
+    marginTop: 6,
+    marginBottom: 24,
+  },
+  contactSupportText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  envBlock: { padding: 14 },
   envBody: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.55)',
+    color: '#94a3b8',
     lineHeight: 20,
-    marginTop: 8,
+    marginTop: 6,
     fontWeight: '600',
   },
   envFootnote: {
     fontSize: 11,
-    color: 'rgba(255,255,255,0.38)',
+    color: '#64748b',
     lineHeight: 17,
-    marginTop: 12,
+    marginTop: 10,
     fontWeight: '600',
   },
 });

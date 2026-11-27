@@ -123,7 +123,9 @@ export interface Product {
   description?: string;
   price: number;
   original_price?: number;
+  brand?: string;
   image_url?: string;
+  gallery_image_urls?: string[];
   /** 商品详细介绍滚动图（纵向浏览） */
   detail_image_urls?: string[];
   /** 多规格 SKU；null 表示单一价格商品 */

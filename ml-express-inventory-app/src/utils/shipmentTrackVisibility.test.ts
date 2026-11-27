@@ -7,6 +7,7 @@ import {
   isActiveInboundTrackingPack,
   isActiveOutboundTrackingPack,
   resolveTrackPackDisplayStatus,
+  slowestTripStatus,
 } from './shipmentTrackVisibility';
 
 function order(
@@ -152,6 +153,24 @@ describe('shipmentTrackVisibility', () => {
     ]);
     expect(resolveTrackPackDisplayStatus(localPack({ loaded: false }), cloud)).toBe('arrived');
     expect(resolveTrackPackDisplayStatus(localPack({ loaded: true }), cloud)).toBe('completed');
+  });
+
+  it('整车状态跟最慢的那一包', () => {
+    const moving = pack([order({ id: '1', status: 'in_transit' })], { id: 'a', status: 'in_transit' });
+    const arrived = pack([order({ id: '2', status: 'hub_received' })], { id: 'b', status: 'hub_received' });
+    const signed = pack([order({ id: '3', status: 'hub_received' })], { id: 'c', status: 'completed' });
+    expect(slowestTripStatus([arrived, moving, signed])).toBe('in_transit');
+    expect(slowestTripStatus([signed, arrived])).toBe('hub_received');
+    expect(slowestTripStatus([signed])).toBe('completed');
+  });
+
+  it('包装行还写在途、订单已经到齐时，整车不把这包算成最慢', () => {
+    const caughtUp = pack(
+      [order({ id: '1', status: 'hub_received' }), order({ id: '2', status: 'hub_received' })],
+      { id: 'a', status: 'in_transit' },
+    );
+    const arrived = pack([order({ id: '3', status: 'hub_received' })], { id: 'b', status: 'hub_received' });
+    expect(slowestTripStatus([caughtUp, arrived])).toBe('hub_received');
   });
 
   it('终态包装不进入在途列表', () => {

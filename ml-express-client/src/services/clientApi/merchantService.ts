@@ -3,10 +3,13 @@ import LoggerService from '../LoggerService';
 import type { Product, ProductCategory } from './types';
 import { rewritePublicStorageUrl } from './nativeSupabaseUrl';
 
-function withPublicImages<T extends { image_url?: string; detail_image_urls?: string[] }>(row: T): T {
+function withPublicImages<T extends { image_url?: string; detail_image_urls?: string[]; gallery_image_urls?: string[] }>(row: T): T {
   return {
     ...row,
     image_url: row.image_url ? rewritePublicStorageUrl(row.image_url) : row.image_url,
+    gallery_image_urls: Array.isArray(row.gallery_image_urls)
+      ? row.gallery_image_urls.map((url) => rewritePublicStorageUrl(url)).filter(Boolean)
+      : row.gallery_image_urls,
     detail_image_urls: Array.isArray(row.detail_image_urls)
       ? row.detail_image_urls.map((url) => rewritePublicStorageUrl(url))
       : row.detail_image_urls,

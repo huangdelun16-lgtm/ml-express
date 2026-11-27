@@ -5,6 +5,7 @@ import type { PackedShipmentListRow } from '../types/inventory';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { packStatusStyle } from '../utils/packDisplayStatus';
 import { resolvePackOrderCount, stockUnitLabel } from '../utils/itemFieldFormat';
+import { parseTransportFeeAmount } from '../services/hubTransportFeeService';
 
 type Props = {
   visible: boolean;
@@ -13,6 +14,8 @@ type Props = {
   onEdit: () => void;
   onPrint?: () => void;
   onViewOrders?: () => void;
+  onAddOrder?: () => void;
+  onFillFee?: () => void;
   onUnpack?: () => void;
   canEdit?: boolean;
   canUnpack?: boolean;
@@ -26,6 +29,8 @@ export default function PkgActionModal({
   onEdit,
   onPrint,
   onViewOrders,
+  onAddOrder,
+  onFillFee,
   onUnpack,
   canEdit = true,
   canUnpack = false,
@@ -86,6 +91,16 @@ export default function PkgActionModal({
               <Text style={styles.readonlyHintText}>{t.items.cannotEditBody}</Text>
             </View>
           )}
+          {pack.loaded && onFillFee && parseTransportFeeAmount(pack.transport_fee) <= 0 ? (
+            <Pressable style={styles.btnPrint} onPress={onFillFee}>
+              <Text style={styles.btnPrintText}>{t.pkg.fillFee}</Text>
+            </Pressable>
+          ) : null}
+          {canEdit && onAddOrder && !pack.loaded ? (
+            <Pressable style={styles.btnPrint} onPress={onAddOrder}>
+              <Text style={styles.btnPrintText}>{t.pkg.addOrder}</Text>
+            </Pressable>
+          ) : null}
           {canUnpack && onUnpack ? (
             <Pressable
               style={[styles.btnUnpack, unpacking && styles.btnBusy]}

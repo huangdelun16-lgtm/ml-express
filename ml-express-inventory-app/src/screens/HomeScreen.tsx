@@ -12,6 +12,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Text from '../components/AppText';
 import HomeTodoQueue from '../components/HomeTodoQueue';
+import TripFeeWorkModal from '../components/TripFeeWorkModal';
 import ExportCostCard from '../components/ExportCostCard';
 import SignedInvoiceCard from '../components/SignedInvoiceCard';
 import { useFocusEffect } from '@react-navigation/native';
@@ -73,6 +74,7 @@ export default function HomeScreen({ navigation }: HomeProps) {
   });
   const [recentPacks, setRecentPacks] = useState<PackedShipmentListRow[]>([]);
   const [todoItems, setTodoItems] = useState<HomeTodoItem[]>([]);
+  const [fillTripFeeOpen, setFillTripFeeOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [query, setQuery] = useState('');
@@ -143,12 +145,6 @@ export default function HomeScreen({ navigation }: HomeProps) {
 
   const tiles: ActionTile[] = [
     { title: t.home.tileStockIn, hint: t.home.tileStockInHint, icon: '📥', screen: 'StockIn' },
-    {
-      title: t.home.tilePackagingStockIn,
-      hint: t.home.tilePackagingStockInHint,
-      icon: '📦',
-      screen: 'PackagingStockIn',
-    },
     { title: t.home.tileItems, hint: t.home.tileItemsHint, icon: '📋', screen: 'Items' },
     { title: t.home.tilePkg, hint: t.home.tilePkgHint, icon: '📦', screen: 'Pkg' },
     { title: t.home.tileStockOut, hint: t.home.tileStockOutHint, icon: '🚚', screen: 'StockOut' },
@@ -160,7 +156,7 @@ export default function HomeScreen({ navigation }: HomeProps) {
     { title: t.home.tileSettings, hint: t.home.tileSettingsHint, icon: '⚙️', screen: 'Settings' },
   ];
   const outboundTiles = tiles.filter((tile) =>
-    ['StockIn', 'PackagingStockIn', 'Items', 'Pkg', 'StockOut'].includes(tile.screen),
+    ['StockIn', 'Items', 'Pkg', 'StockOut'].includes(tile.screen),
   );
   const inboundTiles = tiles.filter((tile) =>
     ['HubReceive', 'Exceptions', 'CrossBorderFinance'].includes(tile.screen),
@@ -324,6 +320,14 @@ export default function HomeScreen({ navigation }: HomeProps) {
               t={t}
               items={todoItems}
               onOpen={(item) => {
+                if (item.key === 'fillTripFee') {
+                  setFillTripFeeOpen(true);
+                  return;
+                }
+                if (item.key === 'transportFee') {
+                  navigation.navigate('HubReceive', { payTrips: true });
+                  return;
+                }
                 if (item.screen === 'Items') {
                   navigation.navigate('Items', { initialMode: item.itemsMode });
                   return;
@@ -493,6 +497,14 @@ export default function HomeScreen({ navigation }: HomeProps) {
           );
         })}
       </View>
+      <TripFeeWorkModal
+        visible={fillTripFeeOpen}
+        mode="fill"
+        store={store}
+        hubCode={hubCode}
+        operator={operatorName}
+        onClose={() => setFillTripFeeOpen(false)}
+      />
     </View>
   );
 }

@@ -12,6 +12,7 @@ import {
 export const HOME_TODO_KEYS = [
   'hubArrive',
   'transportFee',
+  'fillTripFee',
   'hubInbound',
   'exceptions',
   'notify',
@@ -22,7 +23,7 @@ export const HOME_TODO_KEYS = [
 
 export type HomeTodoKey = (typeof HOME_TODO_KEYS)[number];
 
-export type HomeTodoScreen = 'HubReceive' | 'Exceptions' | 'Items' | 'StockOut';
+export type HomeTodoScreen = 'HubReceive' | 'Exceptions' | 'Items' | 'StockOut' | 'Pkg';
 
 export type HomeTodoCounts = Record<HomeTodoKey, number>;
 
@@ -39,6 +40,7 @@ export const HOME_TODO_META: Record<
 > = {
   hubArrive: { screen: 'HubReceive' },
   transportFee: { screen: 'HubReceive' },
+  fillTripFee: { screen: 'Pkg' },
   hubInbound: { screen: 'HubReceive' },
   exceptions: { screen: 'Exceptions' },
   notify: { screen: 'Items', itemsMode: 'sign' },
@@ -51,6 +53,7 @@ export function emptyHomeTodoCounts(): HomeTodoCounts {
   return {
     hubArrive: 0,
     transportFee: 0,
+    fillTripFee: 0,
     hubInbound: 0,
     exceptions: 0,
     notify: 0,

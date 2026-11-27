@@ -42,7 +42,25 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
     () => stores.filter((store) => (store.status || 'active') === 'active'),
     [stores],
   );
-  const [mode, setMode] = useState<Mode>('single');
+  const [mode] = useState<Mode>('single');
+  const [heldOrders, setHeldOrders] = useState<Array<{
+    key: string;
+    expressCode: string;
+    itemName: string;
+    spec: string;
+    weightKg: string;
+    qty: number;
+    quoteCny: string;
+    quoteManual: boolean;
+    chargeBasis: ChargeBasis;
+    recipientName: string;
+    recipientPhone: string;
+    customerCode: string;
+    destination: string;
+    detailAddress: string;
+    note: string;
+    pay: 'cod' | 'prepaid';
+  }>>([]);
   const [storeId, setStoreId] = useState('');
   const [customers, setCustomers] = useState<CrossBorderRegisteredCustomer[]>([]);
   const [customerCode, setCustomerCode] = useState('');
@@ -298,6 +316,126 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
     }
   };
 
+  const currentOrderSnapshot = () => {
+    if (!pay) {
+      setError(isEn ? 'Choose COD or prepaid.' : '请选择到付或预付。');
+      return null;
+    }
+    const basis: ChargeBasis = !chargeManual && autoBasis ? autoBasis : chargeBasis;
+    if (basis === 'volume' && !(volumetricKg && volumetricKg > 0)) {
+      setError(isEn ? 'Enter length, width and height to charge by volume.' : '按体积重量收费时，请先填写长、宽、高。');
+      return null;
+    }
+    const weightN = Number(weightKg);
+    if (!weightKg.trim() || !Number.isFinite(weightN) || weightN <= 0) {
+      setError(isEn ? 'Enter the weight.' : '请填写重量。');
+      return null;
+    }
+    if (!destination.trim() || !recipientName.trim() || !recipientPhone.trim()) {
+      setError(isEn ? 'Customer, phone and destination are required.' : '请填写客户、电话和目的地。');
+      return null;
+    }
+    const spec = [specL, specW, specH].some((part) => part.trim())
+      ? `${specL.trim() || '0'} x ${specW.trim() || '0'} x ${specH.trim() || '0'} cm`
+      : '';
+    return {
+      key: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      expressCode: expressCode.trim(),
+      itemName: itemName.trim(),
+      spec,
+      weightKg: weightKg.trim(),
+      qty: Number(qty) || 1,
+      quoteCny: quoteCny.trim(),
+      quoteManual,
+      chargeBasis: basis,
+      recipientName: recipientName.trim(),
+      recipientPhone: recipientPhone.trim(),
+      customerCode: customerCode.trim(),
+      destination: destination.trim(),
+      detailAddress: detailAddress.trim(),
+      note: note.trim(),
+      pay,
+    };
+  };
+
+  const holdAndContinue = () => {
+    const order = currentOrderSnapshot();
+    if (!order) return;
+    setError('');
+    setHeldOrders((prev) => [...prev, order]);
+    setExpressCode('');
+    setItemName('');
+    setWeightKg('');
+    setSpecL('');
+    setSpecW('');
+    setSpecH('');
+    setQuoteCny('');
+    setQuoteManual(false);
+    setChargeBasis('weight');
+    setChargeManual(false);
+    setNote('');
+    setQty('1');
+  };
+
+  const packTogether = async () => {
+    const current = currentOrderSnapshot();
+    if (!current) return;
+    const orders = [...heldOrders, current];
+    if (orders.length < 2) {
+      setError(isEn ? 'Add at least one more order before packing.' : '至少再加一单才能打包。');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    setResult(null);
+    try {
+      const saved = await submitCrossBorderStockIn({
+        mode: 'bundle_singles',
+        storeId,
+        destination: current.destination,
+        recipientName: current.recipientName,
+        recipientPhone: current.recipientPhone,
+        customerCode: current.customerCode,
+        inboundDate,
+        pay: current.pay,
+        orders: orders.map((order) => ({
+          expressCode: order.expressCode,
+          itemName: order.itemName,
+          spec: order.spec,
+          weightKg: order.weightKg,
+          qty: order.qty,
+          quoteCny: order.quoteCny,
+          quoteManual: order.quoteManual,
+          chargeBasis: order.chargeBasis,
+          recipientName: order.recipientName,
+          recipientPhone: order.recipientPhone,
+          customerCode: order.customerCode,
+          destination: order.destination,
+          detailAddress: order.detailAddress,
+          note: order.note,
+        })),
+      });
+      setResult({ barcode: saved.barcode, lineBarcodes: saved.lineBarcodes || [] });
+      setHeldOrders([]);
+      setExpressCode('');
+      setItemName('');
+      setWeightKg('');
+      setSpecL('');
+      setSpecW('');
+      setSpecH('');
+      setQuoteCny('');
+      setQuoteManual(false);
+      setChargeBasis('weight');
+      setChargeManual(false);
+      setNote('');
+      setQty('1');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : isEn ? 'Stock-in failed' : '入库失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const dateLabel = (() => {
     const [year, month, day] = inboundDate.split('-');
     if (!year || !month || !day) return '';
@@ -310,30 +448,10 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
         <div>
           <h2 className="cbl-card__title">{isEn ? 'Inbound' : '入库'}</h2>
           <p className="cbl-inbound-lead">
-            {mode === 'single'
-              ? isEn
-                ? 'One express order. A new inbound barcode is created.'
-                : '一件快递。系统生成入库条码，件数记在库存里。'
-              : isEn
-                ? 'Several express orders under one package number.'
-                : '多件快递合成一个包装号，每件都打进这个包。'}
+            {isEn
+              ? 'Fill one order, then scan the next. Pack them under one package number when you are ready. Each order keeps its own size, weight and fee.'
+              : '先填好一单，再扫下一单。最后打成一个包装号。每一单仍用自己的尺寸、重量和费用。'}
           </p>
-        </div>
-        <div className="cbl-inbound-modes" role="tablist" aria-label={isEn ? 'Inbound mode' : '入库方式'}>
-          <button
-            type="button"
-            className={`cbl-btn cbl-btn--sm${mode === 'single' ? ' cbl-btn--primary' : ' cbl-btn--light'}`}
-            onClick={() => setMode('single')}
-          >
-            {isEn ? 'Single' : '单个入库'}
-          </button>
-          <button
-            type="button"
-            className={`cbl-btn cbl-btn--sm${mode === 'batch' ? ' cbl-btn--primary' : ' cbl-btn--light'}`}
-            onClick={() => setMode('batch')}
-          >
-            {isEn ? 'Multiple' : '多个入库'}
-          </button>
         </div>
       </div>
       <div className="cbl-inbound">
@@ -702,20 +820,38 @@ export default function CrossBorderInboundPanel({ stores, isEn }: Props) {
         {error ? <p className="cbl-alert cbl-alert--error">{error}</p> : null}
         {result ? (
           <p className="cbl-inbound-result">
-            {mode === 'single'
+            {result.lineBarcodes.length > 1
               ? isEn
-                ? `Stocked in. Barcode ${result.barcode}`
-                : `已入库。条码 ${result.barcode}`
+                ? `Package ${result.barcode}. ${result.lineBarcodes.length} orders, each with its own fee.`
+                : `已打包。包装号 ${result.barcode}，里面 ${result.lineBarcodes.length} 单，费用各算各的。`
               : isEn
-                ? `Package ${result.barcode}. ${result.lineBarcodes.length} orders inside.`
-                : `已入库。包装号 ${result.barcode}，里面 ${result.lineBarcodes.length} 件。`}
+                ? `Stocked in. Barcode ${result.barcode}`
+                : `已入库。条码 ${result.barcode}`}
+          </p>
+        ) : null}
+
+        {heldOrders.length > 0 ? (
+          <p className="cbl-inbound-result">
+            {isEn
+              ? `${heldOrders.length} order(s) filled, not saved yet.`
+              : `已填 ${heldOrders.length} 单，还没入库。`}
+            {heldOrders.map((order, index) => ` ${index + 1}.${order.expressCode || order.itemName || order.weightKg}`)}
           </p>
         ) : null}
 
         <div className="cbl-inbound-foot">
-          <button type="button" className="cbl-btn cbl-btn--primary" disabled={saving || !storeId} onClick={() => void submit()}>
-            {saving ? (isEn ? 'Saving…' : '正在入库…') : isEn ? 'Confirm inbound' : '确认入库'}
+          <button type="button" className="cbl-btn cbl-btn--light" disabled={saving || !storeId} onClick={holdAndContinue}>
+            {isEn ? 'Scan another' : '再录一单'}
           </button>
+          {heldOrders.length > 0 ? (
+            <button type="button" className="cbl-btn cbl-btn--primary" disabled={saving || !storeId} onClick={() => void packTogether()}>
+              {saving ? (isEn ? 'Saving…' : '正在入库…') : isEn ? 'Pack together' : '打成一包'}
+            </button>
+          ) : (
+            <button type="button" className="cbl-btn cbl-btn--primary" disabled={saving || !storeId} onClick={() => void submit()}>
+              {saving ? (isEn ? 'Saving…' : '正在入库…') : isEn ? 'Confirm inbound' : '确认入库'}
+            </button>
+          )}
         </div>
       </div>
     </section>

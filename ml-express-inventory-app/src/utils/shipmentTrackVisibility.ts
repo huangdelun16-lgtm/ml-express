@@ -30,6 +30,24 @@ export function effectivePkgTrackingStatus(pack: PkgTrackingDetail): PkgTracking
   return hasReleased ? 'split_at_hub' : 'hub_received';
 }
 
+/** 数字越小，这包走得越慢。整车跟最慢的那一包。 */
+const TRIP_STATUS_SLOWNESS: Record<PkgTrackingStatus, number> = {
+  in_transit: 0,
+  hub_received: 1,
+  split_at_hub: 2,
+  completed: 3,
+  cancelled: 4,
+};
+
+/** 车次状态取整车里进度最慢的包装，订单已齐但包装行没跟上时按实际进度算 */
+export function slowestTripStatus(packs: PkgTrackingDetail[]): PkgTrackingStatus {
+  if (packs.length === 0) return 'in_transit';
+  return packs.reduce<PkgTrackingStatus>((slowest, pack) => {
+    const status = effectivePkgTrackingStatus(pack);
+    return TRIP_STATUS_SLOWNESS[status] < TRIP_STATUS_SLOWNESS[slowest] ? status : slowest;
+  }, effectivePkgTrackingStatus(packs[0]));
+}
+
 /**
  * 本站待收：还有本站收货或分拨工作才显示。
  * 已确认 n/n 则离开列表，即使包装 status 仍是 in_transit。

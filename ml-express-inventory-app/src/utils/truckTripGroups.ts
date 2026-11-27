@@ -1,4 +1,5 @@
 import type { PkgTrackingDetail } from '../types/tracking';
+import { parseTripTransportFee } from './tripTransportFee';
 
 export type TruckTripSummary = {
   tripNumber: string;
@@ -45,7 +46,9 @@ export function splitOutboundByTrip(packages: PkgTrackingDetail[]): {
     }
     existing.packages.push(pkg);
     existing.packCount += 1;
-    if (!existing.transportFee && pkg.transport_fee) existing.transportFee = pkg.transport_fee;
+    if (parseTripTransportFee(pkg.transport_fee) > parseTripTransportFee(existing.transportFee)) {
+      existing.transportFee = pkg.transport_fee;
+    }
     if (!existing.loadedAt && pkg.truck_loaded_at) existing.loadedAt = pkg.truck_loaded_at;
     if (!existing.outboundDate && pkg.truck_outbound_date) {
       existing.outboundDate = pkg.truck_outbound_date;
@@ -63,4 +66,10 @@ export function splitOutboundByTrip(packages: PkgTrackingDetail[]): {
   );
 
   return { trips, legacyPackages };
+}
+
+/** 发出列表按车次排，无车次号的仍各占一行。页签数字跟这个行数走。 */
+export function outboundTrackRowCount(packages: PkgTrackingDetail[]): number {
+  const { trips, legacyPackages } = splitOutboundByTrip(packages);
+  return trips.length + legacyPackages.length;
 }

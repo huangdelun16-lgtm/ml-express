@@ -208,6 +208,46 @@ describe('buildExportCostBoard', () => {
     expect(next.packages.map((item) => item.base)).toEqual(['RUI26MDY50009']);
   });
 
+  it('sums actual piece weights for a packed bundle and skips the shell', () => {
+    const board = buildExportCostBoard([
+      row({
+        id: 'shell',
+        barcode: 'RUI26MDY20002',
+        weight: '99 Kg',
+        note: '收费体积 40 Kg',
+      }),
+      row({
+        id: 'a',
+        barcode: 'MDY101',
+        input_barcode: 'EXP-A',
+        customer_name: '王',
+        final_destination: 'MDY',
+        weight: '3.5 Kg',
+        packed_bundle_barcode: 'RUI26MDY20002',
+      }),
+      row({
+        id: 'b',
+        barcode: 'MDY102',
+        input_barcode: 'EXP-B',
+        weight: '4 Kg',
+        packed_bundle_barcode: 'RUI26MDY20002',
+      }),
+    ]);
+
+    expect(board.singles).toEqual([]);
+    expect(board.packages).toEqual([
+      {
+        base: 'RUI26MDY20002',
+        customer: '王',
+        destination: 'MDY',
+        pieceCount: 2,
+        declaredTotal: 2,
+        weightKg: 7.5,
+        tripNumber: '',
+      },
+    ]);
+  });
+
   it('matches an export cost row by barcode, customer, or trip', () => {
     expect(matchesExportCostQuery('khaing', ['DPK1', 'Ei Ei Khaing', 'MDY', 'RUI0026'])).toBe(true);
     expect(matchesExportCostQuery('rui0026', ['DPK1', 'Ei', 'MDY', 'RUI0026'])).toBe(true);

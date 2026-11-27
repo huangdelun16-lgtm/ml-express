@@ -339,10 +339,6 @@ export default function StockOutScreen({ navigation }: Props) {
       feedbackService.notify(t.common.tip, t.stockOut.alertInvalidDate);
       return;
     }
-    if (!transportFee.trim() || Number(transportFee) <= 0) {
-      feedbackService.notify(t.common.tip, t.stockOut.alertTransportFee);
-      return;
-    }
 
     setLoading(true);
     try {
@@ -498,9 +494,10 @@ export default function StockOutScreen({ navigation }: Props) {
           ) : null}
 
           <Text style={styles.label}>
-            {t.stockOut.transportFee} *
+            {t.stockOut.transportFee}
             {routeLabel ? <Text style={styles.routeHint}> · {routeLabel}</Text> : null}
           </Text>
+          <Text style={styles.fieldHint}>{t.stockOut.feeLater}</Text>
           <View style={styles.feeRow}>
             <TextInput
               style={styles.feeInput}

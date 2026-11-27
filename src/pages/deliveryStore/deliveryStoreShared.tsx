@@ -215,7 +215,9 @@ export const ADMIN_PRODUCT_FIELD_LABELS: Record<string, string> = {
   price: '售价',
   original_price: '原价',
   variants: '规格与价格',
+  brand: '品牌',
   image_url: '主图',
+  gallery_image_urls: '商品图片',
   detail_image_urls: '详细介绍图',
   stock: '库存',
   is_available: '上架状态',
@@ -224,7 +226,7 @@ export const ADMIN_PRODUCT_FIELD_LABELS: Record<string, string> = {
 export const ADMIN_PRODUCT_DIFF_KEYS = Object.keys(ADMIN_PRODUCT_FIELD_LABELS);
 
 function adminProductValuesEqual(key: string, a: unknown, b: unknown): boolean {
-  if (key === 'detail_image_urls' || key === 'variants') {
+  if (key === 'detail_image_urls' || key === 'gallery_image_urls' || key === 'variants') {
     return JSON.stringify(a ?? (key === 'variants' ? null : [])) === JSON.stringify(b ?? (key === 'variants' ? null : []));
   }
   if (key === 'original_price') {
@@ -246,7 +248,7 @@ export function formatAdminProductFieldText(key: string, value: unknown): string
   if (key === 'stock') return Number(value) === -1 ? '无限' : String(value);
   if (key === 'variants') return formatVariantsForDisplay(value);
   if (key === 'is_available') return value ? '在售' : '下架';
-  if (key === 'detail_image_urls') {
+  if (key === 'detail_image_urls' || key === 'gallery_image_urls') {
     const arr = Array.isArray(value) ? value : [];
     return arr.length ? `${arr.length} 张` : '无';
   }

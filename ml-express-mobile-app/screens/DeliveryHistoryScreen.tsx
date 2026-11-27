@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,27 +10,89 @@ import {
   TextInput,
   Modal,
   ScrollView,
-  Dimensions,
   Platform,
-  StatusBar
+  StatusBar,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { packageService, Package } from '../services/supabase';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { supabase, Package } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
+import { formatYangonStamp } from '../utils/yangonTime';
 
-const { width } = Dimensions.get('window');
+const HISTORY_STATUSES = ['已送达', '已完成', '已取消', '配送失败', 'Delivered', 'Cancelled'];
+const DONE_STATUSES = new Set(['已送达', '已完成', 'Delivered']);
+type HistoryFilter = 'all' | 'done' | 'cancelled' | 'failed';
+
+function moneyAmount(price: unknown): number {
+  const n = parseFloat(String(price ?? '').replace(/[^\d.]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function eventStamp(pkg: Package): string {
+  const raw = DONE_STATUSES.has(pkg.status)
+    ? pkg.delivery_time || pkg.updated_at || pkg.create_time
+    : pkg.updated_at || pkg.create_time || pkg.created_at;
+  return raw || '';
+}
+
+function eventTime(pkg: Package): number {
+  const t = new Date(eventStamp(pkg) || 0).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
+function ordererIdentity(description?: string): string | null {
+  const match = description?.match(
+    /\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/,
+  );
+  return match?.[1] || null;
+}
+
+function balancePaid(description?: string): string | null {
+  const match = description?.match(
+    /\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/,
+  );
+  return match?.[1] || null;
+}
 
 export default function DeliveryHistoryScreen({ navigation }: any) {
   const { language } = useApp();
+  const insets = useSafeAreaInsets();
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState<HistoryFilter>('all');
   const [totalStats, setTotalStats] = useState({ deliveryFee: 0, cod: 0 });
   const [showCODModal, setShowCODModal] = useState(false);
   const [lastSettledDate, setLastSettledDate] = useState<string | null>(null);
+
+  const zh = language === 'zh';
+  const my = language === 'my';
+  const copy = {
+    title: zh ? '配送历史' : my ? 'ပို့ဆောင်မှတ်တမ်း' : 'Delivery History',
+    done: zh ? '已完成' : my ? 'ပြီးပါပြီ' : 'Done',
+    distance: zh ? '里程 km' : my ? 'အကွာအဝေး km' : 'km',
+    unsettled: zh ? '未结清' : my ? 'မရှင်းရသေး' : 'Unsettled',
+    settled: zh ? '已结清' : my ? 'ရှင်းပြီး' : 'Settled',
+    fee: zh ? '未结清配送费' : my ? 'မရှင်းရသေးသော ပို့ခ' : 'Unsettled fee',
+    cod: zh ? '未结清代收款' : my ? 'မရှင်းရသေးသော COD' : 'Unsettled COD',
+    feeHint: zh ? '还没和财务结清' : my ? 'ဘဏ္ဍာရေးနှင့် မရှင်းရသေး' : 'Not settled with finance',
+    lastSettled: zh ? '上次结清 ' : my ? 'နောက်ဆုံးရှင်းချိန် ' : 'Last settled ',
+    search: zh ? '搜单号、收件人或地址' : my ? 'အော်ဒါ၊ လက်ခံသူ၊ လိပ်စာ' : 'Order, name, or address',
+    all: zh ? '全部' : my ? 'အားလုံး' : 'All',
+    cancelled: zh ? '已取消' : my ? 'ပယ်ဖျက်' : 'Cancelled',
+    failed: zh ? '失败' : my ? 'မအောင်မြင်' : 'Failed',
+    delivered: zh ? '已送达' : my ? 'ပေးပို့ပြီး' : 'Delivered',
+    empty: zh ? '没有符合的记录' : my ? 'မှတ်တမ်းမရှိပါ' : 'No matching records',
+    loadFailed: zh ? '历史加载失败，下拉重试' : my ? 'ဖွင့်မရပါ။ ပြန်ဆွဲပါ' : 'Could not load history. Pull to retry.',
+    codTitle: zh ? '未结清代收款' : my ? 'မရှင်းရသေးသော COD' : 'Unsettled COD',
+    codEmpty: zh ? '没有未结清的代收款' : my ? 'မရှင်းရသေးသော COD မရှိပါ' : 'No unsettled COD',
+    ok: zh ? '确定' : my ? 'အိုကေ' : 'OK',
+    balance: zh ? '余额支付' : my ? 'လက်ကျန်ငွေ' : 'Balance',
+    noAccount: zh ? '没有读到骑手账号，请重新登录' : my ? 'အကောင့်မတွေ့ပါ။ ပြန်ဝင်ပါ' : 'Courier account missing. Sign in again.',
+  };
 
   useEffect(() => {
     loadHistory();
@@ -38,40 +100,44 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
 
   const loadHistory = async () => {
     try {
-      setLoading(true);
-      const currentUser = await AsyncStorage.getItem('currentUserName') || '';
-      const allPackages = await packageService.getAllPackages();
-      
-      const history = allPackages.filter(pkg => 
-        pkg.courier === currentUser && 
-        ['已送达', '已取消', '配送失败'].includes(pkg.status)
-      );
-      
+      setLoadError('');
+      const currentUser = (await AsyncStorage.getItem('currentUserName')) || '';
+      if (!currentUser) {
+        setPackages([]);
+        setTotalStats({ deliveryFee: 0, cod: 0 });
+        setLastSettledDate(null);
+        setLoadError(copy.noAccount);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('courier', currentUser)
+        .in('status', HISTORY_STATUSES);
+
+      if (error) throw error;
+
+      const history = ((data || []) as Package[]).sort((a, b) => eventTime(b) - eventTime(a));
       setPackages(history);
 
       let deliveryFee = 0;
       let cod = 0;
-      history.forEach(pkg => {
-        if (pkg.status === '已送达' && !pkg.rider_settled) {
-          const priceVal = parseFloat(pkg.price?.toString().replace(/[^\d.]/g, '') || '0');
-          deliveryFee += priceVal;
+      history.forEach((pkg) => {
+        if (DONE_STATUSES.has(pkg.status) && !pkg.rider_settled) {
+          deliveryFee += moneyAmount(pkg.price);
           cod += Number(pkg.cod_amount || 0);
         }
       });
       setTotalStats({ deliveryFee, cod });
 
-      const settledPackages = allPackages.filter(pkg => 
-        pkg.courier === currentUser && pkg.rider_settled && pkg.rider_settled_at
-      );
-      if (settledPackages.length > 0) {
-        settledPackages.sort((a, b) => new Date(b.rider_settled_at!).getTime() - new Date(a.rider_settled_at!).getTime());
-        setLastSettledDate(settledPackages[0].rider_settled_at || null);
-      } else {
-        setLastSettledDate(null);
-      }
-
+      const settled = history
+        .filter((pkg) => pkg.rider_settled && pkg.rider_settled_at)
+        .sort((a, b) => new Date(b.rider_settled_at!).getTime() - new Date(a.rider_settled_at!).getTime());
+      setLastSettledDate(settled[0]?.rider_settled_at || null);
     } catch (error) {
       console.error('加载历史失败:', error);
+      setLoadError(copy.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -83,256 +149,238 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
     setRefreshing(false);
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case '已送达':
-        return language === 'zh' ? '已送达' : language === 'en' ? 'Delivered' : 'ပေးပို့ပြီး';
-      case '已取消':
-        return language === 'zh' ? '已取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်ပြီး';
-      default:
-        return status;
-    }
-  };
+  const counts = useMemo(() => {
+    let done = 0;
+    let cancelled = 0;
+    let failed = 0;
+    let unsettled = 0;
+    let distance = 0;
+    packages.forEach((pkg) => {
+      if (DONE_STATUSES.has(pkg.status)) {
+        done += 1;
+        if (!pkg.rider_settled) unsettled += 1;
+      } else if (pkg.status === '已取消' || pkg.status === 'Cancelled') {
+        cancelled += 1;
+      } else {
+        failed += 1;
+      }
+      distance += Number(pkg.delivery_distance) || 0;
+    });
+    return { done, cancelled, failed, unsettled, distance };
+  }, [packages]);
 
-  const filteredPackages = packages.filter(pkg => {
-    if (!searchQuery.trim()) return true;
-    return pkg.id.toLowerCase().includes(searchQuery.toLowerCase().trim());
-  });
+  const filteredPackages = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return packages.filter((pkg) => {
+      if (filter === 'done' && !DONE_STATUSES.has(pkg.status)) return false;
+      if (filter === 'cancelled' && pkg.status !== '已取消' && pkg.status !== 'Cancelled') return false;
+      if (filter === 'failed' && pkg.status !== '配送失败') return false;
+      if (!q) return true;
+      return [pkg.id, pkg.receiver_name, pkg.receiver_address]
+        .some((value) => String(value || '').toLowerCase().includes(q));
+    });
+  }, [packages, filter, searchQuery]);
 
-  const renderPackageItem = ({ item }: { item: Package }) => (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      style={styles.cardWrapper}
-      onPress={() => navigation.navigate('PackageDetail', { package: item })}
-    >
-      <LinearGradient
-        colors={['rgba(255, 255, 255, 0.12)', 'rgba(255, 255, 255, 0.05)']}
-        style={styles.glassCard}
-      >
-        <View style={styles.cardHeader}>
-          <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={styles.packageId}>{item.id}</Text>
-              
-              {/* 🚀 新增：在顶部显示下单身份 */}
-              {(() => {
-                const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
-                if (identityMatch && identityMatch[1]) {
-                  const identity = identityMatch[1];
-                  const isMERCHANTS = identity === '商家' || identity === 'MERCHANTS';
-                  return (
-                    <View style={[styles.identityBadge, { backgroundColor: isMERCHANTS ? '#3b82f6' : '#f59e0b' }]}>
-                      <Text style={styles.identityText}>{identity}</Text>
-                    </View>
-                  );
-                }
-                return null;
-              })()}
-            </View>
-            <Text style={styles.dateText}>
-              <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.4)" /> {item.status === '已送达' ? item.delivery_time : item.create_time}
-            </Text>
-          </View>
-          
-          {item.status === '已取消' ? (
-            <View style={[styles.statusBadge, { backgroundColor: 'rgba(239, 68, 68, 0.2)', borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
-              <Text style={[styles.statusText, { color: '#f87171' }]}>{getStatusText(item.status)}</Text>
-            </View>
-          ) : (
-            <View style={[styles.statusBadge, { 
-              backgroundColor: item.payment_method === 'qr' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-              borderColor: item.payment_method === 'qr' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(245, 158, 11, 0.3)'
-            }]}>
-              <Text style={[styles.statusText, { color: item.payment_method === 'qr' ? '#60a5fa' : '#fbbf24' }]}>
-                {item.payment_method === 'qr' ? '📱 QR' : '💵 CASH'}
-              </Text>
-            </View>
-          )}
-        </View>
-        
-        <View style={styles.cardBody}>
-          <View style={styles.infoRow}>
-            <Ionicons name="person-outline" size={14} color="rgba(255,255,255,0.5)" />
-            <Text style={styles.receiverName}>{item.receiver_name}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="location-outline" size={14} color="rgba(255,255,255,0.5)" />
-            <Text style={styles.addressText} numberOfLines={1}>{item.receiver_address}</Text>
-          </View>
-          
-          {/* 🚀 新增：历史列表展示余额支付金额 */}
-          {(() => {
-            const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
-            if (payMatch && payMatch[1]) {
-              return (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' }}>
-                  <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
-                    💰 {language === 'zh' ? '余额支付' : language === 'en' ? 'Balance Payment' : 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း'}: {payMatch[1]} MMK
-                  </Text>
-                </View>
-              );
-            }
-            return null;
-          })()}
-        </View>
-
-                <View style={styles.cardFooter}>
-                  <Text style={styles.priceText}>{Number(parseFloat(String(item.price || 0).replace(/[^\d.]/g, '')) || 0).toLocaleString()} MMK</Text>
-                  <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.3)" />
-                </View>
-      </LinearGradient>
-    </TouchableOpacity>
+  const codRows = useMemo(
+    () => packages.filter((pkg) => DONE_STATUSES.has(pkg.status) && !pkg.rider_settled && Number(pkg.cod_amount || 0) > 0),
+    [packages],
   );
 
-  const completedCount = packages.filter(p => p.status === '已送达').length;
-  const cancelledCount = packages.filter(p => p.status === '已取消').length;
-  const totalDistance = packages.reduce((sum, pkg) => sum + (pkg.delivery_distance || 0), 0);
+  const statusLabel = (status: string) => {
+    if (DONE_STATUSES.has(status)) return copy.delivered;
+    if (status === '已取消' || status === 'Cancelled') return copy.cancelled;
+    return copy.failed;
+  };
+
+  const renderPackageItem = ({ item }: { item: Package }) => {
+    const identity = ordererIdentity(item.description);
+    const paid = balancePaid(item.description);
+    const done = DONE_STATUSES.has(item.status);
+    const cancelled = item.status === '已取消' || item.status === 'Cancelled';
+    const unsettled = done && !item.rider_settled;
+    const statusColor = done ? '#5eead4' : cancelled ? '#f87171' : '#fbbf24';
+    return (
+      <TouchableOpacity
+        activeOpacity={0.85}
+        style={styles.card}
+        onPress={() => navigation.navigate('PackageDetail', { package: item })}
+      >
+        <Text style={styles.packageId} numberOfLines={1}>{item.id}</Text>
+        <View style={styles.metaRow}>
+          <Text style={styles.dateText}>{formatYangonStamp(eventStamp(item))}</Text>
+          <View style={styles.badgeRow}>
+            {identity ? (
+              <View style={[styles.badge, { backgroundColor: identity === '商家' || identity === 'MERCHANTS' ? '#2563eb' : '#b45309' }]}>
+                <Text style={styles.badgeText}>{identity}</Text>
+              </View>
+            ) : null}
+            <View style={[styles.badge, { backgroundColor: 'transparent', borderColor: statusColor }]}>
+              <Text style={[styles.badgeText, { color: statusColor }]}>{statusLabel(item.status)}</Text>
+            </View>
+            {done ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{item.payment_method === 'qr' ? 'QR' : 'CASH'}</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+
+        <View style={styles.infoRow}>
+          <Ionicons name="person-outline" size={14} color="#94a3b8" />
+          <Text style={styles.receiverName} numberOfLines={1}>{item.receiver_name || '—'}</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Ionicons name="location-outline" size={14} color="#94a3b8" />
+          <Text style={styles.addressText} numberOfLines={1}>{item.receiver_address || '—'}</Text>
+        </View>
+        {paid ? (
+          <Text style={styles.balanceText}>{copy.balance} {paid} MMK</Text>
+        ) : null}
+
+        <View style={styles.cardFooter}>
+          <Text style={styles.priceText}>{moneyAmount(item.price).toLocaleString()} MMK</Text>
+          <View style={styles.footerRight}>
+            {done ? (
+              <Text style={[styles.settleTag, { color: unsettled ? '#fbbf24' : '#64748b' }]}>
+                {unsettled ? copy.unsettled : copy.settled}
+              </Text>
+            ) : null}
+            <Ionicons name="chevron-forward" size={16} color="#64748b" />
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const filters: { key: HistoryFilter; label: string; count: number }[] = [
+    { key: 'all', label: copy.all, count: packages.length },
+    { key: 'done', label: copy.done, count: counts.done },
+    { key: 'cancelled', label: copy.cancelled, count: counts.cancelled },
+    { key: 'failed', label: copy.failed, count: counts.failed },
+  ];
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <LinearGradient
-        colors={['#0f172a', '#1e3a8a', '#334155']}
-        style={StyleSheet.absoluteFill}
-      />
-      
-      {/* 头部 */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={28} color="white" />
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconButton}>
+          <Ionicons name="chevron-back" size={22} color="#e2e8f0" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {language === 'zh' ? '配送历史' : 'Delivery History'}
-        </Text>
+        <Text style={styles.headerTitle}>{copy.title}</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* 顶部统计卡片 */}
-        <View style={styles.summaryBar}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryNumber}>{completedCount}</Text>
-            <Text style={styles.summaryLabel}>{language === 'zh' ? '已完成' : 'Completed'}</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryNumber}>{totalDistance.toFixed(1)}</Text>
-            <Text style={styles.summaryLabel}>{language === 'zh' ? '总里程' : 'Distance'}</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryNumber}>{packages.length}</Text>
-            <Text style={styles.summaryLabel}>{language === 'zh' ? '总计' : 'Total'}</Text>
-          </View>
-        </View>
+      <FlatList
+        data={loading && packages.length === 0 ? [] : filteredPackages}
+        keyExtractor={(item) => item.id}
+        renderItem={renderPackageItem}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#94a3b8" />}
+        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 24, paddingHorizontal: 20 }}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View>
+            <View style={styles.summaryBar}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryNumber}>{counts.done}</Text>
+                <Text style={styles.summaryLabel}>{copy.done}</Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryNumber}>{counts.distance.toFixed(1)}</Text>
+                <Text style={styles.summaryLabel}>{copy.distance}</Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryItem}>
+                <Text style={[styles.summaryNumber, { color: counts.unsettled > 0 ? '#fbbf24' : '#f8fafc' }]}>{counts.unsettled}</Text>
+                <Text style={styles.summaryLabel}>{copy.unsettled}</Text>
+              </View>
+            </View>
 
-        {/* 金额概览 */}
-        <View style={styles.statsContainer}>
-          <LinearGradient colors={['rgba(59, 130, 246, 0.25)', 'rgba(37, 99, 235, 0.1)']} style={styles.statsCard}>
-            <Text style={styles.statsLabel}>{language === 'zh' ? '本期配送费' : 'Period Fees'}</Text>
-            <Text style={[styles.statsValue, { color: '#60a5fa' }]}>{totalStats.deliveryFee.toLocaleString()}</Text>
-            <Text style={styles.statsUnit}>MMK</Text>
-          </LinearGradient>
-
-          <TouchableOpacity 
-            style={styles.statsCardWrapper}
-            onPress={() => setShowCODModal(true)}
-          >
-            <LinearGradient colors={['rgba(245, 158, 11, 0.25)', 'rgba(217, 119, 6, 0.1)']} style={styles.statsCard}>
-              <Text style={styles.statsLabel}>{language === 'zh' ? '本期代收款' : 'Period COD'}</Text>
-              <Text style={[styles.statsValue, { color: '#fbbf24' }]}>{totalStats.cod.toLocaleString()}</Text>
-              <Text style={styles.statsUnit}>MMK</Text>
-              <Ionicons name="chevron-forward" size={12} color="rgba(245, 158, 11, 0.5)" style={styles.statsIcon} />
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-
-        {lastSettledDate && (
-          <View style={styles.settleInfo}>
-            <Ionicons name="checkmark-circle" size={14} color="#10b981" />
-            <Text style={styles.settleText}>
-              {language === 'zh' ? '上次结清: ' : 'Last Settled: '}
-              {new Date(lastSettledDate).toLocaleString()}
-            </Text>
-          </View>
-        )}
-
-        {/* 搜索框 */}
-        <View style={styles.searchWrapper}>
-          <View style={styles.searchInner}>
-            <Ionicons name="search" size={18} color="rgba(255,255,255,0.4)" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder={language === 'zh' ? '搜索单号...' : 'Search ID...'}
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              clearButtonMode="while-editing"
-            />
-          </View>
-        </View>
-
-        {/* 列表 */}
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3b82f6" />
-          </View>
-        ) : filteredPackages.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="folder-open-outline" size={64} color="rgba(255,255,255,0.1)" />
-            <Text style={styles.emptyText}>
-              {language === 'zh' ? '暂无记录' : 'No Records'}
-            </Text>
-          </View>
-        ) : (
-          <View style={{ paddingHorizontal: 20, paddingBottom: 40 }}>
-            {filteredPackages.map((item) => (
-              <React.Fragment key={item.id}>
-                {renderPackageItem({ item })}
-              </React.Fragment>
-            ))}
-          </View>
-        )}
-      </ScrollView>
-
-      {/* COD 详情 Modal */}
-      <Modal
-        visible={showCODModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowCODModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.glassModal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{language === 'zh' ? '代收款明细' : 'COD Breakdown'}</Text>
-              <TouchableOpacity onPress={() => setShowCODModal(false)}>
-                <Ionicons name="close" size={24} color="white" />
+            <View style={styles.statsRow}>
+              <View style={styles.statsCard}>
+                <Text style={styles.statsLabel}>{copy.fee}</Text>
+                <Text style={[styles.statsValue, { color: '#7dd3fc' }]}>{totalStats.deliveryFee.toLocaleString()}</Text>
+                <Text style={styles.statsUnit}>MMK · {copy.feeHint}</Text>
+              </View>
+              <TouchableOpacity style={styles.statsCard} onPress={() => setShowCODModal(true)}>
+                <View style={styles.statsLabelRow}>
+                  <Text style={styles.statsLabel}>{copy.cod}</Text>
+                  <Ionicons name="chevron-forward" size={14} color="#94a3b8" />
+                </View>
+                <Text style={[styles.statsValue, { color: '#fbbf24' }]}>{totalStats.cod.toLocaleString()}</Text>
+                <Text style={styles.statsUnit}>MMK · {copy.feeHint}</Text>
               </TouchableOpacity>
             </View>
-            
-            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
-              {packages.filter(p => (p.cod_amount || 0) > 0 && p.status === '已送达' && !p.rider_settled).length > 0 ? (
-                packages
-                  .filter(p => (p.cod_amount || 0) > 0 && p.status === '已送达' && !p.rider_settled)
-                  .map((pkg, index) => (
-                    <View key={index} style={styles.codItem}>
-                      <View>
-                        <Text style={styles.codOrderId}>{pkg.id}</Text>
-                        <Text style={styles.codTime}>{pkg.delivery_time}</Text>
-                      </View>
-                      <Text style={styles.codAmount}>{Number(pkg.cod_amount).toLocaleString()} MMK</Text>
-                    </View>
-                  ))
+
+            {lastSettledDate ? (
+              <Text style={styles.settleInfo}>{copy.lastSettled}{formatYangonStamp(lastSettledDate)}</Text>
+            ) : null}
+
+            <View style={styles.searchInner}>
+              <Ionicons name="search" size={18} color="#94a3b8" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder={copy.search}
+                placeholderTextColor="#64748b"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                clearButtonMode="while-editing"
+              />
+            </View>
+
+            <View style={styles.filterRow}>
+              {filters.map((item) => {
+                const selected = filter === item.key;
+                return (
+                  <TouchableOpacity
+                    key={item.key}
+                    style={[styles.filterChip, selected && styles.filterChipOn]}
+                    onPress={() => setFilter(item.key)}
+                  >
+                    <Text style={[styles.filterText, selected && styles.filterTextOn]}>{item.label} {item.count}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}
+          </View>
+        }
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator style={{ marginTop: 32 }} size="large" color="#7dd3fc" />
+          ) : (
+            <Text style={styles.emptyText}>{copy.empty}</Text>
+          )
+        }
+      />
+
+      <Modal visible={showCODModal} transparent animationType="fade" onRequestClose={() => setShowCODModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{copy.codTitle}</Text>
+              <TouchableOpacity onPress={() => setShowCODModal(false)} style={styles.iconButton}>
+                <Ionicons name="close" size={20} color="#e2e8f0" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+              {codRows.length === 0 ? (
+                <Text style={styles.emptyText}>{copy.codEmpty}</Text>
               ) : (
-                <View style={styles.modalEmpty}>
-                  <Text style={styles.emptyText}>{language === 'zh' ? '暂无未结清记录' : 'No Unsettled Records'}</Text>
-                </View>
+                codRows.map((pkg) => (
+                  <View key={pkg.id} style={styles.codItem}>
+                    <View style={{ flex: 1, marginRight: 12 }}>
+                      <Text style={styles.codOrderId} numberOfLines={1}>{pkg.id}</Text>
+                      <Text style={styles.codTime}>{formatYangonStamp(pkg.delivery_time)} · {pkg.receiver_name}</Text>
+                    </View>
+                    <Text style={styles.codAmount}>{Number(pkg.cod_amount).toLocaleString()} MMK</Text>
+                  </View>
+                ))
               )}
             </ScrollView>
-            
-            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowCODModal(false)}>
-              <Text style={styles.modalCloseBtnText}>{language === 'zh' ? '确定' : 'OK'}</Text>
+            <TouchableOpacity style={styles.modalButton} onPress={() => setShowCODModal(false)}>
+              <Text style={styles.modalButtonText}>{copy.ok}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -342,299 +390,153 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-  },
+  container: { flex: 1, backgroundColor: '#0f172a' },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  backButton: {
+  iconButton: {
     width: 40,
     height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 14,
+    backgroundColor: '#1e293b',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  content: {
-    flex: 1,
-  },
-  summaryBar: {
-    marginHorizontal: 20,
-    marginTop: 10,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    flexDirection: 'row',
-    padding: 16,
-    borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(148, 163, 184, 0.28)',
   },
-  summaryItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  summaryNumber: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#fff',
-  },
-  summaryLabel: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.4)',
-    fontWeight: '700',
+  headerTitle: { color: '#f8fafc', fontSize: 18, fontWeight: '700' },
+  summaryBar: {
     marginTop: 4,
-  },
-  summaryDivider: {
-    width: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  statsContainer: {
+    backgroundColor: '#1e293b',
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginTop: 16,
-    gap: 12,
+    paddingVertical: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.22)',
   },
-  statsCardWrapper: {
-    flex: 1,
-  },
+  summaryItem: { flex: 1, alignItems: 'center' },
+  summaryNumber: { fontSize: 20, fontWeight: '800', color: '#f8fafc' },
+  summaryLabel: { fontSize: 12, color: '#94a3b8', fontWeight: '600', marginTop: 4 },
+  summaryDivider: { width: 1, backgroundColor: 'rgba(148, 163, 184, 0.2)' },
+  statsRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
   statsCard: {
     flex: 1,
-    padding: 16,
-    borderRadius: 24,
+    backgroundColor: '#1e293b',
+    borderRadius: 18,
+    padding: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    position: 'relative',
+    borderColor: 'rgba(148, 163, 184, 0.22)',
   },
-  statsLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.5)',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-  },
-  statsValue: {
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  statsUnit: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.3)',
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  statsIcon: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-  },
-  settleInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-    gap: 6,
-  },
-  settleText: {
-    fontSize: 11,
-    color: 'rgba(16, 185, 129, 0.8)',
-    fontWeight: '700',
-  },
-  searchWrapper: {
-    paddingHorizontal: 20,
-    marginVertical: 20,
-  },
+  statsLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  statsLabel: { fontSize: 12, fontWeight: '700', color: '#94a3b8', marginBottom: 6 },
+  statsValue: { fontSize: 22, fontWeight: '800' },
+  statsUnit: { fontSize: 11, color: '#64748b', fontWeight: '600', marginTop: 4 },
+  settleInfo: { color: '#94a3b8', fontSize: 12, fontWeight: '600', textAlign: 'center', marginTop: 10 },
   searchInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: '#1e293b',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 46,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.22)',
+    marginTop: 14,
+  },
+  searchInput: { flex: 1, color: '#f8fafc', fontSize: 15, fontWeight: '600', marginLeft: 8 },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 12 },
+  filterChip: {
+    height: 32,
+    paddingHorizontal: 12,
     borderRadius: 16,
-    paddingHorizontal: 16,
-    height: 50,
+    backgroundColor: '#1e293b',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(148, 163, 184, 0.22)',
+    justifyContent: 'center',
   },
-  searchInput: {
-    flex: 1,
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-    marginLeft: 10,
-  },
-  cardWrapper: {
-    marginBottom: 12,
-  },
-  glassCard: {
-    borderRadius: 24,
-    padding: 16,
+  filterChipOn: { borderColor: 'rgba(125, 211, 252, 0.7)', backgroundColor: 'rgba(125, 211, 252, 0.08)' },
+  filterText: { color: '#94a3b8', fontSize: 13, fontWeight: '700' },
+  filterTextOn: { color: '#e0f2fe' },
+  errorText: { color: '#fca5a5', fontSize: 13, fontWeight: '600', marginBottom: 8 },
+  card: {
+    backgroundColor: '#1e293b',
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    borderColor: 'rgba(148, 163, 184, 0.22)',
   },
   packageId: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#fff',
+    color: '#f8fafc',
+    fontSize: 14,
+    fontWeight: '700',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
-  dateText: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.4)',
-    marginTop: 4,
-    fontWeight: '600',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+  metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, marginBottom: 10, gap: 8 },
+  dateText: { color: '#94a3b8', fontSize: 12, fontWeight: '600' },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, justifyContent: 'flex-end' },
+  badge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: 8,
+    backgroundColor: '#152033',
     borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.28)',
   },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  cardBody: {
-    gap: 4,
-    marginBottom: 12,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  receiverName: {
-    fontSize: 14,
-    color: '#fff',
-    fontWeight: '700',
-  },
-  addressText: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.5)',
-    fontWeight: '600',
-    flex: 1,
-  },
+  badgeText: { color: '#e2e8f0', fontSize: 10, fontWeight: '700' },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  receiverName: { flex: 1, color: '#f8fafc', fontSize: 14, fontWeight: '700' },
+  addressText: { flex: 1, color: '#94a3b8', fontSize: 13, fontWeight: '600' },
+  balanceText: { marginTop: 8, color: '#5eead4', fontSize: 12, fontWeight: '700' },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 12,
+    marginTop: 12,
+    paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
+    borderTopColor: 'rgba(148, 163, 184, 0.16)',
   },
-  priceText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#10b981',
-  },
-  loadingContainer: {
-    paddingVertical: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    paddingVertical: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.2)',
-    fontWeight: '700',
-  },
+  priceText: { color: '#5eead4', fontSize: 15, fontWeight: '800' },
+  footerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  settleTag: { fontSize: 12, fontWeight: '700' },
+  emptyText: { color: '#64748b', fontSize: 14, fontWeight: '600', textAlign: 'center', marginTop: 28 },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
+    backgroundColor: 'rgba(2, 6, 23, 0.72)',
     justifyContent: 'center',
-    alignItems: 'center',
     padding: 24,
   },
-  glassModal: {
-    width: '100%',
-    maxHeight: '80%',
-    backgroundColor: 'rgba(30, 41, 59, 0.95)',
-    borderRadius: 32,
+  modalCard: {
+    backgroundColor: '#152033',
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    overflow: 'hidden',
-    padding: 24,
+    borderColor: 'rgba(148, 163, 184, 0.22)',
+    padding: 16,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  modalScroll: {
-    marginBottom: 20,
-  },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  modalTitle: { color: '#f8fafc', fontSize: 17, fontWeight: '700' },
   codItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: 'rgba(148, 163, 184, 0.16)',
   },
-  codOrderId: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  codTime: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.4)',
-    marginTop: 2,
-  },
-  codAmount: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#fbbf24',
-  },
-  modalEmpty: {
-    paddingVertical: 40,
+  codOrderId: { color: '#f8fafc', fontSize: 13, fontWeight: '700' },
+  codTime: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
+  codAmount: { color: '#fbbf24', fontSize: 14, fontWeight: '800' },
+  modalButton: {
+    marginTop: 14,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: '#2563eb',
     alignItems: 'center',
-  },
-  modalCloseBtn: {
-    backgroundColor: '#3b82f6',
-    height: 56,
-    borderRadius: 16,
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  modalCloseBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  identityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  identityText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
-  },
+  modalButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

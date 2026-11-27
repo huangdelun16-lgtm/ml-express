@@ -30,6 +30,7 @@ import {
   DeliveryStore,
 } from '../services/supabase';
 import { theme } from '../config/theme';
+import { productGalleryUrls } from '../services/_shared/productReview';
 import Toast from '../components/Toast';
 import { common } from '../i18n';
 import MyanmarAwareText from '../components/MyanmarAwareText';
@@ -95,6 +96,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   // 产品详情模态框
   const [showDetailModal, setShowEditDetailModal] = useState(false);
   const [selectedProductDetail, setSelectedProductDetail] = useState<Product | null>(null);
+  const [detailGalleryIndex, setDetailGalleryIndex] = useState(0);
 
   const [detailOpenedFromCart, setDetailOpenedFromCart] = useState(false);
 
@@ -238,6 +240,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   const currentT = t[language as keyof typeof t] || t.zh;
   const c = common(language);
   const isFocused = useIsFocused();
+
+  useEffect(() => {
+    setDetailGalleryIndex(0);
+  }, [selectedProductDetail?.id]);
 
   useEffect(() => {
     loadProducts();
@@ -815,7 +821,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
             >
               <View style={styles.detailHero}>
                 <ProxiedImage
-                  uri={selectedProductDetail?.image_url}
+                  uri={productGalleryUrls(selectedProductDetail || {})[detailGalleryIndex] || selectedProductDetail?.image_url}
                   style={styles.detailHeroImage}
                   resizeMode="contain"
                   iconSize={64}
@@ -847,6 +853,22 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                     myanmarWeight="bold"
                     text={selectedProductDetail?.name}
                   />
+                  {selectedProductDetail?.brand ? (
+                    <Text style={styles.detailBrand}>{selectedProductDetail.brand}</Text>
+                  ) : null}
+                  {productGalleryUrls(selectedProductDetail || {}).length > 1 ? (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.detailGalleryRow}>
+                      {productGalleryUrls(selectedProductDetail || {}).map((url, idx) => (
+                        <TouchableOpacity key={`${url}-${idx}`} onPress={() => setDetailGalleryIndex(idx)}>
+                          <ProxiedImage
+                            uri={url}
+                            style={[styles.detailGalleryThumb, idx === detailGalleryIndex && styles.detailGalleryThumbOn]}
+                            iconSize={16}
+                          />
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  ) : null}
                   <View style={styles.detailPriceRow}>
                     {selectedProductDetail && productHasVariants(selectedProductDetail) && !selectedVariantId ? (
                       <Text style={styles.detailPriceHint}>
@@ -1626,9 +1648,31 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '900',
     color: '#0f172a',
-    marginBottom: 10,
+    marginBottom: 6,
     lineHeight: 30,
     flexShrink: 0,
+  },
+  detailBrand: {
+    color: '#64748b',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  detailGalleryRow: {
+    flexGrow: 0,
+    marginBottom: 10,
+  },
+  detailGalleryThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    marginRight: 8,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  detailGalleryThumbOn: {
+    borderColor: '#10b981',
   },
   detailPriceRow: {
     flexDirection: 'row',

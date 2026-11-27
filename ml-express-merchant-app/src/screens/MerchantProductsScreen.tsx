@@ -22,7 +22,9 @@ import { useApp } from '../contexts/AppContext';
 import { merchantService, Product, ProductCategory, productFormSource, hasPendingProductUpdate } from '../services/supabase';
 import { theme } from '../config/theme';
 import { feedbackService } from '../services/FeedbackService';
-import { autoPrepareProductImageUri, autoPrepareProductImageUris } from '../utils/productImageNative';
+import { autoPrepareProductImageUris, keepPickedProductImage } from '../utils/productImageNative';
+import * as ImagePicker from 'expo-image-picker';
+import { MAX_PRODUCT_GALLERY_IMAGES, promoteGalleryCover } from '../services/_shared/productReview';
 import { rewritePublicStorageUrl } from '../services/merchantApi/nativeSupabaseUrl';
 import MerchantPageHeader, { MerchantHeaderIconButton, merchantExitLabel } from '../components/MerchantPageHeader';
 import { pickImageFromLibrary } from '../utils/mediaAccess';
@@ -98,6 +100,11 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       addProduct: '添加商品',
       editProduct: '编辑商品',
       name: '商品名称',
+      brand: '品牌',
+      brandPlaceholder: '选填，例如 Nike',
+      uploadHint: '上传图片，最多 6 张',
+      uploadLimit: '最多上传 6 张图片',
+      makeCover: '设为封面',
       price: '售价',
       discount: '商品优惠(%)',
       stock: '库存',
@@ -136,6 +143,11 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       addProduct: 'Add Product',
       editProduct: 'Edit Product',
       name: 'Name',
+      brand: 'Brand',
+      brandPlaceholder: 'Optional',
+      uploadHint: 'Up to 6 photos',
+      uploadLimit: 'Up to 6 photos',
+      makeCover: 'Set cover',
       price: 'Price',
       discount: 'Discount (%)',
       stock: 'Stock',
@@ -174,6 +186,11 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       addProduct: 'ကုန်ပစ္စည်းအသစ်ထည့်ရန်',
       editProduct: 'ပြင်ဆင်ရန်',
       name: 'အမည်',
+      brand: 'အမှတ်တံဆိပ်',
+      brandPlaceholder: 'မထည့်လည်းရ',
+      uploadHint: 'ဓာတ်ပုံ ၆ ပုံအထိ',
+      uploadLimit: 'ဓာတ်ပုံ ၆ ပုံအထိ',
+      makeCover: 'မျက်နှာဖုံးလုပ်',
       price: 'စျေးနှုန်း',
       discount: 'လျှော့စျေး (%)',
       stock: 'လက်ကျန်',
@@ -243,34 +260,91 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     setRefreshing(false);
   };
 
-  const pickImage = async () => {
+  const appendGalleryUris = (uris: string[]) => {
+    if (!uris.length) return;
+    setProductForm((prev) => {
+      const gallery = [...(prev.gallery_image_urls ?? []), ...uris].slice(0, MAX_PRODUCT_GALLERY_IMAGES);
+      return { ...prev, gallery_image_urls: gallery, image_url: gallery[0] || '' };
+    });
+  };
+
+  const resumePickAfterModal = useRef(false);
+
+  const runGalleryPick = async () => {
+    const existing = productForm.gallery_image_urls ?? [];
+    const room = MAX_PRODUCT_GALLERY_IMAGES - existing.length;
+    if (room <= 0) return;
     try {
       const result = await pickImageFromLibrary({
         mediaTypes: ['images'],
         allowsEditing: false,
         quality: 1,
+        allowsMultipleSelection: true,
+        selectionLimit: room,
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
       });
-
-      if (!result.canceled && result.assets?.[0]?.uri) {
-        const preparedUri = await autoPrepareProductImageUri(result.assets[0].uri);
-        setProductForm((prev) => ({ ...prev, image_url: preparedUri }));
+      const picked = (result.assets ?? [])
+        .slice(0, room)
+        .map((asset) => asset.uri)
+        .filter(Boolean);
+      if (!picked.length) return;
+      const stored: string[] = [];
+      for (const uri of picked) {
+        const kept = await keepPickedProductImage(uri);
+        if (kept) stored.push(kept);
       }
+      if (!stored.length) return;
+      appendGalleryUris(stored);
+      setShowProductModal(true);
+      const prepared = await autoPrepareProductImageUris(stored);
+      setProductForm((prev) => {
+        const gallery = [...(prev.gallery_image_urls ?? [])];
+        stored.forEach((raw, index) => {
+          const at = gallery.lastIndexOf(raw);
+          const next = prepared[index];
+          if (at >= 0 && next) gallery[at] = next;
+        });
+        return { ...prev, gallery_image_urls: gallery, image_url: gallery[0] || '' };
+      });
     } catch (error) {
       console.warn('Pick image error:', error);
-      try {
-        const result = await pickImageFromLibrary({
-          mediaTypes: ['images'],
-          allowsEditing: false,
-          quality: 1,
-        });
-        if (!result.canceled && result.assets?.[0]?.uri) {
-          const preparedUri = await autoPrepareProductImageUri(result.assets[0].uri);
-          setProductForm((prev) => ({ ...prev, image_url: preparedUri }));
-        }
-      } catch (retryError) {
-        feedbackService.notify('错误', '无法打开相册，请检查权限');
-      }
+      showToast(language === 'zh' ? '无法打开相册，请检查权限' : 'Cannot open photos', 'error');
     }
+  };
+
+  const pickGalleryImages = () => {
+    const existing = productForm.gallery_image_urls ?? [];
+    if (existing.length >= MAX_PRODUCT_GALLERY_IMAGES) {
+      showToast(currentT.uploadLimit, 'info');
+      return;
+    }
+    if (Platform.OS === 'ios') {
+      // 多选必须等商品窗口关完再打开相册，否则 iOS 会闪退。
+      resumePickAfterModal.current = true;
+      setShowProductModal(false);
+      return;
+    }
+    void runGalleryPick();
+  };
+
+  const handleProductModalDismiss = () => {
+    if (!resumePickAfterModal.current) return;
+    resumePickAfterModal.current = false;
+    void runGalleryPick().finally(() => setShowProductModal(true));
+  };
+
+  const handleRemoveGalleryImage = (index: number) => {
+    setProductForm((prev) => {
+      const gallery = prev.gallery_image_urls.filter((_, i) => i !== index);
+      return { ...prev, gallery_image_urls: gallery, image_url: gallery[0] || '' };
+    });
+  };
+
+  const handleMakeCover = (index: number) => {
+    setProductForm((prev) => {
+      const gallery = promoteGalleryCover(prev.gallery_image_urls ?? [], index);
+      return { ...prev, gallery_image_urls: gallery, image_url: gallery[0] || '' };
+    });
   };
 
   const pickDetailImages = async () => {
@@ -353,21 +427,21 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 
     try {
       setFormLoading(true);
-      let finalImageUrl = productForm.image_url;
-
-      // 如果是本地图片路径，先上传
-      if (productForm.image_url && (productForm.image_url.startsWith('file://') || productForm.image_url.startsWith('content://'))) {
-        console.log('正在上传本地图片:', productForm.image_url);
-        const uploadedUrl = await merchantService.uploadProductImage(activeStoreId, productForm.image_url);
-        if (uploadedUrl) {
-          finalImageUrl = uploadedUrl;
-          console.log('图片上传成功:', uploadedUrl);
-        } else {
-          feedbackService.notify('错误', '图片上传失败，请检查网络或重试。请确保图片已成功上传后再保存商品。\n(提示: 请确保相册授权正常)');
-          setFormLoading(false);
-          return;
+      const finalGalleryUrls: string[] = [];
+      for (const uri of productForm.gallery_image_urls) {
+        if (uri.startsWith('file://') || uri.startsWith('content://')) {
+          const uploadedUrl = await merchantService.uploadProductImage(activeStoreId, uri);
+          if (!uploadedUrl) {
+            feedbackService.notify('错误', '图片上传失败，请检查网络或重试。请确保图片已成功上传后再保存商品。\n(提示: 请确保相册授权正常)');
+            setFormLoading(false);
+            return;
+          }
+          finalGalleryUrls.push(uploadedUrl);
+        } else if (uri) {
+          finalGalleryUrls.push(uri);
         }
       }
+      const finalImageUrl = finalGalleryUrls[0] || '';
 
       const finalDetailUrls: string[] = [];
       for (const uri of productForm.detail_image_urls) {
@@ -385,6 +459,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         store_id: activeStoreId,
         ...draft,
         image_url: finalImageUrl,
+        gallery_image_urls: finalGalleryUrls,
         detail_image_urls: finalDetailUrls,
       };
 
@@ -858,12 +933,12 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         </View>
       </Modal>
 
-      {/* 添加/编辑商品模态框 */}
       <Modal
         visible={showProductModal}
         transparent
         animationType="slide"
         onRequestClose={() => setShowProductModal(false)}
+        onDismiss={handleProductModalDismiss}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -883,21 +958,44 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              {/* 图片上传区域 */}
-              <TouchableOpacity 
-                style={styles.imageUploadBox} 
-                onPress={pickImage}
-                activeOpacity={0.6}
-              >
-                {productForm.image_url ? (
-                  <Image source={{ uri: rewritePublicStorageUrl(productForm.image_url) }} style={styles.uploadedImage} />
-                ) : (
+              {(productForm.gallery_image_urls ?? []).length === 0 ? (
+                <TouchableOpacity
+                  style={styles.imageUploadBox}
+                  onPress={pickGalleryImages}
+                  activeOpacity={0.6}
+                >
                   <View style={styles.uploadPlaceholder}>
                     <Ionicons name="camera-outline" size={40} color="#94a3b8" />
-                    <Text style={styles.uploadText}>点击上传商品图片</Text>
+                    <Text style={styles.uploadText}>{currentT.uploadHint}</Text>
                   </View>
-                )}
-              </TouchableOpacity>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.galleryWrap}>
+                  <View style={styles.galleryGrid}>
+                    {(productForm.gallery_image_urls ?? []).map((uri, idx) => (
+                      <View key={`${uri}-${idx}`} style={styles.galleryTile}>
+                        <Image source={{ uri: rewritePublicStorageUrl(uri) }} style={styles.galleryImage} resizeMode="cover" />
+                        <TouchableOpacity style={styles.galleryRemove} onPress={() => handleRemoveGalleryImage(idx)}>
+                          <Ionicons name="close" size={14} color="#fff" />
+                        </TouchableOpacity>
+                        {idx === 0 ? (
+                          <Text style={styles.galleryCover}>{language === 'zh' ? '封面' : 'Cover'}</Text>
+                        ) : (
+                          <TouchableOpacity style={styles.galleryMakeCover} onPress={() => handleMakeCover(idx)}>
+                            <Text style={styles.galleryMakeCoverText} numberOfLines={1}>{currentT.makeCover}</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    ))}
+                    {(productForm.gallery_image_urls ?? []).length < MAX_PRODUCT_GALLERY_IMAGES ? (
+                      <TouchableOpacity style={styles.galleryAdd} onPress={pickGalleryImages}>
+                        <Ionicons name="add" size={24} color="#64748b" />
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                  <Text style={styles.galleryHint}>{currentT.uploadHint}</Text>
+                </View>
+              )}
 
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>{currentT.name} *</Text>
@@ -906,6 +1004,16 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                   value={productForm.name}
                   onChangeText={(text) => setProductForm({ ...productForm, name: text })}
                   placeholder="如：冰镇可乐 330ml"
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>{currentT.brand}</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={productForm.brand}
+                  onChangeText={(text) => setProductForm({ ...productForm, brand: text })}
+                  placeholder={currentT.brandPlaceholder}
                 />
               </View>
 
@@ -1291,6 +1399,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
+  productFormOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 30,
+    elevation: 30,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
@@ -1426,6 +1539,82 @@ const styles = StyleSheet.create({
   uploadedImage: {
     width: '100%',
     height: '100%',
+  },
+  galleryWrap: {
+    marginBottom: 20,
+  },
+  galleryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  galleryTile: {
+    width: '31%',
+    aspectRatio: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#f1f5f9',
+  },
+  galleryImage: {
+    width: '100%',
+    height: '100%',
+  },
+  galleryRemove: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(15,23,42,0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  galleryCover: {
+    position: 'absolute',
+    left: 4,
+    bottom: 4,
+    backgroundColor: '#2563eb',
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  galleryMakeCover: {
+    position: 'absolute',
+    left: 4,
+    right: 4,
+    bottom: 4,
+    backgroundColor: 'rgba(15,23,42,0.78)',
+    borderRadius: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+  },
+  galleryMakeCoverText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  galleryAdd: {
+    width: '31%',
+    aspectRatio: 1,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8fafc',
+  },
+  galleryHint: {
+    marginTop: 8,
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '600',
   },
   uploadPlaceholder: {
     alignItems: 'center',

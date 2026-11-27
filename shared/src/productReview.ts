@@ -3,6 +3,32 @@
 // 单一真源：/shared/src/productReview.ts
 // 各 app 通过 sync 脚本复制到 src/services/_shared/ 后引用，请勿在副本中修改。
 
+export const MAX_PRODUCT_GALLERY_IMAGES = 6;
+
+/** 商品图：有相册用相册，否则退回封面。最多 6 张。 */
+export function productGalleryUrls(product: {
+  image_url?: string | null;
+  gallery_image_urls?: string[] | null;
+}): string[] {
+  const listed = Array.isArray(product.gallery_image_urls)
+    ? product.gallery_image_urls.map((url) => String(url || "").trim()).filter(Boolean)
+    : [];
+  const source = listed.length
+    ? listed
+    : [String(product.image_url || "").trim()].filter(Boolean);
+  return source.slice(0, MAX_PRODUCT_GALLERY_IMAGES);
+}
+
+/** 把指定图片挪到第一张。第一张就是封面。 */
+export function promoteGalleryCover(urls: string[], index: number): string[] {
+  if (!Number.isInteger(index) || index <= 0 || index >= urls.length) return urls;
+  const next = urls.slice();
+  const [picked] = next.splice(index, 1);
+  if (!picked) return urls;
+  next.unshift(picked);
+  return next;
+}
+
 export type ProductVariant = {
   id: string;
   name: string;
@@ -21,7 +47,11 @@ export interface Product {
   description?: string;
   price: number;
   original_price?: number;
+  /** 商品品牌，可不填 */
+  brand?: string;
   image_url?: string;
+  /** 商品图片，最多 6 张；第一张同时作为列表封面 image_url */
+  gallery_image_urls?: string[];
   /** 商品详细介绍滚动图（纵向浏览） */
   detail_image_urls?: string[];
   /** 多规格 SKU；null 表示单一价格商品 */
@@ -45,7 +75,9 @@ export type ProductPendingUpdate = {
   description?: string;
   price?: number;
   original_price?: number | null;
+  brand?: string;
   image_url?: string;
+  gallery_image_urls?: string[];
   detail_image_urls?: string[];
   variants?: ProductVariant[] | null;
   stock?: number;
@@ -103,7 +135,9 @@ export function pickProductReviewSnapshot(product: Product): ProductPendingUpdat
     description: product.description,
     price: product.price,
     original_price: product.original_price ?? null,
+    brand: product.brand,
     image_url: product.image_url,
+    gallery_image_urls: product.gallery_image_urls,
     detail_image_urls: product.detail_image_urls,
     variants: product.variants ?? null,
     stock: product.stock,
@@ -130,7 +164,14 @@ export function normalizePendingPayload(
     description: raw.description as string | undefined,
     price: raw.price as number | undefined,
     original_price: raw.original_price as number | null | undefined,
+    brand: raw.brand == null ? undefined : String(raw.brand),
     image_url: raw.image_url as string | undefined,
+    gallery_image_urls: Array.isArray(raw.gallery_image_urls)
+      ? raw.gallery_image_urls
+          .map((url) => String(url || "").trim())
+          .filter(Boolean)
+          .slice(0, MAX_PRODUCT_GALLERY_IMAGES)
+      : undefined,
     detail_image_urls: raw.detail_image_urls as string[] | undefined,
     variants: (raw.variants as ProductVariant[] | null | undefined) ?? undefined,
     stock: raw.stock as number | undefined,
@@ -144,7 +185,9 @@ export function toDirectProductPatch(snapshot: ProductPendingUpdate): Partial<Pr
     description: snapshot.description,
     price: snapshot.price,
     original_price: snapshot.original_price ?? undefined,
+    brand: snapshot.brand,
     image_url: snapshot.image_url,
+    gallery_image_urls: snapshot.gallery_image_urls,
     detail_image_urls: snapshot.detail_image_urls,
     variants: snapshot.variants ?? null,
     stock: snapshot.stock,

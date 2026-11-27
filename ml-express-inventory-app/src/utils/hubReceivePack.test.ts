@@ -10,6 +10,7 @@ import {
   matchScanInboundOrder,
   preferConfirmedHubReceivePack,
   resolveHubReceiveStep,
+  revertOptimisticHubInbound,
 } from './hubReceivePack';
 
 function pack(orders: PkgTrackingDetail['orders'], overrides: Partial<PkgTrackingDetail> = {}): PkgTrackingDetail {
@@ -276,5 +277,25 @@ describe('hubReceivePack', () => {
       },
     ] as PkgTrackingDetail['orders']);
     expect(matchScanInboundOrder(duplicated, 'LSO', 'JT111')).toMatchObject({ reason: 'ambiguous' });
+  });
+
+  it('上传失败时把先标成已入库的那一单退回', () => {
+    const snapshot = {
+      id: '1',
+      order_barcode: 'LSO260801001',
+      express_barcode: 'JT111',
+      order_name: 'A',
+      destination_code: 'LSO',
+      status: 'in_transit',
+      pack_barcode: 'RUI26LSO20001',
+      qty: 1,
+    } as PkgTrackingDetail['orders'][number];
+    const shown = pack(
+      [{ ...snapshot, status: 'hub_received' } as PkgTrackingDetail['orders'][number]],
+      { received_order_count: 1 },
+    );
+    const reverted = revertOptimisticHubInbound(shown, '1', snapshot);
+    expect(reverted.orders[0]?.status).toBe('in_transit');
+    expect(reverted.received_order_count).toBe(0);
   });
 });

@@ -55,6 +55,7 @@ export type FinancePackageRow = {
   transport_fee?: string | number | null;
   truck_loaded_at?: string | null;
   updated_at?: string | null;
+  status?: string | null;
 };
 
 export type FinanceOrderRow = {
@@ -535,7 +536,7 @@ export function buildFinanceLedgerEntries(
     entries.push({
       id: tripNumber ? `transport:trip:${tripNumber}` : `transport:${packBarcode}`,
       category: 'transport_cost',
-      title: '运输成本 · 装车车费',
+      title: fee > 0 ? '运输成本 · 装车车费' : '待补车费 · 装车车费',
       subtitle,
       amount: paid ? 0 : fee,
       amountDisplay: paid ? '已支付' : fee > 0 ? `−${formatMmk(fee)}` : '待登记车费',
@@ -548,6 +549,39 @@ export function buildFinanceLedgerEntries(
       originKey,
       originLabel,
       transportDirection: 'inbound',
+    });
+  }
+
+  for (const pkg of dataset.packages) {
+    const originCode = String(pkg.origin_store_code || '').trim().toUpperCase();
+    const originKey = ownershipKeyFromStoreCode(originCode);
+    if (originKey !== currentKey && originCode !== storeCode.trim().toUpperCase()) continue;
+    const fee = parseFinanceAmount(pkg.transport_fee);
+    if (fee > 0) continue;
+    const status = String(pkg.status || '').trim();
+    if (status !== 'hub_received' && status !== 'completed' && status !== 'split_at_hub') continue;
+    const packBarcode = String(pkg.pack_barcode || '').trim().toUpperCase();
+    const tripNumber = String(pkg.trip_number || '').trim().toUpperCase();
+    const tripKey = tripTransportGroupKey(tripNumber, packBarcode, pkg);
+    if (!packBarcode || transportTripSeen.has(tripKey)) continue;
+    transportTripSeen.add(tripKey);
+    const destination = String(pkg.leg_destination_code || pkg.destination_code || '').trim().toUpperCase();
+    entries.push({
+      id: tripNumber ? `fill-fee:trip:${tripNumber}` : `fill-fee:${packBarcode}`,
+      category: 'transport_cost',
+      title: '待补车费 · 已到站或已签收',
+      subtitle: `${tripNumber || packBarcode} → ${destination}`,
+      amount: 0,
+      amountDisplay: '待登记车费',
+      transportFee: 0,
+      paid: false,
+      occurredAt: String(pkg.truck_loaded_at || pkg.updated_at || ''),
+      barcode: packBarcode,
+      itemName: String(pkg.pack_name || packBarcode),
+      destination,
+      originKey: originKey || currentKey,
+      originLabel: ownerLabel(originKey || currentKey, String(pkg.origin_store_name || '')),
+      transportDirection: 'outbound',
     });
   }
 

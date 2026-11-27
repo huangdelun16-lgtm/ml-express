@@ -21,7 +21,7 @@ function MyanmarStackTitle({ children }: { children?: React.ReactNode }) {
 
 export type RootStackParamList = {
   Home: undefined;
-  StockIn: { presetBarcode?: string } | undefined;
+  StockIn: { presetBarcode?: string; addToPackBarcode?: string } | undefined;
   PackagingStockIn: undefined;
   StockOut: { presetBarcode?: string } | undefined;
   Items: { initialMode?: 'pack' | 'sign' } | undefined;
@@ -33,7 +33,7 @@ export type RootStackParamList = {
   PrintPreview: undefined;
   Pkg: undefined;
   TrackExpress: { presetCode?: string } | undefined;
-  HubReceive: { openPackBarcode?: string } | undefined;
+  HubReceive: { openPackBarcode?: string; payTrips?: boolean } | undefined;
   ShipmentTrack: undefined;
   Exceptions: undefined;
 };

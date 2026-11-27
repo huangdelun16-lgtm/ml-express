@@ -324,6 +324,24 @@ export const notificationService = {
     }
   },
 
+  async presentOrderCompleted(title: string, body: string, packageId: string): Promise<void> {
+    if (isExpoGoAndroid || !Notifications) return;
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          data: { packageId, type: 'order_completed' },
+          sound: 'default',
+          ...(Platform.OS === 'android' ? { channelId: 'new-task-channel' } : {}),
+        },
+        trigger: null,
+      });
+    } catch (e) {
+      console.warn('订单完成通知失败:', e);
+    }
+  },
+
   /**
    * 初始化通知监听器
    */

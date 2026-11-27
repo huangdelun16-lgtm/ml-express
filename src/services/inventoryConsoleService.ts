@@ -286,6 +286,8 @@ export type InventoryConsoleData = {
   pendingTruckLoadCount?: number;
   /** 全站已到站、还没通知客户 */
   pendingNotifyCount?: number;
+  /** 已到站或已签收、发站还没补车费的车次 */
+  pendingFillTripFeeCount?: number;
   crossBorderFinance?: CrossBorderFinance;
   warnings?: string[];
 };
@@ -563,6 +565,7 @@ export async function fetchInventoryConsoleOverview(): Promise<{
   pendingPackCount?: number;
   pendingTruckLoadCount?: number;
   pendingNotifyCount?: number;
+  pendingFillTripFeeCount?: number;
   warnings?: string[];
 }> {
   const payload = await fetchInventoryConsoleSection('overview');
@@ -575,6 +578,7 @@ export async function fetchInventoryConsoleOverview(): Promise<{
     pendingPackCount: Number(payload.pendingPackCount) || 0,
     pendingTruckLoadCount: Number(payload.pendingTruckLoadCount) || 0,
     pendingNotifyCount: Number(payload.pendingNotifyCount) || 0,
+    pendingFillTripFeeCount: Number(payload.pendingFillTripFeeCount) || 0,
     warnings: payload.warnings,
   };
 }
@@ -1473,13 +1477,31 @@ export type CrossBorderStockInLine = {
 };
 
 export type CrossBorderStockInResult = {
-  mode: 'single' | 'batch';
+  mode: 'single' | 'batch' | 'bundle_singles';
   barcode: string;
   lineBarcodes: string[];
 };
 
+export type CrossBorderBundledOrder = {
+  expressCode?: string;
+  itemName?: string;
+  spec?: string;
+  weightKg?: string;
+  qty?: number;
+  quoteCny?: string;
+  quoteManual?: boolean;
+  chargeBasis?: 'volume' | 'weight';
+  recipientName: string;
+  recipientPhone: string;
+  customerCode?: string;
+  destination: string;
+  detailAddress?: string;
+  note?: string;
+};
+
 export async function submitCrossBorderStockIn(body: {
-  mode: 'single' | 'batch';
+  mode: 'single' | 'batch' | 'bundle_singles';
+  orders?: CrossBorderBundledOrder[];
   storeId: string;
   destination: string;
   recipientName: string;

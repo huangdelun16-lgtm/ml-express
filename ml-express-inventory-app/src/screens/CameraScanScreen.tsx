@@ -9,7 +9,7 @@ import ExceptionReportModal from '../components/ExceptionReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { getPkgStatusLabel, resolveAppError, useTranslation } from '../i18n';
 import { feedbackService } from '../services/FeedbackService';
-import { isHubTransportFeePaid } from '../services/hubTransportFeeService';
+import { isHubTransportFeePaid, parseTransportFeeAmount } from '../services/hubTransportFeeService';
 import { getItemByBarcode, listItems } from '../services/inventoryService';
 import { findTrackingByAnyCode } from '../services/trackingService';
 import type { InventoryItem, InventoryItemListRow } from '../types/inventory';
@@ -51,6 +51,7 @@ type ScanResult = {
   route: CameraScanRoute | null;
   hubPackBarcode: string;
   feePaid: boolean;
+  feeAllowsSign: boolean;
 };
 
 type ShortagePrompt = {
@@ -63,7 +64,7 @@ function scanPrimaryKind(
   result: ScanResult,
   canSign: boolean,
 ): 'paidSign' | 'sign' | 'stockIn' | 'hub' | 'track' {
-  if (canSign && result.feePaid) return 'paidSign';
+  if (canSign && result.feeAllowsSign) return 'paidSign';
   if (canSign) return 'sign';
   if (result.route?.kind === 'stock_in') return 'stockIn';
   if (result.hubPackBarcode) return 'hub';
@@ -253,6 +254,8 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
           feePaid = false;
         }
       }
+      const feeAmount = parseTransportFeeAmount(pkg?.transport_fee);
+      const feeAllowsSign = feePaid || feeAmount <= 0;
       const actions = cameraScanManualActions({
         route,
         code,
@@ -266,11 +269,12 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
         route,
         hubPackBarcode: actions.hubPackBarcode,
         feePaid,
+        feeAllowsSign,
       };
       setResult(next);
 
       if (multiModeRef.current) {
-        await handleMultiScan(item, signable, feePaid);
+        await handleMultiScan(item, signable, feeAllowsSign);
         return;
       }
       if (route.kind === 'hub_receive') {
@@ -294,6 +298,7 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
         route: null,
         hubPackBarcode: '',
         feePaid: false,
+        feeAllowsSign: true,
       });
     } finally {
       busyRef.current = false;
@@ -569,7 +574,7 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
         onSuccess={async (detail, signedCount) => {
           cancelMulti();
           const item = await getItemByBarcode(result?.code ?? detail.barcode);
-          if (result) setResult({ ...result, item, feePaid: false });
+          if (result) setResult({ ...result, item, feePaid: false, feeAllowsSign: true });
           showTaskSuccess(
             t.common.signSuccess,
             signedCount > 1

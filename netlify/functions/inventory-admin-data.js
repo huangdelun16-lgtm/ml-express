@@ -1124,6 +1124,7 @@ async function handleOverview(supabase, warnings) {
     pendingPackCount: hqTodos.pendingPack,
     pendingTruckLoadCount: hqTodos.pendingTruckLoad,
     pendingNotifyCount: hqTodos.pendingNotify,
+    pendingFillTripFeeCount: hqTodos.pendingFillTripFee,
     warnings,
   };
 }

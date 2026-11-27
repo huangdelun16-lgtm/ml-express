@@ -15,6 +15,7 @@ export function useInboundLeaveGuard(params: {
   message: string;
   stayLabel: string;
   leaveLabel: string;
+  onLeave?: () => void | Promise<void>;
 }): { requestLeave: () => void } {
   const shouldConfirmRef = useRef(params.shouldConfirm);
   shouldConfirmRef.current = params.shouldConfirm;
@@ -29,7 +30,15 @@ export function useInboundLeaveGuard(params: {
     }
     Alert.alert(title, message, [
       { text: stayLabel, style: 'cancel' },
-      { text: leaveLabel, style: 'destructive', onPress: () => navigation.goBack() },
+      {
+        text: leaveLabel,
+        style: 'destructive',
+        onPress: () => {
+          const leave = copyRef.current.onLeave;
+          if (leave) void leave();
+          else navigation.goBack();
+        },
+      },
     ]);
   }, []);
 

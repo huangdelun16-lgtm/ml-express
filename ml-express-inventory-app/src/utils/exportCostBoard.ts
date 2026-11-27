@@ -1,5 +1,6 @@
 import { parsePackagingStockInLineBarcode } from './inboundBarcode';
 import { parseWeightKg } from './itemFieldFormat';
+import { isPackageBarcode } from './packageNumber';
 import type { InventoryItemListRow } from '../types/inventory';
 
 export type ExportCostSingleRow = {
@@ -144,7 +145,7 @@ export function buildExportCostBoard(
   items: InventoryItemListRow[],
   options: ExportCostBoardOptions = {},
 ): ExportCostBoard {
-  const pending = items.filter((item) => isPendingExportItem(item));
+  const pending = items.filter((item) => isPendingExportItem(item) && !isPackageBarcode(item.barcode));
   const bases = new Set<string>();
   for (const item of pending) {
     const parsed = parsePackagingStockInLineBarcode(item.barcode);
@@ -153,6 +154,7 @@ export function buildExportCostBoard(
 
   const singles: ExportCostSingleRow[] = [];
   const groups = new Map<string, InventoryItemListRow[]>();
+  const packedGroups = new Map<string, InventoryItemListRow[]>();
 
   for (const item of pending) {
     const parsed = parsePackagingStockInLineBarcode(item.barcode);
@@ -161,6 +163,13 @@ export function buildExportCostBoard(
       const list = groups.get(key) ?? [];
       list.push(item);
       groups.set(key, list);
+      continue;
+    }
+    const packCode = item.packed_bundle_barcode?.trim().toUpperCase() || item.parent_pack_barcode?.trim().toUpperCase() || '';
+    if (packCode) {
+      const list = packedGroups.get(packCode) ?? [];
+      list.push(item);
+      packedGroups.set(packCode, list);
       continue;
     }
     const code = item.barcode.trim().toUpperCase();
@@ -200,6 +209,38 @@ export function buildExportCostBoard(
       weightKg,
       tripNumber: lookupTrip(
         [base, parsed?.base, ...rows.flatMap((row) => [row.barcode, row.packed_bundle_barcode, `id:${row.id}`])],
+        options.tripByBarcode,
+      ),
+    });
+  }
+
+  for (const [packCode, rows] of packedGroups) {
+    if (rows.length < 2) {
+      for (const item of rows) {
+        singles.push({
+          id: item.id,
+          barcode: item.input_barcode?.trim() || item.barcode,
+          customer: customerOf(item),
+          destination: destinationOf(item),
+          weightKg: weightOf(item),
+          tripNumber: lookupTrip(
+            [item.barcode, item.packed_bundle_barcode, item.parent_pack_barcode, `id:${item.id}`],
+            options.tripByBarcode,
+          ),
+        });
+      }
+      continue;
+    }
+    const actualKg = rows.reduce((sum, row) => sum + weightOf(row), 0);
+    packages.push({
+      base: packCode,
+      customer: rows.map(customerOf).find(Boolean) || '',
+      destination: rows.map(destinationOf).find(Boolean) || '',
+      pieceCount: rows.length,
+      declaredTotal: rows.length,
+      weightKg: actualKg,
+      tripNumber: lookupTrip(
+        [packCode, ...rows.flatMap((row) => [row.barcode, row.packed_bundle_barcode, `id:${row.id}`])],
         options.tripByBarcode,
       ),
     });

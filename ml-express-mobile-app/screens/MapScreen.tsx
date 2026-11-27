@@ -28,6 +28,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useApp } from '../contexts/AppContext';
 import { packageService, Package, supabase, deliveryPhotoService } from '../services/supabase';
 import { feedbackService } from '../services/feedbackService';
+import { notificationService } from '../services/notificationService';
 import { cacheService } from '../services/cacheService';
 import { imageUriToBase64 } from '../utils/imageUriToBase64';
 import { isWriteOk, isWriteQueued, pendingWriteUserMessage } from '../utils/pendingWrite';
@@ -785,7 +786,17 @@ export default function MapScreen({ navigation }: any) {
       console.log(`📍 距离目标点: ${distanceMeters.toFixed(2)} 米`);
 
       if (distanceMeters > 200) {
-        feedbackService.notify(copy.tooFarTitle, copy.tooFarFinish(Math.round(distanceMeters)));
+        const meters = Math.round(distanceMeters);
+        Alert.alert(copy.tooFarTitle, copy.tooFarScan(meters), [
+          { text: copy.cancel, style: 'cancel' },
+          {
+            text: copy.photoDeliver,
+            onPress: () => {
+              setCurrentPackageForDelivery(pkg);
+              setShowCameraModal(true);
+            },
+          },
+        ]);
         return;
       }
 
@@ -1207,20 +1218,11 @@ export default function MapScreen({ navigation }: any) {
         return;
       }
 
-      // 获取实时位置
-      const currentLoc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      if (currentLoc) {
-        const dist = calculateDistanceKm(
-          currentLoc.coords.latitude,
-          currentLoc.coords.longitude,
-          currentPackageForDelivery.deliveryCoords?.lat || currentPackageForDelivery.receiver_latitude || 0,
-          currentPackageForDelivery.deliveryCoords?.lng || currentPackageForDelivery.receiver_longitude || 0
-        );
-
-        if (dist * 1000 > 200) {
-          feedbackService.notify(copy.tooFarTitle, copy.tooFarConfirm(Math.round(dist * 1000)));
-          return;
-        }
+      let currentLoc: Location.LocationObject | null = null;
+      try {
+        currentLoc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      } catch {
+        currentLoc = null;
       }
 
       const name = await AsyncStorage.getItem('currentUserName') || '未知';
@@ -1245,17 +1247,14 @@ export default function MapScreen({ navigation }: any) {
       }
       const ok = await packageService.updatePackageStatus(currentPackageForDelivery.id, '已送达', undefined, new Date().toISOString(), name);
       if (isWriteOk(ok)) {
-        if (isWriteQueued(photoOk) || isWriteQueued(ok)) {
-          feedbackService.success(
-            pendingWriteUserMessage(language, { ok: true, queued: true }, copy.packageDelivered, copy.packageDelivered, copy.packageDelivered),
-          );
-        }
-        console.log(`✅ [验证] 订单 ${currentPackageForDelivery.id} 状态更新成功`);
+        const finishedId = currentPackageForDelivery.id;
+        const queued = isWriteQueued(photoOk) || isWriteQueued(ok);
+        console.log(`✅ [验证] 订单 ${finishedId} 状态更新成功`);
         
         // 🚀 强制再次拉取确认 (双保险)
         setTimeout(async () => {
-          const { data } = await supabase.from('packages').select('status, delivery_time').eq('id', currentPackageForDelivery.id).single();
-          console.log(`📡 [验证回拉] ${currentPackageForDelivery.id} 实时状态: status=${data?.status}, time=${data?.delivery_time}`);
+          const { data } = await supabase.from('packages').select('status, delivery_time').eq('id', finishedId).single();
+          console.log(`📡 [验证回拉] ${finishedId} 实时状态: status=${data?.status}, time=${data?.delivery_time}`);
         }, 2000);
 
         const id = await AsyncStorage.getItem('currentCourierId');
@@ -1267,12 +1266,12 @@ export default function MapScreen({ navigation }: any) {
           return next;
         });
         setCompletedPackageIds(prev => {
-          const next = { ...prev, [currentPackageForDelivery.id]: Date.now() };
+          const next = { ...prev, [finishedId]: Date.now() };
           saveCompletedIds(next);
           return next;
         });
         setPackages(prev => {
-          const nextPackages = prev.filter(pkg => pkg.id !== currentPackageForDelivery.id);
+          const nextPackages = prev.filter(pkg => pkg.id !== finishedId);
           packagesCache.current = nextPackages;
           cacheService.savePackages(nextPackages);
           return nextPackages;
@@ -1281,6 +1280,13 @@ export default function MapScreen({ navigation }: any) {
         setCapturedPhoto(null);
         setCurrentPackageForDelivery(null);
         if (isOnline) loadPackages(true);
+        const finishedTitle = queued ? copy.savedOfflineTitle : copy.orderCompletedTitle;
+        const finishedBody = queued ? copy.orderQueuedBody(finishedId) : copy.orderCompletedBody(finishedId);
+        feedbackService.success(finishedTitle);
+        if (!queued) {
+          void notificationService.presentOrderCompleted(finishedTitle, finishedBody, finishedId);
+        }
+        Alert.alert(finishedTitle, finishedBody);
       } else {
         feedbackService.error(copy.photoSavedStatusFailed);
       }

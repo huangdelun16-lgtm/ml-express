@@ -1,5 +1,6 @@
 import type { Product } from '../services/supabase';
 import { productFormSource } from '../services/supabase';
+import { productGalleryUrls } from '../services/_shared/productReview';
 import {
   ProductVariant,
   normalizeProductVariants,
@@ -14,7 +15,9 @@ export type MerchantProductFormState = {
   price: string;
   discountPercent: string;
   stock: string;
+  brand: string;
   image_url: string;
+  gallery_image_urls: string[];
   detail_image_urls: string[];
   is_available: boolean;
   use_variants: boolean;
@@ -28,7 +31,9 @@ export function defaultMerchantProductForm(): MerchantProductFormState {
     price: '',
     discountPercent: '',
     stock: '-1',
+    brand: '',
     image_url: '',
+    gallery_image_urls: [],
     detail_image_urls: [],
     is_available: true,
     use_variants: false,
@@ -46,13 +51,16 @@ export function merchantProductFormFromProduct(product: Product): MerchantProduc
     discountPercent = Math.round((1 - src.price / src.original_price) * 100).toString();
   }
 
+  const gallery = productGalleryUrls(src);
   return {
     name: src.name,
     description: src.description || '',
     price: src.price.toString(),
     discountPercent,
     stock: src.stock.toString(),
-    image_url: src.image_url || '',
+    brand: src.brand || '',
+    image_url: gallery[0] || '',
+    gallery_image_urls: gallery,
     detail_image_urls: src.detail_image_urls || [],
     is_available: src.is_available,
     use_variants: hasVariants,
@@ -78,10 +86,12 @@ export function buildMerchantProductDraft(
       draft: {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
+        brand: form.brand.trim(),
         price: agg.price,
         original_price: agg.original_price ?? null,
         stock: agg.stock,
-        image_url: form.image_url || undefined,
+        image_url: form.gallery_image_urls[0] || '',
+        gallery_image_urls: form.gallery_image_urls.slice(0, 6),
         detail_image_urls: form.detail_image_urls,
         is_available: form.is_available,
         variants,
@@ -108,10 +118,12 @@ export function buildMerchantProductDraft(
     draft: {
       name: form.name.trim(),
       description: form.description.trim() || undefined,
+      brand: form.brand.trim(),
       price,
       original_price: originalPrice ?? null,
       stock: parseInt(form.stock, 10),
-      image_url: form.image_url || undefined,
+      image_url: form.gallery_image_urls[0] || '',
+      gallery_image_urls: form.gallery_image_urls.slice(0, 6),
       detail_image_urls: form.detail_image_urls,
       is_available: form.is_available,
       variants: null,

@@ -29,6 +29,8 @@ import {
   navigateCourierTask,
 } from '../utils/courierTaskQuickActions';
 import { COURIER_NEW_ORDER_EVENT } from '../services/courierNewOrderMonitor';
+import { cacheService, OFFLINE_QUEUE_CHANGED, type OfflineUpdate } from '../services/cacheService';
+import { offlineQueueFailureText } from '../utils/offlineQueueLabel';
 import { locationService } from '../services/locationService';
 import {
   courierTaskPoint,
@@ -48,6 +50,8 @@ export default function CourierHomeScreen({ navigation }: any) {
   const [currentUserName, setCurrentUserName] = useState('');
   const [riderPoint, setRiderPoint] = useState<GeoPoint | null>(null);
   const [taskFilter, setTaskFilter] = useState<CourierTaskFilter>('all');
+  const [offlineQueue, setOfflineQueue] = useState<OfflineUpdate[]>([]);
+  const [retryingPackageId, setRetryingPackageId] = useState('');
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, 24, 120],
@@ -92,6 +96,30 @@ export default function CourierHomeScreen({ navigation }: any) {
     loadUserInfo();
     void loadMyPackages({ showSpinner: true });
   }, [loadMyPackages]);
+
+  useEffect(() => {
+    let alive = true;
+    const loadQueue = async () => {
+      const next = await cacheService.getOfflineQueue();
+      if (alive) setOfflineQueue(next);
+    };
+    void loadQueue();
+    const sub = DeviceEventEmitter.addListener(OFFLINE_QUEUE_CHANGED, () => {
+      void loadQueue();
+    });
+    return () => {
+      alive = false;
+      sub.remove();
+    };
+  }, []);
+
+  const retryPackageUpload = (packageId: string) => {
+    if (retryingPackageId) return;
+    setRetryingPackageId(packageId);
+    void packageService.syncOfflineUpdates(packageId).finally(() => {
+      setRetryingPackageId('');
+    });
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -274,6 +302,34 @@ export default function CourierHomeScreen({ navigation }: any) {
               : item.receiver_address}
           </Text>
           {distanceLabel ? <Text style={styles.distanceText}>{distanceLabel}</Text> : null}
+          {offlineQueue
+            .filter((row) => row.packageId === item.id)
+            .map((row) => (
+              <Text key={row.id} style={styles.queueFail}>
+                {offlineQueueFailureText(row, language, true)}
+              </Text>
+            ))}
+          {offlineQueue.some((row) => row.packageId === item.id) ? (
+            <TouchableOpacity
+              style={styles.retryBtn}
+              onPress={() => retryPackageUpload(item.id)}
+              disabled={retryingPackageId === item.id}
+            >
+              <Text style={styles.retryText}>
+                {retryingPackageId === item.id
+                  ? language === 'zh'
+                    ? '正在上传…'
+                    : language === 'en'
+                      ? 'Uploading…'
+                      : 'တင်နေသည်…'
+                  : language === 'zh'
+                    ? '重试上传'
+                    : language === 'en'
+                      ? 'Retry upload'
+                      : 'ပြန်တင်မည်'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {(() => {
@@ -618,6 +674,26 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginLeft: 26,
     color: '#5eead4',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  queueFail: {
+    marginTop: 8,
+    color: '#fecaca',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  retryBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    backgroundColor: '#b45309',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  retryText: {
+    color: '#fff',
     fontSize: 13,
     fontWeight: '800',
   },

@@ -3,6 +3,7 @@ import {
   Alert,
   Animated,
   Keyboard,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -34,6 +35,7 @@ import { packDestinationFromBarcode } from '../utils/packageNumber';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 import { feedbackService } from '../services/FeedbackService';
+import { fillTripTransportFee, parseTransportFeeAmount } from '../services/hubTransportFeeService';
 import { canEditOwnedRecord, resolveOwnerKeyForListItem } from '../utils/storeOwnership';
 
 function formatTime(iso: string): string {
@@ -43,7 +45,11 @@ function formatTime(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export default function PkgScreen({ navigation }: { navigation: { goBack: () => void } }) {
+export default function PkgScreen({
+  navigation,
+}: {
+  navigation: { goBack: () => void; navigate: (screen: 'StockIn', params: { addToPackBarcode: string }) => void };
+}) {
   const { store, hubCode, operatorName } = useAuth();
   const { t, fmt, language } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -66,6 +72,9 @@ export default function PkgScreen({ navigation }: { navigation: { goBack: () => 
   const [editPack, setEditPack] = useState<PackedShipmentListRow | null>(null);
   const [ordersPack, setOrdersPack] = useState<PackedShipmentListRow | null>(null);
   const [unpacking, setUnpacking] = useState(false);
+  const [feePack, setFeePack] = useState<PackedShipmentListRow | null>(null);
+  const [feeDraft, setFeeDraft] = useState('');
+  const [feeSaving, setFeeSaving] = useState(false);
 
   const load = useCallback(async () => {
     const scope = store && hubCode ? { store, hubCode } : undefined;
@@ -359,6 +368,32 @@ export default function PkgScreen({ navigation }: { navigation: { goBack: () => 
           setOrdersPack(actionPack);
           setActionPack(null);
         }}
+        onAddOrder={() => {
+          if (!actionPack) return;
+          const barcode = actionPack.bundle_barcode;
+          setActionPack(null);
+          navigation.navigate('StockIn', { addToPackBarcode: barcode });
+        }}
+        onFillFee={
+          actionPack &&
+          actionPack.loaded &&
+          parseTransportFeeAmount(actionPack.transport_fee) <= 0 &&
+          store &&
+          canEditOwnedRecord(
+            store,
+            actionPack.owner_store_code || resolveOwnerKeyForListItem({
+              owner_store_code: actionPack.owner_store_code,
+              barcode: actionPack.bundle_barcode,
+              destination: '',
+            }),
+          )
+            ? () => {
+                setFeeDraft('');
+                setFeePack(actionPack);
+                setActionPack(null);
+              }
+            : undefined
+        }
         onPrint={
           actionPack
             ? () => {
@@ -383,6 +418,46 @@ export default function PkgScreen({ navigation }: { navigation: { goBack: () => 
         onSaved={() => void load()}
       />
 
+      <Modal visible={!!feePack} transparent animationType="fade" onRequestClose={() => setFeePack(null)}>
+        <Pressable style={styles.feeOverlay} onPress={() => setFeePack(null)}>
+          <Pressable style={styles.feeSheet} onPress={(event) => event.stopPropagation()}>
+            <Text style={styles.feeTitle}>{t.pkg.fillFee}</Text>
+            <Text style={styles.feeHint}>{t.pkg.fillFeeHint}</Text>
+            <Text style={styles.feeBarcode}>{feePack?.bundle_barcode}</Text>
+            <TextInput
+              style={styles.feeInput}
+              value={feeDraft}
+              onChangeText={setFeeDraft}
+              keyboardType="decimal-pad"
+              placeholder="MMK"
+              placeholderTextColor="#94a3b8"
+            />
+            <Pressable
+              style={styles.feeSave}
+              disabled={feeSaving}
+              onPress={() => {
+                if (!feePack || feeSaving) return;
+                void (async () => {
+                  setFeeSaving(true);
+                  try {
+                    await fillTripTransportFee({ packBarcode: feePack.bundle_barcode, fee: feeDraft });
+                    showTaskSuccess(t.pkg.fillFee, feePack.bundle_barcode);
+                    setFeePack(null);
+                    await load();
+                  } catch (e: unknown) {
+                    feedbackService.notify(t.common.fail, resolveAppError(t, e));
+                  } finally {
+                    setFeeSaving(false);
+                  }
+                })();
+              }}
+            >
+              <Text style={styles.feeSaveText}>{feeSaving ? t.common.processing : t.common.confirm}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <PkgOrdersModal
         visible={!!ordersPack}
         pack={ordersPack}
@@ -400,6 +475,14 @@ export default function PkgScreen({ navigation }: { navigation: { goBack: () => 
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0f172a' },
+  feeOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.78)', justifyContent: 'flex-end' },
+  feeSheet: { backgroundColor: '#1e293b', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10 },
+  feeTitle: { color: '#f8fafc', fontSize: 18, fontWeight: '800' },
+  feeHint: { color: '#94a3b8', fontSize: 13, lineHeight: 18 },
+  feeBarcode: { color: '#67e8f9', fontWeight: '800' },
+  feeInput: { backgroundColor: '#0f172a', color: '#f8fafc', borderRadius: 12, padding: 12, fontSize: 18 },
+  feeSave: { backgroundColor: '#0891b2', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  feeSaveText: { color: '#fff', fontWeight: '800' },
   listView: { flex: 1 },
   navRow: {
     flexDirection: 'row',

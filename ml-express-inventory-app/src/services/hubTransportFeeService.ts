@@ -4,7 +4,13 @@ import { svc } from '../errors/serviceError';
 import { upsertCloudTransportFeePayment } from './inventoryCloudApi';
 import { supabase } from './supabase';
 import { isCloudReachable } from '../utils/networkReachability';
-import { loadBatchGroupKey } from '../utils/tripTransportFee';
+import {
+  buildTripFeeGroupMap,
+  isTripTransportFeePaid,
+  listOriginFeeTrips,
+  loadBatchGroupKey,
+  type OriginFeeTrip,
+} from '../utils/tripTransportFee';
 import {
   claimTripFeeAnchorIfUnset,
   clearTripFeeAnchorCache,
@@ -199,6 +205,87 @@ export async function getAllHubTransportFeePayments(): Promise<Array<{
     paid_at: String(row.paid_at),
   }));
 }
+const TRIP_COLUMNS =
+  'pack_barcode, trip_number, transport_fee, truck_loaded_at, origin_store_code, leg_destination_code, destination_code, status';
+
+export async function listOriginFeeTripsForStore(storeCode: string): Promise<OriginFeeTrip[]> {
+  const origin = code(storeCode);
+  if (!origin) return [];
+  await ready();
+  const { data, error } = await supabase
+    .from('inventory_pkg_tracking')
+    .select(TRIP_COLUMNS)
+    .eq('origin_store_code', origin)
+    .not('truck_loaded_at', 'is', null);
+  if (error) throw new Error(error.message);
+  return listOriginFeeTrips(data ?? []);
+}
+
+export type UnpaidTripFee = {
+  tripNumber: string;
+  destination: string;
+  packCount: number;
+  primaryPackBarcode: string;
+  fee: number;
+};
+
+export async function listDestinationUnpaidTrips(hubCode: string): Promise<UnpaidTripFee[]> {
+  const dest = code(hubCode);
+  if (!dest) return [];
+  await ready();
+  const { data, error } = await supabase
+    .from('inventory_pkg_tracking')
+    .select(TRIP_COLUMNS)
+    .or(`leg_destination_code.eq.${dest},destination_code.eq.${dest}`)
+    .in('status', ['in_transit', 'hub_received', 'completed', 'split_at_hub']);
+  if (error) throw new Error(error.message);
+  const packs = data ?? [];
+  const groups = buildTripFeeGroupMap(packs);
+  const paid = await getHubTransportFeePaidBarcodeSet();
+  const rows: UnpaidTripFee[] = [];
+  for (const group of groups.values()) {
+    if (group.fee <= 0) continue;
+    if (isTripTransportFeePaid(group.packBarcodes, paid)) continue;
+    const sample = packs.find((pack) =>
+      group.packBarcodes.includes(code(String(pack.pack_barcode ?? ''))),
+    );
+    rows.push({
+      tripNumber: group.tripNumber,
+      destination: code(String(sample?.leg_destination_code || sample?.destination_code || dest)),
+      packCount: group.packCount,
+      primaryPackBarcode: group.primaryPackBarcode,
+      fee: group.fee,
+    });
+  }
+  return rows.sort((a, b) => a.tripNumber.localeCompare(b.tripNumber));
+}
+
+/** 发站事后给整车补一笔车费。还没付款，到站和签收不因此被拦住。 */
+export async function fillTripTransportFee(params: {
+  packBarcode: string;
+  fee: string;
+}): Promise<void> {
+  const amount = parseTransportFeeAmount(params.fee);
+  if (!code(params.packBarcode)) throw svc('invalidPackBarcode');
+  if (amount <= 0) throw svc('packNoTransportFee');
+  await ready();
+  const siblings = await resolveTripSiblingBarcodes(params.packBarcode);
+  const feeText = String(amount);
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from('inventory_pkg_tracking')
+    .update({ transport_fee: feeText, updated_at: now })
+    .in('pack_barcode', siblings);
+  if (error) throw new Error(error.message);
+  const { error: packError } = await supabase
+    .from('inventory_packed_shipments')
+    .update({ transport_fee: feeText, updated_at: now })
+    .in('bundle_barcode', siblings);
+  if (packError && !/transport_fee/i.test(packError.message || '')) {
+    throw new Error(packError.message);
+  }
+}
+
 export async function markHubTransportFeePaid(params: {
   packBarcode: string; fee: string; legDestination: string; originStoreCode: string;
   operator: string; store: InventoryStoreSession;

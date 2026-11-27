@@ -362,11 +362,11 @@ export default function PackagingStockInScreen({ navigation }: Props) {
   };
 
   const handleCancel = () => {
-    if (hasScanDraft || step === 1) {
-      requestLeave();
+    if (step > 1) {
+      setStep((current) => (current === 3 ? 2 : 1));
       return;
     }
-    setStep((s) => (s === 3 ? 2 : 1));
+    requestLeave();
   };
 
   const goNext = () => {
@@ -777,7 +777,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
       </ScrollView>
 
       <InboundWizardFooter
-        cancelLabel={t.stockIn.cancel}
+        cancelLabel={step > 1 ? t.stockIn.previousPage : t.stockIn.cancel}
         primaryLabel={primaryLabel}
         loading={loading}
         onCancel={handleCancel}

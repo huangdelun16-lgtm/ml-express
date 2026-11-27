@@ -46,7 +46,7 @@ import {
   packagingExpressKey,
 } from '../utils/packagingExpressMatch';
 import { canEditItemCustomerProfileAsync } from '../utils/itemCustomerProfileEdit';
-import { parseWeight } from '../utils/itemFieldFormat';
+import { formatWeight, parseWeight, sumPackageWeightsKg } from '../utils/itemFieldFormat';
 import { fetchCrossBorderRoutePerKg, quoteCnyForEditedWeight } from '../utils/crossBorderPricing';
 import { applySignedQuoteSettlement, replaceInboundQuoteCny } from '../utils/inboundMovementNote';
 import { todayIsoDate } from '../utils/dateFormat';
@@ -373,6 +373,64 @@ export async function createPackedShipment(params: {
     );
   }
   return { bundleItem: savedBundle, pack: { ...pack, bundle_item_id: savedBundle.id } };
+}
+
+/** 把已经入库的一单补进未装车的包装，包装重量改成各单实际重量之和。 */
+export async function addStockedItemToPack(params: {
+  packBarcode: string;
+  item: InventoryItem;
+  qty: number;
+  actingStore?: InventoryStoreSession;
+}): Promise<void> {
+  const pack = await getPackedShipmentByBarcode(params.packBarcode);
+  if (!pack) throw svc('packNotFoundGeneric');
+  if (pack.loaded) throw svc('packNotEditableLoaded');
+  const qty = Math.max(1, params.qty);
+  const now = nowIso();
+  await cloudUpsertItem({
+    ...params.item,
+    qty_on_hand: Math.max(0, params.item.qty_on_hand - qty),
+    packed_at: now,
+    packed_bundle_barcode: pack.bundle_barcode,
+    updated_at: now,
+  }, params.actingStore);
+
+  const lines: PackedShipmentItem[] = [
+    ...pack.items.filter((line) => line.item_id !== params.item.id),
+    {
+      id: newId(),
+      pack_id: pack.id,
+      item_id: params.item.id,
+      item_barcode: params.item.barcode,
+      input_barcode: params.item.input_barcode,
+      item_name: params.item.name,
+      destination: params.item.final_destination ?? '',
+      customer_name: params.item.recipient_name ?? '',
+      owner_store_code: params.item.owner_store_code,
+      qty,
+    },
+  ];
+  const weights: string[] = [];
+  for (const line of lines) {
+    const item = line.item_id === params.item.id ? params.item : await getItemById(line.item_id);
+    weights.push(item?.weight || '');
+  }
+  const weight = formatWeight({ n: sumPackageWeightsKg(weights) });
+  const bundle = await getItemById(pack.bundle_item_id);
+  if (bundle) {
+    await cloudUpsertItem({
+      ...bundle,
+      weight,
+      unit: `${lines.length} Pcs`,
+      updated_at: now,
+    }, params.actingStore);
+  }
+  await createPack(
+    { ...pack, weight, unit: `${lines.length} Pcs` },
+    lines,
+    pack.loaded ? now : null,
+    params.actingStore,
+  );
 }
 
 /** 多个入库：原子创建已打包订单（库存 0）与快递包（整包重量）。 */

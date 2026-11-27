@@ -20,6 +20,11 @@ const TODO_VISUAL: Record<
     bg: 'rgba(245,158,11,0.12)',
     border: 'rgba(251,191,36,0.28)',
   },
+  fillTripFee: {
+    accent: '#fb7185',
+    bg: 'rgba(225,29,72,0.14)',
+    border: 'rgba(251,113,133,0.4)',
+  },
   hubInbound: {
     accent: '#34d399',
     bg: 'rgba(16,185,129,0.12)',
@@ -58,6 +63,8 @@ function todoLabel(t: TranslationDict, key: HomeTodoKey): string {
       return t.home.todoHubArrive;
     case 'transportFee':
       return t.home.todoTransportFee;
+    case 'fillTripFee':
+      return t.home.todoFillTripFee;
     case 'hubInbound':
       return t.home.todoHubInbound;
     case 'exceptions':

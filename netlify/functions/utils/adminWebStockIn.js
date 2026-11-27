@@ -1,5 +1,16 @@
 const { randomUUID } = require('crypto');
 
+function sumActualWeight(orders) {
+  const total = (orders || []).reduce((sum, order) => {
+    const match = String(order.weight || '').replace(/,/g, '').match(/(\d+(?:\.\d+)?)/);
+    const kg = match ? Number(match[1]) : 0;
+    return sum + (Number.isFinite(kg) && kg > 0 ? kg : 0);
+  }, 0);
+  if (!(total > 0)) return '';
+  const rounded = Math.round(total * 100) / 100;
+  return Number.isInteger(rounded) ? `${rounded} Kg` : `${rounded.toFixed(2)} Kg`;
+}
+
 function fail(error) {
   if (error) throw new Error(error.message || '入库失败');
 }
@@ -216,4 +227,137 @@ async function writeAdminStockIn(supabase, payload) {
   };
 }
 
-module.exports = { writeAdminStockIn };
+async function writeBundleSingles(supabase, payload) {
+  const { data: store, error: storeError } = await supabase
+    .from('delivery_stores')
+    .select('id, store_code, store_name')
+    .eq('id', payload.store_id)
+    .maybeSingle();
+  fail(storeError);
+  if (!store) throw new Error('发出站点不存在');
+
+  const storeCode = String(store.store_code || '').trim().toUpperCase();
+  const now = payload.inbound_at;
+  const orders = payload.orders || [];
+  const bundle = payload.bundle;
+  const bundleId = randomUUID();
+  const packId = randomUUID();
+  const bundleRow = await insertStoreItem(supabase, {
+    id: bundleId,
+    barcode: bundle.barcode,
+    input_barcode: '',
+    name: bundle.name,
+    spec: '',
+    unit: bundle.unit,
+    weight: sumActualWeight(orders),
+    qty_on_hand: 1,
+    min_qty: 0,
+    note: bundle.note || '',
+    owner_store_id: store.id,
+    owner_store_code: storeCode,
+    recipient_name: orders[0]?.recipient_name || payload.recipient_name,
+    final_destination: orders[0]?.destination || payload.destination,
+    created_at: now,
+    updated_at: now,
+  });
+  fail(bundleRow.error);
+
+  const packRow = await supabase.from('inventory_packed_shipments').insert({
+    id: packId,
+    bundle_item_id: bundleId,
+    bundle_barcode: bundle.barcode,
+    bundle_name: bundle.name,
+    operator: payload.operator,
+    note: bundle.note || '',
+    owner_store_id: store.id,
+    owner_store_code: storeCode,
+    created_at: now,
+    updated_at: now,
+  }).select('id').single();
+  if (packRow.error) {
+    await supabase.from('inventory_store_items').delete().eq('id', bundleId);
+    throw new Error(packRow.error.message);
+  }
+
+  const lineIds = [];
+  const lineBarcodes = [];
+  try {
+    for (const order of orders) {
+      const itemId = randomUUID();
+      const itemRow = await insertStoreItem(supabase, {
+        id: itemId,
+        barcode: order.barcode,
+        input_barcode: order.input_barcode || '',
+        name: order.name,
+        spec: order.spec || '',
+        unit: order.unit,
+        weight: order.weight,
+        qty_on_hand: 0,
+        min_qty: 0,
+        note: '',
+        owner_store_id: store.id,
+        owner_store_code: storeCode,
+        recipient_name: order.recipient_name,
+        final_destination: order.destination,
+        packed_at: now,
+        packed_bundle_barcode: bundle.barcode,
+        created_at: now,
+        updated_at: now,
+        charge_basis: order.charge_basis || '',
+        charge_weight_kg: order.charge_weight_kg,
+      });
+      fail(itemRow.error);
+      lineIds.push(itemId);
+      lineBarcodes.push(order.barcode);
+
+      const movement = await supabase.from('inventory_stock_movements').insert({
+        id: randomUUID(),
+        item_id: itemId,
+        barcode: order.barcode,
+        item_name: order.name,
+        type: 'in',
+        qty: order.qty,
+        qty_before: 0,
+        qty_after: 0,
+        operator: payload.operator,
+        note: order.note,
+        recipient_name: order.recipient_name,
+        recipient_phone: order.recipient_phone,
+        destination: order.destination,
+        detail_address: order.detail_address || '',
+        packaging: bundle.barcode,
+        input_barcode: order.input_barcode || '',
+        origin_store_id: store.id,
+        origin_store_code: storeCode,
+        origin_store_name: store.store_name || '',
+        customer_code: order.customer_code || '',
+        created_at: now,
+      });
+      fail(movement.error);
+
+      const packed = await supabase.from('inventory_packed_shipment_items').insert({
+        id: randomUUID(),
+        pack_id: packId,
+        item_id: itemId,
+        item_barcode: order.barcode,
+        item_name: order.name,
+        qty: order.qty,
+        input_barcode: order.input_barcode || '',
+      });
+      fail(packed.error);
+    }
+  } catch (error) {
+    if (lineIds.length) {
+      await supabase.from('inventory_packed_shipment_items').delete().in('item_id', lineIds);
+      await supabase.from('inventory_stock_movements').delete().in('item_id', lineIds);
+      await supabase.from('inventory_store_items').delete().in('id', lineIds);
+    }
+    await supabase.from('inventory_packed_shipments').delete().eq('id', packId);
+    await supabase.from('inventory_store_items').delete().eq('id', bundleId);
+    throw error;
+  }
+
+  return { mode: 'bundle_singles', barcode: bundle.barcode, line_barcodes: lineBarcodes };
+}
+
+module.exports = { writeAdminStockIn, writeBundleSingles };

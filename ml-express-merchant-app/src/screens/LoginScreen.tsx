@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import LoggerService from './../services/LoggerService';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator, Image, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,7 +30,9 @@ export default function LoginScreen({ navigation }: any) {
       title: '商家登录',
       subtitle: '管理您的店铺、订单与商品',
       storeCode: '店铺代码',
+      storeCodePlaceholder: '例如 MDY001',
       password: '密码',
+      passwordPlaceholder: '请输入密码',
       loginButton: '登录商户后台',
       loginSuccess: '商户登录成功',
       loginFailed: '登录失败',
@@ -47,7 +50,9 @@ export default function LoginScreen({ navigation }: any) {
       title: 'Merchant Login',
       subtitle: 'Manage your store, orders and products',
       storeCode: 'Store Code',
+      storeCodePlaceholder: 'e.g. MDY001',
       password: 'Password',
+      passwordPlaceholder: 'Enter password',
       loginButton: 'Login to Backoffice',
       loginSuccess: 'Merchant login successful',
       loginFailed: 'Login failed',
@@ -65,7 +70,9 @@ export default function LoginScreen({ navigation }: any) {
       title: 'ကုန်သည်ဝင်ရောက်ရန်',
       subtitle: 'သင့်ဆိုင်၊ အော်ဒါများနှင့် ကုန်ပစ္စည်းများကို စီမံခန့်ခွဲပါ',
       storeCode: 'ဆိုင်ကုဒ်',
+      storeCodePlaceholder: 'ဥပမာ MDY001',
       password: 'စကားဝှက်',
+      passwordPlaceholder: 'စကားဝှက်ထည့်ပါ',
       loginButton: 'စီမံခန့်ခွဲမှုစနစ်သို့ ဝင်ရောက်ပါ',
       loginSuccess: 'ကုန်သည်ဝင်ရောက်မှု အောင်မြင်သည်',
       loginFailed: 'ဝင်ရောက်မှုမအောင်မြင်',
@@ -80,6 +87,7 @@ export default function LoginScreen({ navigation }: any) {
     },
   };
 
+  const insets = useSafeAreaInsets();
   const currentT = t[language] || t.zh;
   const loginLang: MerchantLoginLang = language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh';
 
@@ -238,35 +246,33 @@ export default function LoginScreen({ navigation }: any) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <LinearGradient
-        colors={['#0f172a', '#1e293b', '#334155']}
+        colors={['#0f172a', '#162032', '#0f172a']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingTop: insets.top + 64, paddingBottom: Math.max(insets.bottom, 16) + 24 },
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
           <LanguageSelector />
 
           <View style={styles.logoContainer}>
-            <View style={styles.logoCircle}>
+            <View style={styles.logoPlate}>
               <Image
                 source={require('../../assets/logo.png')}
                 style={styles.logo}
                 resizeMode="contain"
               />
             </View>
-            <View style={styles.appTitleContainer}>
-              <Text style={styles.appTitleMain}>MARKET LINK </Text>
-              <Text style={styles.appTitleExpress}>EXPRESS</Text>
-            </View>
-            <View style={styles.divider}>
-              <View style={styles.line} />
-              <Text style={styles.dividerText}>MERCHANTS</Text>
-              <View style={styles.line} />
-            </View>
+            <Text style={styles.role}>{currentT.welcome}</Text>
+            <Text style={styles.brandName}>MARKET LINK</Text>
+            <Text style={styles.brandExpress}>EXPRESS</Text>
+            <Text style={styles.subtitle}>{currentT.subtitle}</Text>
           </View>
 
           <View style={styles.formContainer}>
@@ -274,8 +280,8 @@ export default function LoginScreen({ navigation }: any) {
               <Text style={styles.label}>{currentT.storeCode}</Text>
               <TextInput
                 style={styles.input}
-                placeholder=""
-                placeholderTextColor="#94a3b8"
+                placeholder={currentT.storeCodePlaceholder}
+                placeholderTextColor="#64748b"
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="characters" // 🚀 自动转大写，匹配 MDY001 格式
@@ -289,8 +295,8 @@ export default function LoginScreen({ navigation }: any) {
               <View style={styles.passwordContainer}>
                 <TextInput
                   style={styles.passwordInput}
-                  placeholder=""
-                  placeholderTextColor="#94a3b8"
+                  placeholder={currentT.passwordPlaceholder}
+                  placeholderTextColor="#64748b"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
@@ -338,90 +344,74 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 40,
     alignItems: 'center',
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 28,
     width: '100%',
   },
-  logoCircle: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  logoPlate: {
+    width: 88,
+    height: 88,
+    borderRadius: 24,
+    backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 10,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    marginBottom: 18,
   },
   logo: {
-    width: '100%',
-    height: '100%',
+    width: 56,
+    height: 56,
   },
-  appTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  appTitleMain: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#ffffff',
-    letterSpacing: 1,
-  },
-  appTitleExpress: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#f59e0b',
-    letterSpacing: 1,
-    fontStyle: 'italic',
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '80%',
-  },
-  line: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  dividerText: {
-    color: 'rgba(255, 255, 255, 0.5)',
-    marginHorizontal: 12,
-    fontSize: 11,
+  role: {
+    color: '#7dd3fc',
+    fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  brandName: {
+    color: '#f8fafc',
+    fontSize: 26,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  brandExpress: {
+    marginTop: 2,
+    color: '#7dd3fc',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 2.4,
+  },
+  subtitle: {
+    marginTop: 12,
+    color: '#94a3b8',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
   },
   formContainer: {
     width: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 24,
-    padding: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 20,
+    padding: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#cbd5e1',
     marginBottom: 8,
-    marginLeft: 4,
   },
   input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 14,
+    borderColor: 'rgba(148, 163, 184, 0.28)',
+    borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
@@ -430,10 +420,10 @@ const styles = StyleSheet.create({
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 14,
+    borderColor: 'rgba(148, 163, 184, 0.28)',
+    borderRadius: 12,
   },
   passwordInput: {
     flex: 1,
@@ -447,26 +437,21 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     backgroundColor: '#f59e0b',
-    borderRadius: 14,
-    paddingVertical: 16,
+    borderRadius: 12,
+    minHeight: 52,
     alignItems: 'center',
-    marginTop: 10,
-    shadowColor: '#f59e0b',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    justifyContent: 'center',
+    marginTop: 6,
   },
   loginButtonText: {
     color: '#0f172a',
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontSize: 16,
+    fontWeight: '700',
   },
   footerInfo: {
-    marginTop: 40,
-    color: 'rgba(255, 255, 255, 0.3)',
+    marginTop: 28,
+    color: 'rgba(148, 163, 184, 0.7)',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
   }
 });

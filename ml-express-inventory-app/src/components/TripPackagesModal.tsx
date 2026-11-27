@@ -9,6 +9,8 @@ import {
   View,
 } from 'react-native';
 import { getPkgStatusLabel, useTranslation } from '../i18n';
+import { effectivePkgTrackingStatus } from '../utils/shipmentTrackVisibility';
+import { parseTripTransportFee } from '../utils/tripTransportFee';
 import type { TruckTripSummary } from '../utils/truckTripGroups';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { formatDisplayDate } from '../utils/dateFormat';
@@ -65,11 +67,13 @@ export default function TripPackagesModal({
                   count: trip.packCount,
                 })}
               </Text>
-              {trip.transportFee ? (
+              {parseTripTransportFee(trip.transportFee) > 0 ? (
                 <Text style={styles.feeInline}>
                   {fmt(t.shipmentTrack.tripModalFee, { fee: trip.transportFee })}
                 </Text>
-              ) : null}
+              ) : (
+                <Text style={styles.feeMissing}>{t.shipmentTrack.feeMissing}</Text>
+              )}
             </View>
             {trip.outboundDate ? (
               <Text style={styles.dateMeta}>
@@ -109,7 +113,9 @@ export default function TripPackagesModal({
                       <Text style={styles.packBarcode} numberOfLines={1} selectable>
                         {pkg.pack_barcode}
                       </Text>
-                      <Text style={styles.packStatus}>{getPkgStatusLabel(t, pkg.status)}</Text>
+                      <Text style={styles.packStatus}>
+                        {getPkgStatusLabel(t, effectivePkgTrackingStatus(pkg))}
+                      </Text>
                     </View>
                     <Text style={styles.packMeta}>
                       {fmt(t.common.itemsCount, { count: pkg.item_count })}
@@ -190,6 +196,7 @@ const styles = StyleSheet.create({
   },
   routeMeta: { color: '#94a3b8', fontSize: 12, flex: 1 },
   feeInline: { color: '#fde68a', fontSize: 13, fontWeight: '900' },
+  feeMissing: { color: '#fcd34d', fontSize: 12, fontWeight: '800' },
   dateMeta: { color: '#64748b', fontSize: 11, marginTop: 4 },
   summaryBody: {
     paddingVertical: 20,

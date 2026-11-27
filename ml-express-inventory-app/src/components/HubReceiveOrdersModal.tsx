@@ -61,6 +61,7 @@ type Props = {
   onScanSessionBegin: () => Promise<{ ok: true; pending: number } | { ok: false; message: string }>;
   onScanSessionEnd: () => void;
   scanUploadLeft?: number;
+  scanUploadFailure?: { seq: number; message: string } | null;
   onBatchInbound: () => void;
   onPayTransportFee: () => void;
   onReleaseTransit: () => void;
@@ -91,6 +92,7 @@ export default function HubReceiveOrdersModal({
   onScanSessionBegin,
   onScanSessionEnd,
   scanUploadLeft = 0,
+  scanUploadFailure = null,
   onBatchInbound,
   onPayTransportFee,
   onReleaseTransit,
@@ -105,6 +107,9 @@ export default function HubReceiveOrdersModal({
   const [scanTone, setScanTone] = useState<'ok' | 'warn' | undefined>(undefined);
   const [scanCount, setScanCount] = useState(0);
   const scanBusyRef = useRef(false);
+  const settleScanRef = useRef(false);
+  const seenUploadFailureRef = useRef(0);
+  const failureFloorRef = useRef(0);
 
   useEffect(() => {
     if (visible || !scanOpen) return;
@@ -112,6 +117,33 @@ export default function HubReceiveOrdersModal({
     setScanHint('');
     onScanSessionEnd();
   }, [visible, scanOpen, onScanSessionEnd]);
+
+  useEffect(() => {
+    if (!scanOpen || !scanUploadFailure) return;
+    if (scanUploadFailure.seq <= failureFloorRef.current) return;
+    if (scanUploadFailure.seq === seenUploadFailureRef.current) return;
+    seenUploadFailureRef.current = scanUploadFailure.seq;
+    settleScanRef.current = false;
+    setScanHint(scanUploadFailure.message);
+    setScanTone('warn');
+    setScanCount((count) => Math.max(0, count - 1));
+    vibrateScanReject();
+  }, [scanOpen, scanUploadFailure]);
+
+  useEffect(() => {
+    if (!scanOpen || !settleScanRef.current || !pack) return;
+    if (scanUploadLeft > 0) return;
+    if (countPendingPackInboundOrders(pack, hubCode) > 0) {
+      settleScanRef.current = false;
+      return;
+    }
+    settleScanRef.current = false;
+    setScanOpen(false);
+    setScanHint('');
+    setScanTone(undefined);
+    setScanCount(0);
+    onScanSessionEnd();
+  }, [scanOpen, scanUploadLeft, pack, hubCode, onScanSessionEnd]);
 
   const layout = useMemo(() => {
     const cardMax = windowHeight * 0.92;
@@ -174,6 +206,8 @@ export default function HubReceiveOrdersModal({
     void onScanSessionBegin()
       .then((ready) => {
         if (!ready.ok) return;
+        failureFloorRef.current = scanUploadFailure?.seq ?? 0;
+        settleScanRef.current = false;
         setScanHint(fmt(t.hubReceive.scanInboundRemain, { count: ready.pending }));
         setScanTone(undefined);
         setScanCount(0);
@@ -191,14 +225,22 @@ export default function HubReceiveOrdersModal({
       .then((result) => {
         setScanHint(result.message);
         setScanTone(result.ok ? 'ok' : 'warn');
-        if (result.ok) setScanCount((count) => count + 1);
-        else vibrateScanReject();
-        if (result.done) closeScan();
+        if (result.ok) {
+          setScanCount((count) => count + 1);
+          if (result.done) settleScanRef.current = true;
+        } else {
+          vibrateScanReject();
+        }
       })
       .finally(() => {
         scanBusyRef.current = false;
       });
   };
+
+  const uploadFailText =
+    scanOpen && scanUploadFailure && scanUploadFailure.seq > failureFloorRef.current
+      ? scanUploadFailure.message
+      : '';
 
   return (
     <>
@@ -483,11 +525,12 @@ export default function HubReceiveOrdersModal({
                 [
                   scanHint || t.hubReceive.scanInboundSubtitle,
                   scanUploadLeft > 0 ? fmt(t.hubReceive.scanInboundUploading, { count: scanUploadLeft }) : '',
+                  uploadFailText && uploadFailText !== scanHint ? uploadFailText : '',
                 ]
                   .filter(Boolean)
                   .join('\n')
               }
-              hintTone={scanTone}
+              hintTone={uploadFailText ? 'warn' : scanTone}
               onClose={closeScan}
               onScanned={handleScanned}
             />

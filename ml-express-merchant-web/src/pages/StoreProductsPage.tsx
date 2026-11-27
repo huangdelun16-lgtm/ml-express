@@ -17,6 +17,8 @@ import { collectStockAlerts } from '../utils/merchantOpsReport';
 import '../styles/merchantProductsPage.css';
 import { feedbackService } from '../services/FeedbackService';
 import StorageImg from '../components/StorageImg';
+import ProductPhotoGrid from '../components/ProductPhotoGrid';
+import { MAX_PRODUCT_GALLERY_IMAGES, promoteGalleryCover } from '../services/_shared/productReview';
 
 const StoreProductsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -33,7 +35,6 @@ const StoreProductsPage: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const productFileInputRef = useRef<HTMLInputElement>(null);
   const detailImagesFileInputRef = useRef<HTMLInputElement>(null);
   
   const [productForm, setProductForm] = useState<MerchantProductFormState>(defaultMerchantProductForm());
@@ -89,25 +90,53 @@ const StoreProductsPage: React.FC = () => {
     setShowAddEditProductModal(true);
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleImageUpload = async (files: File[]) => {
     const storeId = currentUser?.store_id || currentUser?.id;
-    if (!file || !storeId) return;
+    if (!files.length || !storeId) return;
+    const room = MAX_PRODUCT_GALLERY_IMAGES - productForm.gallery_image_urls.length;
+    if (room <= 0) {
+      feedbackService.notify(language === 'zh' ? '最多上传 6 张图片' : 'Up to 6 photos');
+      return;
+    }
+    const batch = files.slice(0, room);
+    if (files.length > room) {
+      feedbackService.notify(language === 'zh' ? '最多上传 6 张图片' : 'Up to 6 photos');
+    }
 
     try {
       setIsUploading(true);
-      const prepared = await autoPrepareProductImageForUpload(file);
-      const url = await merchantService.uploadProductImage(storeId, prepared);
-      if (url) {
-        setProductForm((prev) => ({ ...prev, image_url: url }));
+      const uploadedUrls: string[] = [];
+      for (const file of batch) {
+        const prepared = await autoPrepareProductImageForUpload(file);
+        const url = await merchantService.uploadProductImage(storeId, prepared);
+        if (url) uploadedUrls.push(url);
+      }
+      if (uploadedUrls.length > 0) {
+        setProductForm((prev) => {
+          const gallery = [...prev.gallery_image_urls, ...uploadedUrls].slice(0, MAX_PRODUCT_GALLERY_IMAGES);
+          return { ...prev, gallery_image_urls: gallery, image_url: gallery[0] || '' };
+        });
       }
     } catch (error) {
       LoggerService.error('图片上传失败:', error);
       feedbackService.notify(language === 'zh' ? '图片上传失败，请重试' : 'Image upload failed');
     } finally {
       setIsUploading(false);
-      if (productFileInputRef.current) productFileInputRef.current.value = '';
     }
+  };
+
+  const handleRemoveGalleryImage = (index: number) => {
+    setProductForm((prev) => {
+      const gallery = prev.gallery_image_urls.filter((_, i) => i !== index);
+      return { ...prev, gallery_image_urls: gallery, image_url: gallery[0] || '' };
+    });
+  };
+
+  const handleMakeCover = (index: number) => {
+    setProductForm((prev) => {
+      const gallery = promoteGalleryCover(prev.gallery_image_urls, index);
+      return { ...prev, gallery_image_urls: gallery, image_url: gallery[0] || '' };
+    });
   };
 
   const handleDetailImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -488,41 +517,14 @@ const StoreProductsPage: React.FC = () => {
             </h2>
 
             <div className="merchant-product-modal__form">
-              <div
-                className="merchant-product-modal__upload"
-                onClick={() => productFileInputRef.current?.click()}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    productFileInputRef.current?.click();
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-              >
-                {productForm.image_url ? (
-                  <StorageImg src={productForm.image_url} alt="" />
-                ) : (
-                  <>
-                    <span style={{ fontSize: '1.75rem', marginBottom: '0.35rem' }} aria-hidden>
-                      📸
-                    </span>
-                    <span className="merchant-product-modal__upload-hint">
-                      {isUploading
-                        ? t?.uploading || '上传中...'
-                        : language === 'zh'
-                          ? '上传图片（自动原比例压缩）'
-                          : 'Upload (auto compress)'}
-                    </span>
-                  </>
-                )}
-                <input
-                  type="file"
-                  ref={productFileInputRef}
-                  onChange={handleImageUpload}
-                  style={{ display: 'none' }}
-                  accept="image/*"
-                />
-              </div>
+              <ProductPhotoGrid
+                urls={productForm.gallery_image_urls}
+                uploading={isUploading}
+                language={language}
+                onFiles={handleImageUpload}
+                onRemove={handleRemoveGalleryImage}
+                onMakeCover={handleMakeCover}
+              />
 
               <div>
                 <label className="merchant-product-modal__label" htmlFor="product-name">
@@ -535,6 +537,20 @@ const StoreProductsPage: React.FC = () => {
                   value={productForm.name}
                   onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
                   placeholder={language === 'zh' ? '输入商品名称' : 'Product name'}
+                />
+              </div>
+
+              <div>
+                <label className="merchant-product-modal__label" htmlFor="product-brand">
+                  {language === 'zh' ? '品牌' : 'Brand'}
+                </label>
+                <input
+                  id="product-brand"
+                  type="text"
+                  className="merchant-product-modal__input"
+                  value={productForm.brand}
+                  onChange={(e) => setProductForm({ ...productForm, brand: e.target.value })}
+                  placeholder={language === 'zh' ? '选填，例如 Nike' : 'Optional'}
                 />
               </div>
 

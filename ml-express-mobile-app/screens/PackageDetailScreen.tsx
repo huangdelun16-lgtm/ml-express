@@ -23,6 +23,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { chatService } from '../services/chatService';
 import { feedbackService } from '../services/feedbackService';
+import { notificationService } from '../services/notificationService';
 import { packageService, deliveryStoreService, supabase, deliveryPhotoService } from '../services/supabase';
 import { cacheService } from '../services/cacheService';
 import NetInfo from '@react-native-community/netinfo';
@@ -63,7 +64,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
   const isFocused = useIsFocused();
   const { language, t } = useApp();
   const copy = riderActionCopy(language);
-  const { packageId, package: initialPackage, openScan, openDeliveryActions } =
+  const { packageId, package: initialPackage, openScan, openDeliveryActions, openPhoto } =
     route.params || {};
   const [pkg, setPkg] = useState<any>(initialPackage || null);
   const [loading, setLoading] = useState(!initialPackage);
@@ -139,11 +140,11 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       setShowScanModal(true);
       return;
     }
-    if (openDeliveryActions) {
+    if (openDeliveryActions || openPhoto) {
       autoOpenHandledRef.current = true;
       setShowCameraModal(true);
     }
-  }, [pkg, openScan, openDeliveryActions]);
+  }, [pkg, openScan, openDeliveryActions, openPhoto]);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -403,27 +404,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         return;
       }
 
-      // 2. 🚀 电子围栏距离检查（须先经 locationPermissionGate，避免系统弹窗无前置披露）
       const coords = await locationService.getCurrentLocation(language);
-      if (coords && pkg.receiver_latitude && pkg.receiver_longitude) {
-        const { latitude, longitude } = coords;
-        const R = 6371e3; // meters
-        const p1 = latitude * Math.PI/180;
-        const p2 = pkg.receiver_latitude * Math.PI/180;
-        const dp = (pkg.receiver_latitude - latitude) * Math.PI/180;
-        const dl = (pkg.receiver_longitude - longitude) * Math.PI/180;
-        const a = Math.sin(dp/2) * Math.sin(dp/2) +
-                  Math.cos(p1) * Math.cos(p2) *
-                  Math.sin(dl/2) * Math.sin(dl/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        const dist = R * c;
-
-        if (dist > 200) {
-          feedbackService.notify(copy.tooFarTitle, copy.tooFarPhoto(Math.round(dist)));
-          return;
-        }
-      }
-
       const courierId = await AsyncStorage.getItem('currentCourierId') || undefined;
       const courierName =
         (await AsyncStorage.getItem('currentUserName')) || pkg.courier || '骑手';
@@ -455,29 +436,21 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         return;
       }
       const queued = isWriteQueued(photoOk) || isWriteQueued(success);
-      const combined = queued ? { ok: true, queued: true } : success;
-      feedbackService.success(
-        pendingWriteUserMessage(language, combined, copy.packageDelivered, copy.packageDelivered, copy.packageDelivered),
-      );
-      Alert.alert(
-        queued ? copy.savedOfflineTitle : copy.deliveredTitle,
-        pendingWriteUserMessage(
-          language,
-          combined,
-          copy.proofSubmitted,
-          copy.proofSubmitted,
-          copy.proofSubmitted,
-        ),
-          [
-            {
-              text: copy.done,
-              onPress: () => {
-                setShowPhotoModal(false);
-                navigation.goBack();
-              },
-            },
-          ],
-        );
+      const finishedTitle = queued ? copy.savedOfflineTitle : copy.orderCompletedTitle;
+      const finishedBody = queued ? copy.orderQueuedBody(pkg.id) : copy.orderCompletedBody(pkg.id);
+      feedbackService.success(finishedTitle);
+      if (!queued) {
+        void notificationService.presentOrderCompleted(finishedTitle, finishedBody, pkg.id);
+      }
+      Alert.alert(finishedTitle, finishedBody, [
+        {
+          text: copy.done,
+          onPress: () => {
+            setShowPhotoModal(false);
+            navigation.goBack();
+          },
+        },
+      ]);
       } catch (error) {
       feedbackService.notify('失败', '上传配送证明失败');
     } finally {
